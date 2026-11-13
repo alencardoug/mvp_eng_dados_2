@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **aguarda a sua autorização** para começar pelo Bloco 0 |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abre a rodada 3 de perguntas (Q9 a Q11, §6) e pede a revisão da emenda; **aguarda a sua autorização** para começar pelo Bloco 0 |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -82,7 +82,32 @@ Fora desta fase: o `airbyte_internal` da V2 (só existia no GCP), a V3 inteira (
 tem data própria: 16/11), D43, D63 e D64, por não servirem aos consumidores. A **D66** serve a eles —
 ela recorta a população da P13, que o portal precisa exibir (G08) e a vitrine mostra —, mas fica fora
 por ser decisão de modelagem adiada; a limitação dela vai no aviso do Bloco 0 e no pacote, e o
-fechamento desta fase não declara os consumidores livres dela (RVC-1-09).
+fechamento desta fase não declara os consumidores livres dela (RVC-1-09). Se ela entra nesta fase é
+a **Q10**.
+
+### 2.1 O que a leitura dos consumidores acrescenta (emenda de 13/11/2026)
+
+O inventário acima nasceu dos achados que voltaram para cá. Lidos os planos dos três consumidores
+(`gdados/PLANO.md` e `docs/decisoes.md`, `bi-como-codigo/PLAN.md` §3.5, §6.2 e §7,
+`nl_sql/CLAUDE.md` §3 e §4), em 13/11/2026 e só por leitura, sobram nove lacunas que o plano não
+tratava. **Esta fase não completa os consumidores**, porque cada um termina na sessão dele. Ela completa
+o que eles leem daqui, e cada lacuna abaixo tem um destino.
+
+| # | Lacuna | Consumidor | Evidência | Destino |
+|---|---|---|---|---|
+| L1 | O canal de volta está quebrado: a regra 1 manda escrever os achados em `~/Projetos/mvp_eng_dados_1/docs/achados_nl_sql.md`, arquivo que saiu de lá em 13/11 | N | `nl_sql/CLAUDE.md` §3, regra 1, e a tabela de arquivos | Bloco 0, aviso — o primeiro a sair |
+| L2 | A D03 do `gdados` ainda lista como alternativa o anexo de *release* com *hash*, que a D91 daqui descartou, e não sabe da decisão | G | `gdados/docs/decisoes.md`, D03; D91 nas Pendências §2 | Bloco 0, aviso |
+| L3 | Não há caminho para achado novo durante a fase: os próximos passos do `nl_sql` (grão e colunas, regras globais, data local de `date_key`, membros "desconhecido") vão gerar F11 em diante, e o inventário para em F10 | N, G, B | `nl_sql/CLAUDE.md` §4, "Próximos passos" | Bloco 0, item 3: a regra de entrada |
+| L4 | A página de estrutura e ambientes do portal (infraestrutura local, Terraform, mapa de paridade, batch e *streaming*, diagramas entidade-relacionamento) não tem fonte declarada: a D91 leva metadados de dados e nada disso | G | `gdados/PLANO.md` §3 | Bloco 4, no contrato do pacote |
+| L5 | Nada prova qual *commit* construiu o armazém que o BI lê: a procedência da D91 é a dos artefatos do dbt, não a do banco | B, G | `bi-como-codigo/PLAN.md` §3.5, linha "Version": "has no evidence today" | Bloco 4, diagnóstico e proposta; se pedir objeto novo no armazém, volta ao Owner |
+| L6 | Só duas das 16 views são examinadas (F1 e F2), e por achado externo, não por auditoria. A etapa 2.11 do BI exige auditar cada view (não aditividade, saldo dependente do tempo, população recortada). A verificação do Bloco 5 confere a métrica contra a própria view e não acharia defeito nela. Não conferido: se alguma auditoria anterior cobriu as outras 14 | B, G | `bi-como-codigo/PLAN.md` §6.2, etapa 2.11 | **Q9** |
+| L7 | A D66 fica fora, e a primeira publicação do BI leva o relatório da P13, que ela recorta | B, G | D66 nas Pendências; `bi-como-codigo/PLAN.md` §6.3 item 3 e N43 | **Q10** |
+| L8 | Dois portais para a mesma governança: a etapa 2.7 do BI ("reading portal of the data governance") e o `gdados`, sem decisão sobre se são duas coisas nem se leem a mesma fonte | G, B | `bi-como-codigo/PLAN.md` §6.2, 2.7; `gdados/PLANO.md` §1 | **Q11** |
+| L9 | O efeito no BigQuery fica sem medição: o F4 e o F10 só se provam no PostgreSQL, e o GCP está desmontado. Para o `nl_sql`, o que importa é o que o Gemini lê no BigQuery | N | Blocos 3 e 6; D92 | Fechamento: limitação declarada |
+
+A retenção foi examinada e **não é lacuna**: está declarada por objeto (Governança §8,
+`meta.retention`, `tests/test_retencao.py`), e o pacote da D91 leva o `meta`. O item 8 da V3 é a
+expiração dos *datasets* do BigQuery, fora desta fase como o resto da V3.
 
 ---
 
@@ -101,7 +126,15 @@ depois o que é texto e teste sem decisão; o pacote do portal quando houver con
    separa as três coisas do §1.1 — a leitura do banco, que já é a daqui; os artefatos novos, por
    *commit* fixado daqui; e as referências históricas, que seguem pedindo um *checkout* do
    `mvp_eng_dados_1` — e diz quais views mudam de valor e quando (RVC-1-05). Para o `nl_sql`, só o
-   canal de volta muda: a regra 2 do `CLAUDE.md` de lá proíbe reimportar.
+   canal de volta muda: a regra 2 do `CLAUDE.md` de lá proíbe reimportar. O aviso dele sai
+   **primeiro**, porque o canal está quebrado agora (L1). O do `gdados` leva a D91 decidida, para a
+   D03 de lá (L2), e a resposta da Q11, se ela for perguntar às duas sessões.
+3. **A regra de entrada de achado novo** (L3): todo achado que chegar durante a fase — do `nl_sql`
+   pelos Achados ou do BI pela auditoria da 2.11 — ganha um ID (F11 em diante) no dono dele, os Achados,
+   e uma linha no §2 deste plano com o bloco de destino. Defeito de número ou texto já lido entra no
+   bloco aberto mais próximo; o que pede decisão vira pergunta da rodada seguinte; o que chegar depois
+   do Bloco 4 entra no pacote como campo novo, sem quebrar. O que não couber nesta fase vai às
+   Pendências no fechamento, com o motivo.
 
 ### Bloco 1 — os números (F1, F3, F2)
 
@@ -177,6 +210,18 @@ dos Blocos 1 a 3 para que a primeira versão do pacote já leve o texto corrigid
 Blocos 5 e 6, para que o `gdados` possa abrir a E1 sem esperar os ADRs. O formato acompanha versão
 (como o `lineage --json`); o que os Blocos 5 e 6 acrescentarem entra como campo novo, sem quebrar.
 
+Duas coisas entram no contrato, vindas da emenda:
+
+- **A fonte da página de estrutura e ambientes** (L4). O contrato diz, artefato por artefato, o que
+  entra no pacote e o que o `gdados` lê direto por *commit* fixado: `docker-compose`, Terraform, mapa
+  de paridade, Arquitetura, modelo de dados. A regra é a da D91: compor o que já é declarado, sem
+  reimplementar. A evidência do GCP é **datada e congelada**, porque a infraestrutura foi destruída, e
+  o pacote a rotula assim.
+- **A procedência do armazém** (L5). Primeiro o diagnóstico: se o banco já guarda alguma coisa da execução que
+  o construiu, como o `invocation_id` do dbt ou um *commit* (não conferido). Depois a proposta, que liga o pacote e
+  a leitura do BI ao mesmo *build*. Se ela pedir tabela ou *schema* novo, volta ao Owner antes de
+  implementar. Até lá, a procedência do banco fica marcada **não verificada**, como o BI já faz.
+
 ### Bloco 5 — domínios e métricas (F7, F9)
 
 Pela Q3-a. O ADR do formato preserva as chaves de `meta` que já existem (`sensitivity`,
@@ -209,6 +254,11 @@ executado lá. Se o desenho mudar a materialização, ele volta ao Owner antes d
 
 `make check` verde; catálogo, dicionário, linhagem e pacote regenerados; revisão por outro agente
 por bloco; a nota de versão. A *tag* — a primeira deste repositório — é pergunta da rodada 2.
+
+O fechamento declara o que **não** foi provado (L9): as descrições curtas e as *constraints* `NOT
+ENFORCED` nunca foram aplicadas no BigQuery nesta fase. Para o `nl_sql`, o efeito sobre o Gemini
+continua sendo medição dele, no GCP dele. Declara também, conforme a Q9, quantas das 16 views foram
+auditadas, e quais.
 
 ---
 
@@ -270,6 +320,16 @@ As opções como foram apresentadas:
 | **Q7** | O F3, se a causa medida for regra |
 | **Q8** | O F2, sobre a proposta do passo 2: a média no tempo, a valorização do estoque médio, os cortes do trimestre e o fuso, o evento atrasado, o par cujo histórico não reconstrói o saldo (legado com movimento rejeitado) — e se a regra pede ADR. Perguntada **no Bloco 1**, logo depois do diagnóstico, e não com as outras (RVC-1-02) |
 
+### Rodada 3 — Q9 a Q11, da emenda (§2.1), antes do Bloco 0
+
+Elas mudam o escopo, por isso vêm antes de executar.
+
+| | Pergunta | Recomendação | Alternativas |
+|---|---|---|---|
+| **Q9** | L6: as 14 views que ninguém examinou | **(a)** Um **Bloco 1b**, depois do F1 e do F2, que audita as 16 views pelos três critérios da 2.11 do BI. Cada view é comparada com um cálculo independente sobre `analytics`, escrito a partir do glossário e não do SQL da view. Defeito vira F novo pela regra de entrada (Bloco 0, item 3); view sem defeito ganha o resultado escrito "auditada em `<commit>`". **Por quê:** o BI publica as 16 e o portal exibe as 16; corrigir duas e calar sobre 14 repete o padrão que o `nl_sql` revelou, e a 2.11 do BI faria a mesma auditoria do lado de lá, sem poder corrigir. **Custo:** o maior bloco depois do G06, sem estimativa | (b) Auditar só as views da primeira publicação do BI (P01 e P13), além do F1 e do F2; as outras ficam "não auditadas" no pacote, e a 2.11 do BI devolve o que achar. (c) Não auditar aqui: o pacote e o fechamento dizem "2 de 16 corrigidas por achado externo, 14 não auditadas" |
+| **Q10** | L7: a D66 nesta fase | **(a)** Trazer a D66 para esta fase, como pergunta própria com as alternativas dela, decidida **antes do Bloco 4**, sobre o que já foi medido (M27 do BI). Se a resposta for a fato no grão da remessa (ADR-0033), ela vira bloco próprio, com ADR, antes do Bloco 5. **Por quê:** a primeira publicação do BI leva a P13, e o pacote nasceria com a limitação | (b) Manter adiada: a limitação segue declarada na descrição da view, no relatório da P13 (N43 do BI) e no pacote. São 12 remessas legadas em 3.310 entregues; o BI já se protege. É a opção de menor custo, e a lacuna continua aberta |
+| **Q11** | L8: um portal ou dois | **(a)** O contrato daqui é **um só**: o pacote da D91 serve a qualquer portal. Quantos portais existem é decisão das sessões do `gdados` e do BI, e o aviso do Bloco 0 leva a pergunta às duas. **Por quê:** este repositório não decide o escopo dos outros (§1.1), e um pacote só evita duas leituras da mesma governança que divergem | (b) Decidir aqui que o `gdados` é o portal e que a 2.7 do BI aponta para ele: o aviso leva a decisão, não a pergunta. É mais simples, mas decide no lugar das duas sessões. (c) Dois contratos: o BI continua lendo *manifest* e YAML por *commit* (§3.5 dele), e o `gdados` lê o pacote. Não dá trabalho aqui, e as duas leituras podem divergir |
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
@@ -283,12 +343,14 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 ## 8. Ordem
 
 1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 a 3, §9; fechada sem achado aberto).
-2. Bloco 0.
-3. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
-   e da proposta, até a **Q8**; o F1 e o F3 seguem.
-4. Bloco 4.
-5. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs.
-6. Fechamento.
+2. Rodada 3 de perguntas (Q9 a Q11) e revisão da emenda (§2.1) por outro agente, já com as respostas.
+3. Bloco 0, com o aviso ao `nl_sql` primeiro.
+4. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
+   e da proposta, até a **Q8**; o F1 e o F3 seguem. Pela Q9-a, o Bloco 1b vem depois do F1 e do F2.
+   Pela Q10-a, a D66 é perguntada antes do Bloco 4.
+5. Bloco 4.
+6. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs.
+7. Fechamento.
 
 **Estimativa:** não há. O G06 sozinho foi estimado em 2 a 3 h de escrita mais a revisão do Owner
 (planejado, não medido); os outros blocos não foram estimados.
