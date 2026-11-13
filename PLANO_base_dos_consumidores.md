@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **aguarda a sua autorização** para começar pelo Bloco 0 |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); próximo: o Bloco 1 |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -136,6 +136,17 @@ depois o que é texto e teste sem decisão; o pacote do portal quando houver con
    bloco aberto mais próximo; o que pede decisão vira pergunta da rodada seguinte; o que chegar depois
    do Bloco 4 entra no pacote como campo novo, sem quebrar. O que não couber nesta fase vai às
    Pendências no fechamento, com o motivo.
+
+**Entregue em 13/11/2026**, com a autorização do Owner:
+
+- item 1 em `e63f1cb`;
+- item 2: a Q1 na D92 (`040a796`); os três avisos fora do Git, em
+  `data/medicoes/base_consumidores/avisos/` (`aviso_nl_sql.md`, `aviso_gdados.md`,
+  `aviso_bi_como_codigo.md`), para o Owner levar a cada sessão. O número da D66 citado no aviso do BI
+  é o do dado da v1.1.0 (16 remessas, de 04/11), não o 12 da v1.0.0 que aparece na Q10;
+- item 3: a regra de entrada vale a partir daqui.
+
+O que cada consumidor fará com o aviso é da sessão dele, e esta fase não o acompanha.
 
 ### Bloco 1 — os números (F1, F3, F2)
 
@@ -403,7 +414,7 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 
 1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 a 3, §9; fechada sem achado aberto).
 2. ~~Rodada 3 de perguntas (Q9 a Q11)~~ (respondida) e revisão da emenda (§2.1) por outro agente (rodadas 4 e 5, §9; fechada sem achado aberto).
-3. Bloco 0, com o aviso ao `nl_sql` primeiro.
+3. ~~Bloco 0, com o aviso ao `nl_sql` primeiro~~ (entregue em 13/11/2026).
 4. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
    e da proposta, até a **Q8**; o F1 e o F3 seguem. Pela Q9-a, o Bloco 1b vem depois do F1 e do F2:
    a definição (com o F5 e o texto do F9), a referência e a contraprova. Pela Q10-a, a D66 é
