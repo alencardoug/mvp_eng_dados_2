@@ -75,6 +75,7 @@ Cada assunto tem **um único dono documental**. Se a informação está em dois 
 | [Dicionário de Dados](docs/dicionario_de_dados.md) | Registro: objetos, campos, classificação aplicada e linhagem | **Gerado** pelo `make catalog` |
 | [Glossário de Negócio](docs/glossario_de_negocio/) | Conceitos do varejo e as perguntas de negócio, importados pelo dbt | Vigente |
 | [Glossário Técnico](docs/glossario.md) | Termos de engenharia de dados usados no projeto | Vigente |
+| [Achados do nl_sql](docs/achados_nl_sql.md) | O que o banco de provas NL→SQL (projeto apartado) descobriu e mudou, para replicar aqui com os desvios: falhas deste projeto, melhorias de governança e registro | Em andamento — aberto em 12/11/2026 |
 | [Pendências do Owner](docs/pendencias.md) | O que está parado esperando decisão sua, em ordem de urgência | Decisões: 4 pendentes; verificações e trabalho: 3 adiadas, em 13/11/2026. Quais são, no cabeçalho das [Pendências](docs/pendencias.md) |
 | [Registro de Decisões](docs/adr/) | ADRs aceitos e decisões ainda pendentes | 51 aceitos, 2 pendentes (D43 e D66, adiadas) |
 | [Materialização no dbt](docs/materializacao.md) | Materializações, estratégias de incremental e o critério de robustez que escolhe entre elas | Vigente — base do [ADR-0016](docs/adr/0016-materializacao-por-camada.md) |
