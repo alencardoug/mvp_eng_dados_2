@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda **aguarda a revisão** por outro agente e depois a sua autorização para começar pelo Bloco 0 |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9) e **aguarda a rodada 5**, restrita às respostas, e depois a sua autorização para começar pelo Bloco 0 |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -180,10 +180,31 @@ depois o que é texto e teste sem decisão; o pacote do portal quando houver con
 ### Bloco 1b — a auditoria das 16 views (Q9-a)
 
 Depois do F1 e do F2, as 16 views de `consumption` passam pelos três critérios da etapa 2.11 do BI:
-não aditividade, saldo que depende do tempo e população recortada. Cada view ganha um **cálculo
-independente** sobre `analytics`, escrito a partir do glossário e do ADR da pergunta, **nunca** do SQL
-da view, e é comparada com ele no armazém local. O F1 e o F2 entram também, já corrigidos, como
-contraprova de que a auditoria acha o que já se sabe errado.
+não aditividade, saldo que depende do tempo e população recortada. São três passos, por view.
+
+1. **A definição primeiro** (RVC-4-03). A referência nasce do glossário e do ADR da pergunta,
+   **nunca** do SQL da view. Por isso, antes de escrevê-la, confere-se que a definição está completa
+   no texto. Onde falta, o texto vem antes: a regra do pedido realizado do F5 sai aqui, e não no
+   Bloco 3; as regras do F9 que a view usa saem aqui em prosa, no glossário (a população de
+   autorizações da P09, o capturado do mês inteiro do reembolso, os outros itens do F9). Escolha nova
+   é pergunta ao Owner, nunca leitura do SQL. A forma estruturada e o ADR dela ficam no Bloco 5.
+2. **A referência, com as fontes que a pergunta declara** (RVC-4-02). Cada pergunta diz de onde lê.
+   Em geral é `analytics`. A **P12** soma à fato os deltas do caminho quente
+   (`raw.inventory_movements_stream`, com a fronteira pela ausência do `movement_id` na fato,
+   Streaming §4.1) e as reservas de `trusted.inventory_balances`. Tudo é lido num corte consistente,
+   numa transação `REPEATABLE READ`. O critério de **população** compara a view com a população
+   elegível na camada responsável, por exemplo a P13 com as remessas entregues de `trusted.shipments`,
+   porque recalcular sobre a fato conservaria o que ela perdeu. Onde isso não é possível, o limite
+   fica escrito. As referências são testes do custodiante, que já lê as camadas internas. O login do
+   BI não muda.
+3. **A contraprova** (RVC-4-04). Uma referência que só concorda com a view corrigida não prova que
+   acharia o defeito. Para o F1 e o F2, o SQL da versão defeituosa (do *commit* anterior à correção,
+   compilado) roda como **consulta somente leitura**, sem criar objeto. A referência tem de acusar a
+   diferença nos casos de antes do Bloco 1 (o 4,5455 do F1, por exemplo) e passar com a view
+   corrigida. Os casos e os testes do Bloco 1 são os mesmos, aqui ligados à referência.
+
+A conclusão da **P13** espera a D66 (seção seguinte). Se a D66 trouxer fato nova, a auditoria da P13
+é refeita sobre ela antes que o Bloco 5 a use como referência.
 
 - Defeito achado vira F novo pela regra de entrada (Bloco 0, item 3). Correção sem decisão entra
   neste bloco; o que pede regra vira pergunta.
@@ -195,7 +216,9 @@ contraprova de que a auditoria acha o que já se sabe errado.
 
 ### D66 — antes do Bloco 4 (Q10-a)
 
-A D66 é perguntada com as alternativas dela (Pendências) e com o que já foi medido (M27 do BI). Se a
+A D66 é perguntada com as alternativas dela (Pendências) e com o que já foi medido: o M27 do BI e a
+medição posterior à regeneração que a própria D66 registra. As duas são históricas e são remedidas
+antes de perguntar. A auditoria da P13 no Bloco 1b só conclui depois da resposta (RVC-4-02). Se a
 resposta for a fato no grão da remessa (ADR-0033), ela vira bloco próprio, com ADR, antes do Bloco 5,
 e o pacote leva a limitação até lá. Se a definição mudar, o glossário e a descrição da view mudam no
 Bloco 3 ou num *commit* próprio.
@@ -208,7 +231,8 @@ outras. Os órfãos são medidos aqui antes, no armazém local.
 ### Bloco 3 — o texto (F5, F4, F8, G06)
 
 - **F5:** a regra do pedido realizado no glossário (receita líquida, ticket médio, lucro bruto) e na
-  descrição de `net_revenue_amount`.
+  descrição de `net_revenue_amount`. **Sai no passo 1 do Bloco 1b** (RVC-4-03); aqui só se confere
+  que ele chegou à descrição curta do F4.
 - **F4:** as três descrições erradas, e **todas** as que passam de 1.024 caracteres — o *manifest* de
   13/11 tem oito, quatro em `analytics` e quatro em `consumption`, não só as quatro que o `nl_sql`
   viu (RVC-1-04). Cada uma ganha uma versão curta e completa. A macro `bigquery__alter_column_comment`
@@ -234,7 +258,7 @@ dos Blocos 1 a 3 para que a primeira versão do pacote já leve o texto corrigid
 Blocos 5 e 6, para que o `gdados` possa abrir a E1 sem esperar os ADRs. O formato acompanha versão
 (como o `lineage --json`); o que os Blocos 5 e 6 acrescentarem entra como campo novo, sem quebrar.
 
-Duas coisas entram no contrato, vindas da emenda:
+Três coisas entram no contrato, vindas da emenda e da rodada 4 de revisão:
 
 - **A fonte da página de estrutura e ambientes** (L4). O contrato diz, artefato por artefato, o que
   entra no pacote e o que o `gdados` lê direto por *commit* fixado: `docker-compose`, Terraform, mapa
@@ -245,6 +269,13 @@ Duas coisas entram no contrato, vindas da emenda:
   o construiu, como o `invocation_id` do dbt ou um *commit* (não conferido). Depois a proposta, que liga o pacote e
   a leitura do BI ao mesmo *build*. Se ela pedir tabela ou *schema* novo, volta ao Owner antes de
   implementar. Até lá, a procedência do banco fica marcada **não verificada**, como o BI já faz.
+- **O resultado dos testes** (RVC-4-01). O catálogo do BI mostra três estados por teste: declarado,
+  executado com sucesso numa data, e problema em aberto hoje. A D91 leva só a procedência do
+  `run_results.json`, que é ignorado pelo Git. O contrato leva, por teste, o objeto que ele guarda, o
+  estado e a data, ligados à execução (`invocation_id`). Só campos sanitizados: nada da mensagem de
+  falha nem do SQL compilado. Execução que não seja a do *manifest* do pacote é rotulada assim. Teste
+  sem resultado aparece **sem resultado**: nunca se infere sucesso da declaração. As pendências
+  documentadas (D62 a D64) ficam separadas.
 
 ### Bloco 5 — domínios e métricas (F7, F9)
 
@@ -254,7 +285,8 @@ declarativo, nunca no `_derived.yml`. Em qualquer formato, cada valor e cada mé
 contra a view por teste — a verificação do `nl_sql` (23 de 23 gabaritos reproduzidos só a partir
 das definições) é o modelo. A referência é a view de `consumption` **auditada no Bloco 1b**, cujo
 resultado já foi conferido contra o cálculo independente; métrica sem view auditada não se dá por
-conferida (Q9-a).
+conferida (Q9-a). O texto das regras do F9 já existe em prosa desde o passo 1 do Bloco 1b; aqui ele
+ganha a forma estruturada e o ADR (RVC-4-03).
 
 ### Bloco 6 — as chaves declaradas (F10)
 
@@ -370,11 +402,12 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 ## 8. Ordem
 
 1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 a 3, §9; fechada sem achado aberto).
-2. Rodada 3 de perguntas (Q9 a Q11) e revisão da emenda (§2.1) por outro agente, já com as respostas.
+2. ~~Rodada 3 de perguntas (Q9 a Q11)~~ (respondida) e revisão da emenda (§2.1) por outro agente (rodada 4 de revisão, §9; rodada 5 restrita às respostas).
 3. Bloco 0, com o aviso ao `nl_sql` primeiro.
 4. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
-   e da proposta, até a **Q8**; o F1 e o F3 seguem. Pela Q9-a, o Bloco 1b vem depois do F1 e do F2.
-   Pela Q10-a, a D66 é perguntada antes do Bloco 4 (§3, "D66").
+   e da proposta, até a **Q8**; o F1 e o F3 seguem. Pela Q9-a, o Bloco 1b vem depois do F1 e do F2:
+   a definição (com o F5 e o texto do F9), a referência e a contraprova. Pela Q10-a, a D66 é
+   perguntada antes do Bloco 4 (§3, "D66"), e a auditoria da P13 só conclui depois dela.
 5. Bloco 4.
 6. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs.
 7. Fechamento.
@@ -431,4 +464,18 @@ bloqueante no escopo revisado** — RVC-1-02 **resolvido**, os outros oito prese
 novo. Relatório em `data/medicoes/base_consumidores/codex2_plano_r3.md`. A observação de que o título
 da rodada 2 de perguntas parecia pôr a Q8 depois do Bloco 4 foi atendida no título, sem mudar a ordem.
 **A revisão do plano está fechada.**
+
+### Rodada 4 — Codex conta 2, sobre a emenda em `976c44c` (13/11/2026, 19:41)
+
+`gpt-6.1-sol`, só leitura, com o dossiê `REVISAO.md` (`make check` verde, 1360 *passed*). Veredito:
+**mudanças necessárias** — um bloqueante e três ajustes. L1 a L9 conferem com os planos dos
+consumidores, e os RVC-1-01 a 09 ficam preservados. Relatório, pedido e *log* em
+`data/medicoes/base_consumidores/` (`codex2_plano_r4*`). Cada achado foi reproduzido antes da resposta.
+
+| # | Onde | Achado | Veredito | Situação |
+|---|---|---|---|---|
+| RVC-4-01 | Bloco 4 / D91 / Q11-a | O contrato comum não leva o resultado datado dos testes por objeto, e o catálogo do BI distingue declarado de executado | ajuste | **Aceito.** Reproduzido: `bi-como-codigo/PLAN.md:340–342` (os três estados); a D91 cita só `generated_at` e `invocation_id`; `dbt/target/run_results.json` ignorado (`.gitignore:51`). O Bloco 4 ganhou o item "O resultado dos testes", com campos sanitizados e a ausência explícita |
+| RVC-4-02 | Bloco 1b; D66; §8 | A referência só sobre `analytics` não vê os deltas e as reservas da P12 e conserva a população que a fato da P13 perdeu | bloqueante | **Aceito.** Reproduzido: `perguntas_de_negocio.md:192–209` (P12 = fato + deltas não absorvidos); `skus_below_reorder_point.sql:66,157` (`inventory_movements_stream`, `inventory_balances`); `fact_shipment_item.sql:51–54` parte de `shipment_items`. O passo 2 do 1b declara as fontes por pergunta, com corte consistente e população contra a camada responsável; a P13 só conclui depois da D66, e é refeita se vier fato nova |
+| RVC-4-03 | Blocos 1b, 3 e 5; §8 | A auditoria precisa de definições que o F5 e o F9 só completam depois dela | ajuste | **Aceito.** Reproduzido: `receita_liquida.md:5–12` sem o pedido realizado; a P09 (`perguntas_de_negocio.md:158–165`) sem a população, que só está em `payment_approval_rate_by_method.sql:3–5,35–36`. O passo 1 do 1b antecipa o F5 e o texto do F9 em prosa; o Bloco 5 mantém a forma estruturada e o ADR; o §8 diz a ordem |
+| RVC-4-04 | Bloco 1b, contraprova | Comparar o F1 e o F2 já corrigidos não prova que a referência detecta o defeito | ajuste | **Aceito.** O passo 3 do 1b roda o SQL defeituoso, do *commit* anterior à correção, como consulta somente leitura: a referência acusa a diferença e passa com a view corrigida, sem escrever no armazém |
 
