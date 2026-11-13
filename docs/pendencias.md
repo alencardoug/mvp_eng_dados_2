@@ -360,6 +360,13 @@ fica sem verificação na nuvem, sem que nenhum teste local acuse.
 - **Ambiente local:** herda os contêineres, os volumes e o Airbyte do `mvp_eng_dados_1`
   (`COMPOSE_PROJECT_NAME=mvp_ed1`, as mesmas portas). Daqui em diante, só este repositório roda
   `make` contra eles.
+- **Os consumidores** (`gdados`, `bi-como-codigo`, `nl_sql`) leem **daqui**, por *commit* fixado. O
+  `mvp_eng_dados_1` fica como referência histórica da `v2.0.0` (Q1 do plano da base dos consumidores,
+  13/11/2026). São três coisas distintas. O **banco** já é o daqui, porque os contêineres são os
+  mesmos. Os **artefatos novos** chegam a quem fixar um *commit* daqui. As **referências
+  históricas** (links e *commits* anteriores a `a35a8cb`) continuam pedindo o `mvp_eng_dados_1`. A
+  mudança é de cada consumidor, na sessão dele. O `nl_sql` não reimporta: muda só o caminho do canal
+  de volta, que agora é [Achados do nl_sql](achados_nl_sql.md).
 - **Exceção combinada:** em 16/11/2026 o `mvp_eng_dados_1` é desarquivado só para registrar o custo
   real da fase GCP (V3, item 9) e arquivado de novo.
 - **O estado que o Git não guarda**, no ponto `v2.0.0`, tem backup local fora do repositório, com
