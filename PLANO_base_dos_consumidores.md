@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9) e **aguarda a rodada 5**, restrita às respostas, e depois a sua autorização para começar pelo Bloco 0 |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **aguarda a sua autorização** para começar pelo Bloco 0 |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -402,7 +402,7 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 ## 8. Ordem
 
 1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 a 3, §9; fechada sem achado aberto).
-2. ~~Rodada 3 de perguntas (Q9 a Q11)~~ (respondida) e revisão da emenda (§2.1) por outro agente (rodada 4 de revisão, §9; rodada 5 restrita às respostas).
+2. ~~Rodada 3 de perguntas (Q9 a Q11)~~ (respondida) e revisão da emenda (§2.1) por outro agente (rodadas 4 e 5, §9; fechada sem achado aberto).
 3. Bloco 0, com o aviso ao `nl_sql` primeiro.
 4. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
    e da proposta, até a **Q8**; o F1 e o F3 seguem. Pela Q9-a, o Bloco 1b vem depois do F1 e do F2:
@@ -479,3 +479,9 @@ consumidores, e os RVC-1-01 a 09 ficam preservados. Relatório, pedido e *log* e
 | RVC-4-03 | Blocos 1b, 3 e 5; §8 | A auditoria precisa de definições que o F5 e o F9 só completam depois dela | ajuste | **Aceito.** Reproduzido: `receita_liquida.md:5–12` sem o pedido realizado; a P09 (`perguntas_de_negocio.md:158–165`) sem a população, que só está em `payment_approval_rate_by_method.sql:3–5,35–36`. O passo 1 do 1b antecipa o F5 e o texto do F9 em prosa; o Bloco 5 mantém a forma estruturada e o ADR; o §8 diz a ordem |
 | RVC-4-04 | Bloco 1b, contraprova | Comparar o F1 e o F2 já corrigidos não prova que a referência detecta o defeito | ajuste | **Aceito.** O passo 3 do 1b roda o SQL defeituoso, do *commit* anterior à correção, como consulta somente leitura: a referência acusa a diferença e passa com a view corrigida, sem escrever no armazém |
 
+### Rodada 5 — Codex conta 2, sobre `e3252a5` (13/11/2026)
+
+`gpt-6.1-sol`, só leitura, restrita às respostas da rodada 4 e a regressões. Veredito: **nenhum
+bloqueante no escopo revisado**. RVC-4-01 a 04 estão **resolvidos**, não há achado novo, e os achados
+das rodadas 1 a 4 ficam preservados. Relatório em `data/medicoes/base_consumidores/codex2_plano_r5.md`.
+**A revisão da emenda está fechada.**
