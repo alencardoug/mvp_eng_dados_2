@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); revisão do Codex, rodadas 1 e 2, respondidas (§9); **aguarda a rodada 3 da revisão** antes de executar |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **aguarda a sua autorização** para começar pelo Bloco 0 |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -261,7 +261,7 @@ As opções como foram apresentadas:
 | **Q3** | F7 e F9, o formato dos domínios e das métricas | **(a)** declarativo no dbt: `accepted_values` com o significado em `meta` da coluna, e as métricas estruturadas no glossário (fórmula, numerador, denominador, filtro, data, grão) com teste contra a view; ADR curto do formato | (b) camada semântica do dbt (*metrics*/MetricFlow) — componente novo, ADR com custo e contrapartida no GCP; (c) arquivos canônicos à parte, como o `nl_sql` |
 | **Q4** | F10, as chaves | **(a)** *contract* e *constraints* nos modelos de `analytics` (PK e FK declaradas; no PostgreSQL, impostas), com ADR | (b) só declaradas nos metadados e no pacote, sem *constraint* no banco; (c) adiar até a fase GCP ser reaberta, onde o efeito (Gemini, Knowledge Catalog) aparece |
 
-### Rodada 2 — depois da revisão do plano
+### Rodada 2 — Q5 a Q7 depois do Bloco 4; a Q8 no Bloco 1, antes do SQL do F2
 
 | | Pergunta |
 |---|---|
@@ -282,7 +282,7 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 
 ## 8. Ordem
 
-1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 e 2, §9). Rodada 3 da revisão, sobre a resposta ao RVC-1-02.
+1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 a 3, §9; fechada sem achado aberto).
 2. Bloco 0.
 3. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
    e da proposta, até a **Q8**; o F1 e o F3 seguem.
@@ -334,4 +334,12 @@ achado novo; o RVC-1-02 **parcial**. Relatório, pedido e *log* em `data/medicoe
 | # | Onde | Achado | Veredito | Situação |
 |---|---|---|---|---|
 | RVC-1-02 | Bloco 1 / F2; Q8; §8 | A aprovação da regra completa (média no tempo, valorização, cortes, atraso) não ia ao Owner; a Q8 ficava depois dos blocos que dependem dela | bloqueante | **Aceito.** Reproduzido: o glossário (`giro_de_estoque.md`) diz "média do período" sem o cálculo; o §8 punha a rodada 2 de perguntas depois do Bloco 4. O F2 tem agora quatro passos — diagnóstico, proposta, Q8, SQL —; a Q8 cobre a regra inteira e é perguntada no Bloco 1; o §8 diz que o F2 para ali e o F1 e o F3 seguem |
+
+### Rodada 3 — Codex conta 2, sobre `32f1097` (13/11/2026, 05:15)
+
+`gpt-6.1-sol`, esforço *high*, só leitura, restrita ao RVC-1-02 e a regressões. Veredito: **nenhum
+bloqueante no escopo revisado** — RVC-1-02 **resolvido**, os outros oito preservados, nenhum achado
+novo. Relatório em `data/medicoes/base_consumidores/codex2_plano_r3.md`. A observação de que o título
+da rodada 2 de perguntas parecia pôr a Q8 depois do Bloco 4 foi atendida no título, sem mudar a ordem.
+**A revisão do plano está fechada.**
 
