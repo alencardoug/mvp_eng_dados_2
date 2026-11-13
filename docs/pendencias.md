@@ -13,8 +13,8 @@
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
 | Verificações e trabalho adiados | 3 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026) |
-| Decisões pendentes | 4 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D66, levantada pela revisão do roteiro de regeneração da v1.1.0 e adiada para depois dela; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça e a D91 na revisão da governança para o portal (§2) |
-| Última revisão | 13/11/2026 — M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Decisões pendentes | 4 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D66, levantada pela revisão do roteiro de regeneração da v1.1.0 e adiada para depois dela; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal e a D92 na separação do `mvp_eng_dados_2` (§2) |
+| Última revisão | 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -343,6 +343,30 @@ cada lote e estão no histórico em `28044c7^`, `20ea4f3^` e `4cf41ff^`.
 ---
 
 ## 2. Decisões já fechadas
+
+### D92 — o projeto continua no `mvp_eng_dados_2`, e o `mvp_eng_dados_1` fica travado (decidida em 13/11/2026)
+
+Levantada no fim da Etapa 13, sobre a pergunta do Owner: completar a governança no repositório
+aceito pode prejudicar o que foi validado? A parte da governança que alcança o BigQuery
+(classificação, macros, modelos) só se confere com a nuvem de pé; mudada depois da `v2.0.0`, ela
+fica sem verificação na nuvem, sem que nenhum teste local acuse.
+
+- **Decisão:** o [`mvp_eng_dados_1`](https://github.com/alencardoug/mvp_eng_dados_1) fica **arquivado** no GitHub no ponto `v2.0.0`
+  (`f86b9fb`), com a *release* `v2.0.0`, as *tags* `v*` protegidas contra apagar ou mover e o `main`
+  protegido contra reescrita. Ele é *template*: pode ser copiado e recriado. O trabalho segue
+  **aqui**, com liberdade para mudar estruturas.
+- **Como nasceu:** do *template*, **sem histórico** — um *commit* inicial com a árvore idêntica à
+  da `v2.0.0`. Os documentos citam *commits* e *tags* que vivem no repositório de origem.
+- **Ambiente local:** herda os contêineres, os volumes e o Airbyte do `mvp_eng_dados_1`
+  (`COMPOSE_PROJECT_NAME=mvp_ed1`, as mesmas portas). Daqui em diante, só este repositório roda
+  `make` contra eles.
+- **Exceção combinada:** em 16/11/2026 o `mvp_eng_dados_1` é desarquivado só para registrar o custo
+  real da fase GCP (V3, item 9) e arquivado de novo.
+- **O estado que o Git não guarda**, no ponto `v2.0.0`, tem backup local fora do repositório, com
+  instruções de recuperação ao lado.
+- Descartadas: continuar no mesmo repositório, congelando só as áreas da fase GCP (a recomendação do
+  Claude, recusada pelo Owner); nascer com o histórico inteiro; *fork* no GitHub; ambiente local
+  próprio, com outro nome de projeto e bancos novos.
 
 ### D91 — o pacote de metadados para o portal `gdados` (decidida em 10/11/2026)
 

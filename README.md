@@ -1,4 +1,4 @@
-# mvp_eng_dados_1 — Engenharia e Governança de Dados de Referência
+# mvp_eng_dados_2 — Engenharia e Governança de Dados de Referência
 
 MVP que constrói, de ponta a ponta, um fluxo de dados sobre um **marketplace de varejo
 *omnichannel* sintético**: de um banco transacional PostgreSQL até um **datamart dimensional** com
@@ -7,6 +7,12 @@ local** e, quando maduro, **replicado no Google Cloud Platform** com Terraform, 
 mesmas boas práticas.
 
 Todos os dados são **sintéticos**. Nenhum dado pessoal real é usado em nenhuma fase.
+
+**Origem.** Este repositório continua o [`mvp_eng_dados_1`](https://github.com/alencardoug/mvp_eng_dados_1), que ficou **arquivado** no ponto
+aprovado `v2.0.0` (13/11/2026): fase local e fase GCP aceitas. Aqui o trabalho segue — completar a
+governança de dados —, com liberdade para mudar estruturas ([D92](docs/pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026)). O histórico de
+*commits* e as *tags* `v1.0.0`, `v1.1.0` e `v2.0.0` estão no repositório de origem; os documentos
+deste herdam as referências a ele.
 
 ```text
 Faker → PostgreSQL → Airbyte → dbt → datamart → consumption     (batch, orquestrado por Airflow)
@@ -18,7 +24,7 @@ Faker → PostgreSQL → Airbyte → dbt → datamart → consumption     (batch
 
 | | |
 |---|---|
-| **Estado** | Fase local concluída: `v1.0.0`, em 04/10/2026, e a versão de manutenção `v1.1.0`, em 05/11/2026. A fase GCP (Etapa 13, M6) foi autorizada em 06/11/2026, desmontada em 13/11/2026 e **aceita com ressalvas** no mesmo dia; o custo real entra quando o faturamento fechar — o estado é do [Plano](docs/plano_de_desenvolvimento.md), e o processo, do [Registro da fase GCP](docs/registro_fase_gcp.md) |
+| **Estado** | Continuação do `mvp_eng_dados_1` desde 13/11/2026 ([D92](docs/pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026)). Fase local concluída: `v1.0.0`, em 04/10/2026, e a versão de manutenção `v1.1.0`, em 05/11/2026. A fase GCP (Etapa 13, M6) foi autorizada em 06/11/2026, desmontada em 13/11/2026 e **aceita com ressalvas** no mesmo dia; o custo real entra quando o faturamento fechar — o estado é do [Plano](docs/plano_de_desenvolvimento.md), e o processo, do [Registro da fase GCP](docs/registro_fase_gcp.md) |
 | **Stack** | PostgreSQL · Airbyte (em Kubernetes local) · dbt · Airflow · Debezium sobre Kafka Connect · Redpanda · Apache Beam · Terraform · Docker · Python com SQLAlchemy e Alembic |
 | **Escopo** | Na `v1.1.0`: 40 tabelas de origem e uma origem legada defeituosa de propósito; nove camadas no armazém; 10 fatos, 15 dimensões e 16 views de consumo, uma por pergunta de negócio |
 | **Qualidade** | No aceite da `v1.1.0` (05/11/2026): `make check` verde com `PASS=907` e 1.079 testes Python; reconciliação em toda fronteira entre camadas; toda coluna classificada por sensibilidade, conferida por igualdade a cada `make check`. O medido de cada etapa está no [Plano](docs/plano_de_desenvolvimento.md) |
