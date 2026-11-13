@@ -1,0 +1,729 @@
+# Execução Local
+
+> **O que vive aqui:** como operar o projeto pelo terminal — pré-requisitos, comandos e ordem de
+> execução.
+>
+> **O que não vive aqui:** o que cada componente faz (ver [Arquitetura](arquitetura.md)); os
+> parâmetros do gerador (ver [Geração de Dados](geracao_de_dados.md)); o orçamento de disco (ver
+> [Capacidade e Recuperação](capacidade_e_recuperacao.md)).
+
+| Campo | Informação |
+|---|---|
+| Interface | `Makefile` — a operação inteira acontece no terminal |
+| Versão | 1.18 |
+| Situação | Operação da Etapa 12 (B0–B4) implementada; o ciclo da §3 está na ordem que o B5 executa e mede. Reconstrução com *streaming* conferida na D31 |
+| Última revisão | 04/11/2026 — os alvos da v1.1.0: medidas da geração, oráculo das origens e livro retido (ADR-0050) |
+
+Este documento é, hoje, o **contrato** do que a execução local deve oferecer. Cada alvo é
+preenchido e conferido — executando-o — na etapa em que nasce, conforme o
+[Plano de Desenvolvimento](plano_de_desenvolvimento.md).
+
+---
+
+## 1. Pré-requisitos
+
+| Requisito | Observação |
+|---|---|
+| Docker e Docker Compose | Todo o ambiente roda em contêineres |
+| `uv` | Gerencia interpretador, dependências e ambiente ([ADR-0026](adr/0026-uv-para-ambiente-e-dependencias.md)). Instala o Python 3.11 sozinho — não é preciso ter Python antes |
+| `abctl` e Terraform | Baixados por `make tools` nas versões fixadas no `Makefile`, para `.tools/`. Não precisam existir na máquina antes. O `abctl` fixado não fixa o Airbyte: a versão do *chart* que `make airbyte-up` instala também está no `Makefile` (`AIRBYTE_CHART_VERSION`, a 2.3.0 que o B5 mediu) — sem ela, cada instalação nova traria o *chart* mais recente do dia |
+| **CPU** | **A restrição descoberta na Etapa 5.** Quatro núcleos é o mínimo documentado do Airbyte para a *plataforma* — o *pod* de replicação pede outros quatro. Ver seção 6 |
+| Python 3.11 | Fixado por paridade com o Cloud Composer. `make install` cria o `.venv` e instala o pacote ([ADR-0012](adr/0012-repositorio-com-pacote-instalavel.md)) |
+| `make` | Interface única de operação |
+| `curl` | Baixa o `abctl` e o Terraform em `make tools`, e é por ele que a retomada do Airbyte espera a API responder |
+| Disco livre | **Pelo menos 8 GB** — o volume de dados é baixo por desenho ([ADR-0014](adr/0014-volume-por-proporcoes-e-fator-de-escala.md)); o espaço é para imagem, log e WAL |
+| Memória | Airbyte, Airflow, Redpanda e Kafka Connect não precisam subir ao mesmo tempo; ver seção 5. Com o Airbyte e o Airflow juntos, contar com **cerca de 6 GB** |
+
+Nenhum serviço de nuvem é necessário na fase local, e nenhuma credencial de nuvem deve existir na
+máquina para executá-la.
+
+---
+
+## 2. Configuração
+
+```bash
+make env            # gera o .env com portas padrão e senhas aleatórias, permissão 600
+make install        # instala o Python 3.11, o pacote no .venv e os pacotes dbt da trava
+make tools          # baixa o abctl e o Terraform nas versões fixadas, para .tools/
+make check-offline  # segredos, documentos e a suíte sem os testes de integração
+```
+
+É o preparo de um clone novo, e nada dele sobe contêiner. `make install` traz os pacotes do dbt —
+`dbt_utils`, `dbt_expectations`, `dbt_date` — nas versões do `dbt/package-lock.yml`: sem eles, o
+primeiro comando dbt falha no `parse`. `make tools` põe o `abctl` e o Terraform em `.tools/`, que é
+de cada *checkout* e não vem no clone. `make check-offline` é a primeira verificação, antes dos
+bancos: o que ele não roda — os testes marcados `integracao`, que precisam do armazém ou do `dbt` —
+é listado por arquivo, e roda no `make check` do ciclo.
+
+O `.env.example` é versionado com as chaves e **sem** valores, e serve para declarar quais chaves
+existem — não para ser copiado e preenchido à mão. `make env` recusa sobrescrever um `.env`
+existente, porque trocar as senhas torna os volumes já criados inacessíveis. Ver
+[Política de Governança de Dados](governanca_de_dados.md#9-tratamento-de-segredos). A exceção são
+chaves que nasceram depois do `.env`: `make airflow-up` acrescenta os segredos do Airflow, e
+`make dbt-build` o login de leitura do armazém
+([Governança §7](governanca_de_dados.md#7-regras-de-acesso-por-camada)) — só o que falta, sem
+tocar no resto.
+
+---
+
+## 3. Ciclo completo
+
+A sequência abaixo leva de um repositório recém-clonado, preparado pela seção 2, até as views de
+consumo. **A ordem importa num ponto:** o *snapshot* do *streaming* vem antes do primeiro
+`dbt-build` completo. O *staging* do estoque lê `raw.inventory_movements_stream`, que só o
+*pipeline* Beam cria, e a reconciliação dos dois caminhos reprova todo movimento que só chegou pelo
+lote: num armazém vazio, o primeiro *build* sem o *snapshot* falha por construção. As trocas entre
+Airbyte e *streaming* são automáticas (seção 5).
+
+| # | Comando | O que faz | Disponível na |
+|---|---|---|---|
+| 1 | `make up` | Sobe os três bancos — `source_db`, `legacy_db`, `warehouse_db` — e garante a rede do projeto | Etapa 2 · 12 |
+| 2 | `make migrate` | Aplica as migrações Alembic da origem principal | Etapa 3 |
+| 3 | `make seed-data` | Gera e carrega os dados sintéticos da origem principal | Etapa 4 |
+| 4 | `make seed-legacy` | Migra o schema legado e gera a origem legada com as falhas do catálogo; `FORCE=1` trunca antes | Etapa 10 |
+| 5 | `make airbyte-up` | Sobe o Airbyte local, em cluster próprio | Etapa 5 |
+| 6 | `make airbyte-config` | Cria fonte, destinos e conexões por Terraform; `AUTO=1` aplica sem perguntar | Etapa 5 |
+| 7 | `make sync-airbyte` | Sincroniza a origem principal: `oltp` → `raw` | Etapa 5 |
+| 8 | `make sync-legacy` | Captura o legado em `raw_legacy` e a **certifica** em `governance.legacy_captures` (duas fases, [ADR-0044](adr/0044-certificar-cada-captura-do-legado-por-conteudo.md)); cada execução acrescenta uma captura e a registra no livro retido, que precisa de época corrente ([Origem Legada §4.3](origem_legada.md#43-o-livro-retido-da-memória-v110)) | Etapa 10 · v1.1.0 |
+| 9 | `make stream-up` | Sobe Redpanda e Kafka Connect e aplica o conector Debezium; pausa o Airbyte | Etapa 7 |
+| 10 | `make stream-run` | Sobe o *pipeline* Beam — **primeiro plano**, noutro terminal | Etapa 7 |
+| 11 | `make stream-wait ATE_SEQ=<corte>` | Espera o livro quente alcançar a origem; o corte é o que `make stream-corte` imprime. Depois, `Ctrl-C` no `stream-run` | Etapa 12 |
+| 12 | `make airbyte-up` | Retoma o Airbyte; pausa o *streaming* | Etapa 5 · 12 |
+| 13 | `make dbt-build` | O primeiro *build* completo: modelos, testes de dados e reconciliações | Etapa 5 |
+| 14 | `make check` | Verificação completa em quatro etapas, parando na primeira falha: segredos e documentos, `dbt build` (modelos, testes de dados, reconciliações), classificação e linhagem derivadas em dia com os modelos, `pytest`; `FATO=1` e `RESET=1` passam adiante. Tempo e memória medidos na [Capacidade §2.12](capacidade_e_recuperacao.md#212-o-ciclo-do-zero-medido--b5-25092026) | Etapa 11 |
+| 15 | `make airflow-up`, `make dag-run`, `make dag-wait` | O fluxo pelo orquestrador, com o Airbyte de pé — o par permitido | Etapa 5 · 12 |
+| 16 | `make stream-produce` | Eventos novos no livro da origem, com o *streaming* de pé e o `stream-run` rodando; `LIMITE=`, `SEED=`. Para exercitar o alerta, `LIMITE=2200` — com 200 nenhum saldo cruzou o limiar (B5) | Etapa 7 |
+| 17 | `make docs-generate`, `make dbt-docs` | Gera o catálogo; o segundo o serve | Etapa 5 · 12 |
+| 18 | `make size-report` | Tamanho de cada banco e a soma dos três; tabela a tabela, só o schema `oltp` da origem — nos outros dois, "(sem tabelas com dados)" quer dizer nenhuma tabela do `oltp`. Observação, não limite | Etapa 4 |
+
+Qualquer linha pode rodar sob `make medir ALVO=<alvo>`, que registra duração e memória do alvo e,
+depois do intervalo medido, o tamanho de cada banco pelo `make size-report` (D59); é assim que a
+capacidade é medida (seção 4).
+
+### 3.1 Parâmetros do gerador
+
+Passados por variável do alvo, nunca editados no código. O padrão de todos vem da
+[configuração do gerador](../src/mvp_ed1/generator/geracao.yml).
+
+```bash
+make seed-data                      # fator `dev`, padrão em todas as etapas
+make seed-data SCALE=10             # fator maior, quando houver motivo declarado
+make seed-data SEED=42 AS_OF=2026-06-30   # outra semente e outra data de corte
+make seed-data DRY_RUN=1            # gera e mede em memória, sem escrever no banco
+make seed-data FORCE=1              # trunca as 40 tabelas antes de carregar
+```
+
+O volume é expresso por **fator de escala** sobre um conjunto único de proporções
+([ADR-0014](adr/0014-volume-por-proporcoes-e-fator-de-escala.md)). Não há perfis de tamanho.
+
+**`make seed-data` recusa carregar sobre dados existentes.** É o mesmo contrato de `make env` e
+`make reset`: comando que destrói estado não destrói sozinho. `FORCE=1` autoriza o truncamento das
+40 tabelas antes da carga.
+
+A mesma versão do código/configuração, `SEED` e `AS_OF` recria exatamente os mesmos dados
+([ADR-0005](adr/0005-geracao-com-faker-orientada-a-configuracao.md)) — inclusive as chaves
+primárias, porque o gerador as atribui e o `COPY` as escreve.
+
+### 3.2 Regerar uma origem que já alimenta streaming
+
+**Não é uma restauração.** Para devolver o estado do pacote de recuperação, o caminho é a
+sequência de restauração ([Capacidade §3.4](capacidade_e_recuperacao.md#34-a-sequência-de-restauração)),
+que descarta o CDC, esvazia o destino quente e refaz o *snapshot* sozinha. O que segue é para
+regerar a origem, e nada dele restaura memória do armazém.
+
+**Manutenção destrutiva de desenvolvimento, não operação normal do livro imutável.** Regerar pode
+reutilizar `movement_id` com outro conteúdo e deixar eventos antigos sem correspondente. O destino
+quente usa `on conflict do nothing` e o `staging` prefere seu payload ao do lote: refazer apenas o
+Airbyte conserva o erro. O decodificador também recusa `TRUNCATE`; não faça a carga com CDC ativo.
+
+1. Identifique produtores, Beam/Prism, jobs do Airbyte e execuções da DAG. Registre o estado a
+   restabelecer, pause a DAG e espere os jobs ativos terminarem. A pausa não cancela jobs existentes.
+   Encerre os produtores e o `make stream-run` acompanhado, incluindo o Prism filho — derrubar o
+   Compose não encerra processos no host. Para pausar e consultar a DAG:
+
+   ```bash
+   docker compose --env-file .env -f docker/docker-compose.airflow.yml exec -T airflow_scheduler airflow dags pause fluxo_batch
+   docker compose --env-file .env -f docker/docker-compose.airflow.yml exec -T airflow_scheduler airflow dags list-runs fluxo_batch -o json
+   ```
+
+2. Valide a geração em memória e registre versão, parâmetros, contagens e hashes. Preserve um dump
+   local identificado da origem se precisar voltar ao estado exato: o `writer` confirma o truncamento
+   **antes** da transação de carga, e uma falha de `COPY` não recupera a carga anterior. Essa
+   salvaguarda não entrega o ponto de recuperação da Etapa 12. O teste de carga substitui a origem
+   por um fator reduzido, e por isso `make test CARGA=1` o roda num **banco efêmero** que o próprio
+   alvo cria e derruba — nunca na origem de trabalho.
+3. Com os consumidores parados, execute cada comando abaixo **somente após o anterior terminar
+   com sucesso**:
+
+   ```bash
+   make stream-down FORCE=1
+   make stream-reset-sink FORCE=1
+   make seed-data FORCE=1
+   ```
+
+   O primeiro remove tópicos/offsets e os slots **declarados** nos conectores. A manutenção recusa
+   slot ativo ou de outro banco, propaga erros e confere a ausência em `pg_replication_slots`.
+   O segundo exige `FORCE=1`, aceita exclusivamente `raw.inventory_movements_stream` e trunca sem
+   `CASCADE`, com lock e conferência na mesma transação. Não limpa `raw_legacy` nem outra tabela.
+   Nenhum dos dois encerra Beam/Prism por você; não use `make reset` ou `--remove-orphans` aqui.
+4. Confira a nova origem antes de prosseguir. Depois:
+
+   ```bash
+   make sync-airbyte RESET=1
+   make stream-up
+   make stream-run
+   ```
+
+   A sincronização espera reset e carga terminarem. Acompanhe `stream-run` em terminal próprio e
+   espere o novo snapshot alcançar a origem. Compare **chaves e todas as colunas de negócio**
+   (`streaming/sink.py`, `COLUNAS_DO_EVENTO`) nos dois caminhos, normalizando tipos; exclua apenas
+   metadados de transporte. Contagens iguais e flags de chegada não bastam. Confira também o
+   saldo por armazém/SKU, não apenas a soma geral.
+5. Só após a igualdade, execute `make dbt-build RESET=1`: snapshots SCD e fato incremental precisam
+   ser refeitos juntos. Guarde `dbt/target/run_results.json` antes que outra tarefa o sobrescreva.
+   A geração do catálogo não substitui a evidência do build e dos testes. *Medido em 18/09/2026:*
+   se a regeneração é determinística e idêntica — mesma semente, mesmos parâmetros —, o histórico
+   SCD não muda e não precisa ser destruído; o que **não** esquece sozinho é a fato incremental, que
+   guarda os movimentos velhos até um `dbt build --select fact_inventory_movement+ --full-refresh`.
+   `fato_reconcilia_com_a_condutora` e `incremental_confere_com_a_reconstrucao_completa` acusam
+   enquanto isso não for feito.
+6. Se a mudança afetou o livro de estoque, reexercite produtor, duplicatas e alertas pelos alvos
+   existentes. Registre `LIMITE`, `SEED` e o deslocamento de `.stream/producer_state.json`: a mesma
+   semente **retoma**, não necessariamente começa em zero. Depois de cessar a produção, espere o
+   CDC, sincronize o Airbyte e rode `make dbt-build` no corte comum. Confira incremento contra
+   reconstrução completa, invariantes e P13 no mesmo universo de remessas entregues.
+7. Execute `make test` e `make dag-run`, acompanhe **a execução disparada** até todas as tarefas
+   terminarem, gere catálogo e medições. `make dag-status` é consulta, não espera. Restabeleça a
+   pausa e os processos conforme o estado registrado; não libere consumo sobre base incompleta.
+
+Se algum passo falhar, preserve a evidência e retome pelo ponto que restabeleça coerência entre
+origem e destinos; não contorne a falha enfraquecendo a imutabilidade ou editando payloads à mão.
+
+---
+
+## 4. Alvos auxiliares
+
+| Comando | O que faz | Disponível na |
+|---|---|---|
+| `make help` | Lista os alvos já implementados | Etapa 2 |
+| `make ps` | Estado e portas dos contêineres | Etapa 2 |
+| `make logs` | Acompanha os logs; `SERVICE=source_db` filtra | Etapa 2 |
+| `make psql-source` · `make psql-legacy` · `make psql-warehouse` | Abre o `psql` no banco correspondente | Etapa 2 |
+| `make pgcli-source` · `make pgcli-legacy` · `make pgcli-warehouse` | Abre o pgcli, com autocompletar de colunas, em sessão somente leitura que cai após 5 min parada dentro de transação e pede confirmação antes de comando destrutivo. É opcional e fica fora do projeto: `uv tool install --with 'psycopg[binary]' pgcli` | Pós-M5 |
+| `make down` | Derruba os contêineres preservando os volumes | Etapa 2 |
+| `make reset` | Derruba e apaga os volumes — recomeço do zero | Etapa 2 |
+| `make migrate-down` | Desfaz migrações; `TO=base` derruba tudo | Etapa 3 |
+| `make migrate-new` | Gera rascunho de migração; exige `M="o que mudou"` | Etapa 3 |
+| `make migrate-status` | Mostra a revisão aplicada no banco | Etapa 3 |
+| `make migrate-legacy` | Aplica as migrações do schema legado (`legacy_db`); `seed-legacy` já a executa | Etapa 10 |
+| `make migrate-legacy-down` / `-status` / `-new` | O mesmo ciclo para o schema legado (`alembic -n legacy`) | Etapa 10 |
+| `make seed-plan` | Mostra o plano de volume das 40 tabelas, sem tocar no banco | Etapa 4 |
+| `make legacy-plan` | Mostra o que o legado geraria e injetaria, sem tocar no banco | Etapa 10 |
+| `make legacy-catalogo` | Imprime o catálogo de falhas em português, para revisão sem abrir o YAML | Etapa 10 |
+| `make generation-measure` | Gera as duas origens **em memória** e mede, por tabela, a contagem e o *digest* do conteúdo gravável (`oraculos.digest` na principal, o *hash* do gravador no legado) e as chaves canônicas do legado; grava em `data/medicoes/v1_1_0/`. Não toca banco | v1.1.0 |
+| `make generation-compare ANTES= DEPOIS=` | Compara duas medidas da mesma semente: as tabelas que mudam e as transições de chave do legado (removida, adicionada, reduzida, aumentada) | v1.1.0 |
+| `make generation-realism` | Gera a origem principal **em memória** e refaz M7 a M9 do plano do `bi-como-codigo`: o caminho raiz › intermediária › folha de cada folha com produto contra a árvore declarada, o preço dos itens por folha contra a faixa declarada e os itens vendidos antes do lançamento; grava em `data/medicoes/v1_1_0/`. Não toca banco | v1.1.0 |
+| `make ledger-baseline` | Abre a época seguinte do livro retido da memória do legado com a linha de base de agora ([Origem Legada §4.3](origem_legada.md#43-o-livro-retido-da-memória-v110)). Pede a janela parada e o Airbyte de pé, para listar os *jobs* da conexão legada. Sem época corrente, `make sync-legacy` e a DAG recusam capturar | v1.1.0 |
+| `make ledger-attempt TENTATIVA= NOME=` | O registro de uma tentativa de captura tomado à mão, na época corrente do livro retido, com o nome da linha do runbook (`D2_a1_memoria.json`); recusa se o lock da tentativa estiver com um chamador vivo | v1.1.0 |
+| `make ledger-treatment NOME=` | O registro do tratamento corrente no livro retido — captura, versão do catálogo, impressão digital — e das rejeitadas dele por tabela, com contagem e *digest*; tomado depois de toda linha que constrói a quarentena (`D3_a1_tratamento.json`) | v1.1.0 |
+| `make memory-oracle` | O oráculo da memória do legado, somente leitura, contra a época corrente do livro retido: capturas intactas e só com as transições do eng_dados, as certificadas medidas de novo, todo dado retido de uma tentativa do livro, a quarentena contida e as versões e exclusões iguais às da linha de base. `LIVRO_DE_CAPTURAS=` dá as certificadas que o diário espera; grava em `data/medicoes/v1_1_0/` e sai com 1 se algo falhar | v1.1.0 |
+| `make source-oracle MEDIDA=` | Lê `source_db` e `legacy_db` em sessão somente leitura contra uma medida: conteúdo por tabela, as colunas que o banco gera (`event_sequence` de 1 a n, `quantity_available`) e o legado com o diário de mutações do manifesto encadeado. `CALIBRACAO=1` exclui o que o produtor do *streaming* move — `inventory_balances` e o livro depois do `max_event_sequence` do pacote aprovado | v1.1.0 |
+| `make catalog` | Regenera dicionário, inventário de tabelas e diagrama ER dos modelos e da configuração, e a classificação de sensibilidade derivada nos `.yml` do dbt (precisa do `manifest` de um `make dbt-build` recente) | Etapa 3 · 11 |
+| `make dbt-drop-snapshots` | **Destrói** o histórico SCD; só depois de regerar a origem | Etapa 5 |
+| `make tools` | Baixa `abctl` e Terraform nas versões fixadas, para `.tools/` | Etapa 5 |
+| `make airbyte-credentials` | Mostra as credenciais do Airbyte local | Etapa 5 |
+| `make airbyte-plan` | O que o `airbyte-config` mudaria no Airbyte local, sem aplicar; falha se há mudança ou erro, e a última linha diz qual. Precisa do Airbyte de pé | Etapa 13 |
+| `make airbyte-down` | Derruba o Airbyte | Etapa 5 |
+| `make preflight` | Diz se cabe subir um subconjunto; `ALVO=airbyte\|airflow\|streaming`. Consulta pura | Etapa 10 |
+| `make airbyte-pause` / `-resume` | Para e religa o cluster do Airbyte devolvendo a memória, sem desmontá-lo; a retomada passa pela troca do *preflight* | Etapa 10 · 12 |
+| `make stream-pause` / `-resume` | Para e religa Redpanda e Kafka Connect preservando o conector; a retomada passa pela troca do *preflight* | Etapa 10 · 12 |
+| `make airflow-pause` / `-resume` | Para e religa os contêineres do Airflow; a retomada passa pela troca do *preflight* | Etapa 10 · 12 |
+| `make test` | Testes de código Python (`pytest`); `CARGA=1` roda a carga num banco efêmero (`test-carga`); `FATO=1` inclui o teste que escreve na fato de trabalho | Etapa 4 |
+| `make dbt-test` | Somente os testes de dados | Etapa 5 |
+| `make airflow-up` | Sobe o Airflow (LocalExecutor, três contêineres) | Etapa 5 |
+| `make airflow-down` | Derruba o Airflow preservando o histórico de execuções | Etapa 5 |
+| `make dag-status` | Estado das tarefas da última execução da DAG | Etapa 5 |
+| `make dag-run` | Despausa e dispara a DAG `fluxo_batch` do caminho frio | Etapa 5 |
+| `make stream-connector` | Aplica as declarações de `streaming/connectors/` pela API REST | Etapa 7 |
+| `make stream-status` | Estado do conector Debezium e das tarefas | Etapa 7 |
+| `make stream-duplicate` | Republica mensagens no transporte — o teste de idempotência; `QUANTAS=` | Etapa 7 |
+| `make stream-alerts` | Lê e resume o tópico de alerta de estoque baixo | Etapa 7 |
+| `make stream-down` | Derruba Kafka Connect e mensageria; `FORCE=1` apaga tópicos **e o slot de replicação** | Etapa 7 |
+| `make stream-reset-sink FORCE=1` | Esvazia somente `raw.inventory_movements_stream`, com consumidores parados e ausência conferida | D31 |
+| `make check-offline` | Segredos, documentos e a suíte sem os testes de integração — o que se confere sem nada de pé | Etapa 12 |
+| `make docs-check` | Confere links, âncoras e citações de ADR nos documentos rastreados | Etapa 12 |
+| `make secrets-history` | Varre **todo** o histórico do *git* por forma de credencial, sem depender do `.env` | Etapa 12 |
+| `make medir` | Mede um alvo: `ALVO=` e, para quem só dispara, `ATE=<alvo de espera>`; ou `CENARIO=streaming [LIMITE=n]`. Ao fim, fora do intervalo, o `size-report` e o total por banco | Etapa 12 |
+| `make dag-wait` | Espera a execução da DAG terminar; `RUN_ID=` (padrão: a última disparada), `PRAZO=` | Etapa 12 |
+| `make stream-corte` | Imprime o `max(event_sequence)` da origem — o fim de uma medição | Etapa 12 |
+| `make stream-wait` | Espera o livro quente alcançar `ATE_SEQ=`; `PID=` vigia o *pipeline*, `PRAZO=` | Etapa 12 |
+| `make docs-generate` | Só gera o catálogo — tem fim, e por isso é o que se mede | Etapa 12 |
+| `make dbt-rebuild` | Reconstrói tudo **sem** derrubar os *snapshots* — o *build* de uma restauração | Etapa 12 |
+| `make recovery-pack` | Monta o candidato do pacote de recuperação; exige janela parada e árvore limpa | Etapa 12 |
+| `make recovery-verify` | Confere o pacote sem restaurar nada; `CONTRA_O_BANCO=1` o compara com os bancos | Etapa 12 |
+| `make recovery-rebase` | Re-basa as gerações retidas do bruto; `DRY_RUN=1` só mostra | Etapa 12 |
+| `make recovery-airbyte-jobs` | Num Airbyte novo, avança o contador de *jobs* além da captura retida (D50) | Etapa 12 |
+| `make recovery-restore RESTAURAR=1` | A sequência de restauração, passo a passo, a partir do pacote | Etapa 12 |
+| `make recovery-promote` | Promove o candidato a aprovado, depois de uma restauração validada | Etapa 12 |
+
+> `make reset`, `make seed-data FORCE=1`, `make sync-airbyte RESET=1`, `make dbt-build RESET=1`,
+> `make stream-down FORCE=1`, `make stream-reset-sink FORCE=1`, `make airflow-down FORCE=1`,
+> `make dbt-drop-snapshots`, `make test FATO=1` e `make recovery-restore RESTAURAR=1` **destroem
+> estado**. Todos exigem a variável explícita, exceto `dbt-drop-snapshots`, cujo nome já é o aviso;
+> `recovery-restore` só é executado mediante decisão explícita do Owner.
+
+---
+
+## 5. Executando por partes
+
+Não é necessário — nem recomendável — manter tudo ativo ao mesmo tempo. O ambiente foi desenhado
+para subir em subconjuntos, mitigação direta do risco **R11**:
+
+| Cenário | O que precisa estar de pé |
+|---|---|
+| Desenvolver modelos dbt | `make up` + dados já carregados |
+| Rodar o fluxo pelo orquestrador | `make up` + `make airbyte-up` + `make airflow-up` |
+| Ajustar o gerador | `make up` apenas — ou nada, com `DRY_RUN=1` |
+| Trabalhar no streaming | `make up` + `make stream-up` + `make stream-run` |
+| Reconciliar o CDC contra a carga completa | acrescentar `make airbyte-up` e `make sync-airbyte` |
+| Execução completa de validação (Etapa 12) | Cada cenário acima, no seu subconjunto — nunca tudo de pé ([ADR-0046](adr/0046-validar-a-fase-local-por-partes.md)) |
+
+**A tabela deixou de depender de quem a lê, e a troca deixou de ser manual.** `make airbyte-up`,
+`airflow-up` e `stream-up` — e as retomadas, `airbyte-resume`, `stream-resume` e `airflow-resume`
+(D54) — passam por `docker/preflight.sh`, que mede a memória, vê o que está de pé e **pausa o
+ambiente conflitante** antes de subir o que foi pedido:
+
+```
+$ make stream-up
+[preflight] Já de pé: Airbyte (cluster kind)
+[preflight] Airbyte está de pé e não convive com 'streaming' — pausando.
+[preflight] Airbyte pausado — retomar com make airbyte-resume
+[preflight] RAM disponível agora: 6,4 GB — sobraria 5,9 GB
+[preflight] OK
+```
+
+**Pausar, nunca desmontar.** Um `docker stop` devolve a memória inteira, preserva contêineres, dados
+e o conector Debezium, e a volta não reinstala nada — contra os minutos de um `airbyte-down`, que é
+`abctl local uninstall` e cai na armadilha do `PG_VERSION` da seção 6. Os pares são
+`airbyte-pause`/`airbyte-resume`, `stream-pause`/`stream-resume` e `airflow-pause`/`airflow-resume`,
+e **`make airbyte-up` retoma sozinho** um cluster pausado em vez de tentar reinstalá-lo — e, com
+ele de pé, só confere a API (D53). O ciclo
+completo de troca, medido: **18 s**. A volta do Airbyte, medida em 23/09/2026 em três retomadas: a
+API responde **entre 74 s e 101 s** depois do `docker start` (74 s com 9,0 GB livres depois da pausa,
+96 s com 6,3 GB), e `airbyte-resume` e `airbyte-up` esperam por ela.
+
+**O que a pausa custa a quem é pausado (D56).** O `docker stop` dá 10 s. O nó do Airbyte para com o
+desligamento ordenado do systemd, que leva **~91 s** (90,7 s medidos em 24/09/2026, código 130); na
+pausa, ele termina em SIGKILL (137), e o Kafka Connect também. Para o Postgres interno do Airbyte —
+o contador de *jobs* e os cursores —, cada pausa é uma queda, e a retomada passa pela recuperação
+dele. Nas retomadas medidas depois da pausa de sempre — três em 23/09 e duas em 24/09/2026, com o
+137 observado nas de 24/09 —, a API voltou e o contador de *jobs* continuou o mesmo. Esperar a
+parada limpa custaria ~80 s em toda troca que pausa o Airbyte, e ficou decidido não pagar.
+
+**A rede do projeto é externa (D55).** As três composições compartilham o projeto e a rede dele,
+que o `Makefile` cria antes de qualquer `up` e nenhum `down` remove: contêiner pausado nunca perde a
+rede. Antes, o `make down` dos bancos a levava — ver
+[a retomada que falha com `network … not found`](#retomar-o-airflow-ou-o-streaming-falha-com-network--not-found).
+
+**O que está de pé é lido pelos rótulos do Compose**, e não pelo nome dos contêineres:
+`docker/conteineres.sh` resolve cada serviço pelo projeto e pelo serviço, com os grupos `@bancos`,
+`@airflow` e `@streaming`, e o nome do projeto é o que o próprio Compose resolve. O trabalho do
+Airflow é consultado **por DAG**, contando as execuções `queued` e com prazo — execução enfileirada
+também é trabalho.
+
+**Duas salvaguardas, porque troca automática que erra custa trabalho perdido:**
+
+- **Nada é pausado com trabalho em andamento.** Antes de parar qualquer coisa, o *preflight* procura
+  sincronização ativa no Airbyte, DAG em execução no Airflow e o *pipeline* Beam ou o produtor
+  rodando no *host* — este último importa porque roda **fora** dos contêineres, e parar o transporte
+  sob ele o quebra. Achando qualquer um, recusa e não toca em nada. Verificação que não responde
+  conta como bloqueio, não como "não há trabalho": perder uma sincronização em silêncio é pior que
+  uma recusa a mais.
+- **Pausa que não resolve é desfeita.** Se, mesmo depois de pausar, a memória ainda não bastar, o
+  que foi pausado é religado antes da recusa. Quem rodou o alvo pediu para subir algo, não para
+  derrubar o resto. Pelo mesmo motivo, a retomada confere antes da troca que há o que religar, e
+  `airbyte-up` confere o `curl` da espera: sem isso, o outro ambiente seria pausado à toa.
+
+**O que já está de pé não é cobrado de novo (D53).** Subir o que já está inteiro de pé não
+acrescenta memória, e o *preflight* não cobra o custo dele; de pé pela metade, cobra inteiro. A
+família continua valendo: a outra é pausada do mesmo jeito, e essa pausa não é desfeita por falta
+de memória — desfazê-la religaria as duas famílias juntas. O que ninguém confere é o acréscimo de
+uma sincronização sobre o Airbyte ocioso, até o pico de 4,95 GiB da
+[Capacidade §2.9](capacidade_e_recuperacao.md#29-o-teto-de-memória-do-airbyte-medido--07092026):
+`sync-airbyte` nunca passou pelo *preflight*.
+
+`make preflight ALVO=airbyte|airflow|streaming` responde à mesma pergunta sem efeito nenhum — é
+consulta, não ação.
+
+**Recusa só resta quando a troca não basta:** memória insuficiente mesmo depois de pausar. Como em
+`seed-data` e `reset`, `FORCE=1` autoriza — e é autorização do Owner, não atalho de quem esbarrou na
+recusa. Não há cenário previsto em que ela se aplique: a Etapa 12 valida **por partes**, cada
+cenário no seu subconjunto ([ADR-0046](adr/0046-validar-a-fase-local-por-partes.md)) — *batch* e
+*streaming* juntos nesta máquina foi o que a travou em 07/09/2026 (D36, fechada). Desde a D54,
+`FORCE=1` é o único caminho que liga ambiente pesado sem conferência, nos `*-up` e nos `*-resume`.
+
+---
+
+## 6. Solução de problemas
+
+Preenchido com os problemas **realmente encontrados**, e não com hipóteses — princípio **P5**.
+
+### `make size-report` acusa tamanho maior do que a carga justifica
+
+Uma carga que falha no meio deixa tuplas mortas: o `COPY` desfaz a transação, mas o espaço só volta
+com `VACUUM`. Uma execução seguinte escreve por cima disso, e o relatório soma as duas. Foi o que
+aconteceu na primeira medição da Etapa 4 — 86 MB onde havia 55.
+
+`make seed-data FORCE=1` trunca antes de carregar, e `TRUNCATE` devolve o espaço na hora. Para uma
+medição que vá para documento, comece do zero:
+
+```bash
+make reset FORCE=1 && make up && make migrate && make seed-data
+```
+
+### A sincronização do Airbyte fica `running` para sempre e não move linha
+
+Sintoma: `make sync-airbyte` imprime `running · 0 linhas` indefinidamente, a interface mostra o job
+ativo, e `raw` continua vazio.
+
+Diagnóstico:
+
+```bash
+docker exec airbyte-abctl-control-plane \
+  kubectl get pods -n airbyte-abctl | grep replication
+```
+
+`Pending` com o evento `Insufficient cpu` é o caso: o *pod* de replicação pede **4 CPUs** — 2 para o
+orquestrador e 1 para cada conector —, e a plataforma já segura 1,1 dos 4 da máquina. O Kubernetes
+não agenda, o Airbyte não avisa, e o job fica vivo sem executar.
+
+**Solução:** o [`airbyte/values.yaml`](../airbyte/values.yaml), que `make airbyte-up` passa ao
+`abctl` **na instalação**. Ele fixa `global.workloads.resources` com pedidos de 100m por contêiner,
+e o *pod* passa a pedir 300m em vez de 4 CPUs. Num cluster já instalado, `make airbyte-up` não
+reaplica o chart — com o cluster de pé, só confere a API (D53) —, e o caminho documentado para
+reaplicá-lo é reinstalar: `make airbyte-down`, a armadilha do
+[`PG_VERSION`](#make-airbyte-up-falha-com-permission-denied-no-pg_version) e `make airbyte-up`.
+
+Três caminhos **não** funcionam, e estão registrados no próprio `values.yaml` para não serem
+tentados de novo: `--low-resource-mode`, que é a resposta documentada do Airbyte;
+`global.jobs.resources`, que o chart marca como depreciada com a ressalva "replication is not
+consumed"; e alterar o ConfigMap à mão, que a instalação seguinte desfaz.
+
+### Regerei os dados e o `raw` continua com o conteúdo antigo
+
+Sintoma: `make seed-data FORCE=1` recarrega a origem, `make sync-airbyte` diz "concluída" com poucas
+linhas, e o datamart continua mostrando o dado anterior.
+
+É consequência direta da geração ser **determinística**. A mesma `seed` produz os mesmos
+`updated_at`, e `updated_at` é o cursor das oito tabelas em `dedup_history`
+([ADR-0015](adr/0015-sincronizacao-e-exclusoes.md)): o Airbyte olha para o cursor, não vê nada mais
+recente e não traz nada. O conteúdo mudou; o carimbo, não.
+
+É o mesmo defeito que em produção se chama "alguém alterou a linha sem tocar no `updated_at`" — só
+que aqui ele é produzido pela reprodutibilidade, que é uma virtude. Depois de **regerar** os dados,
+descarte o cursor:
+
+```bash
+make sync-airbyte RESET=1
+```
+
+`RESET=1` apaga o estado do cursor e o conteúdo de `raw` antes de sincronizar. Não é preciso em
+operação normal, quando cada alteração da origem move o seu próprio `updated_at`. Havendo streaming,
+esse comando **não** limpa sua tabela: siga a sequência completa da §3.2.
+
+### Um valor financeiro apareceu dobrado, ou um saldo não fecha
+
+O modo `append` do [ADR-0015](adr/0015-sincronizacao-e-exclusoes.md) é **entrega ao menos uma vez**:
+o Airbyte relê a fronteira do cursor e reescreve linhas já entregues. Em `raw` isso vira duplicata —
+foram 9 em `payment_transactions` e 1 em `inventory_movements` na segunda sincronização, o
+suficiente para dobrar uma captura.
+
+Não é defeito a corrigir na ingestão: é a garantia que o transporte oferece. Quem deduplica é o
+`staging`, pela chave do evento, e é essa a fronteira entre *at least once* e *exactly once*. Se um
+número financeiro estiver dobrado, confira primeiro se o modelo de `staging` da tabela em questão
+tem o `distinct on`.
+
+### A DAG foi disparada, o Airflow diz `queued`, e nada acontece
+
+DAG nasce **pausada** no Airflow, e execução enfileirada em DAG pausada fica `queued` para sempre —
+o disparo "funciona" e não faz nada. `make dag-run` despausa antes de disparar, e espera a DAG ser
+registrada: logo depois de um `make airflow-up` ela ainda não existe no banco de metadados.
+
+Se acontecer mesmo assim, confirme com `airflow dags list` que a coluna `is_paused` está em `False`.
+
+### `Permission denied` ou `Connection refused` nas tarefas da DAG
+
+Dois erros que apareceram construindo, com causas diferentes e não óbvias:
+
+- **`Permission denied: '/opt/mvp_ed1/.env'`** — o contêiner não monta o repositório inteiro, só os
+  diretórios de que precisa. O `.env` fica de fora **por desenho**: least privilege, e ele tem
+  permissão 600 de outro usuário. Se aparecer, alguém acrescentou uma montagem ampla demais.
+- **`httpx.ConnectError: Connection refused`** — no Airflow 3 a tarefa não fala com o banco de
+  metadados: fala com o *api-server* pela API de execução. O padrão aponta para `localhost:8080`,
+  que dentro do contêiner do *scheduler* não é ninguém. O compose declara
+  `AIRFLOW__CORE__EXECUTION_API_SERVER_URL`; sem ela, toda tarefa morre sem dizer que era isso.
+
+### Regerei os dados e o datamart continua mostrando o conteúdo antigo
+
+Depois de `make sync-airbyte RESET=1` o `raw` está certo, mas a dimensão continua errada. A causa é
+o **histórico SCD**: o `dbt snapshot` guarda versões, e regerar a origem não apaga o que ele já
+guardou — ele passa a ser história de um dado que não existe mais.
+
+Pior, ele acerta ao errar: a venda de 2024 aponta corretamente para a versão que valia em 2024, e
+essa versão tem o conteúdo anterior. O modelo está certo; a premissa é que mudou.
+
+```bash
+make dbt-build RESET=1
+```
+
+`RESET=1` descarta o schema `snapshots` e constrói com `--full-refresh`. As duas coisas andam
+juntas por necessidade, não por precaução: refazer os *snapshots* gera **novas chaves substitutas**,
+e a fato incremental continuaria apontando para as antigas — foram 13.514 linhas órfãs até o teste
+de `relationships` pegar. **Só em desenvolvimento**: em operação o histórico é o ativo, e descartá-lo
+é perda de dado.
+
+A sequência completa depois de regerar a origem é:
+
+```bash
+make seed-data FORCE=1 && make sync-airbyte RESET=1 && make dbt-build RESET=1
+```
+
+### Reconstruí um modelo sozinho e views de `consumption` sumiram — e o dbt disse `PASS`
+
+Um `dbt run --select <modelo>` que reconstrói uma **tabela** de `analytics` — qualquer uma, com ou
+sem `--full-refresh` — troca a tabela por outra e apaga a antiga com `cascade`. As views de
+`consumption` que a referenciam vão junto, e **o dbt reporta sucesso**, porque só o nó pedido está
+sendo executado. Nada avisa; a view só falta quando alguém a consulta.
+
+Medido em 14/09/2026, com o armazém íntegro (16 views publicadas):
+
+```text
+$ dbt run --select dim_warehouse
+1 of 1 OK created sql table model analytics.dim_warehouse ... [SELECT 10 in 0.27s]
+Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1
+views em consumption depois: 13
+
+$ dbt run --select dim_warehouse+
+Done. PASS=8 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=8
+views em consumption depois: 16
+```
+
+O mesmo acontece com `--select fact_inventory_movement --full-refresh`, que é o comando de
+recuperação da fato incremental: as três views que a leem somem. Por isso **toda reconstrução
+seletiva de tabela leva o sufixo `+`** — `--select <modelo>+` reconstrói os descendentes na mesma
+execução —, e a operação confere as views publicadas depois:
+
+```sql
+select count(*) from information_schema.views where table_schema = 'consumption';  -- 16
+```
+
+O `make dbt-build` completo não tem o problema: ele recria as views depois das tabelas, na ordem do
+grafo. O agendamento do `--full-refresh` da fato (proteção nº 3 da exceção incremental no
+[ADR-0016](adr/0016-materializacao-por-camada.md)) precisa nascer já com o `+`.
+
+### A sincronização falha com "cannot drop table because other objects depend on it"
+
+O modo `full_refresh_overwrite` **derruba** a tabela de destino a cada carga, e as views de
+`staging` dependem dela. A primeira sincronização passa; a segunda falha.
+
+O tratamento está no Terraform do destino: `drop_cascade = true`. O que ele apaga são as views que
+o `dbt build` recria em seguida, não dado — o `raw` é declarado descartável pelo
+[ADR-0008](adr/0008-schemas-do-armazem.md), e a fonte da verdade é `oltp`.
+
+**A consequência precisa ser dita:** a ordem `sync-airbyte` → `dbt-build` deixa de ser preferência e
+passa a ser obrigatória. Entre as duas, as views de `staging` não existem. É uma das razões de o
+[ADR-0003](adr/0003-stack-airbyte-dbt-airflow.md) ter ido buscar um orquestrador.
+
+### Parei o contêiner do Airbyte para liberar memória, e agora `make airbyte-up` não volta
+
+Sintoma, depois de um `docker stop airbyte-abctl-control-plane`:
+
+```
+Validating existing cluster 'airbyte-abctl'
+ERROR  container "airbyte-abctl-control-plane" is not running (status = "exited")
+```
+
+O `abctl` **valida** o cluster existente, mas não o reinicia: para ele, cluster parado é cluster
+quebrado. Parar o contêiner é a forma mais barata de devolver memória à máquina sem desinstalar
+nada — e é o que o [preflight](#5-executando-por-partes) recomenda quando o Airbyte está no caminho
+—, então o caminho de volta precisa ser conhecido.
+
+**Solução:** religar o contêiner e esperar a API do Airbyte responder, que é quando ele volta a
+servir — é o que `make airbyte-resume` faz (e `make airbyte-up`, quando encontra o cluster parado),
+depois da mesma troca do [preflight](#5-executando-por-partes): o *streaming* de pé é pausado antes
+(D54).
+
+```bash
+make airbyte-resume
+# aguardando a API do Airbyte................... pronta.   ← 74 a 101 s, medido em 23/09/2026
+```
+
+Os pods não servem de sinal: o nó lista os sandboxes da partida anterior como `NotReady`, e o
+Kubernetes chega a dizer todos prontos nos primeiros segundos, com o estado de antes da pausa.
+Reiniciar o contêiner **não** reaplica o chart, e `make airbyte-up` também não: com o cluster de
+pé, ele só confere a API (D53). Mudança no `airbyte/values.yaml` vale na instalação — ver
+[a sincronização que fica `running`](#a-sincronização-do-airbyte-fica-running-para-sempre-e-não-move-linha).
+
+### Retomar o Airflow ou o *streaming* falha com `network … not found`
+
+Sintoma, num `make airflow-resume` (ou `stream-resume`), ou já no `make airflow-up`:
+
+```
+ATENÇÃO: Airflow NÃO voltou por inteiro — 4 de 4 continuam parados:
+```
+
+e o erro que o Docker guardou no contêiner, em `docker inspect -f '{{.State.Error}}' <contêiner>`:
+
+```
+failed to set up container networking: network ca8efc33b24f… not found
+```
+
+As três composições compartilham o projeto e a rede dele. Até a D55, essa rede era do Compose, e o
+`make down` dos bancos a removia; o `make up` seguinte criava outra, com outro ID, e os contêineres
+pausados do Airflow e do *streaming* continuavam apontando para a antiga. Foi o que aconteceu de
+21/09 a 24/09/2026. Desde a D55, a rede é externa e nenhum `down` a remove: o sintoma não se repete.
+
+**Com contêineres presos a uma rede que já saiu:** recriá-los. `make airflow-up` recria os que
+mudaram de configuração, mas não o que ficou igual — em 24/09/2026, o `airflow_db` continuou preso.
+O que funcionou foi remover só o contêiner preso, cujos dados ficam no volume, e subir de novo:
+
+```bash
+docker rm mvp_ed1-airflow_db-1   # o volume mvp_ed1_airflow_db_data fica — o histórico da DAG sobreviveu
+make airflow-up
+```
+
+### `make airbyte-up` falha com `permission denied` no `PG_VERSION`
+
+Sintoma, depois de um `make airbyte-down` seguido de `make airbyte-up`:
+
+```
+failed to determine if any previous psql version exists: error reading pgdata
+version file: open ~/.airbyte/abctl/data/airbyte-volume-db/pgdata/PG_VERSION: permission denied
+```
+
+O `abctl local uninstall` destrói o cluster mas **preserva** o diretório de dados, e o `pgdata` lá
+dentro pertence ao `uid 70` com modo `0700` — o usuário que roda o `abctl` não consegue lê-lo de
+volta. A reinstalação para nesse ponto.
+
+O diretório guarda o banco de metadados do Airbyte: conexões, fontes, destinos e histórico de jobs.
+As três primeiras são recriáveis por `make airbyte-config`, porque o [ADR-0004](adr/0004-terraform-como-iac.md)
+pôs a configuração do Airbyte no Terraform justamente para isto. O histórico de jobs se perde, e não é estado do projeto.
+
+**Solução:** mover o diretório de lado — mover, não apagar — e reinstalar. O estado do Terraform
+sai de lado junto: ele nomeia as fontes, os destinos e as conexões do Airbyte que se foi, e sem ele
+o `airbyte-config` cria tudo no novo, como num clone. Que o provedor recriaria sozinho a partir do
+estado velho não foi verificado.
+
+```bash
+mv ~/.airbyte/abctl/data ~/.airbyte/abctl/data.$(date +%Y%m%d%H%M)
+mv airbyte/terraform.tfstate airbyte/terraform.tfstate.$(date +%Y%m%d%H%M)
+make airbyte-up && make airbyte-config AUTO=1
+```
+
+**Conferido no B5, em 25/09/2026:** com os dois apartados, a instalação nova passou limpa, em
+12m 47s, e o `airbyte-config` criou tudo — um recurso por vez, porque as primeiras escritas de um
+Airbyte novo colidem na tabela de segredos dele se vierem juntas.
+
+**A regra da sequência do Airbyte.** Um Airbyte novo recomeça o contador de *jobs* em 1 e as
+gerações do bruto também. Sobre um armazém com capturas retidas, antes da primeira sincronização do
+legado:
+
+```bash
+make recovery-airbyte-jobs   # o contador passa da maior captura retida (D50)
+make recovery-rebase         # as gerações retidas vão para a faixa negativa (D52)
+make sync-airbyte            # antes do legado: a guarda precisa ver o job novo na listagem
+make sync-legacy
+```
+
+Sem o contador, a guarda de identidade recusa o disparo; sem o re-base, a certificação da captura
+acusa `inconsistent`, porque a geração nova divide o número com uma retida. A sequência de
+restauração faz os dois sozinha ([Capacidade §3.4](capacidade_e_recuperacao.md#34-a-sequência-de-restauração)),
+e é lá que foram medidos; depois de só reinstalar o Airbyte, eles vão à mão — esse caminho não foi
+medido fora da restauração.
+
+### Depois de reiniciar a máquina, o Airbyte responde 401 e o `terraform` não aplica
+
+Sintoma: a API sobe e responde `/health`, mas toda chamada volta com
+
+```
+401 {"message":"Could not get the current Airbyte user due to an internal error."}
+```
+
+e o log do `server` traz a causa real: `ERROR: relation "public.auth_user" does not exist`.
+
+O banco interno do Airbyte subiu **vazio** — `select count(*) from information_schema.tables where
+table_schema='public'` devolve zero. Os *pods* estão todos de pé; o que falta é o schema. Não é o
+mesmo caso da seção anterior: lá o cluster foi destruído e os dados ficaram; aqui o cluster está
+inteiro e os dados é que não estão. Em 05/09/2026, o `make airbyte-up` esbarrou no mesmo
+`permission denied` ao tentar consertar. Desde a D53 ele nem tenta: com o cluster de pé, só confere
+o `/health`, que nesse estado responde — se com `available:true`, não foi registrado —, e por isso
+não é o que acusa o problema.
+
+Quem cria esse schema é o *pod* `airbyte-abctl-bootloader`, que roda uma vez na instalação e fica
+como `Completed`. Rodá-lo de novo aplica as migrações sobre o banco vazio, e é a correção mais
+barata — não mexe em nada no disco do host:
+
+```bash
+K="docker exec airbyte-abctl-control-plane kubectl -n airbyte-abctl"
+$K get pod airbyte-abctl-bootloader -o json \
+  | python3 -c "import json,sys; p=json.load(sys.stdin); p['metadata']={'name':'bootloader-rerun','namespace':'airbyte-abctl'}; p.pop('status'); [p['spec'].pop(k,None) for k in ('nodeName','nodeSelector','tolerations')]; print(json.dumps(p))" \
+  | docker exec -i airbyte-abctl-control-plane kubectl apply -n airbyte-abctl -f -
+```
+
+Quando o *pod* chegar a `Succeeded`, reinicie `server`, `worker`, `workload-launcher`,
+`workload-api-server` e `cron` (`kubectl rollout restart deploy/...`) e refaça a configuração com
+`make airbyte-config AUTO=1`.
+
+**Uma armadilha no caminho de volta.** A conexão recriada nasce **sem cursor**: a sincronização
+seguinte relê tudo. Isso é inofensivo por construção — o `dedup_history` casa versões pela chave e o
+`staging` deduplica o `append` (ADR-0015) —, mas leva o tempo de uma carga completa, não o de um
+incremental.
+
+Havia uma segunda até o B5: o `terraform apply` criava fonte e destino em paralelo, os dois
+inicializavam a tabela `secrets` ao mesmo tempo, e um morria com `duplicate key value violates unique
+constraint "pg_type_typname_nsp_index"` — rodar de novo resolvia. Desde `45395e3` (25/09/2026) o
+`make airbyte-config` aplica um recurso por vez (`-parallelism=1`), e a colisão não se repete; se
+aparecer, o `terraform apply` foi chamado por fora do alvo.
+
+### O `pipeline` Beam morre sozinho depois de exatos cinco minutos
+
+Sintoma: `make stream-run` roda normalmente, o Prism informa `pipeline is running`, e em cinco
+minutos o processo cai com `DEADLINE_EXCEEDED: Stream removed`.
+
+É o `job_server_timeout` do Beam, cujo padrão é 300 s. A documentação da opção diz que ele "não se
+aplica ao tempo de execução do pipeline" — e se aplica: o fluxo de mensagens do job herda o mesmo
+prazo, e o cliente desiste de um job que continua vivo do lado do runner.
+
+Já está tratado em `mvp_ed1/streaming/pipeline.py`, que declara um dia. Se um dia não bastar para a
+sua sessão, o número está lá, nomeado.
+
+### O tópico de alerta fica vazio mesmo com eventos entrando
+
+Duas causas, e as duas são comportamento correto:
+
+1. **Os eventos vieram do *snapshot* inicial.** O painel formado só por eventos do *snapshot*
+   constrói o saldo e não alerta — do contrário, replicar dois anos e meio de livro encheria o
+   tópico de avisos sobre estoque de 2024 (Streaming §5).
+2. **Nada cruzou o limiar.** O alerta é borda, não nível: só a travessia emite. Confira com
+   `make stream-alerts`, que resume aberturas e normalizações, e produza mais eventos com
+   `make stream-produce`. No B5, 200 eventos não cruzaram o limiar em saldo nenhum; 2.200
+   produziram 11 alertas.
+
+### `make stream-down` sem `FORCE=1` deixa o slot de replicação para trás
+
+O *slot* de replicação vive no `source_db` e sobrevive à queda do Kafka Connect. Enquanto ele
+existir, o PostgreSQL segura WAL para um consumidor que não existe mais — até o disco acabar. É a
+pegadinha clássica de CDC.
+
+`make stream-down FORCE=1` remove o *slot* junto com os tópicos. Para conferir o que ficou:
+
+```sql
+select slot_name, active, pg_size_pretty(
+    pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) as wal_retido
+from pg_replication_slots;
+```
+
+### `make seed-data` recusa executar
+
+Mensagem `N tabelas já contêm dados`. É o comportamento pretendido — ver
+[seção 3.1](#31-parâmetros-do-gerador). Use `FORCE=1` se realmente quiser descartar a carga atual.

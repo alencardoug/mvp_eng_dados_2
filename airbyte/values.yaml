@@ -1,0 +1,199 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Dimensionamento dos *jobs* do Airbyte para uma máquina de 4 CPUs.
+#
+# ── O problema ────────────────────────────────────────────────────────────────
+# O Airbyte pede "4 CPUs e 8 GB" para a plataforma, e é exatamente o tamanho da
+# máquina de desenvolvimento deste projeto. O que a documentação não diz é que o
+# *pod* de replicação pede, por padrão, **outros 4 CPUs**: 2 para o orquestrador
+# e 1 para cada conector. Com a plataforma já segurando 1,1, ele nunca é
+# agendável — o Kubernetes responde `Insufficient cpu`, o job fica `Pending`
+# para sempre e a interface mostra "running". Falha silenciosa.
+#
+# ── O que **não** resolve ─────────────────────────────────────────────────────
+# Três caminhos foram testados e nenhum alcança a replicação:
+#
+#   * `abctl local install --low-resource-mode`, que é a resposta documentada do
+#     Airbyte para máquina apertada;
+#   * `global.jobs.resources`, que o próprio chart marca como **depreciada** com
+#     a ressalva "replication is not consumed";
+#   * mexer no ConfigMap com o Helm por cima, que a próxima instalação desfaz.
+#
+# ── O que resolve ─────────────────────────────────────────────────────────────
+# `global.workloads.resources`, abaixo. `useConnectorResourceDefaults: false` é
+# o que faz os valores valerem: com ele ligado, os padrões por conector passam
+# por cima de tudo.
+#
+# **Pedido não é limite.** O pedido é o que o agendador reserva; o limite é o
+# teto. Baixar o pedido não torna a carga mais lenta em máquina ociosa — apenas
+# deixa de exigir garantia que a máquina não tem para dar. Os limites continuam
+# altos de propósito.
+#
+# Uso: `make airbyte-up`, que passa este arquivo ao `abctl`.
+# ══════════════════════════════════════════════════════════════════════════════
+
+global:
+  workloads:
+    resources:
+      # Sem isto, os padrões por conector sobrepõem tudo que vem abaixo.
+      useConnectorResourceDefaults: false
+
+      # Conectores de origem e destino dentro do pod de replicação.
+      mainContainer:
+        cpu:
+          request: 100m
+          limit: "2"
+        memory:
+          request: 512Mi
+          limit: 2Gi
+
+      # Orquestrador da replicação — era ele que pedia 2 CPUs sozinho.
+      replication:
+        cpu:
+          request: 100m
+          limit: "2"
+        memory:
+          request: 512Mi
+          limit: 2Gi
+
+      # Sidecar que carrega configuração e recolhe log.
+      sidecar:
+        cpu:
+          request: 50m
+          limit: "1"
+        memory:
+          request: 128Mi
+          limit: 512Mi
+
+      # Verificação de conexão e descoberta de schema: rápidas e pequenas.
+      check:
+        cpu:
+          request: 50m
+          limit: "1"
+        memory:
+          request: 256Mi
+          limit: 1Gi
+      discover:
+        cpu:
+          request: 50m
+          limit: "1"
+        memory:
+          request: 256Mi
+          limit: 1Gi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Teto de memória dos serviços da plataforma.
+#
+# ── O problema ────────────────────────────────────────────────────────────────
+# O bloco acima dimensiona os *jobs* — pods efêmeros de replicação, check e
+# discover. Os serviços **permanentes** ficavam sem teto nenhum, e são eles que
+# seguram memória o dia inteiro: cinco JVMs medidas em 2,8 GB somados, dentro de
+# um cluster `kind` que custava 4,5 GB à máquina (Capacidade §2.8).
+#
+# A causa é a combinação de dois padrões, nenhum deles errado sozinho:
+#
+#   * o chart entrega `resources.limits: {}` — sem limite de cgroup;
+#   * o template fixa `-XX:MaxRAMPercentage=75.0` em toda JVM
+#     (`templates/_helpers.tpl`), e o valor **não** é parametrizável.
+#
+# Sem limite no contêiner, "75% da RAM" é 75% da **máquina inteira**: cada uma
+# das cinco JVMs se considera autorizada a um heap de ~8,6 GB numa máquina de
+# 11,5 GB. Elas não chegam lá — mas o GC não tem por que ser econômico, o heap
+# incha, e o conjunto empurra a máquina para o swap. Foi o que travou a estação
+# em 07/09/2026.
+#
+# ── O que resolve ─────────────────────────────────────────────────────────────
+# Declarar `limits.memory` por serviço. O Java 21 é *container-aware*: com o
+# limite presente, `MaxRAMPercentage` passa a ser lido sobre o teto do contêiner
+# e não sobre a máquina — 75% de 1Gi, não de 11,5Gi. É o mesmo tratamento que o
+# Redpanda e o Kafka Connect já recebem por `--memory` e `-Xmx` declarados em
+# `docker-compose.streaming.yml` (Capacidade §2.4), e que faltava aqui.
+#
+# ── Por que só memória ────────────────────────────────────────────────────────
+# **CPU fica intocada, de propósito.** A restrição da Etapa 5 foi CPU, e o custo
+# de descobrir isso está documentado no bloco acima: pedido de CPU alto demais
+# torna o pod não-agendável e a falha é silenciosa. Teto de memória não tem esse
+# efeito colateral — o pedido continua baixo, e o que muda é só o limite.
+#
+# ── Como estes números foram escolhidos ───────────────────────────────────────
+# Limite ≈ 1,5× o RSS medido em 07/09/2026 com heap irrestrito, arredondado para
+# cima. A folga cobre o que vive fora do heap — metaspace, pilhas, buffers —, que
+# `MaxRAMPercentage` não governa: limite apertado demais não faz o GC trabalhar,
+# faz o Kubernetes matar o pod. Pedido baixo porque pedido é reserva do
+# agendador, não consumo.
+#
+#   Serviço              RSS sem teto    limite    RSS com teto
+#   server                    662 MB      1Gi         634 MB
+#   cron                      624 MB    768Mi         605 MB
+#   workload-api-server       553 MB    768Mi         455 MB
+#   workload-launcher         484 MB    768Mi         437 MB
+#   worker                    480 MB      1Gi         466 MB
+#   somados                 2.803 MB                2.596 MB
+#
+# ── O que a medição mostrou, e o que ela não mostrou ──────────────────────────
+# **Medido em 07/09/2026, com `make sync-airbyte` completando 26.093 linhas.**
+#
+#   * Ocioso: −207 MB, 7%. Modesto, e a razão é aritmética — o RSS já estava
+#     abaixo dos tetos, e teto acima do consumo não aperta nada.
+#   * Pico durante a sincronização: **não caiu** (4,95 GiB). O pico é dominado
+#     pelos *pods de job*, cujos limites vivem no bloco `global.workloads` acima
+#     e **não** foram alterados: `replication` 2Gi + `mainContainer` 2Gi +
+#     `sidecar` 512Mi somam mais que toda a plataforma permanente.
+#   * Nenhum pod morto por limite; nenhum disparo do OOM killer na janela.
+#
+# Então o que estes tetos entregam **não** é redução de consumo: é a garantia de
+# que nenhuma JVM permanente pode inchar sem limite sob pressão, que era o
+# defeito de origem. Quem impede o travamento da estação é o `docker/preflight.sh`,
+# dimensionado pelo pico medido. Registrado no ADR-0041.
+# ══════════════════════════════════════════════════════════════════════════════
+
+server:
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      memory: 384Mi
+
+worker:
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      memory: 384Mi
+
+cron:
+  resources:
+    limits:
+      memory: 768Mi
+    requests:
+      memory: 256Mi
+
+workloadApiServer:
+  resources:
+    limits:
+      memory: 768Mi
+    requests:
+      memory: 256Mi
+
+workloadLauncher:
+  resources:
+    limits:
+      memory: 768Mi
+    requests:
+      memory: 256Mi
+
+# Servidor de manifesto e Temporal não apareceram entre os cinco maiores; os
+# tetos abaixo são folgados de propósito, e só existem para que nenhum serviço
+# permanente fique sem limite — que era a falha de origem.
+manifestServer:
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      memory: 128Mi
+
+temporal:
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      memory: 256Mi

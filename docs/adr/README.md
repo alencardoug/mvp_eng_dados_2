@@ -1,0 +1,143 @@
+# Registro de Decisões (ADR)
+
+> **O que vive aqui:** as decisões do projeto — as tomadas (um arquivo ADR cada) e as ainda
+> abertas, quando houver (seção 3).
+>
+> **O que não vive aqui:** a arquitetura resultante (ver [Arquitetura](../arquitetura.md)) e a
+> ordem de execução (ver [Plano de Desenvolvimento](../plano_de_desenvolvimento.md)).
+
+Um **ADR** registra uma decisão relevante, o contexto que a motivou, as alternativas consideradas e
+as consequências aceitas. O objetivo não é documentar o que foi feito, e sim **por que** — de modo
+que a decisão possa ser revista com conhecimento de causa, inclusive na replicação para o GCP.
+
+---
+
+## 1. Como funciona
+
+1. Enquanto a escolha está aberta, ela é uma **decisão pendente** (`Dnn`) na tabela da seção 3.
+2. Quando é decidida, nasce um arquivo `NNNN-titulo-em-kebab-case.md` a partir do
+   [`0000-template.md`](0000-template.md), e a pendência sai da tabela.
+3. Um ADR aceito **nunca é apagado nem reescrito**. Se for revertido, passa a `Substituída` e o
+   novo ADR referencia o anterior.
+4. Toda *mudança relevante*, no sentido do [Termo de Abertura](../../Abertura_de_projeto.md), exige
+   um ADR.
+5. Todo ADR declara a sua **contrapartida na fase GCP**. Decisão sem equivalente na nuvem não é
+   aceitável (princípio **P4**).
+
+A numeração `Dnn` é sequencial mas **não é densa**: uma lacuna não significa decisão perdida.
+**D19** nunca existiu — verificado em 03/09/2026 contra todas as revisões do repositório — e o
+identificador não será reaproveitado, para que nenhuma referência antiga passe a apontar para outra
+decisão.
+
+**Estados:** `Proposta` · `Aceita` · `Rejeitada` · `Substituída`
+
+---
+
+## 2. Decisões registradas
+
+| ADR | Título | Estado | Resolve |
+|---|---|---|---|
+| [0001](0001-registrar-decisoes-em-adr.md) | Registrar decisões de arquitetura em ADR | Aceita | — |
+| [0002](0002-dominio-marketplace-omnichannel.md) | Adotar um marketplace de varejo *omnichannel* como domínio | Aceita | D01 |
+| [0003](0003-stack-airbyte-dbt-airflow.md) | Adotar Airbyte, dbt e Airflow desde a fase local | Aceita | D06, D07, D08 |
+| [0004](0004-terraform-como-iac.md) | Usar Terraform para levar o ambiente local ao GCP | Aceita | D12 |
+| [0005](0005-geracao-com-faker-orientada-a-configuracao.md) | Gerar dados com Faker por meio de um motor orientado a configuração | Aceita | D05 |
+| [0006](0006-streaming-de-estoque-com-cdc-e-beam.md) | Incluir um fluxo de streaming de estoque com CDC e Apache Beam | Aceita | Mecanismo de baixa latência |
+| [0007](0007-catalogo-como-codigo.md) | Manter o catálogo de dados como código | Aceita | Ferramenta de catálogo local |
+| [0008](0008-schemas-do-armazem.md) | Fixar os schemas do armazém e separar estágio de schema | Aceita | D02 |
+| [0009](0009-sqlalchemy-para-acesso-a-dados.md) | Usar SQLAlchemy para o acesso a dados em Python | Aceita | D03 |
+| [0010](0010-alembic-para-migracoes.md) | Usar Alembic para as migrações de schema | Aceita | D04 |
+| [0011](0011-classificacao-e-papeis-de-acesso.md) | Fixar os níveis de classificação e os papéis de acesso | Aceita | D09 |
+| [0012](0012-repositorio-com-pacote-instalavel.md) | Organizar o repositório com `src/` como pacote instalável | Aceita | D10 |
+| [0013](0013-nomenclatura-por-prefixo-de-tipo.md) | Nomear objetos de banco com prefixo por tipo | Aceita | D13 |
+| [0014](0014-volume-por-proporcoes-e-fator-de-escala.md) | Parametrizar o volume por proporções e fator de escala | Aceita | D26 |
+| [0015](0015-sincronizacao-e-exclusoes.md) | Fixar o critério de sincronização e o tratamento de exclusões | Aceita | D20, D21 |
+| [0016](0016-materializacao-por-camada.md) | Materializar por camada, com incremental como exceção justificada | Aceita | D23 |
+| [0017](0017-chaves-substitutas-e-scd.md) | Derivar chaves substitutas por hash e historizar com snapshots | Aceita | D25 |
+| [0018](0018-fatos-e-views-a-partir-de-perguntas-de-negocio.md) | Derivar fatos e views de consumo das perguntas de negócio | Aceita | D24, D27 |
+| [0019](0019-saldo-em-deltas-com-entrega-idempotente.md) | Manter o saldo de estoque como deltas imutáveis, com entrega idempotente | Aceita | D16, D17, D18 |
+| [0020](0020-debezium-sobre-kafka-connect.md) | Implantar o Debezium sobre Kafka Connect | Aceita | D29 |
+| [0021](0021-procedencia-no-empilhamento.md) | Carregar a procedência em coluna própria no empilhamento | Aceita | D15 |
+| [0022](0022-catalogo-declarativo-de-falhas-do-legado.md) | Declarar as falhas do legado em catálogo único | Aceita | D28 |
+| [0023](0023-escopo-do-schema-governance.md) | Restringir o schema `governance` a controle e auditoria | Aceita | D14 |
+| [0024](0024-airbyte-e-airflow-no-gcp.md) | Replicar Airbyte e Airflow no GCP preservando a paridade | Aceita | D11, D22 |
+| [0025](0025-policy-tags-por-fluxo-automatizado.md) | Aplicar as policy tags por fluxo automatizado | Aceita | Q1 |
+| [0026](0026-uv-para-ambiente-e-dependencias.md) | Adotar `uv` para o ambiente e as dependências Python | Aceita | Ambiente e interpretador Python |
+| [0027](0027-configuracao-do-gerador-em-yaml.md) | Declarar o gerador em YAML, com o piso derivado dos modelos | Aceita | Formato e piso da configuração |
+| [0028](0028-fato-de-carrinho-para-o-funil.md) | Acrescentar uma fato de carrinho para o funil de conversão | Aceita | Lacuna do funil de conversão |
+| [0029](0029-exclusao-logica-como-marca-na-dimensao.md) | Carregar a exclusão lógica como marca até a dimensão | Aceita | D30 |
+| [0030](0030-cmv-do-livro-de-estoque.md) | Tirar o custo do produto vendido do livro de estoque | Aceita | Origem do CMV |
+| [0031](0031-aterrissagem-do-caminho-quente-em-raw.md) | Aterrissar o caminho quente em `raw` e transformar o Airbyte em reconciliação | Aceita | Aterrissagem, *snapshot* e papel do Airbyte |
+| [0032](0032-fonte-python-no-lugar-do-kafkaio.md) | Ler o transporte com fonte Python, e não com o KafkaIO do Beam | Aceita | Ponta de leitura sem Java |
+| [0033](0033-entrega-medida-em-dois-graos.md) | Medir a entrega em dois grãos, e nomear os dois no glossário | Aceita | Grão da medição de entrega |
+| [0034](0034-entrega-do-livro-de-eventos.md) | Tirar a data de entrega do livro de eventos, não da coluna da remessa | Aceita | Procedência da data de entrega |
+| [0035](0035-aposentar-dimensoes-sem-pergunta.md) | Aposentar `dim_time` e `dim_currency`, que nenhuma pergunta recorta | Aceita | Escopo do inventário dimensional |
+| [0036](0036-recompra-ancorada-no-pedido.md) | Ancorar a recompra pós-atendimento no pedido | Aceita | Âncora da janela de P16 |
+| [0037](0037-reter-capturas-do-legado-por-acrescimo.md) | Reter as capturas do legado com um quarto modo de sincronização | Aceita | Retenção do *snapshot* legado |
+| [0038](0038-quarentena-de-excedente-e-rejeicao-em-cascata.md) | Fechar as equações com quarentena de excedente e rejeição em cascata | Aceita | Duplicata exata e filho de pai rejeitado |
+| [0039](0039-alcance-da-procedencia.md) | Aplicar a procedência onde as duas origens se encontram | Aceita | Alcance do `source_system` |
+| [0040](0040-rejeitar-nulo-em-campo-obrigatorio.md) | Rejeitar nulo em campo obrigatório após a limpeza | Aceita | D32 |
+| [0041](0041-teto-de-memoria-nos-servicos-do-airbyte.md) | Declarar teto de memória em todo serviço permanente do Airbyte | Aceita | Parte da D36 |
+| [0042](0042-reconciliar-a-captura-legada-na-fato-incremental.md) | Reconciliar a captura legada na fato incremental por `delete+insert` | Aceita | D37 |
+| [0043](0043-impedir-que-o-tratamento-do-legado-esgote-a-estacao.md) | Impedir que o tratamento do legado esgote a memória da estação | Aceita | D38 |
+| [0044](0044-certificar-cada-captura-do-legado-por-conteudo.md) | Certificar cada captura do legado por conteúdo, por *stream* e por *job* | Aceita | D41 |
+| [0045](0045-detectar-exclusao-fisica-do-legado-no-bruto-retido.md) | Detectar a exclusão física do legado no bruto retido, sem marca dimensional | Aceita | D39 |
+| [0046](0046-validar-a-fase-local-por-partes.md) | Validar a fase local por partes, sem exigir *batch* e *streaming* simultâneos | Aceita | D36 |
+| [0047](0047-materializar-o-cte-de-limpeza-do-legado.md) | Materializar o CTE de limpeza dos modelos do legado no PostgreSQL | Aceita | D42 |
+| [0048](0048-tratar-segredo-achado-no-historico-pelo-tipo-da-credencial.md) | Tratar segredo achado no histórico pelo tipo da credencial | Aceita | D48 |
+| [0049](0049-separar-a-classificacao-da-exposicao.md) | Separar a classificação da exposição do dado sintético | Aceita | — (O2 e N8 do plano do `bi-como-codigo`) |
+| [0050](0050-guardar-a-memoria-do-legado-num-livro-retido.md) | Guardar a memória do legado num livro retido, com recuperação registrada | Aceita | — (N29 a N35 do plano do `bi-como-codigo`) |
+| [0051](0051-cdc-da-fase-gcp-pelo-debezium-server.md) | Levar o CDC da fase GCP ao Pub/Sub pelo Debezium Server | Aceita | D69 |
+
+---
+
+## 3. Decisões pendentes
+
+| # | Decisão | Levantada em | Efeito de não decidir |
+|---|---|---|---|
+| D43 | A guarda de identidade da macro `chave_canonica` como função `safe_cast` no armazém, em vez da gramática reproduzida em SQL — **adiada de propósito** para a Etapa 13 ([Pendências](../pendencias.md#d43--a-guarda-de-identidade-como-função-no-armazém-adiada-em-16092026)) | 16/09/2026 | Nenhum na fase local; a paridade com `SAFE_CAST` fica suposta até lá |
+| D66 | Uma fato no grão da remessa para a P13 contar toda remessa entregue, como o ADR-0033 define, ou a definição emendada — **adiada** para depois da v1.1.0 ([Pendências](../pendencias.md#d66--a-p13-não-conta-a-remessa-entregue-cujos-itens-foram-todos-rejeitados)) | 03/11/2026 | A taxa do ramo legado deixa de fora 12 de 144 remessas entregues, sem teste que acuse |
+
+Decisões nascidas da **revisão por outro agente**, e não da construção, já são maioria nesta etapa —
+quatro delas, todas de alguém olhando o que estava pronto, e nenhuma era implementação: as quatro
+mudaram contrato. Estão todas registradas na §2 acima, com o ADR que as fechou; a tabela desta seção
+lista apenas o que continua em aberto.
+
+### Decisões de abertura já resolvidas
+
+As três lacunas de contrato que a Etapa 10 levantou na abertura foram fechadas no mesmo
+dia, por interrogatório: como o legado retém as capturas
+([ADR-0037](0037-reter-capturas-do-legado-por-acrescimo.md)), o que acontece com a duplicata exata e
+com o filho de um pai rejeitado ([ADR-0038](0038-quarentena-de-excedente-e-rejeicao-em-cascata.md)),
+e onde a procedência passa a existir ([ADR-0039](0039-alcance-da-procedencia.md)).
+
+Antes delas, a última pendência numerada foi a D31 — a remessa que nascia sem item —, fechada em 05/09/2026: o
+Owner autorizou corrigir o gerador e re-medir, a correção foi executada e revalidada, e o aceite
+está registrado nas [Pendências](../pendencias.md). O conserto **não** exigiu ADR novo, e nenhum
+ADR aceito foi reescrito — a re-medição foi registrada como execução nova, ao lado das históricas.
+
+Ela é a única `Dnn` do projeto que não nasceu de uma escolha de arquitetura, e sim de um achado: um
+defeito encontrado ao construir a Etapa 8 e que só virou decisão porque consertá-lo custava refazer
+medições já publicadas.
+
+As decisões de abertura das Etapas 8 e 9 foram fechadas no mesmo dia em que foram levantadas, por
+interrogatório: em que grão a entrega é medida, quando o pedido se divide em duas remessas
+([ADR-0033](0033-entrega-medida-em-dois-graos.md)); de onde sai a data de entrega realizada — do
+livro de eventos, não da coluna da remessa ([ADR-0034](0034-entrega-do-livro-de-eventos.md)); o que
+fazer com as duas dimensões que nenhuma pergunta recorta
+([ADR-0035](0035-aposentar-dimensoes-sem-pergunta.md)); e de que marco corre a janela de recompra de
+P16 ([ADR-0036](0036-recompra-ancorada-no-pedido.md)).
+
+Antes delas, as três que a Etapa 7 levantou foram fechadas do mesmo modo: onde o caminho quente
+aterrissa, quem faz o *backfill* dele e o que acontece com o *stream* do Airbyte — todas no
+[ADR-0031](0031-aterrissagem-do-caminho-quente-em-raw.md) —, e como o *pipeline* lê o transporte sem
+Java na máquina, no [ADR-0032](0032-fonte-python-no-lugar-do-kafkaio.md).
+
+As duas primeiras nasceram de **documentos aceitos que se contradiziam**: o ADR-0008 proíbe ler de
+camada posterior, o `streaming.md` desenhava o Beam escrevendo em `analytics`, e o ADR-0016
+concedera a exceção incremental justamente porque o *streaming* alimentaria a fato. Contradição
+entre decisões vigentes é decisão nova, e volta ao Owner — não se resolve escolhendo em silêncio
+qual documento vale.
+
+O procedimento — registrar como pendência, devolver ao Owner, e só então implementar — está na
+seção 1.

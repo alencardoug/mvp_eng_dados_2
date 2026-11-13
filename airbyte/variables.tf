@@ -1,0 +1,133 @@
+# Nenhum valor de credencial aqui. Todos entram por `TF_VAR_*`, que o Makefile
+# preenche a partir do `.env` e do `abctl local credentials` — regra inviolável
+# 1 do CLAUDE.md.
+
+variable "airbyte_server_url" {
+  description = "URL da API pública do Airbyte local."
+  type        = string
+  default     = "http://localhost:8000/api/public/v1"
+}
+
+variable "airbyte_client_id" {
+  description = "Client ID da aplicação Airbyte; vem de `abctl local credentials`."
+  type        = string
+  sensitive   = true
+}
+
+variable "airbyte_client_secret" {
+  description = "Client secret da aplicação Airbyte."
+  type        = string
+  sensitive   = true
+}
+
+variable "source_db_host" {
+  description = <<-EOT
+    Host do `source_db` **visto de dentro do cluster do Airbyte**, que não é o
+    mesmo que `localhost`: o Airbyte roda em um cluster Kubernetes próprio, e o
+    banco está publicado no host. O gateway da bridge do Docker é o caminho.
+  EOT
+  type        = string
+  default     = "172.17.0.1"
+}
+
+variable "source_db_port" {
+  type    = number
+  default = 5432
+}
+
+variable "source_db_name" { type = string }
+variable "source_db_user" { type = string }
+variable "source_db_password" {
+  type      = string
+  sensitive = true
+}
+
+# ── Origem legada (Etapa 10) ─────────────────────────────────────────────────
+# Segundo banco de origem, com as mesmas 40 tabelas e sem governança. A porta
+# padrão é a do serviço `legacy_db` do Compose.
+variable "legacy_db_host" {
+  type    = string
+  default = "172.17.0.1"
+}
+variable "legacy_db_port" {
+  type    = number
+  default = 5433
+}
+variable "legacy_db_name" { type = string }
+variable "legacy_db_user" { type = string }
+variable "legacy_db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "warehouse_db_host" {
+  type    = string
+  default = "172.17.0.1"
+}
+variable "warehouse_db_port" {
+  type    = number
+  default = 5434
+}
+variable "warehouse_db_name" { type = string }
+variable "warehouse_db_user" { type = string }
+variable "warehouse_db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "airbyte_workspace_id" {
+  description = "Workspace padrão criado pelo `abctl`; o Makefile o descobre pela API."
+  type        = string
+}
+
+# Identificadores dos conectores no catálogo do Airbyte. São estáveis entre
+# instalações — estes foram conferidos na tabela `actor_definition` da própria
+# instância, e não copiados de documentação. A API pública não lista definições
+# (responde 403), então fixá-los aqui é a alternativa honesta a um `curl` que
+# não funciona.
+variable "postgres_source_definition_id" {
+  description = "definition_id do conector de origem PostgreSQL."
+  type        = string
+  default     = "decd338e-5647-4c0b-adf4-da0e75f5a750"
+}
+
+variable "postgres_destination_definition_id" {
+  description = "definition_id do conector de destino PostgreSQL."
+  type        = string
+  default     = "25c5221d-dce2-4163-ade9-739ef790f503"
+}
+
+# ── Fase GCP (Etapa 13, G3; D72) ─────────────────────────────────────────────
+# A mesma declaração, com o armazém trocado: `bigquery` cria o destino BigQuery no lugar do
+# PostgreSQL local, e as origens passam a exigir SSL (o Cloud SQL só aceita conexão cifrada).
+# O estado da nuvem vive num *workspace* próprio do Terraform (`gcp`), nunca no local.
+variable "armazem" {
+  description = "postgres (fase local) ou bigquery (fase GCP)."
+  type        = string
+  default     = "postgres"
+
+  validation {
+    condition     = contains(["postgres", "bigquery"], var.armazem)
+    error_message = "armazem: postgres ou bigquery."
+  }
+}
+
+variable "gcp_project_id" {
+  description = "O projeto do BigQuery na fase GCP."
+  type        = string
+  default     = ""
+}
+
+variable "gcp_bq_location" {
+  description = "A região dos datasets na fase GCP."
+  type        = string
+  default     = ""
+}
+
+# Conferido no registro oficial de conectores (oss_registry.json, destination-bigquery 3.1.0)
+# em 07/11/2026 — a mesma regra dos dois acima: fixado, não descoberto pela API.
+variable "bigquery_destination_definition_id" {
+  description = "definition_id do conector de destino BigQuery."
+  type        = string
+  default     = "22f6c74f-5699-40ff-833c-4a879ea40133"
+}

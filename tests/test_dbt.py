@@ -1,0 +1,297 @@
+"""O projeto dbt confere com o resto do repositório.
+
+São testes de **coerência entre artefatos**, não de dados: o dbt tem os seus
+próprios testes, e o banco tem as suas constraints. O que nenhum dos dois vê é
+quando dois arquivos do repositório passam a discordar um do outro.
+"""
+
+from __future__ import annotations
+
+import json
+import pathlib
+import re
+
+import pytest
+import yaml
+
+RAIZ = pathlib.Path(__file__).resolve().parents[1]
+DBT = RAIZ / "dbt"
+
+
+def _carregar(caminho: pathlib.Path) -> dict:
+    return yaml.safe_load(caminho.read_text(encoding="utf-8"))
+
+
+# ── As tarefas da DAG e os testes que atravessam camadas ─────────────────────
+#: As tarefas dbt de `fluxo_batch`, na ordem em que rodam: o que cada uma seleciona
+#: (camadas e etiquetas) e o que exclui. `seed` e `snapshots` não rodam teste; a
+#: `fronteiras`, a última, roda só os de etiqueta `fronteira`, com tudo construído.
+#: Espelha `airflow/dags/fluxo_batch.py`, que o teste confere para o espelho não
+#: envelhecer calado.
+TAREFAS_DA_DAG = (
+    ("seed", None, set()),
+    ("staging", ({"staging"}, set()), {"fronteira"}),
+    ("trusted", ({"trusted"}, set()), {"legado_reconciliacao", "fronteira"}),
+    ("quarantine", ({"quarantine"}, {"legado_reconciliacao"}), set()),
+    ("snapshots", None, set()),
+    ("analytics", ({"analytics"}, set()), {"fronteira"}),
+    ("consumption", ({"consumption"}, set()), {"fronteira"}),
+)
+SELECOES_DA_DAG = (
+    'camada("seed", "", comando="seed")',
+    'camada("staging", f"--select staging {fronteira}")',
+    'camada("trusted", f"--select trusted --exclude tag:legado_reconciliacao tag:fronteira")',
+    'camada("quarantine", "--select quarantine tag:legado_reconciliacao")',
+    'camada("snapshots", "", comando="snapshot")',
+    'camada("analytics", f"--select analytics {fronteira}")',
+    'camada("consumption", f"--select consumption {fronteira}")',
+    'camada("fronteiras", "--select tag:fronteira", comando="test")',
+)
+
+
+def _tarefa_que_constroi(no: dict) -> str | None:
+    if no["resource_type"] == "seed":
+        return "seed"
+    if no["resource_type"] == "snapshot":
+        return "snapshots"
+    if no["resource_type"] == "model":
+        return no["fqn"][1]
+    return None
+
+
+def test_teste_que_atravessa_tarefas_da_dag_nunca_roda_antes_de_um_pai() -> None:
+    """A seleção indireta do dbt (*eager*) traz para cada tarefa da DAG todo teste que cite um modelo
+    dela. Rodando ali antes da tarefa que constrói outro pai dele, o teste compara o novo com o velho —
+    ou com nada: a tarefa que refaz uma tabela derruba por `cascade` as views que dependem dela. Foi o
+    que a P09 da D67 encontrou no F3 da regeneração da v1.1.0, com o consumo vazio. O remédio é a
+    etiqueta `fronteira`, que tira o teste das tarefas por camada (Qualidade §7)."""
+    dag = (RAIZ / "airflow" / "dags" / "fluxo_batch.py").read_text(encoding="utf-8")
+    for selecao in SELECOES_DA_DAG:
+        assert selecao in dag, f"a DAG mudou ({selecao!r} não está lá): atualize TAREFAS_DA_DAG"
+    manifest_path = DBT / "target" / "manifest.json"
+    if not manifest_path.exists():
+        pytest.skip("sem dbt/target/manifest.json; rode `make dbt-build`")
+    nos = json.loads(manifest_path.read_text(encoding="utf-8"))["nodes"]
+    ordem = {nome: i for i, (nome, *_) in enumerate(TAREFAS_DA_DAG)}
+    antes_de_um_pai = []
+    for no in nos.values():
+        if no["resource_type"] != "test":
+            continue
+        etiquetas = set(no.get("tags") or [])
+        pais = {_tarefa_que_constroi(nos[p]) for p in no["depends_on"]["nodes"] if p in nos} - {None}
+        for nome, selecao, exclui in TAREFAS_DA_DAG:
+            if selecao is None or etiquetas & exclui:
+                continue
+            camadas, por_etiqueta = selecao
+            if not (pais & camadas or etiquetas & por_etiqueta):
+                continue
+            tardios = sorted(p for p in pais if ordem[p] > ordem[nome])
+            if tardios:
+                antes_de_um_pai.append((no["name"], nome, tardios))
+    assert antes_de_um_pai == [], (
+        "teste que roda numa tarefa da DAG antes da tarefa que constrói um pai dele — leva a etiqueta "
+        f"`fronteira`: {antes_de_um_pai}"
+    )
+
+
+@pytest.fixture(scope="module")
+def projeto_dbt() -> dict:
+    return _carregar(DBT / "dbt_project.yml")
+
+
+def test_as_of_date_do_dbt_bate_com_a_do_gerador(config, projeto_dbt) -> None:
+    """O dono do valor é o gerador; o dbt tem um espelho que ele consegue ler.
+
+    Se os dois divergirem, "cliente ativo" passa a ser contado em uma janela que
+    termina onde o dado não termina — e o erro não aparece como falha, aparece
+    como um número menor.
+    """
+    assert str(projeto_dbt["vars"]["as_of_date"]) == config.as_of_date.isoformat()
+    assert str(projeto_dbt["vars"]["period_start"]) == config.period_start.isoformat()
+
+
+#: Fontes de `raw` que **não** vêm do Airbyte. Desde a Etapa 7 há uma: o
+#: caminho quente escreve os próprios deltas em `raw` (ADR-0031), e o `staging`
+#: os lê como qualquer outra fonte da camada. A lista é explícita de propósito —
+#: acrescentar uma fonte sem alimentador é o defeito que este teste pega, e uma
+#: exceção genérica o desligaria.
+FONTES_DO_CAMINHO_QUENTE = {"inventory_movements_stream"}
+
+#: Os quatro modos do ADR-0015, mais o quarto que o ADR-0037 acrescentou.
+MODOS = {"full_refresh", "full_refresh_append", "dedup_history", "append"}
+
+
+def _origem(nome: str) -> dict:
+    return _carregar(RAIZ / "airbyte/streams.yml")["origens"][nome]
+
+
+def test_toda_tabela_do_stream_tem_fonte_declarada_no_dbt() -> None:
+    """O que se ingere é o que o dbt lê — nem mais, nem menos.
+
+    Stream ingerido sem modelo que o leia é volume sem consumidor; fonte
+    declarada sem quem a alimente é modelo que quebra na primeira execução
+    limpa. Desde a Etapa 7 há dois alimentadores, não um: o Airbyte e o pipeline
+    Beam. A conta continua fechando, com as duas parcelas nomeadas.
+    """
+    fontes = _carregar(DBT / "models/staging/_retail__sources.yml")
+    por_nome = {f["name"]: f for f in fontes["sources"]}
+
+    ingeridas = set(_origem("retail")["tabelas"])
+    declaradas = {t["name"] for t in por_nome["retail"]["tables"]}
+    assert ingeridas | FONTES_DO_CAMINHO_QUENTE == declaradas
+
+
+def test_o_legado_ingere_as_quarenta_tabelas() -> None:
+    """A origem legada reproduz **todas** as 40, e não um recorte.
+
+    O critério da Etapa 10 é `extraídos = aceitos + corrigidos + rejeitados`
+    por tabela: uma tabela fora da captura não é uma reconciliação a menos, é
+    uma que ninguém percebe faltando.
+    """
+    from mvp_ed1.models import Base
+
+    modelos = {t.name for t in Base.metadata.sorted_tables}
+    assert set(_origem("legacy")["tabelas"]) == modelos
+
+
+def test_todo_stream_tem_modo_e_o_modo_e_conhecido() -> None:
+    streams = _carregar(RAIZ / "airbyte/streams.yml")
+    for origem, spec_origem in streams["origens"].items():
+        # Origem que declara um modo só o aplica a todas as suas tabelas
+        # (ADR-0037): a justificativa é da origem, e não de cada tabela.
+        if "modo" in spec_origem:
+            assert spec_origem["modo"] in MODOS, f"{origem}: modo desconhecido"
+            assert spec_origem.get("motivo"), f"{origem}: modo único exige motivo escrito"
+            assert isinstance(spec_origem["tabelas"], list)
+            continue
+
+        for nome, spec in spec_origem["tabelas"].items():
+            modo = spec.get("modo")
+            if modo == "dedup_history":
+                # Precisa saber o que mudou e a quem a mudança pertence.
+                assert spec.get("cursor"), f"{nome}: dedup_history exige cursor"
+                assert spec.get("chave"), f"{nome}: dedup_history exige chave"
+            elif modo == "append":
+                # Livro de eventos: só cresce, então basta saber por onde parou.
+                assert spec.get("cursor"), f"{nome}: append exige cursor"
+                assert not spec.get("chave"), f"{nome}: append não deduplica, e não usa chave"
+            elif modo == "full_refresh":
+                # Não ter cursor é a escolha, e escolha precisa de justificativa.
+                assert spec.get("motivo"), f"{nome}: carga completa exige motivo escrito"
+            else:
+                raise AssertionError(f"{nome}: modo ausente ou desconhecido ({modo!r})")
+
+
+def test_o_destino_do_legado_nao_e_descartavel() -> None:
+    """`raw_legacy` é retido: derrubar a tabela apagaria a captura anterior.
+
+    O `drop_cascade` do destino sai desta declaração. Ligá-lo no legado seria
+    autorizar o Airbyte a apagar a única coisa contra a qual a exclusão física
+    é detectada (ADR-0037).
+    """
+    assert _origem("retail")["destino_descartavel"] is True
+    assert _origem("legacy")["destino_descartavel"] is False
+
+
+def test_ponto_de_reposicao_do_dbt_bate_com_o_do_fluxo(projeto_dbt) -> None:
+    """O dono do valor é `streaming/fluxo.yml`; o dbt tem o espelho que ele lê.
+
+    Mesmo arranjo de `as_of_date`, pelo mesmo motivo: dois runtimes precisam do
+    número e só um pode ser o dono. Se divergirem, o pipeline alerta em um
+    limiar e a view P12 lista SKUs por outro — e as duas telas discordam sem que
+    nada falhe.
+    """
+    fluxo = _carregar(RAIZ / "streaming/fluxo.yml")
+    assert int(projeto_dbt["vars"]["reorder_point_units"]) == int(
+        fluxo["alerta"]["limiar_de_unidades"]
+    )
+
+
+def test_toda_pergunta_com_view_construida_existe_como_modelo() -> None:
+    """A view declarada no Glossário existe em `consumption` — e vice-versa.
+
+    O ADR-0018 diz que cada pergunta vira uma view nomeada por ela. Sem este
+    teste, a lista de perguntas e o diretório de views divergem em silêncio.
+    """
+    perguntas = (RAIZ / "docs/glossario_de_negocio/perguntas_de_negocio.md").read_text(
+        encoding="utf-8"
+    )
+    # A Etapa 9 fecha a lista: as dezesseis perguntas têm view construída, e a
+    # fronteira que andava uma seção por etapa chegou ao fim do documento.
+    # Pergunta nova daqui em diante nasce junto com a view que a responde.
+    construidas = perguntas
+    declaradas = set(re.findall(r"\*\*View\*\* \| `([a-z0-9_]+)`", construidas))
+    existentes = {p.stem for p in (DBT / "models/consumption").glob("*.sql")}
+
+    assert declaradas == existentes, (
+        f"declaradas e não construídas: {sorted(declaradas - existentes)}; "
+        f"construídas e não declaradas: {sorted(existentes - declaradas)}"
+    )
+
+
+def test_toda_view_de_consumo_tem_contrato_aplicado() -> None:
+    """`contract: enforced` em todas — é o que o ADR-0018 exige das views."""
+    modelos = _carregar(DBT / "models/consumption/_consumption__models.yml")["models"]
+    com_contrato = {
+        m["name"] for m in modelos if m.get("config", {}).get("contract", {}).get("enforced")
+    }
+    existentes = {p.stem for p in (DBT / "models/consumption").glob("*.sql")}
+    assert existentes == com_contrato
+
+
+def test_transicoes_declaradas_batem_com_os_caminhos_do_gerador() -> None:
+    """A *seed* e o gerador declaram a mesma máquina de estados.
+
+    A regra do que é transição legal vive na *seed* `order_status_transitions`,
+    porque é lá que ela é revisável. Quem **produz** as transições é o gerador,
+    a partir de `CAMINHOS` e `_CANCELAMENTO`. São dois artefatos dizendo a mesma
+    coisa, e é o par que precisa concordar: uma regra que o gerador nunca produz
+    é regra morta, e um caminho que a regra não permite quebraria a invariante 9
+    no primeiro `dbt build`.
+
+    Mesmo arranjo do espelho de `as_of_date` e do ponto de reposição, pelo mesmo
+    motivo: dois lugares precisam do valor e só um pode ser o dono.
+    """
+    from mvp_ed1.generator.domains.vendas import _CANCELAMENTO, CAMINHOS
+
+    linhas = (DBT / "seeds/order_status_transitions.csv").read_text(encoding="utf-8")
+    declaradas = {
+        (linha.split(",")[0] or None, linha.split(",")[1])
+        for linha in linhas.strip().splitlines()[1:]
+    }
+
+    produzidas = set()
+    for caminho in list(CAMINHOS.values()) + [c + ("cancelled",) for c in _CANCELAMENTO]:
+        anterior = None
+        for estado in caminho:
+            produzidas.add((anterior, estado))
+            anterior = estado
+
+    assert declaradas == produzidas, (
+        f"declaradas e nunca produzidas: {sorted(declaradas - produzidas)}; "
+        f"produzidas e não declaradas: {sorted(produzidas - declaradas)}"
+    )
+
+
+def test_categorias_de_chamado_da_seed_batem_com_o_modelo() -> None:
+    """A *seed* de categorias e o modelo transacional declaram as mesmas seis.
+
+    `dim_support_category` é **derivada**: a origem não tem tabela para ela, só
+    a lista dentro de um `CHECK`. A *seed* acrescenta nome legível e
+    agrupamento, que é o que faz dela uma dimensão — e passa a ser um segundo
+    lugar onde a lista existe.
+
+    Se a origem ganhar uma sétima categoria, o `accepted_values` do `staging`
+    quebra, mas a dimensão apenas deixaria de ter a linha — e o chamado da
+    categoria nova sumiria do recorte sem que nada falhasse. Este teste é o que
+    avisa antes.
+    """
+    from mvp_ed1.models.support import TICKET_CATEGORIES
+
+    linhas = (DBT / "seeds/support_categories.csv").read_text(encoding="utf-8")
+    declaradas = {linha.split(",")[0] for linha in linhas.strip().splitlines()[1:]}
+
+    assert declaradas == set(TICKET_CATEGORIES), (
+        f"na seed e não no modelo: {sorted(declaradas - set(TICKET_CATEGORIES))}; "
+        f"no modelo e não na seed: {sorted(set(TICKET_CATEGORIES) - declaradas)}"
+    )

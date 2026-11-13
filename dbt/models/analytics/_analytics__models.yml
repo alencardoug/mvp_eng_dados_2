@@ -1,0 +1,2897 @@
+version: 2
+
+# Testes do datamart. Três famílias, e cada uma existe por um motivo diferente:
+#
+#   grão          prova que a fato é o que ela diz ser. `unique` sobre a chave
+#                 do grão é a única forma de a afirmação "uma linha por item de
+#                 pedido" deixar de ser intenção (ADR-0018).
+#   integridade   `not_null` + `relationships` em toda chave de dimensão. É a
+#                 salvaguarda estrutural que o ADR-0029 exige: se alguém filtrar
+#                 membros excluídos de uma dimensão, as linhas de fato
+#                 correspondentes ficam sem par e o *build* quebra.
+#   vigência      as SCD tipo 2 não podem ter vigências sobrepostas, senão o
+#                 *join* temporal duplica linha de fato (invariante 11).
+#   reconciliação toda fato declara a relação condutora de `trusted` de que
+#                 nasce e as medidas que têm de somar igual dos dois lados
+#                 (`fato_reconcilia_com_a_condutora`, Qualidade §7). É o que
+#                 pega a junção interna que derruba linha em silêncio. Leva a
+#                 etiqueta `fronteira`: compara camadas que a DAG constrói em
+#                 tarefas diferentes, e só roda depois da última delas.
+
+models:
+  # ── Dimensões ──────────────────────────────────────────────────────────────
+  - name: dim_date
+    meta:
+      domain: transversal
+    description: Calendário do período simulado. Dimensão estática, gerada da série de datas.
+    columns:
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: full_date
+        description: "A data, uma linha por dia do calendário do período simulado."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          sensitivity: internal
+      - name: quarter_number
+        description: "Trimestre do ano, de 1 a 4."
+        meta:
+          sensitivity: internal
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          sensitivity: internal
+      - name: month_name
+        description: "Nome do mês por extenso, no idioma do banco."
+        meta:
+          sensitivity: internal
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          sensitivity: internal
+      - name: day_of_month
+        description: "Dia do mês, de 1 a 31."
+        meta:
+          sensitivity: internal
+      - name: day_of_week
+        description: "Dia da semana ISO: 1 é segunda-feira, 7 é domingo."
+        meta:
+          sensitivity: internal
+      - name: day_name
+        description: "Nome do dia da semana por extenso, no idioma do banco."
+        meta:
+          sensitivity: internal
+      - name: iso_week_number
+        description: "Número da semana ISO no ano."
+        meta:
+          sensitivity: internal
+      - name: month_start_date
+        description: "Primeiro dia do mês da data."
+        meta:
+          sensitivity: internal
+      - name: quarter_start_date
+        description: "Primeiro dia do trimestre da data."
+        meta:
+          sensitivity: internal
+      - name: year_start_date
+        description: "Primeiro dia do ano da data."
+        meta:
+          sensitivity: internal
+      - name: is_weekend
+        description: "Verdadeiro no sábado e no domingo."
+        meta:
+          sensitivity: internal
+
+  - name: dim_customer
+    meta:
+      domain: clientes
+    description: '{{ doc("active_customer") }}'
+    data_tests:
+      - vigencias_sem_sobreposicao:
+          chave_natural: customer_natural_key
+    columns:
+      - name: customer_key
+        meta:
+          sensitivity: internal
+        description: Chave substituta da **versão** do cliente (ADR-0017).
+        data_tests: [unique, not_null]
+      - name: customer_natural_key
+        description: "Identificador do cliente na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: is_active
+        meta:
+          sensitivity: internal
+        description: '{{ doc("active_customer") }}'
+      - name: is_repeat_buyer
+        meta:
+          sensitivity: internal
+        description: '{{ doc("repeat_purchase") }}'
+      - name: is_deleted
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: Exclusão lógica na origem; a linha permanece na dimensão (ADR-0029).
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: customer_code
+        description: "Chave natural do cliente na origem; estável entre cargas."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: first_name
+        description: "Primeiro nome do cliente (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: last_name
+        description: "Sobrenome do cliente (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: customer_full_name
+        description: "Nome completo do cliente: o primeiro nome e o sobrenome, separados por espaço (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: customer_document
+        description: "Documento de identificação do cliente (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: birth_date
+        description: "Data de nascimento do cliente (sintética)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: registered_at
+        description: "Momento de negócio do cadastro, distinto de `created_at`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: first_order_at
+        description: "Instante do primeiro pedido realizado do cliente; nulo para quem nunca comprou."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: last_order_at
+        description: "Instante do último pedido realizado do cliente; nulo para quem nunca comprou."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_count
+        description: "**Aditiva entre clientes, só na versão vigente** (`is_current`) — pedidos realizados do cliente, com o valor atual repetido em cada versão dele; zero para quem nunca comprou."
+        meta:
+          sensitivity: internal
+          description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
+      - name: lifetime_net_revenue_amount
+        description: "**Aditiva entre clientes, só na versão vigente** (`is_current`) — receita líquida dos itens dos pedidos realizados do cliente, com o valor atual repetido em cada versão dele; zero para quem nunca comprou."
+        meta:
+          sensitivity: confidential
+          description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
+      - name: is_churned
+        description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência do armazém (`active_customer_window_days`)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: days_since_last_order
+        description: "Dias entre o último pedido realizado do cliente e a data de referência do armazém; nulo para quem nunca comprou."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: customer_status
+        description: "Estado do relacionamento: active, inactive, blocked ou pending."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: customer_segment_id
+        description: "Segmento comercial ao qual o cliente pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: customer_segment_code
+        description: "Código estável do segmento, usado como chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: customer_segment_name
+        description: "Nome do segmento do cliente; 'Sem segmento' quando ele não tem um."
+        meta:
+          sensitivity: public
+      - name: city
+        description: "Cidade; alimenta a dimensão de geografia."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: state_code
+        description: "Unidade federativa em sigla de duas letras."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: country
+        description: "País em código ISO de duas letras."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: valid_from
+        description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
+        meta:
+          sensitivity: internal
+      - name: valid_to
+        description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
+        meta:
+          description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
+          sensitivity: internal
+      - name: is_current
+        description: "Verdadeiro na versão vigente — a que não tem fim de vigência."
+        meta:
+          sensitivity: internal
+
+  - name: dim_product
+    meta:
+      domain: catalogo
+    description: SKU com produto, categoria e marca. SCD tipo 2.
+    data_tests:
+      - vigencias_sem_sobreposicao:
+          chave_natural: product_natural_key
+    columns:
+      - name: product_key
+        description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: product_natural_key
+        description: "Identificador da variante do produto (o SKU) na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: is_deleted
+        description: "Verdadeiro quando a variante, o seu produto ou a sua categoria foi excluído logicamente na origem (ADR-0029)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: sku
+        description: "Código de estoque da variante; chave natural do SKU."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: product_code
+        description: "Chave natural do produto na origem."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: product_name
+        description: "Nome comercial do produto."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: variant_size
+        description: "Tamanho da variante."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: variant_color
+        description: "Cor da variante."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: variant_package
+        description: "Embalagem ou unidade de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: barcode
+        description: "Código de barras da variante (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: weight_grams
+        description: "Peso em gramas, usado no cálculo de frete."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: product_id
+        description: "Identificador do produto na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: launched_at
+        description: "Momento de lançamento comercial."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: product_status
+        description: "Estado do produto: draft, active ou discontinued."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: variant_is_active
+        description: "Indica se o SKU continua disponível para venda."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: product_category_id
+        description: "Identificador da categoria na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: leaf_category_name
+        description: "Nome comercial da categoria."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: sub_category_name
+        description: "Nome da categoria intermediária da variante, entre a raiz e a folha; nulo quando a categoria da variante é uma raiz."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: root_category_name
+        description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: brand_id
+        description: "Identificador da marca na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: brand_name
+        description: "Nome da marca do produto; 'Sem marca' quando ele não tem uma."
+        meta:
+          sensitivity: public
+      - name: brand_country
+        description: "País de origem, em código ISO."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: variant_is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: product_is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: valid_from
+        description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
+        meta:
+          sensitivity: internal
+      - name: valid_to
+        description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
+        meta:
+          description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
+          sensitivity: internal
+      - name: is_current
+        description: "Verdadeiro na versão vigente — a que não tem fim de vigência."
+        meta:
+          sensitivity: internal
+
+  - name: dim_category
+    meta:
+      domain: catalogo
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, category_natural_key]
+    columns:
+      - name: category_key
+        description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: category_natural_key
+        description: "Identificador da categoria na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: category_name
+        description: "Nome comercial da categoria."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: sub_category_name
+        description: "Nome da categoria intermediária; na categoria que não tem intermediária, o da própria folha."
+        meta:
+          sensitivity: public
+      - name: root_category_name
+        description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: category_depth
+        description: "Profundidade na hierarquia, com a raiz em zero."
+        meta:
+          description_inherited: true
+          sensitivity: public
+
+  - name: dim_brand
+    meta:
+      domain: catalogo
+    columns:
+      - name: brand_key
+        description: "Chave substituta da marca: hash de `source_system` e `brand_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: brand_natural_key
+        description: "Identificador da marca na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: brand_name
+        description: "Nome da marca."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: brand_country
+        description: "País de origem, em código ISO."
+        meta:
+          description_inherited: true
+          sensitivity: public
+
+  - name: dim_sales_channel
+    meta:
+      domain: vendas
+    description: >
+      Canal de venda. Carrega um membro "Sem canal" desde a Etapa 9: chamado que
+      não nasce de pedido não tem canal, e a alternativa seria chave nula na
+      fato — que some de todo recorte em vez de aparecer agrupada.
+    columns:
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: channel_type
+        description: "Natureza do canal: web, app ou store."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests:
+          - accepted_values:
+              values: [web, app, store, unknown]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: sales_channel_natural_key
+        description: "Identificador do canal de venda na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: sales_channel_code
+        description: "Código estável do canal."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_active
+        description: "Indica se o canal continua operando."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  - name: dim_geography
+    meta:
+      domain: transversal
+    description: >
+      Geografia conformada — atende a venda aqui e a remessa na Etapa 8. Carrega
+      um membro "Desconhecido" para que a fato nunca fique com chave nula.
+    columns:
+      - name: geography_key
+        description: "Chave substituta do lugar: hash de país, unidade federativa e cidade; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          sensitivity: public
+        data_tests: [unique, not_null]
+      - name: region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [Norte, Nordeste, Centro-Oeste, Sudeste, Sul, Desconhecido]
+      - name: country
+        description: "País em código ISO de duas letras."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: state_code
+        description: "Unidade federativa em sigla de duas letras."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: state_name
+        description: "Nome da unidade federativa por extenso."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: city
+        description: "Cidade; alimenta a dimensão de geografia."
+        meta:
+          description_inherited: true
+          sensitivity: public
+
+  # ── Fatos ──────────────────────────────────────────────────────────────────
+  - name: fact_sales_order_item
+    meta:
+      domain: vendas
+    description: >
+      **Grão: uma linha de item de pedido.** Um SKU comprado em um pedido.
+      Medidas todas aditivas; valores de nível de pedido não estão aqui, porque
+      somá-los no grão de item multiplicaria o frete pelo número de itens.
+    data_tests:
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('order_items')
+            medidas:
+              quantity: quantity
+              net_revenue_amount: net_revenue_amount
+              line_total_amount: line_total_amount
+    columns:
+      - name: order_item_key
+        meta:
+          sensitivity: internal
+        description: Chave do grão. O `unique` abaixo é o que prova o grão declarado.
+        data_tests: [unique, not_null]
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: product_key
+        description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_product'), field: product_key}
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
+      - name: category_key
+        description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_category'), field: category_key}
+      - name: geography_key
+        description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_geography'), field: geography_key}
+      - name: net_revenue_amount
+        meta:
+          sensitivity: confidential
+        description: '{{ doc("net_revenue") }}'
+        data_tests: [not_null]
+      - name: quantity
+        description: "Quantidade comprada do SKU."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between: {min_value: 1}
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: brand_key
+        description: "Chave substituta da marca: hash de `source_system` e `brand_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_id
+        description: "Pedido ao qual o item pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_item_id
+        description: "Identificador do item do pedido na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_number
+        description: "Número do pedido; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_status
+        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_date
+        description: "Data do pedido, no fuso de São Paulo."
+        meta:
+          sensitivity: internal
+      - name: placed_at
+        description: "Momento de negócio em que o pedido foi feito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_realised
+        description: "Verdadeiro quando o pedido é venda realizada: pago, em separação, enviado, entregue ou devolvido. O pendente e o cancelado não contam."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_cancelled
+        description: "Verdadeiro quando o pedido está cancelado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_from_cart
+        description: "Verdadeiro quando o pedido nasceu de um carrinho; falso em venda direta."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: has_post_order_repeat
+        description: "Verdadeiro quando o cliente fez outro pedido realizado em até 90 dias depois deste (`repeat_purchase_window_days`); nulo enquanto a janela não fechou na data de referência do armazém (ADR-0036)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_repeat_window_closed
+        description: "Verdadeiro quando já se passaram 90 dias do pedido na data de referência do armazém: a janela da recompra pós-pedido está fechada."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: days_to_next_order
+        description: "Dias até o próximo pedido realizado do mesmo cliente; nulo quando não houve outro."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: unit_price
+        description: "Preço unitário praticado na venda."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: gross_revenue_amount
+        description: "Aditiva — receita bruta da linha: quantidade vezes preço unitário, antes do desconto, arredondada a centavos."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: discount_amount
+        description: "Desconto aplicado a este item."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: tax_amount
+        description: "Imposto simulado sobre este item."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: line_total_amount
+        description: "Valor total da linha, já arredondado."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+
+  - name: fact_cart_event
+    meta:
+      domain: vendas
+    description: >
+      **Grão: um evento de ciclo de vida de um carrinho** (ADR-0028). Até dois
+      por carrinho, a abertura e o desfecho. As medidas são contadores que valem
+      só na linha em que fazem sentido, de modo que toda soma esteja certa em
+      qualquer recorte.
+    data_tests:
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('cart_lifecycle_events')
+            # A fato zera o valor fora da linha de abertura (comentário do modelo);
+            # a condutora recebe a mesma regra, senão o carrinho somaria em dobro.
+            medidas:
+              cart_value_amount: "case when event_type = 'created' then cart_value_amount else 0 end"
+    columns:
+      - name: cart_event_key
+        description: "Chave substituta do evento do carrinho: hash de `source_system`, `cart_id` e `event_type` — um evento de cada tipo por carrinho (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: event_date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: cart_created_date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
+      - name: customer_key
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: Nulo em sessão anônima — o carrinho existe, o cliente não foi identificado.
+        data_tests:
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: event_type
+        description: "Estado do carrinho: open, converted, abandoned ou expired."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [created, converted, abandoned, expired]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: cart_id
+        description: "Identificador do carrinho na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: occurred_at
+        description: "Instante do evento: a criação do carrinho, no evento de criação; a conversão, no de conversão; e, no carrinho que não converteu, o que vier primeiro entre a expiração e a data de referência do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: event_date
+        description: "Data do evento, no fuso de São Paulo."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: cart_created_date
+        description: "Data da criação do carrinho, no fuso de São Paulo."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_anonymous
+        description: "Verdadeiro quando o carrinho não tem cliente identificado — sessão anônima."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: cart_count
+        description: "Aditiva — 1 no evento de criação do carrinho, 0 nos demais: soma-se para contar carrinhos."
+        meta:
+          sensitivity: internal
+      - name: closed_cart_count
+        description: "Aditiva — 1 no evento que fecha o carrinho (conversão, abandono ou expiração), 0 na criação."
+        meta:
+          sensitivity: internal
+      - name: converted_cart_count
+        description: "Aditiva — 1 quando o evento converte o carrinho em pedido, 0 nos demais."
+        meta:
+          sensitivity: internal
+      - name: abandoned_cart_count
+        description: "Aditiva — 1 quando o evento fecha o carrinho sem compra, por abandono ou expiração; 0 nos demais."
+        meta:
+          sensitivity: internal
+      - name: cart_item_count
+        description: "Aditiva — itens do carrinho, no evento de criação; 0 nos demais."
+        meta:
+          sensitivity: internal
+      - name: cart_unit_count
+        description: "Aditiva — unidades do carrinho, no evento de criação; 0 nos demais."
+        meta:
+          sensitivity: internal
+      - name: cart_value_amount
+        description: "Aditiva — valor do carrinho, no evento de criação; 0 nos demais."
+        meta:
+          sensitivity: confidential
+      - name: abandoned_value_amount
+        description: "Aditiva — valor do carrinho fechado sem compra, no evento de abandono ou expiração; 0 nos demais."
+        meta:
+          sensitivity: confidential
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Etapa 6 — financeiro e estoque
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - name: dim_payment_method
+    meta:
+      domain: pagamentos
+    columns:
+      - name: payment_method_key
+        description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: method_type
+        description: "Natureza do meio: cartão, pix, boleto, carteira ou vale."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests:
+          - accepted_values:
+              values: [credit_card, debit_card, pix, boleto, wallet, voucher]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_method_natural_key
+        description: "Identificador do meio de pagamento na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_method_code
+        description: "Código estável do meio de pagamento."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: payment_method_name
+        description: "Nome do meio de pagamento."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_card
+        description: "Verdadeiro para cartão de crédito ou de débito."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_instant
+        description: "Verdadeiro para meio de liquidação imediata: Pix ou cartão de débito."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_active
+        description: "Indica se o meio continua aceito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  - name: dim_supplier
+    meta:
+      domain: compras
+    description: Fornecedor. SCD tipo 1 nesta etapa — a divergência do §3.2 está declarada no modelo.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, supplier_natural_key]
+    columns:
+      - name: supplier_key
+        description: "Chave substituta do fornecedor: hash de `source_system` e `supplier_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: supplier_natural_key
+        description: "Identificador do fornecedor na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: supplier_code
+        description: "Chave natural do fornecedor na origem."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: supplier_legal_name
+        description: "Razão social do fornecedor (sintética)."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: supplier_name
+        description: "Nome do fornecedor: o fantasia, ou a razão social quando não há nome fantasia."
+        meta:
+          sensitivity: confidential
+      - name: supplier_country
+        description: "País do fornecedor, em código ISO."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: payment_terms_days
+        description: "Prazo de pagamento negociado, em dias."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: is_active
+        description: "Indica se o fornecedor continua ativo."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  - name: dim_warehouse
+    meta:
+      domain: estoque
+    description: Armazém, com a **mesma** `dim_geography` do endereço de entrega.
+    columns:
+      - name: warehouse_key
+        description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: geography_key
+        description: "Lugar do armazém em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_geography'), field: geography_key}
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: warehouse_natural_key
+        description: "Identificador do armazém na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: warehouse_code
+        description: "Código estável do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: warehouse_name
+        description: "Nome do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: warehouse_city
+        description: "Cidade do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: warehouse_state
+        description: "Unidade federativa do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: warehouse_state_name
+        description: "Nome da unidade federativa por extenso."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: warehouse_region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: warehouse_country
+        description: "País, em código ISO."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: capacity_units
+        description: "Capacidade máxima em unidades."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: is_active
+        description: "Indica se o armazém está operando."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  - name: fact_payment_transaction
+    meta:
+      domain: pagamentos
+    description: >
+      **Grão: uma tentativa ou operação financeira.** A operação recusada fica —
+      "quantas tentativas foram precisas para receber" é a pergunta P09, e ela só
+      existe se a recusa estiver aqui.
+    data_tests:
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('payment_transactions')
+            medidas:
+              transaction_amount: transaction_amount
+              captured_amount: captured_amount
+    columns:
+      - name: payment_transaction_key
+        description: "Chave substituta da transação de pagamento: hash de `source_system` e `payment_transaction_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: payment_method_key
+        description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_payment_method'), field: payment_method_key}
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: transaction_type
+        description: "Operação financeira: authorization, capture, void ou refund."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - accepted_values:
+              values: [authorization, capture, void, refund]
+      - name: transaction_result
+        description: "Desfecho da operação: succeeded, failed ou pending."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - accepted_values:
+              values: [succeeded, failed, pending]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_transaction_id
+        description: "Identificador da transação de pagamento na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: transaction_code
+        description: "Chave natural da transação."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_id
+        description: "Pagamento ao qual a transação pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_code
+        description: "Chave natural do pagamento."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_id
+        description: "Pedido que o pagamento quita."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_number
+        description: "Número do pedido; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: gateway_response_code
+        description: "Código de retorno do adquirente simulado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: occurred_at
+        description: "Momento de negócio da operação."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: installments
+        description: "Número de parcelas acordadas."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_instalment_plan
+        description: "Verdadeiro quando o pagamento é parcelado, em mais de uma parcela."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: attempt_count
+        description: "Aditiva — 1 por transação: soma-se para contar tentativas."
+        meta:
+          sensitivity: internal
+      - name: approved_count
+        description: "Aditiva — 1 quando a transação foi aprovada, 0 nas demais."
+        meta:
+          sensitivity: internal
+      - name: authorization_count
+        description: "Aditiva — 1 quando a transação é uma autorização, 0 nas demais."
+        meta:
+          sensitivity: internal
+      - name: approved_authorization_count
+        description: "Aditiva — 1 quando a transação é uma autorização aprovada, 0 nas demais."
+        meta:
+          sensitivity: internal
+      - name: transaction_amount
+        description: "Valor movimentado nesta operação."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: authorized_amount
+        description: "Aditiva — valor autorizado: o da transação quando ela é uma autorização bem-sucedida; zero nas demais."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: captured_amount
+        description: "Aditiva — valor capturado: o da transação quando ela é uma captura bem-sucedida; zero nas demais."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: refunded_amount
+        description: "Aditiva — valor estornado: o da transação quando ela é um estorno bem-sucedido; zero nas demais."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+
+  - name: fact_refund
+    meta:
+      domain: pagamentos
+    description: '**Grão: um reembolso realizado.**'
+    data_tests:
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('refunds')
+            medidas:
+              refund_amount: refund_amount
+    columns:
+      - name: refund_key
+        description: "Chave substituta do reembolso: hash de `source_system` e `refund_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: refund_amount
+        description: "Valor reembolsado."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between: {min_value: 0.01}
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_method_key
+        description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: refund_id
+        description: "Identificador do reembolso na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: refund_code
+        description: "Chave natural do reembolso."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_transaction_id
+        description: "Transação de captura que está sendo revertida."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: payment_id
+        description: "Pagamento ao qual a transação pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_id
+        description: "Pedido que o pagamento quita."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_number
+        description: "Número do pedido; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: refund_reason
+        description: "Motivo comercial do reembolso."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: refund_status
+        description: "Estado do reembolso: requested, completed ou rejected."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: refunded_at
+        description: "Momento em que o reembolso foi concluído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_completed
+        description: "Verdadeiro quando o reembolso foi concluído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_full_refund
+        description: "Verdadeiro quando o reembolso alcança o valor capturado do pagamento."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: refund_count
+        description: "Aditiva — 1 por reembolso: soma-se para contar reembolsos."
+        meta:
+          sensitivity: internal
+      - name: originally_captured_amount
+        description: "Valor movimentado nesta operação."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: completed_refund_amount
+        description: "Aditiva — valor do reembolso quando ele foi concluído; 0 nos demais."
+        meta:
+          sensitivity: confidential
+
+  - name: fact_purchase_order_item
+    meta:
+      domain: compras
+    description: '**Grão: um item de uma ordem de compra.**'
+    data_tests:
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('purchase_order_items')
+            medidas:
+              quantity_ordered: quantity_ordered
+              received_cost_amount: received_cost_amount
+    columns:
+      - name: purchase_order_item_key
+        description: "Chave substituta da linha do pedido de compra: hash de `source_system` e `purchase_order_item_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: supplier_key
+        description: "Chave substituta do fornecedor: hash de `source_system` e `supplier_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_supplier'), field: supplier_key}
+      - name: product_key
+        description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_product'), field: product_key}
+      - name: quantity_ordered
+        description: "Quantidade solicitada ao fornecedor."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between: {min_value: 1}
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: category_key
+        description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: purchase_order_item_id
+        description: "Identificador do item do pedido de compra na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: purchase_order_id
+        description: "Ordem de compra à qual o item pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: po_number
+        description: "Número da ordem de compra; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: purchase_order_status
+        description: "Estado da ordem; transições válidas em Modelo de Dados §4."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: ordered_at
+        description: "Momento de emissão da ordem."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: expected_at
+        description: "Data prometida de entrega pelo fornecedor."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: first_received_at
+        description: "Instante do primeiro recebimento **concluído** da linha; nulo enquanto nenhum foi concluído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: last_received_at
+        description: "Instante do último recebimento **concluído** da linha; nulo enquanto nenhum foi concluído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_fully_received
+        description: "Verdadeiro quando a quantidade recebida em recebimentos concluídos alcança a pedida."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_not_received
+        description: "Verdadeiro quando nenhuma unidade da linha chegou em recebimento concluído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_cancelled
+        description: "Verdadeiro quando o pedido de compra está cancelado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: quantity_received
+        description: "Aditiva — unidades recebidas da linha, somando só os recebimentos **concluídos**; zero enquanto nenhum foi concluído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: quantity_outstanding
+        description: "Aditiva — unidades pedidas que ainda não chegaram em recebimento concluído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: unit_cost
+        description: "Custo unitário negociado."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: ordered_cost_amount
+        description: "Custo total do item, já arredondado."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: received_cost_amount
+        description: "Aditiva — custo do que chegou: a quantidade recebida vezes o custo unitário de cada recebimento **concluído**, arredondado a centavos."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+
+  - name: fact_inventory_movement
+    meta:
+      domain: estoque
+    description: >
+      **Grão: um movimento de um SKU em um armazém.** Única fato `incremental`
+      do projeto (ADR-0016), com as quatro proteções obrigatórias: `unique_key`,
+      filtro por tempo de evento com margem, `--full-refresh` no plano da Etapa
+      12, e o teste `incremental_confere_com_a_reconstrucao_completa`.
+      A exceção tem **duas estratégias, uma por origem** (ADR-0042): `retail`
+      chega por evento e entra por `merge` com a janela de atraso; `legacy` chega
+      por captura e entra por `delete+insert`, com a partição reescrita inteira a
+      cada execução. Para o ramo legado a idempotência vem do recorte por
+      captura, não da `unique_key`, e a reconciliação por linha está em
+      `legado_na_fato_segue_a_captura_corrente`.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, idempotency_key]
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('inventory_movements')
+            medidas:
+              quantity_delta: quantity_delta
+              cogs_amount: cogs_amount
+    columns:
+      - name: movement_key
+        description: "Chave substituta do movimento de estoque: hash de `source_system` e `movement_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: movement_id
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: Chave do evento; é ela que torna o reprocessamento idempotente.
+        data_tests: [unique, not_null]
+      - name: idempotency_key
+        description: "Chave que impede aplicação duplicada pelo consumidor (ADR-0019)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: product_key
+        description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_product'), field: product_key}
+      - name: warehouse_key
+        description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_warehouse'), field: warehouse_key}
+      - name: quantity_delta
+        meta:
+          sensitivity: internal
+          description_reason: "diz a aditividade da medida nesta fato, que o texto herdado não diz; aditiva, porque é delta assinado (RVL3-10)"
+        description: '**Aditiva** — variação assinada do saldo: positiva na entrada, negativa na saída; a soma num período é a variação líquida do estoque nele.'
+        data_tests: [not_null]
+      - name: cogs_amount
+        meta:
+          sensitivity: confidential
+        description: '{{ doc("cost_of_goods_sold") }}'
+        data_tests: [not_null]
+      - name: movement_type
+        description: "Tipo controlado do movimento; determina o sinal da quantidade."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - accepted_values:
+              values: [purchase_receipt, customer_return, transfer_in, adjustment_in,
+                       sale_dispatch, supplier_return, transfer_out, adjustment_out]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: event_sequence
+        description: "Ordem do evento dentro da sua origem. No varejo, a sequência técnica que o banco atribui; no legado, a identidade física da linha na captura — desempate técnico, sem promessa de ordem de negócio (D40)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: source_type
+        description: "Processo de negócio que originou o movimento."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: source_id
+        description: "Identificador do registro que causou o movimento."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: correlation_id
+        description: "Agrupa eventos relacionados; obrigatório nos pares de transferência."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: aggregate_version
+        description: "Ordem do evento dentro do par armazém/SKU; sem lacuna nem repetição."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: occurred_at
+        description: "Momento de negócio do movimento; é por ele que o Beam janela (ADR-0019)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: recorded_at
+        description: "Momento em que a origem registrou o evento; base da leitura incremental."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: movement_date
+        description: "Data do movimento, no fuso de São Paulo."
+        meta:
+          sensitivity: internal
+      - name: is_inbound
+        description: "Verdadeiro quando o movimento é de entrada: todo tipo que não é venda, devolução a fornecedor, transferência de saída ou ajuste de saída."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_outbound
+        description: "Verdadeiro quando o movimento é de saída: venda (`sale_dispatch`), devolução a fornecedor, transferência de saída ou ajuste de saída."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_sale
+        description: "Verdadeiro quando o movimento é a saída de uma venda (`sale_dispatch`)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: quantity_in
+        description: "Aditiva — unidades que entraram no movimento; zero numa saída."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: quantity_out
+        description: "Aditiva — unidades que saíram no movimento, em número positivo; zero numa entrada."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: unit_cost
+        description: "Custo unitário, quando aplicável ao tipo."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: movement_cost_amount
+        description: "Aditiva — custo do movimento: a quantidade movimentada, em valor absoluto, vezes o custo unitário (zero sem custo), arredondado a centavos."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: recording_delay_seconds
+        description: "Segundos entre o instante de negócio do movimento e o seu registro na origem."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  # ── Etapa 8 — entrega e logística ──────────────────────────────────────────
+  - name: dim_carrier
+    meta:
+      domain: logistica
+    description: >
+      Transportadora e a modalidade que ela presta. SCD tipo 1: a modalidade
+      classifica o fato, mas não muda para uma transportadora contratada — o
+      gatilho que a tornaria tipo 2 está escrito no próprio modelo.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, carrier_natural_key]
+    columns:
+      - name: carrier_key
+        description: "Chave substituta da transportadora: hash de `source_system` e `carrier_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: carrier_natural_key
+        description: "Identificador da transportadora na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: service_level
+        meta:
+          sensitivity: public
+          description_reason: "liga a coluna ao conceito do glossário de negócio que ela determina"
+        description: '{{ doc("promised_lead_time") }}'
+        data_tests:
+          - not_null
+          - accepted_values: {values: [standard, express, same_day]}
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: carrier_code
+        description: "Código estável da transportadora."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: carrier_name
+        description: "Nome da transportadora."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: service_level_rank
+        description: "Ordem da modalidade, da mais lenta à mais rápida: 1 standard, 2 express, 3 same_day."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: tracking_url_template
+        description: "Modelo de URL de rastreio, com marcador do código."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_active
+        description: "Indica se a transportadora está em uso."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  - name: fact_shipment_item
+    meta:
+      domain: logistica
+    description: >
+      **Grão: um item de uma remessa.** Duas datas em papéis diferentes —
+      `date_key` é o despacho, `delivered_date_key` é a chegada (ADR-0033). As
+      colunas de grão de pedido (`order_to_delivery_days` e as vizinhas) são
+      atributos repetidos: reduza ao pedido antes de agregar.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, shipment_item_id]
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('shipment_items')
+            medidas:
+              quantity_shipped: quantity_shipped
+    columns:
+      - name: shipment_item_key
+        meta:
+          sensitivity: internal
+        description: Prova do grão — uma linha por item de remessa.
+        data_tests: [unique, not_null]
+      - name: shipment_item_id
+        description: "Identificador do item da remessa na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: date_key
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: "Data de **despacho** da remessa."
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: delivered_date_key
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: "Data de **chegada**. Nula enquanto a remessa não chega, e o nulo significa *ainda não chegou* — o motivo está no cabeçalho do modelo. Sem `not_null` por isso; o `relationships` continua valendo para as linhas preenchidas."
+        data_tests:
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: carrier_key
+        description: "Chave substituta da transportadora: hash de `source_system` e `carrier_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_carrier'), field: carrier_key}
+      - name: warehouse_key
+        description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_warehouse'), field: warehouse_key}
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: product_key
+        description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_product'), field: product_key}
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
+      - name: geography_key
+        description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_geography'), field: geography_key}
+      - name: is_on_time
+        meta:
+          sensitivity: internal
+        description: '{{ doc("on_time_delivery") }}'
+      - name: order_to_delivery_days
+        meta:
+          sensitivity: internal
+        description: '{{ doc("order_to_delivery_cycle") }}'
+      - name: quantity_shipped
+        meta:
+          sensitivity: internal
+          description_reason: "diz a aditividade da medida nesta fato, que o texto herdado não diz"
+        description: '**Aditiva** — unidades que viajaram nesta caixa.'
+        data_tests: [not_null]
+      - name: shipment_status
+        description: "Estado da remessa; transições válidas em Modelo de Dados §4."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [created, picking, dispatched, in_transit, delivered, returned, lost]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: shipment_id
+        description: "Remessa à qual o item pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_item_id
+        description: "Item de pedido sendo enviado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_id
+        description: "Pedido ao qual o item pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: shipment_code
+        description: "Chave natural da remessa."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_number
+        description: "Número do pedido; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: tracking_code
+        description: "Código de rastreio junto à transportadora."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_status
+        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: placed_at
+        description: "Momento de negócio em que o pedido foi feito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: shipped_at
+        description: "Momento do despacho."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: estimated_delivery_at
+        description: "Prazo de entrega prometido ao cliente."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: delivered_at
+        description: "Instante da entrega, o do último evento de entrega da remessa; nulo enquanto ela não foi entregue."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: returned_at
+        description: "Instante da devolução, o do último evento de devolução; nulo sem devolução."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_dispatched
+        description: "Verdadeiro quando a remessa saiu do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_delivered
+        description: "Verdadeiro quando a remessa foi entregue."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_returned
+        description: "Verdadeiro quando a remessa voltou ao remetente."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_lost
+        description: "Verdadeiro quando a remessa está extraviada."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_shipment_count
+        description: "Não aditiva entre itens — número de remessas do pedido, repetido em cada item dele."
+        meta:
+          sensitivity: internal
+      - name: delivered_shipment_count
+        description: "Não aditiva entre itens — remessas entregues do pedido, repetidas em cada item dele."
+        meta:
+          sensitivity: internal
+      - name: is_order_cycle_closed
+        description: "Verdadeiro quando todas as remessas do pedido foram entregues e o ciclo de entrega está fechado (ADR-0033)."
+        meta:
+          sensitivity: internal
+      - name: is_cycle_closing_shipment
+        description: "Verdadeiro na remessa que fecha o ciclo de entrega do pedido: a última entregue (ADR-0033)."
+        meta:
+          sensitivity: internal
+      - name: is_split_order
+        description: "Verdadeiro quando o pedido foi dividido em mais de uma remessa."
+        meta:
+          sensitivity: internal
+      - name: order_delivered_at
+        description: "Instante em que a última remessa do pedido foi entregue; nulo enquanto falta alguma."
+        meta:
+          sensitivity: internal
+      - name: quantity_ordered
+        description: "**Não aditiva entre itens de remessa** — quantidade comprada do SKU na linha do pedido, repetida em cada item de remessa da linha: some uma vez por linha do pedido, nunca por item de remessa."
+        meta:
+          sensitivity: internal
+          description_reason: a fato está no grão do item de remessa e o valor é da linha do pedido — o herdado não diz o grão (RVL3-2-03)
+      - name: shipped_share_of_line
+        description: "Fração da linha do pedido que viajou nesta remessa: a quantidade enviada sobre a pedida, de 0 a 1."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: failed_attempt_count
+        description: "**Não aditiva entre itens** — tentativas de entrega da remessa que falharam, repetidas em cada item dela: some uma vez por remessa, nunca por item."
+        meta:
+          sensitivity: public
+          description_reason: a fato está no grão do item e o valor é da remessa — o herdado diria aditiva por item (RVL3-03)
+      - name: delivery_delay_days
+        description: "Dias entre a entrega e o prazo prometido: positivo é atraso, negativo é adiantamento; nulo sem entrega."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: transit_days
+        description: "Dias entre o despacho e a entrega; nulo enquanto falta um dos dois."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  - name: fact_order_status_event
+    meta:
+      domain: vendas
+    description: >
+      **Grão: uma transição de estado do pedido.** A máquina de estados vista
+      como fato: `orders.order_status` diz onde o pedido está hoje, e esta fato
+      diz por onde ele passou.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, order_status_event_id]
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('order_status_events')
+            medidas:
+              hours_in_previous_status: hours_in_previous_status
+    columns:
+      - name: order_status_event_key
+        description: "Chave substituta da transição de estado do pedido: hash de `source_system` e `order_status_event_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: order_status_event_id
+        description: "Identificador da mudança de estado do pedido na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
+      - name: geography_key
+        description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_geography'), field: geography_key}
+      - name: to_status
+        description: "Estado resultante da transição."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [pending, paid, picking, shipped, delivered, cancelled, returned]
+      - name: from_status
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        description: "Estado anterior; nulo na criação do pedido."
+        data_tests:
+          - accepted_values:
+              values: [pending, paid, picking, shipped, delivered, cancelled, returned]
+      - name: hours_in_previous_status
+        meta:
+          sensitivity: internal
+        description: '**Não aditiva** — tempo no estado de origem; soma dentro do pedido, nunca entre pedidos.'
+      - name: transition_count
+        meta:
+          sensitivity: internal
+        description: '**Aditiva** — sempre 1, para que a contagem seja uma soma explícita.'
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_id
+        description: "Pedido cujo estado mudou."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_number
+        description: "Número do pedido; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: change_reason
+        description: "Motivo registrado para a transição."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: status_sequence
+        description: "Posição da transição na história do pedido, por ordem de data (1 é a criação)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: placed_at
+        description: "Momento de negócio em que o pedido foi feito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: changed_at
+        description: "Momento de negócio da transição."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: previous_changed_at
+        description: "Instante da transição anterior do mesmo pedido; nulo na primeira."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: current_order_status
+        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_order_creation
+        description: "Verdadeiro na primeira transição do pedido, que não vem de estado nenhum."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_current_status
+        description: "Verdadeiro na transição mais recente do pedido — a do estado em que ele está."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_terminal_status
+        description: "Verdadeiro quando a transição leva o pedido a um estado final: `cancelled` ou `returned`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_cancellation
+        description: "Verdadeiro quando a transição leva o pedido a `cancelled`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_return
+        description: "Verdadeiro quando a transição leva o pedido a `returned`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_realised
+        description: "Verdadeiro quando o pedido é venda realizada: pago, em separação, enviado, entregue ou devolvido. O pendente e o cancelado não contam."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  # ── Etapa 9 — relacionamento e histórico ───────────────────────────────────
+  - name: dim_campaign
+    meta:
+      domain: marketing
+    description: Campanha e objetivo. SCD tipo 1 — o objetivo é fixado na criação e não muda.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, campaign_natural_key]
+    columns:
+      - name: campaign_key
+        description: "Chave substituta da campanha: hash de `source_system` e `campaign_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: campaign_natural_key
+        description: "Identificador da campanha na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: campaign_objective
+        description: "Objetivo comercial da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [acquisition, retention, reactivation, clearance]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: campaign_code
+        description: "Código estável da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_name
+        description: "Nome da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_valid_from
+        description: "Início da vigência da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_valid_to
+        description: "Fim da vigência da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: budget_amount
+        description: "Orçamento previsto da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: campaign_is_active
+        description: "Indica se a campanha está ativa."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_running
+        description: "Verdadeiro quando a data de referência do armazém (`as_of_date`, 01/09/2026) cai dentro da vigência da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_finished
+        description: "Verdadeiro quando a vigência da campanha terminou antes de a data de referência do armazém (`as_of_date`, 01/09/2026)."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
+  - name: dim_support_category
+    meta:
+      domain: atendimento
+    description: >
+      Categoria de chamado — **derivada** de uma *seed*, porque a origem só tem
+      a lista dentro de um `CHECK` e uma dimensão precisa de nome legível e de
+      agrupamento.
+    columns:
+      - name: support_category_key
+        description: "Chave substituta da categoria de chamado: hash de `category_code` (ADR-0017)."
+        meta:
+          sensitivity: public
+        data_tests: [unique, not_null]
+      - name: support_category_natural_key
+        description: "Código estável da categoria de chamado; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests: [unique, not_null]
+      - name: support_category_name
+        description: "Nome da categoria de chamado."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests: [not_null]
+      - name: support_category_group
+        description: "Grupo que reúne categorias de chamado afins."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: support_category_description
+        description: "O que a categoria de chamado cobre."
+        meta:
+          description_inherited: true
+          sensitivity: public
+
+  - name: dim_coupon
+    meta:
+      domain: marketing
+    description: >
+      Cupom. SCD tipo 2 no padrão misto: campanha e regra de desconto
+      historizadas, uso acumulado corrente. `redemption_count` **não** entra nas
+      `check_cols` do *snapshot* — cada resgate criaria uma versão, e a dimensão
+      teria mais linhas que a fato que ela recorta.
+    data_tests:
+      - vigencias_sem_sobreposicao:
+          chave_natural: coupon_natural_key
+    columns:
+      - name: coupon_key
+        description: "Chave substituta da **versão** do cupom: hash de `source_system`, `coupon_id` e do início da vigência da versão (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: coupon_natural_key
+        description: "Identificador do cupom na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: discount_type
+        description: "Natureza do desconto: percentage ou fixed."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests:
+          - not_null
+          - accepted_values: {values: [percentage, fixed]}
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: coupon_code
+        description: "Código digitado pelo cliente."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: coupon_valid_from
+        description: "Início da vigência do cupom."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: coupon_valid_to
+        description: "Fim da vigência do cupom."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: max_redemptions
+        description: "Limite total de utilizações; nulo quando ilimitado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: redemption_count
+        description: "**Aditiva entre cupons, só na versão vigente** (`is_current`) — resgates do cupom, com o valor atual repetido em cada versão dele; zero quando ele nunca foi usado."
+        meta:
+          sensitivity: internal
+          description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
+      - name: redeemed_discount_amount
+        description: "**Aditiva entre cupons, só na versão vigente** (`is_current`) — desconto total concedido nos resgates do cupom, com o valor atual repetido em cada versão dele; zero quando ele nunca foi usado."
+        meta:
+          sensitivity: confidential
+          description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
+      - name: is_exhausted
+        description: "Verdadeiro quando o cupom tem limite de usos e os resgates já o alcançaram."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_redeemable_now
+        description: "Verdadeiro quando a data de referência do armazém (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_id
+        description: "Campanha à qual o cupom pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_code
+        description: "Código estável da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_name
+        description: "Nome da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_objective
+        description: "Objetivo comercial da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: discount_value
+        description: "Valor do desconto: percentual quando `percentage`, moeda quando `fixed`."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: min_order_amount
+        description: "Valor mínimo de pedido para o cupom ser elegível."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: coupon_is_active
+        description: "Indica se o cupom continua aceito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: valid_from
+        description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
+        meta:
+          sensitivity: internal
+      - name: valid_to
+        description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
+        meta:
+          description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
+          sensitivity: internal
+      - name: is_current
+        description: "Verdadeiro na versão vigente — a que não tem fim de vigência."
+        meta:
+          sensitivity: internal
+
+  - name: dim_support_agent
+    meta:
+      domain: atendimento
+    description: >
+      Agente. SCD tipo 2 pela **equipe**, que classifica o chamado. Carrega o
+      membro desconhecido: `ticket_events.agent_id` é nulo quando o autor é o
+      cliente.
+    data_tests:
+      - vigencias_sem_sobreposicao:
+          chave_natural: support_agent_natural_key
+    columns:
+      - name: support_agent_key
+        description: "Chave substituta da **versão** do atendente: hash de `source_system`, `support_agent_id` e do início da vigência da versão (ADR-0017). O membro desconhecido tem chave própria."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: support_agent_natural_key
+        description: "Identificador do atendente na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: agent_team
+        description: "Equipe de atendimento à qual o agente pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests: [not_null]
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: agent_code
+        description: "Chave natural do agente."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: agent_first_name
+        description: "Primeiro nome do agente (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: agent_last_name
+        description: "Sobrenome do agente (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: agent_full_name
+        description: "Nome completo do atendente: o primeiro nome e o sobrenome, separados por espaço (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: agent_email
+        description: "E-mail corporativo do agente (sintético)."
+        meta:
+          description_inherited: true
+          sensitivity: personal
+      - name: hired_at
+        description: "Início do período de atuação do agente."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: handled_ticket_count
+        description: "**Não aditiva entre atendentes nem entre versões** — chamados distintos em que o atendente registrou algum evento, com o valor atual repetido em cada versão dele; um chamado atendido por dois conta para os dois."
+        meta:
+          sensitivity: internal
+          description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
+      - name: handled_event_count
+        description: "**Aditiva entre atendentes, só na versão vigente** (`is_current`) — eventos de chamado registrados pelo atendente, com o valor atual repetido em cada versão dele."
+        meta:
+          sensitivity: internal
+          description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
+      - name: agent_is_active
+        description: "Indica se o agente continua atuando."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: valid_from
+        description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
+        meta:
+          sensitivity: internal
+      - name: valid_to
+        description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
+        meta:
+          description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
+          sensitivity: internal
+      - name: is_current
+        description: "Verdadeiro na versão vigente — a que não tem fim de vigência. O membro desconhecido é sempre vigente."
+        meta:
+          sensitivity: internal
+
+  - name: fact_coupon_redemption
+    meta:
+      domain: marketing
+    description: >
+      **Grão: um uso de cupom**, um por pedido. Duas âncoras temporais de
+      propósito — o cupom pela versão do **resgate**, o cliente pela versão da
+      **venda**, que é a mesma de `fact_sales_order_item`.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, coupon_redemption_id]
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, order_id]
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('coupon_redemptions')
+            medidas:
+              coupon_discount_amount: coupon_discount_amount
+    columns:
+      - name: coupon_redemption_key
+        description: "Chave substituta do resgate de cupom: hash de `source_system` e `coupon_redemption_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: coupon_redemption_id
+        description: "Identificador do resgate de cupom na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: order_id
+        meta:
+          sensitivity: internal
+          description_reason: "acrescenta ao significado herdado a restrição que o teste deste modelo cobra"
+        description: >
+          Um cupom por pedido — **por origem**. A unicidade está no teste de
+          combinação do modelo: dois sistemas numeram pedidos a partir de 1, e
+          exigi-la do id sozinho reprovaria dado correto.
+        data_tests: [not_null]
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: coupon_key
+        description: "Chave substituta da **versão** do cupom: hash de `source_system`, `coupon_id` e do início da vigência da versão (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_coupon'), field: coupon_key}
+      - name: campaign_key
+        description: "Chave substituta da campanha: hash de `source_system` e `campaign_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_campaign'), field: campaign_key}
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
+      - name: geography_key
+        description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_geography'), field: geography_key}
+      - name: is_eligible
+        meta:
+          sensitivity: confidential
+        description: As três condições da invariante 12 juntas — vigência, piso e teto.
+        data_tests: [not_null]
+      - name: coupon_discount_amount
+        meta:
+          sensitivity: confidential
+          description_reason: "diz a aditividade da medida nesta fato, que o texto herdado não diz"
+        description: '**Aditiva** — desconto efetivamente concedido.'
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: coupon_id
+        description: "Cupom utilizado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_number
+        description: "Número do pedido; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: coupon_code
+        description: "Código digitado pelo cliente."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: discount_type
+        description: "Natureza do desconto: percentage ou fixed."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: campaign_objective
+        description: "Objetivo comercial da campanha."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: redemption_sequence
+        description: "Posição do resgate entre os do mesmo cupom, por ordem de data (1 é o primeiro); é ela que mede o limite de usos."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: redeemed_at
+        description: "Momento de negócio da utilização."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: placed_at
+        description: "Momento de negócio em que o pedido foi feito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_within_validity
+        description: "Verdadeiro quando o resgate aconteceu dentro da vigência do cupom."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_above_minimum
+        description: "Verdadeiro quando o subtotal do pedido alcança o valor mínimo do cupom, ou o cupom não tem mínimo."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: is_within_limit
+        description: "Verdadeiro quando o resgate cabe no limite de usos do cupom, pela ordem dos resgates, ou o cupom não tem limite."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_discount_bounded
+        description: "Verdadeiro quando o desconto do resgate não passa do subtotal do pedido."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: order_is_cancelled
+        description: "Verdadeiro quando o pedido está cancelado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_realised
+        description: "Verdadeiro quando o pedido é venda realizada: pago, em separação, enviado, entregue ou devolvido. O pendente e o cancelado não contam."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: redemption_count
+        description: "Aditiva — 1 por resgate: soma-se para contar resgates."
+        meta:
+          sensitivity: internal
+      - name: order_subtotal_amount
+        description: "Soma dos itens antes de desconto, frete e imposto."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: order_total_amount
+        description: "Valor total do pedido; reconcilia os demais campos."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: discount_share_of_order
+        description: "Não aditiva — fração do subtotal do pedido que o cupom descontou, de 0 a 1; nula em pedido sem subtotal."
+        meta:
+          sensitivity: confidential
+
+  - name: fact_support_ticket_event
+    meta:
+      domain: atendimento
+    description: >
+      **Grão: um evento de um chamado.** Contar chamados aqui exige
+      `count(distinct support_ticket_id)`; `event_count` é o que se soma.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, ticket_event_id]
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('ticket_events')
+            # só contagem: as horas até atribuição e resolução nascem na própria fato
+    columns:
+      - name: support_ticket_event_key
+        description: "Chave substituta do evento de chamado: hash de `source_system` e `ticket_event_id` (ADR-0017)."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: ticket_event_id
+        description: "Identificador do evento do chamado na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: date_key
+        description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: support_category_key
+        description: "Chave substituta da categoria de chamado: hash de `category_code` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_support_category'), field: support_category_key}
+      - name: support_agent_key
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: "Membro desconhecido quando o autor do evento é o cliente."
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_support_agent'), field: support_agent_key}
+      - name: sales_channel_key
+        meta:
+          sensitivity: internal
+        description: Membro desconhecido quando o chamado não nasceu de um pedido.
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
+      - name: geography_key
+        description: "Lugar do endereço de entrega do cliente em `dim_geography`; o membro desconhecido quando não há endereço que case."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_geography'), field: geography_key}
+      - name: ticket_event_type
+        description: "Natureza do evento no chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [created, assigned, message, status_changed, resolved, reopened]
+      - name: event_count
+        meta:
+          sensitivity: internal
+        description: '**Aditiva** — sempre 1, para que a contagem de eventos seja uma soma explícita.'
+        data_tests: [not_null]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: support_ticket_id
+        description: "Chamado ao qual o evento pertence."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: ticket_number
+        description: "Número do chamado; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_id
+        description: "Pedido relacionado ao chamado, quando houver."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: ticket_category
+        description: "Motivo do chamado."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: ticket_priority
+        description: "Prioridade atribuída ao chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: ticket_status
+        description: "Estado atual do chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: event_sequence
+        description: "Posição do evento na história do chamado, por ordem de data (1 é a abertura)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: occurred_at
+        description: "Momento de negócio do evento."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: opened_at
+        description: "Momento de abertura do chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: closed_at
+        description: "Momento de encerramento do chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_placed_at
+        description: "Momento de negócio em que o pedido foi feito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_ticket_creation
+        description: "Verdadeiro quando o evento abre o chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_assignment
+        description: "Verdadeiro quando o evento atribui o chamado a um atendente."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_message
+        description: "Verdadeiro quando o evento é uma mensagem."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_status_change
+        description: "Verdadeiro quando o evento muda o estado do chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_resolution
+        description: "Verdadeiro quando o evento resolve o chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_reopening
+        description: "Verdadeiro quando o evento reabre o chamado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_from_customer
+        description: "Verdadeiro quando o evento veio do cliente, sem atendente."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_closed
+        description: "Verdadeiro quando o chamado está resolvido ou fechado."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: has_order
+        description: "Verdadeiro quando o chamado está ligado a um pedido."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: was_reopened
+        description: "Verdadeiro quando o chamado foi reaberto pelo menos uma vez."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_solved_first_time
+        description: "Verdadeiro quando o chamado foi resolvido e nunca reaberto."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: reopening_count
+        description: "**Não aditiva entre eventos** — vezes que o chamado foi reaberto, repetidas em cada evento dele: some uma vez por chamado, nunca por evento."
+        meta:
+          sensitivity: internal
+          description_reason: a fato está no grão do evento e o valor é do chamado — o herdado diria aditiva por evento (RVL3-03)
+      - name: hours_to_assignment
+        description: "Horas entre a abertura do chamado e a primeira atribuição a um atendente; nulo enquanto ele não foi atribuído."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: hours_to_resolution
+        description: "Horas entre a abertura do chamado e a primeira resolução; nulo enquanto ele não foi resolvido."
+        meta:
+          description_inherited: true
+          sensitivity: internal

@@ -1,0 +1,456 @@
+# Política de Governança de Dados
+
+> **O que vive aqui:** as **regras** sobre os dados — o que pode existir, como classificar, quem
+> acessa o quê, por quanto tempo, como os segredos são tratados e como o catálogo é mantido como
+> código.
+>
+> **O que não vive aqui:** o **registro** da aplicação dessas regras — campos, classificações e
+> linhagem concretas (ver [Dicionário de Dados](dicionario_de_dados.md)); a estrutura das camadas
+> (ver [Arquitetura](arquitetura.md)); os testes (ver [Qualidade de Dados](qualidade_de_dados.md)).
+
+| Campo | Informação |
+|---|---|
+| Versão | 2.23 |
+| Situação | Vigente para a fase local |
+| Responsável | Líder de Governança |
+| Última revisão | 10/11/2026 — §5.2 alinhada às decisões D79 e D80 da Etapa 13; 05/11/2026 — §5.1: a coluna é achada pelo nome que o YAML lê, e todo conteúdo final é lido estrito antes de qualquer escrita; o domínio é escrito e conferido no `meta` efetivo; o limite do escritor em bloco (rodadas 11 e 12 do lote 3 da v1.1.0) |
+
+---
+
+## 1. Propósito
+
+Tornar o princípio **P3** operacional: catálogo, linhagem e classificação nascem junto com os
+dados, não depois. A política vale para todo dado, metadado e artefato produzido no repositório,
+nas duas fases.
+
+---
+
+## 2. Dados permitidos
+
+- dados sintéticos gerados pelo próprio projeto — origem principal e origem legada;
+- metadados, dicionário e catálogo;
+- estatísticas agregadas do pipeline.
+
+## 3. Dados não permitidos
+
+- dados pessoais reais, de qualquer natureza ou origem;
+- extrações de sistemas corporativos;
+- *datasets* privados sem autorização;
+- credenciais, tokens e segredos.
+
+A proibição vale inclusive para exemplos em documentação, mensagens de *commit*, capturas de tela e
+*issues*. Um dado sintético que reproduza um registro real deixa de ser sintético.
+
+---
+
+## 4. Classificação de sensibilidade
+
+Todo campo de todas as camadas recebe exatamente um nível. Campo sem classificação bloqueia a
+conclusão da etapa que o criou.
+
+**Como se mede** (desde 17/09/2026): `tests/test_classificacao.py` compara coluna a coluna o que
+existe no armazém (`information_schema.columns`, nas nove camadas) com o que o `manifest.json` do
+dbt declara com `sensitivity`, e vigia também o vocabulário e a declaração sem coluna. É uma
+**catraca** por camada: o piso é a cobertura medida na última entrega que classificou a camada;
+regredir falha, subir exige levantar o piso no mesmo *commit*. **Medido em 17/09/2026:** de manhã, 738
+de 4.161 colunas (17,7 %); à tarde, com a classificação derivada dos modelos (§5.1), **4.161 de
+4.161** — todos os pisos em 100, e a asserção é igualdade: coluna nova sem classificação falha em
+`make check`.
+
+Os níveis estão fixados em [ADR-0011](adr/0011-classificacao-e-papeis-de-acesso.md). O vocabulário
+é inglês, por ser identificador técnico: cada valor vira nome de *policy tag* no BigQuery.
+
+| Valor de `sensitivity` | Definição | Exemplos no projeto | Exposição |
+|---|---|---|---|
+| `public` | Pode ser exposto sem restrição | Catálogo, contagens agregadas, `product_categories` | Livre |
+| `internal` | Operacional, sem valor sensível | Chaves técnicas, `recorded_at`, identificadores de lote | Livre |
+| `confidential` | Não pessoal, mas de valor comercial | `unit_cost`, condições de fornecedor, margem | Livre, por ser sintético |
+| `personal` | Campo que, se fosse real, seria dado pessoal | Nome, e-mail, telefone, endereço, documento — sempre sintéticos | Livre, por ser sintético |
+
+**Classificar não é expor** ([ADR-0049](adr/0049-separar-a-classificacao-da-exposicao.md)). O
+nível declara o que o campo **seria** se o dado fosse real, e por isso vale também para o sintético:
+o objetivo é exercitar o controle real, não presumir que dado simulado dispensa governança. Ele não
+decide quem vê o campo. Como todo dado do projeto é sintético (§3), a exposição é livre em todos os
+níveis — nas views de consumo e fora do armazém —, e quem acessa o quê é decidido por concessão
+(§7), nunca por reclassificação. A liberdade é consequência da §3: com dado real, a decisão não
+valeria.
+
+É essa classificação que, na fase GCP, vira *policy tag* com o controle de acesso ligado — e a
+exposição passa a ser a concessão do IAM a cada grupo (§5.2).
+
+**A proibição de dados reais não é um nível.** Ela vive exclusivamente na
+[seção 3](#3-dados-não-permitidos) — repeti-la aqui criaria dois donos para a mesma regra (**P8**),
+e nenhum campo do projeto poderia recebê-la.
+
+---
+
+## 5. Catálogo como código
+
+O catálogo não é um sistema à parte: **o repositório é a fonte de verdade**. A alternativa —
+subir um contêiner pesado de catálogo no ambiente local — foi rejeitada por custo de memória e por
+não ter contrapartida direta no GCP ([ADR-0007](adr/0007-catalogo-como-codigo.md)).
+
+A estrutura tem dois pilares:
+
+| Pilar | Formato | Conteúdo |
+|---|---|---|
+| **Dicionário técnico** | Arquivos `.yml` do dbt | Descrição de cada modelo e coluna, testes e bloco `meta:` |
+| **Glossário de negócio** | Markdown em [`glossario_de_negocio/`](glossario_de_negocio/) | Conceitos do varejo *omnichannel*, interligados entre si |
+
+O dbt importa o glossário nos `.yml` por meio de blocos `{% docs %}`, e `dbt docs generate`
+consolida tudo em um site navegável onde **linhagem técnica e conceito de negócio aparecem juntos**.
+
+### 5.1 Padrão de metadados
+
+O bloco `meta:` é a ponte para a nuvem — e por isso é estrito. As chaves são fixas e ficam em
+inglês, por serem identificadores técnicos; o conteúdo descritivo fica em português.
+
+```yaml
+models:
+  - name: dim_customer
+    description: '{{ doc("active_customer") }}'
+    meta:
+      domain: "vendas"
+      owner: "data_custodian"
+      retention: rebuildable
+    columns:
+      - name: customer_document
+        description: "Documento de identificação do cliente (sintético)."
+        meta:
+          sensitivity: "personal"
+          data_type: "pii"
+```
+
+Chaves obrigatórias: `domain` e `owner` no modelo; `sensitivity` em toda coluna; `retention` em todo
+objeto — `permanent`, `rebuildable` ou um inteiro de dias — declarada **por camada** no
+`dbt_project.yml` (`+meta`) e por fonte nos `_sources.yml`, e cobrada objeto a objeto por
+`tests/test_retencao.py` contra a §8. `data_type` conforme aplicável. O acesso segue o mesmo
+arranjo, pelas chaves da §7: `writers` no `meta` de cada camada e fonte, `+grants` por camada de
+modelos e `meta.grants` por fonte. `lineage` numa coluna — lista de `schema.tabela.coluna` —
+declara a origem que o SQL não deixa ver, e vale mais que a derivada; hoje só as pontes do legado a
+carregam, geradas por `legacy/ponte.py` (lista vazia é constante).
+
+**`sensitivity` é declarada uma vez e derivada em todo o resto** (desde 17/09/2026). A declaração
+vive nos modelos SQLAlchemy da origem (`models/base.py::meta`, obrigatória e validada, 418 colunas);
+as 4 mil colunas do armazém são transporte, renome, conversão ou combinação dessas, e
+`make catalog` (`models/sensitivity.py`) escreve o `sensitivity` de cada uma nos `.yml` por
+**linhagem do SQL compilado**: uma folha só herda; várias folhas recebem a mais restritiva
+(`public < internal < confidential < personal`); o que decide o ramo de um `case` não entra, só o que
+vira valor; coluna sem folha (literal, `row_number()`, hash de chave, `count(*)`) e as colunas técnicas
+(`_airbyte_*`, `_stream_*`, `dbt_*`) são `internal`. O `.yml` escrito à mão é preservado linha a
+linha e só o `meta.sensitivity` é inserido ou reescrito; modelo sem `.yml` entra em `_derived.yml`
+(gerado) no diretório dele — para promovê-lo a um `.yml` à mão, acrescente a entrada e rode
+`make catalog` **antes** do dbt: o gerado perde a entrada e o manual ganha a classificação, sem editar
+o derivado; os `.yml` gerados por `make legacy-models` derivam a mesma declaração no próprio gerador.
+Derivação incompleta — manifest de `dbt parse`, SQL que o parser não lê — não escreve nem apaga nada. Quem discorda do derivado numa coluna declara `sensitivity` à mão **com
+`sensitivity_reason`** — sem a justificativa o derivado prevalece na próxima geração. Exceções de hoje:
+os payloads JSON do legado (`personal` por regra, porque a linhagem não vê o que um JSON carrega) e as
+pontes `legado__*` (o nível real de cada coluna extraída do payload). `make check` falha se algum
+`.yml` estiver atrás dos modelos. Seeds são declaração, não derivado: a classificação delas é escrita
+em `dbt/seeds/_seeds.yml`. A regra está provada em `tests/test_classificacao_derivada.py`.
+
+**`description` também é declarada uma vez — e herdada só por transporte** (desde 03/11/2026). O
+texto de cada coluna da origem vive nos modelos SQLAlchemy, ao lado do nível; `make catalog`
+(`models/descriptions.py`) o escreve em cada coluna do armazém que só **transporta** aquele valor:
+referência pura, apelido, ou `cast` de volta ao tipo declarado na origem (`models/transport.py`, que
+lê a forma da expressão a cada salto — a linhagem não basta, porque soma, arredondamento e cópia têm
+a mesma folha). O que **calcula** — agregação, aritmética, função, `case`, comparação, literal —
+significa outra coisa e só tem descrição se alguém a escrever no `.yml`. Numa união, herda-se quando
+todo ramo que transporta chega ao mesmo texto; ramo constante, como o membro desconhecido das
+dimensões, não vota — salvo quando o tipo dele, ou o de outro ramo, faz o PostgreSQL converter o
+valor transportado ao resolver o tipo da coluna, e aí a união calcula (RVL3-02, RVL3-3-03). A regra
+segue a resolução do servidor: nas categorias numérica e de data/hora a união resolve o tipo mais
+alto presente e converte todo ramo para ele, e só vale herdar quando a conversão do que é
+transportado não muda o valor — alargar inteiro, inteiro para numérico exato; `bigint` para `real` e
+`timestamp` para `timestamptz` (pelo fuso da sessão) não valem. Tipo desconhecido não prova nada:
+com mais de uma folha, ou diante de constante tipada, não se herda. Fora das categorias ordenadas,
+construir a união prova compatibilidade, não igualdade: aceita-se o mesmo tipo, `varchar` com
+`text` e `uuid`/`json`/`jsonb` com texto (o Airbyte grava texto no lugar deles); `char(n)` com
+texto, que perde o preenchimento, e `array` de tipos diferentes não herdam (RVL3-4-02); o
+parâmetro do tipo sai na comparação, o `[]` não — `varchar(8)[]` é array, não texto (RVL3-5-03). O tipo
+conhecido vem da origem, do `cast`, do teste e da comparação, da espécie do literal (`'true'` é
+texto) e de `||` cujos operandos provam ser texto (RVL3-4-03). A ponte do legado só herda pela declaração `meta.description_from` que
+`legacy/ponte.py` gera, apontando a coluna do `stg_retail__*` que ela reproduz — onde o legado põe
+outra coisa no lugar, como a identidade física em `event_sequence`, não há par. As colunas de
+convenção (`source_system`, `is_deleted`) e as que as ferramentas acrescentam (`_airbyte_*`,
+`_stream_*`, `dbt_*`, `legacy_row_id`) têm o texto num bloco `{% docs %}` único
+(`dbt/models/_convencoes.md`), aplicado onde a coluna nasce com **nome e forma** da convenção. Texto à
+mão numa coluna que herda vale só com `meta.description_reason`; sem ele, o herdado o substitui, e a
+troca é impressa. O `.yml` à mão guarda também o herdado que `make catalog` escreveu nele; o que separa um do outro
+é a marca `meta.description_inherited: true`, que a derivação põe em todo texto que escreve — no
+`.yml` à mão e no gerado — e que anda com a coluna quando ela é renomeada, movida ou promovida a um
+`.yml` à mão. A marca é conferida no YAML como ele é carregado, nos dois modos do `make catalog`; `meta`
+escrito em linha (`meta: {…}`) o escritor recusa, em vez de duplicar a chave (RVL3-4-01). E todo
+`.yml` do projeto é **lido** sem deixar uma ocorrência encobrir outra: chave repetida num mapa,
+coluna listada duas vezes numa entrada, entrada documentada em dois arquivos e a mesma tabela de
+fonte duas vezes são recusa. E a tabela de fonte tem **um nome só, que é o físico**: sem
+`identifier` diferente do nome, sem `quoting`, nome de fonte, schema e tabela em minúsculas, e uma
+fonte por schema. O dbt permite os quatro apelidos, e cada um daria à mesma tabela um nome para
+escrever e outro para ler; o projeto não usa nenhum, e a leitura os recusa em vez de resolvê-los
+(RVL3-9-01/02). Duas fontes podem ter tabelas **homônimas** em schemas diferentes no mesmo arquivo
+(`raw.order_items`, `raw_legacy.order_items`): a escrita acha a tabela de fonte pelo par (fonte,
+tabela) e o modelo pelo nome no bloco de topo, endereço repetido no arquivo é recusa, e todo destino
+pedido é conferido no YAML carregado nos dois modos do `make catalog` — um texto pedido que já estava
+certo noutra entrada não muda byte nenhum, e só a conferência por endereço o vê (RVL3-10-01). Dentro
+da entrada, a coluna é achada pelo nome **como o YAML o lê** — com comentário, aspas ou espaço a mais —
+e com o recuo da lista dela; e todo conteúdo final é lido estrito antes de qualquer escrita, nos dois
+modos, mesmo sem marca a escrever: uma coluna que o escritor duplicasse sairia com 0 e só seria
+recusada na rodada seguinte (RVL3-11-01). O escritor edita YAML **em bloco**: coluna em fluxo
+(`- {name: x, …}`) ou com espaço depois do traço (`-   name:`) dá uma saída que a leitura estrita
+recusa, sem escrever nada — o projeto não usa essas formas, e quem as introduzir normaliza o layout
+ou amplia o escritor antes de gerar (limite declarado no fechamento do lote 3). Fonte
+de **pacote** — a vinda de uma dependência, ou a local com `overrides` — também é recusa: a
+identidade dela é a do pacote, que o leitor não lê; o manifest efetivo é conferido, e a fonte de
+outro pacote para o `make catalog` (RVL3-10-03) —
+não a última que vence; sem isso, uma segunda ocorrência sem a marca faria o texto velho virar raiz
+(RVL3-5-02, RVL3-6-02, RVL3-7-01, RVL3-8-01, RVL3-9-01/02). O `config.meta` da coluna é lido junto com o `meta`, como o dbt
+os junta (RVL3-6-01). A exceção é a promoção documentada: o modelo com entrada à mão e ainda no
+`_derived.yml` vale pela à mão, e a gerada sai na geração seguinte (RVL3-6-03). Coluna marcada que deixou de transportar é recusada, como a que guarda, sem motivo, o
+texto de quem ela lê; escreve-se o texto do cálculo e tira-se a marca, que só sai por quem revisa
+(RVL3-01, RVL3-2-01, RVL3-3-01). Toda grafia de `{{ doc("x") }}` é a mesma referência (RVL3-3-02). E o texto herdado diz o que o valor é, não como somá-lo **no grão de
+quem o recebe**: medida da remessa repetida em cada item, valor atual que a dimensão repete em cada versão
+da entidade, ou acumulado que o snapshot congela na captura que abriu a versão (a coluna não está em
+`check_cols`), pede texto próprio com motivo no destino (RVL3-03, RVL3-2-03/04). O `persist_docs` leva o texto aos comentários das colunas dos modelos, dos
+snapshots e das seeds no banco (as seeds desde a revisão do lote 3, RVL3-08); as fontes (`raw`, `raw_legacy`), que o dbt não constrói e o Airbyte recria a cada
+recarga, o mostram só no catálogo do dbt — limitação declarada (medido em 03/11/2026). A derivação lê o SQL compilado do manifest: um modelo, snapshot ou macro (fora de comentário
+Jinja) mudado no disco depois do último build, ou uma declaração de `.yml` que ela lê do manifest
+— o nível com motivo da ponte, o da seed, o da fonte não espelhada, inclusive a entrada retirada
+inteira (RVL3-4-04) —, faz `make catalog` recusar e
+não tocar em nada, até o `make dbt-build` (RVL3-07, RVL3-2-05, RVL3-3-04/05). Macro nova ou apagada
+e o `dbt_project.yml` não se conferem — a compilação recente continua sendo a premissa, que o `make
+check` cumpre com o build antes (RVL3-2-07). A catraca de descrição
+(`tests/test_descricao.py`) conta o catálogo, não o comentário físico. O texto da ponte é cópia que o gerador do legado faz: quando um texto do `staging` muda, `make catalog`,
+`make legacy-models` e `make catalog` de novo — o `make check` acusa a ponte atrasada. A regra está
+provada em `tests/test_descricao_derivada.py`.
+
+**`owner` e `domain`, também de uma vez** (desde 03/11/2026). Há um dono só, o `data_custodian`, e
+ele é declarado por camada no `dbt_project.yml` (`+meta`), como a retenção. O `domain` de um objeto de
+`staging`, `trusted`, `snapshots` ou `quarantine` que **conduz** uma tabela da origem é o dela, declarado
+nos modelos SQLAlchemy, e `make catalog` (`models/domains.py`) o escreve no `.yml` do objeto. A tabela
+conduzida é a do nome do modelo, e a lista `CONDUCTS` diz qual é onde o nome não diz. O que não conduz
+tabela nenhuma — dimensões, fatos, views de consumo, seeds — tem o `domain` escrito à mão. Os objetos
+gerados por `make legacy-models` declaram o deles no gerador. Domínio à mão num objeto que conduz uma
+tabela vale só com `meta.domain_reason`. O domínio é escrito no `meta` que a entrada já declara —
+`config.meta`, quando é ele, já que o dbt recusa os dois juntos e a leitura recusa o par — e conferido
+no valor que o dbt lê, nos dois modos do `make catalog`, mude o arquivo ou não (RVL3-11-02). Os valores são os nove domínios dos modelos SQLAlchemy, mais
+`transversal`, para o que serve a todos e não conduz tabela de domínio nenhum — o calendário e a
+geografia —, e o `legado` dos objetos do gerador. O texto de uma medida diz a aditividade, o que ela
+mede e o grão ou o filtro ("Aditiva — receita líquida dos itens de pedidos realizados, por mês, canal
+e categoria"); o conceito fica no [Glossário de Negócio](glossario_de_negocio/), que a view aponta.
+
+**Como se mede a descrição** (desde 03/11/2026): `tests/test_descricao.py` conta, por camada, as
+colunas que existem no armazém sem descrição no `manifest.json` e os objetos sem `domain` ou `owner`.
+É uma catraca de **faltas**, não de percentual: o número tem de ser igual ao teto — coluna nova sem
+texto falha, e a melhora também, até o teto baixar no mesmo *commit*. Os tetos são os medidos na
+entrega que os criou, e o que eles contam está nos próprios testes.
+
+### 5.2 Materialização da governança na fase GCP
+
+O trabalho já está codificado; a migração consome os mesmos arquivos:
+
+1. **Descrições e metadados** — o dbt grava as descrições de tabela e de coluna no BigQuery pelo
+   `persist_docs`; `domain`, `owner` e `retention` viram *labels* do BigQuery, derivados do bloco
+   `meta:` por um *post-hook* do dbt, e o **Dataplex** os lê do próprio BigQuery. A linhagem por
+   coluna é a que o BigQuery captura dos *jobs* do dbt, **medida** contra o módulo do
+   [Dicionário §3](dicionario_de_dados.md) em vez de publicada a partir dele; as travessias de fora
+   do BigQuery (Airbyte, CDC, Beam) são publicadas por tabela, pela API. Decidido na D80
+   ([Pendências §2](pendencias.md#d80--a-linhagem-por-coluna-é-a-nativa-do-bigquery-o-metadado-vai-em-labels-decidida-em-07112026));
+   o que se mediu está no [Registro §23](registro_fase_gcp.md#23-g5-catálogo-e-linhagem-07112026-noite).
+2. **Políticas de acesso** — só os níveis `confidential` e `personal` viram *policy tag* com
+   controle ligado: em `public` e `internal` não há o que negar. O **Terraform** cria a taxonomia,
+   as *tags* e o IAM de leitura; o **dbt** aplica a *tag* às colunas das tabelas que materializa, a
+   partir do YAML de classificação (D71), porque substituir uma tabela no BigQuery apaga as *tags*
+   dela; o **fluxo automatizado** do [ADR-0025](adr/0025-policy-tags-por-fluxo-automatizado.md)
+   converge as tabelas que o dbt não materializa, e roda só na janela da fase GCP. Como a
+   sincronização do Airbyte recria as tabelas das fontes — e com elas apaga as *tags* —, a
+   convergência é a tarefa `convergir_policy_tags` da `fluxo_batch`, entre as capturas e o
+   `dbt_seed`, rodando como `mvp-politicas`, que a conta do Composer personifica
+   (`MVP_POLITICAS_IMPERSONATE_SA`); no armazém local ela não faz nada. Essa rota está
+   implementada, **não validada no Composer**: a tarefa rodou com a ADC do Owner, e o IAM da
+   personificação nunca foi aplicado
+   ([Registro §57](registro_fase_gcp.md#57-o-que-foi-manual-na-quarta-vira-código-11112026-2125--2230)). Apenas
+   identidades autorizadas pelo IAM conseguem executar `SELECT` sobre coluna marcada. A autorização
+   é a exposição ([ADR-0049](adr/0049-separar-a-classificacao-da-exposicao.md)): os papéis a
+   recebem nas *tags* do dado sintético, e a negação se prova com uma identidade sem ela. A
+   autenticação do fluxo usa **federação de identidade**: nenhuma chave de conta de serviço é
+   armazenada como segredo. Decidido na D79
+   ([Pendências §2](pendencias.md#d79--as-policy-tags-quais-níveis-quem-cria-quem-lê-quando-o-fluxo-roda-decidida-em-07112026));
+   o que se mediu está no [Registro §22](registro_fase_gcp.md#22-g4-as-policy-tags-07112026-noite).
+
+A classificação deixa de ser documental e passa a ser **controle efetivo**, sem que nenhuma
+descrição precise ser reescrita.
+
+---
+
+## 6. Controles obrigatórios
+
+| Controle | O que exige | Onde é registrado |
+|---|---|---|
+| Classificação por campo | Todo campo tem um nível da seção 4 | `.yml` do dbt e [Dicionário de Dados](dicionario_de_dados.md) |
+| Linhagem origem → consumo | Toda coluna analítica aponta para a sua origem | Linhagem do dbt entre modelos; por coluna e fora do dbt, [Dicionário §3](dicionario_de_dados.md#3-linhagem), gerada de `models/lineage.py` e conferida por `make check` |
+| Procedência entre origens | Registro empilhado identifica se veio da origem principal ou da legada | [Origem Legada](origem_legada.md) |
+| Certificado de captura do legado | Toda sincronização do legado deixa, por tabela, contagem e hash de conteúdo da origem antes e depois do *job*, o recebido no bruto e o vínculo com o *job*; só captura `complete` nas 40 tabelas é elegível ([ADR-0044](adr/0044-certificar-cada-captura-do-legado-por-conteudo.md)) | `governance.legacy_captures` — o primeiro conjunto do log de execução do [ADR-0023](adr/0023-escopo-do-schema-governance.md) materializado |
+| Regras de acesso por camada | Cada camada tem papéis de leitura e escrita | Seção 7, `+grants`, `meta.grants` e `meta.writers` |
+| Retenção | Todo objeto tem prazo e critério de descarte | Seção 8 e `meta.retention` |
+| Segredos fora do repositório | Credenciais só em `.env` local; `.env.example` versionado sem valores | `.gitignore` + revisão de cada entrega |
+
+---
+
+## 7. Regras de acesso por camada
+
+Os papéis estão fixados em [ADR-0011](adr/0011-classificacao-e-papeis-de-acesso.md). Na fase local
+são *roles* do PostgreSQL; na fase GCP, contas de serviço e grupos IAM por dataset.
+
+| Papel | Escreve | Lê | Equivalente na fase GCP |
+|---|---|---|---|
+| `ingestor` | `raw`, `raw_legacy`, `governance` | as próprias | Conta de serviço do Airbyte |
+| `transformer` | `staging`, `trusted`, `analytics`, `consumption`, `quarantine`, `snapshots` | camadas anteriores | Conta de serviço do dbt |
+| `streamer` | `raw.inventory_movements_stream` | a própria | Conta de serviço do Dataflow |
+| `analyst` | — | `consumption` apenas | Grupo IAM no dataset das views |
+| `auditor` | — | `quarantine`, `governance` | Grupo IAM de auditoria |
+
+`governance` e `snapshots` não são camadas de fluxo: `governance` recebe o certificado de captura
+do legado, escrito pela ingestão ([ADR-0044](adr/0044-certificar-cada-captura-do-legado-por-conteudo.md)),
+e é lido pelo dbt — só para a elegibilidade da captura — e pelo `auditor`
+([ADR-0023](adr/0023-escopo-do-schema-governance.md)); `snapshots` é mantido exclusivamente pelo dbt
+([ADR-0017](adr/0017-chaves-substitutas-e-scd.md)) e não é lido por ninguém fora do pipeline. O
+`streamer` escreve em `raw`, e não em `analytics` como o [ADR-0011](adr/0011-classificacao-e-papeis-de-acesso.md)
+previa: o [ADR-0031](adr/0031-aterrissagem-do-caminho-quente-em-raw.md) aterrissou o caminho quente
+ao lado da tabela do Airbyte, e o papel acompanha o dado.
+
+Nenhum consumidor de análise recebe acesso direto a `raw`, `raw_legacy`, `staging`, `trusted` ou
+`analytics`. O contrato de consumo é a view, e o schema `consumption`
+([ADR-0008](adr/0008-schemas-do-armazem.md)) torna a regra testável por asserção de falha: um
+`SELECT` de `analyst` contra `raw` **precisa** falhar.
+
+**Implementado e testado desde 18/09/2026.** Os cinco papéis são grupos de privilégio **sem login**
+no armazém, criados por `mvp_ed1.governance.garantir()` antes de todo `make dbt-build` — quem se
+conecta é membro de um deles: o superusuário do `.env`, que os assume por `set role`, e o login de
+leitura, membro de `analyst` (abaixo); não há senha por papel, como não haverá na fase GCP. A concessão é declarada onde a
+camada é declarada: `+grants` por camada no `dbt_project.yml` (quem lê, aplicado pelo dbt objeto a
+objeto ao materializar), `meta.grants` por fonte nos `_sources.yml` (`raw`, `raw_legacy` e
+`governance`, que o dbt não materializa) e `meta.writers` em ambos (quem escreve o schema). O
+`on-run-end` (`aplicar_acesso_por_camada`) concede `usage` e `create` no schema, aplica os grants
+das fontes e **revoga** o que não está declarado, a cada execução. `tests/test_acesso.py` confere
+que o declarado é esta tabela e depois **assume cada papel e executa**: leitura em todo objeto
+declarado das nove camadas (5 papéis × 278 objetos, 1.390 leituras), criação de tabela em cada
+schema (revertida) e `insert` na aterrissagem do caminho quente — o permitido passa e o proibido
+falha com *permission denied*. Contraprovas feitas na entrega: grant dado à mão ao `analyst` em
+`trusted` acusa e é revogado na execução seguinte, assim como privilégio a mais numa tabela de
+fonte e `create` a mais num leitor (`analyst` em `consumption`, `auditor` em `quarantine` — revisão
+de 18/09/2026); papel apagado volta no `garantir()`; declaração fora desta tabela falha o teste. O
+`streamer` não tem `create` em `raw`: escreve uma tabela, e criá-la é preparação do ambiente feita
+por quem é dono do schema, não privilégio do papel. O passo
+seguinte, fora desta entrega, é cada componente conectar-se como membro do próprio papel (Airbyte,
+dbt, Beam e o certificado de captura) — hoje todos usam o superusuário, e a mudança exige subir cada
+ambiente para provar.
+
+**O login de leitura (v1.1.0, 23/10/2026).** O primeiro consumidor que se conecta como membro do
+próprio papel, e não como superusuário: `consumption_reader`, com `WAREHOUSE_READER_USER` e
+`WAREHOUSE_READER_PASSWORD` no `.env` (`make dbt-build` acrescenta as duas a um `.env` que não as
+tenha). É o login por onde um consumidor de fora do armazém — o exportador do `bi-como-codigo` — lê
+as views. `garantir()` o cria e o repõe a cada `make dbt-build`: membro de `analyst` e de nada mais,
+sem *admin option*; nenhum atributo que escale (`superuser`, `createdb`, `createrole`,
+`replication`, `bypassrls`); leitura como padrão da sessão; a senha do `.env`, enviada como
+verificador SCRAM, para que o texto dela nunca chegue ao servidor. E saem de `PUBLIC` no banco
+`temporary` e o `EXECUTE` das funções que o PostgreSQL deixa a qualquer login e que escrevem ou
+interferem sem grant nenhum (`governance.FECHADAS_A_PUBLIC`): criar e escrever *large object*, que
+fica fora dos grants de tabela, e tomar *advisory lock* — os mesmos com que a captura do legado
+marca chamador vivo, e que um leitor poderia segurar para deixar uma tentativa pendente para sempre
+(revisão do lote 2 da v1.1.0, RVL2-01) —, e gravar mensagem no WAL (`pg_logical_emit_message`,
+RVL2-2-01). Sem isso, "não escreve" teria exceções. A lista é argumento; o oráculo é o que **sobra**:
+toda função volátil que o leitor ainda executa está classificada com o motivo em
+`tests/test_acesso.py` (`ABERTAS_AO_LEITOR`) — leitura ou efeito na própria sessão, execução de SQL
+de quem chama com o privilégio dele (`query_to_xml`, `ts_stat`), efeito interno sem dado
+(`pg_export_snapshot`), ler *large object* e soltar lock, recusa feita pelo próprio servidor
+(atributo de replicação, modo de *upgrade*, superusuário, dono do objeto) e interferência declarada
+—, e a recusa do servidor é sondada família a família pelo leitor. O motivo diz por que a função
+fica aberta, não que ela não tenha efeito nenhum, e o recorte é declarado (RVL2-3-05): por **nome**
+— um nome volátil novo numa versão do PostgreSQL falha o teste até ser classificado ou fechado, uma
+sobrecarga nova de nome já classificado não —, e só **voláteis**: `txid_current` é estável e aloca
+um XID. O superusuário, por
+onde Airbyte, dbt, Beam e o certificado se conectam, não depende de `EXECUTE`; um componente que
+passe a se conectar pelo próprio papel precisa declarar o que dessas funções usa. O que vem do
+catálogo — os papéis de que o login é membro, o nome do banco — se compõe no servidor, nunca em
+texto Python (RVL2-02). **"Não interfere" tem alcance declarado** (RVL2-2-05): o leitor não escreve,
+não toma lock que a captura use e não sinaliza sessão de outro login, mas ainda pode o que qualquer
+sessão de PostgreSQL pode — `notify`/`listen` (canais não isolam usuários), alongar os próprios
+*timeouts*, cancelar ou encerrar sessão do **próprio** login, e segurar `access share` numa view
+durante uma leitura longa, o que atrasa um DDL concorrente (o `dbt-build` que a recria). E pode tirar
+o próprio padrão de leitura (`alter role … [in database …] set default_transaction_read_only`, que o
+PostgreSQL permite a todo papel sobre si): o padrão é conveniência, a garantia é o privilégio, e o
+`garantir()` seguinte apaga todo padrão do papel — o global e o de cada banco, que vence o global —
+e repõe só o de leitura (RVL2-3-07). Nenhum consumidor usa `listen`/`notify` hoje. A prova é por
+**conexão de verdade** com ele, não por `set role` (`tests/test_acesso.py`): lê toda view de
+`consumption`; é recusado em todo objeto das outras oito camadas; não cria tabela, tabela
+temporária, schema nem *large object*, nem toma *advisory lock* nem grava no WAL, mesmo pedindo
+`read write`, e nenhuma assinatura fechada executa por ele; e não assume outro papel nem o superusuário, não
+concede `analyst` nem cria papel. Contraprova na entrega: membro de `transformer`, `createdb` e
+`temporary` devolvido a `PUBLIC` acusaram nos quatro testes, e o `garantir()` seguinte desfez os
+três; as funções devolvidas a `PUBLIC` acusaram nos dois testes delas (lote 2); e, antes de fechar
+`pg_logical_emit_message`, os três testes dela acusaram (rodada 2 do lote 2). **Depois de uma
+restauração**, o login e as revogações de `PUBLIC` não vêm do *dump*: o login é do cluster, e o
+ACL do banco e das funções do `pg_catalog` fica fora de um *dump* por schema. Num cluster novo,
+quem os estabelece é o `dbt-rebuild` da sequência de recuperação, e até ele o leitor não existe
+(RVL2-04). Na fase GCP, o equivalente é uma conta de serviço no grupo IAM do `analyst`, autenticada
+por federação de identidade, sem chave guardada.
+
+---
+
+## 8. Retenção
+
+| Objeto | Retenção | Critério de descarte |
+|---|---|---|
+| Dados sintéticos gerados localmente | Enquanto o ambiente existir | Recriáveis pela `seed`; descartáveis a qualquer momento |
+| Lotes em `raw` | Os necessários à reconciliação | Definido na Etapa 5 do [plano](plano_de_desenvolvimento.md) |
+| `raw_legacy` | Permanente enquanto o *snapshot* for o vigente | Substituído apenas por novo *snapshot* aprovado |
+| `quarantine` | Permanente | Nunca descartado sem decisão registrada — é evidência de auditoria |
+| `staging`, `trusted`, `analytics` | Reconstruíveis | Descartáveis; nunca são fonte de verdade |
+| Catálogo, dicionário e linhagem | Permanente | Versionados no Git |
+
+**Declarada por objeto desde 17/09/2026:** `meta.retention` — `permanent` para `raw`, `raw_legacy`,
+`quarantine`, `snapshots` e `governance`; `rebuildable` para `staging`, `trusted` (inclusive seeds),
+`analytics` e `consumption`. `tests/test_retencao.py` cobra que todo objeto materializado nas nove
+camadas declare uma, no vocabulário, e igual à desta tabela (contraprova: `quarantine` declarada
+`rebuildable` falha).
+
+**O respaldo da retenção `permanent` é o pacote de recuperação**, entregue em 25/09/2026: a memória do
+armazém entra nele, e a restauração a devolve conferida — ver
+[Capacidade §3](capacidade_e_recuperacao.md#3-ponto-único-de-recuperação).
+
+Como todo dado é sintético e reconstruível, a retenção neste MVP é **exercício de disciplina**, não
+obrigação legal. A estrutura, porém, é a mesma que se aplicaria a dados reais.
+
+---
+
+## 9. Tratamento de segredos
+
+- segredos apenas em `.env` local, nunca versionados;
+- `.env.example` versionado com as chaves e **sem** valores;
+- toda entrega passa por revisão de `.gitignore` e de segredos — automatizada como a primeira
+  etapa de `make check` (`mvp_ed1/secrets_review.py`): `.env` fora do índice e ignorado,
+  `.env.example` sem valor, nenhum valor de chave `PASSWORD|SECRET|KEY|TOKEN` do `.env` em arquivo
+  rastreado, nenhuma forma genérica de credencial, e nenhum arquivo rastreado que o `.gitignore`
+  também ignore;
+- **o histórico também é varrido**, por `make secrets-history` (`secrets_review --historico`): fora do
+  `make check`, porque o histórico só cresce, e dentro da definição de pronto e do dossiê de revisão.
+  A detecção é por **forma**, não por valor — atribuições nas sintaxes ENV, YAML e JSON, credencial
+  embutida em URL, a senha igual ao usuário e as formas genéricas —, porque depois de uma rotação o
+  valor antigo não é mais conhecido. Molde é propriedade do valor inteiro, e os moldes aceitos estão
+  declarados no código, com os seus limites; *blob* pulado é listado por nome, porque pulado não é
+  verificado. O veredito é "nada **não tratado**", nunca "nada encontrado";
+- **segredo achado no histórico
+  ([ADR-0048](adr/0048-tratar-segredo-achado-no-historico-pelo-tipo-da-credencial.md)):** senha de
+  contêiner local se regenera e se registra em [`segredos_tratados.yml`](segredos_tratados.yml), com
+  o tratamento e o motivo, sem reescrever o histórico; chave de nuvem ou token externo se revoga
+  **e** se reescreve, só pela mão do Owner. O registro é dono dos achados; esta seção, da política.
+  Em 03/10/2026: 11 achados, todos registrados;
+- um segredo exposto por engano é considerado comprometido: deve ser rotacionado, não apenas
+  removido do histórico.
+
+---
+
+## 10. Revisão desta política
+
+Alterações aqui são **mudanças relevantes**: exigem decisão explícita do Owner e ADR, conforme o
+[Termo de Abertura](../Abertura_de_projeto.md).

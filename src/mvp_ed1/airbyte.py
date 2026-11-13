@@ -1,0 +1,367 @@
+"""Cliente mínimo da API pública do Airbyte.
+
+Existe por um motivo só: **disparar a sincronização e esperar o resultado**. A
+configuração — fonte, destino e o modo de cada tabela — é declarativa e vive no
+Terraform (ADR-0004); nada aqui cria nem altera recurso.
+
+As credenciais vêm do ambiente, e o `Makefile` as obtém de
+`abctl local credentials` no momento da execução. Elas não são escritas em
+arquivo nenhum, versionado ou não (regra inviolável 1 do `CLAUDE.md`).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Any, Callable
+
+#: A API pública do Airbyte local. Lida **na hora da chamada**, como as credenciais: no Composer
+#: o endereço vem do Secret Manager para o ambiente da tarefa depois de o módulo já poder estar
+#: importado (`mvp_ed1.orquestracao.segredos`, Etapa 13).
+PADRAO = "http://localhost:8000/api/public/v1"
+
+
+def _base() -> str:
+    return os.environ.get("AIRBYTE_URL") or PADRAO
+
+#: Estados terminais de um job de sincronização.
+CONCLUIDOS = {"succeeded", "failed", "cancelled", "incomplete"}
+
+
+class AirbyteIndisponivel(Exception):
+    """A API não respondeu, ou respondeu o que não devia."""
+
+
+def _chamar(caminho: str, token: str | None = None, corpo: dict | None = None) -> Any:
+    dados = json.dumps(corpo).encode() if corpo is not None else None
+    req = urllib.request.Request(f"{_base()}{caminho}", data=dados, method="POST" if dados else "GET")
+    req.add_header("content-type", "application/json")
+    if token:
+        req.add_header("authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resposta:
+            return json.load(resposta)
+    except urllib.error.HTTPError as erro:
+        detalhe = erro.read().decode(errors="replace")[:400]
+        raise AirbyteIndisponivel(f"{erro.code} em {caminho}: {detalhe}") from erro
+    except urllib.error.URLError as erro:
+        raise AirbyteIndisponivel(
+            f"Airbyte não respondeu em {_base()}. Rode `make airbyte-up`. ({erro.reason})"
+        ) from erro
+
+
+def token() -> str:
+    """Token de acesso a partir das credenciais do ambiente."""
+    cliente = os.environ.get("AIRBYTE_CLIENT_ID")
+    segredo = os.environ.get("AIRBYTE_CLIENT_SECRET")
+    if not cliente or not segredo:
+        raise AirbyteIndisponivel(
+            "AIRBYTE_CLIENT_ID e AIRBYTE_CLIENT_SECRET ausentes. "
+            "Use os alvos do Makefile, que os obtêm de `abctl local credentials`."
+        )
+    resposta = _chamar(
+        "/applications/token", corpo={"client_id": cliente, "client_secret": segredo}
+    )
+    return resposta["access_token"]
+
+
+def workspace(jwt: str) -> str:
+    """`workspaceId` do espaço padrão criado pelo `abctl`."""
+    espacos = _chamar("/workspaces", jwt).get("data", [])
+    if not espacos:
+        raise AirbyteIndisponivel("nenhum workspace no Airbyte")
+    return espacos[0]["workspaceId"]
+
+
+def conexao(nome: str, jwt: str) -> str:
+    """`connection_id` pelo nome declarado no Terraform."""
+    for item in _chamar("/connections", jwt).get("data", []):
+        if item["name"] == nome:
+            return item["connectionId"]
+    raise AirbyteIndisponivel(
+        f"conexão {nome!r} não existe no Airbyte. Rode `make airbyte-config`, "
+        "que a cria a partir do Terraform."
+    )
+
+
+def sincronizar(connection_id: str, jwt: str, tipo: str = "sync") -> dict:
+    return _chamar("/jobs", jwt, {"connectionId": connection_id, "jobType": tipo})
+
+
+#: A ordenação da listagem, como a API a escreve: `campo|sentido`. O `|` é
+#: caractere reservado numa URL e vai **codificado** (`%7C`): cru, a API real
+#: respondeu `400 Malformed URI` — e toda sincronização do legado passa por
+#: esta consulta (RVE-01, medido em 21/09/2026 no Airbyte 2.2.0).
+ORDENACAO_DOS_JOBS = "createdAt|DESC"
+
+
+def caminho_dos_jobs(limite: int = 100) -> str:
+    """O caminho da listagem, com a query montada por `urlencode`, nunca à mão."""
+    return "/jobs?" + urllib.parse.urlencode({"limit": limite, "orderBy": ORDENACAO_DOS_JOBS})
+
+
+def jobs(jwt: str, limite: int = 100) -> Any:
+    """Os *jobs* que o Airbyte conhece, de qualquer conexão, os mais recentes primeiro.
+
+    Serve à guarda de identidade: o `jobId` é o contador compartilhado de que
+    sai o `snapshot_id` da captura (ADR-0044).
+    """
+    return _chamar(caminho_dos_jobs(limite), jwt)
+
+
+def em_curso(listagem: Any) -> list[dict]:
+    """Os *jobs* que ainda não terminaram, de qualquer conexão (RVT-1-04).
+
+    O desmonte não tira o Airbyte nem o `airbyte_internal` com sincronização no ar: interromper o
+    cliente não interrompe o *job* remoto (Registro §49, passo 12). Estado ausente conta como em
+    curso — não se conclui nada do que não se leu.
+    """
+    dados = (listagem or {}).get("data", [])
+    return [item for item in dados if item.get("status") not in CONCLUIDOS]
+
+
+def guardar_identidade(conexao_nome: str, jwt: str) -> None:
+    """Pré-condição de disparar a conexão legada (D50, RV12-4-03).
+
+    Fica aqui, e não no chamador, porque **este** é o ponto por onde todos os
+    disparos passam: a CLI com e sem `--certificar-legado`, o fluxo
+    certificado e a tarefa da DAG. Pôr a guarda em cada chamador foi o que a
+    revisão 5 fez, e a quarta rodada mostrou duas entradas que escapavam.
+    """
+    from sqlalchemy import create_engine
+
+    from mvp_ed1.db import LEGACY, database_url
+    from mvp_ed1.legacy import armazem as armazens
+    from mvp_ed1.legacy import identidade
+
+    if conexao_nome != identidade.CONEXAO_LEGADA:
+        return
+    # O armazém é o que o `.env` declara (`LEGACY_WAREHOUSE`): no GCP, a guarda lê o BigQuery.
+    legado = create_engine(database_url(LEGACY))
+    armazem = armazens.do_ambiente(legado)
+    try:
+        identidade.exigir(armazem, lambda: jobs(jwt))
+    finally:
+        armazem.dispose()
+        legado.dispose()
+
+
+def disparar(conexao_nome: str, connection_id: str, jwt: str, tipo: str = "sync") -> dict:
+    """Dispara um *job* **depois** das pré-condições. É por aqui que se dispara.
+
+    `sincronizar` continua existindo como a chamada crua — é o que os testes
+    interceptam para provar que os caminhos recusados fazem **zero** POSTs.
+    """
+    from mvp_ed1.legacy import identidade
+
+    if tipo == "reset":
+        identidade.recusar_reset(conexao_nome)
+    guardar_identidade(conexao_nome, jwt)
+    return sincronizar(connection_id, jwt, tipo)
+
+
+def observador(jwt: str) -> Callable[[int], dict]:
+    """Uma função `job_id -> job`, que renova o token quando ele expira.
+
+    O token do Airbyte vale poucos minutos, e uma sincronização de porte dura
+    mais que isso: reusar o mesmo token faz a espera morrer com `401` no meio,
+    com o job seguindo vivo do outro lado — que é o pior desfecho possível,
+    porque parece falha e não é.
+    """
+    atual = jwt
+
+    def consultar(job_id: int) -> dict:
+        nonlocal atual
+        try:
+            return _chamar(f"/jobs/{job_id}", atual)
+        except AirbyteIndisponivel as erro:
+            if "401" not in str(erro):
+                raise
+            atual = token()
+            return _chamar(f"/jobs/{job_id}", atual)
+
+    return consultar
+
+
+def estado_do_job(jwt: str) -> Callable[[int], str]:
+    """O que a retomada do certificado pergunta: `job_id -> status` (ADR-0044, item 4)."""
+    consultar = observador(jwt)
+    return lambda job_id: str(consultar(job_id).get("status", "?"))
+
+
+def acompanhar(job_id: int, jwt: str, intervalo: float = 15.0) -> dict:
+    """Espera o job terminar, imprimindo o andamento.
+
+    Sem espera, `make sync-airbyte` devolveria o controle antes de existir uma
+    linha em `raw` — e o `dbt build` seguinte rodaria sobre o schema vazio.
+    """
+    consultar = observador(jwt)
+    while True:
+        job = consultar(job_id)
+        estado = job.get("status", "?")
+        linhas = job.get("rowsSynced") or 0
+        print(f"  job {job_id}: {estado} · {linhas:,} linhas".replace(",", "."), flush=True)
+        if estado in CONCLUIDOS:
+            return job
+        time.sleep(intervalo)
+
+
+def sincronizar_certificando(connection_id: str, nome: str, jwt: str) -> tuple[dict, dict]:
+    """A sincronização do legado entre as duas fases do certificado (ADR-0044).
+
+    Uma implementação para dois chamadores — a DAG e `make sync-legacy` —, e a
+    ordem é o contrato: a origem é medida **antes** de o job nascer, o `job_id`
+    é gravado assim que ele nasce, e só depois de ele terminar a origem e o
+    bruto são conferidos. Devolve o job e o certificado.
+
+    **O portão da CLI (H6 da regeneração da v1.1.0).** Antes de abrir a
+    tentativa, a época corrente do livro retido precisa existir e aceitar
+    escrita; depois de `concluir`, a tentativa é registrada nela — seja qual
+    for o certificado — antes de o comando voltar, e o comando falha se o
+    registro não for escrito. Toda tentativa que a CLI abre termina registrada
+    por ela mesma.
+
+    **A fase de recuperação (H7) vem antes de tudo**: resolve e registra as
+    tentativas que ficaram para trás e passa a barreira, ou para — e nada se
+    abre. A tentativa nova abre sob a mesma barreira, dentro do lock de
+    abertura, e o lock dela é tomado antes do *insert* e segurado a invocação
+    inteira: a recuperação de outro chamador nunca a abandona enquanto esta CLI
+    vive. Antes do `POST` que cria o *job*, ela ainda precisa estar pendente
+    sem *job*.
+    """
+    import os
+    import uuid
+
+    from sqlalchemy import create_engine
+
+    from mvp_ed1.db import LEGACY, database_url
+    from mvp_ed1.legacy import armazem as armazens
+    from mvp_ed1.legacy import captura
+    from mvp_ed1.recovery import capture_recovery, ledger
+
+    ledger.writable_epoch()
+    legado = create_engine(database_url(LEGACY))
+    armazem = armazens.do_ambiente(legado)
+    chamador = {"kind": "cli", "pid": os.getpid()}
+
+    def listar() -> capture_recovery.Listing:
+        return capture_recovery.airbyte_listing(jwt, connection_id)
+
+    try:
+        observador = estado_do_job(jwt)
+        relatorio = capture_recovery.recover(legado, armazem, job_state=observador, listar=listar, caller=chamador)
+        for caminho in relatorio["published"]:
+            print(f"  recuperação registrou: {caminho}", flush=True)
+        if not relatorio["published"]:
+            # O silêncio dizia o mesmo, mas quem segue um roteiro não distingue
+            # "nada a retomar" de "a fase não rodou" (D2 da regeneração da v1.1.0).
+            print("  recuperação: nada devido — nenhuma tentativa a retomar", flush=True)
+        tentativa = uuid.uuid4().hex
+        with captura.bloqueio_da_tentativa(armazem, tentativa):
+            captura.iniciar(legado, armazem, nome, tentativa=tentativa,
+                            barreira=capture_recovery.opening_barrier(listar))
+            captura.conferir_antes_do_disparo(armazem, tentativa)
+            nascido = disparar(nome, connection_id, jwt)["jobId"]
+            captura.registrar_job(armazem, tentativa, nascido)
+            # O id que vale é o do disparo — o que o certificado gravou —, e não o
+            # que a consulta de andamento repetir.
+            job = acompanhar(nascido, jwt) | {"jobId": nascido}
+            certificado = captura.concluir(legado, armazem, tentativa)
+            publicado, _ = ledger.gate(armazem, tentativa, caller=chamador, lock_held=True)
+        print(f"  registro da tentativa: {publicado.path} · sha256 {publicado.sha256}", flush=True)
+    finally:
+        legado.dispose()
+        armazem.dispose()
+    return job, certificado
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m mvp_ed1.airbyte")
+    parser.add_argument("comando", choices=["sync", "reset", "status", "workspace", "ativos"])
+    parser.add_argument("--connection", default="oltp_para_raw")
+    parser.add_argument(
+        "--certificar-legado",
+        action="store_true",
+        help="mede a origem legada antes do job e confere origem e bruto depois (ADR-0044)",
+    )
+    parser.add_argument(
+        "--job-em",
+        metavar="ARQUIVO",
+        help="grava o jobId da sincronização concluída — é como o passo 9 da restauração o recebe",
+    )
+    args = parser.parse_args(argv)
+
+    from mvp_ed1.legacy import identidade as _identidade
+
+    try:
+        jwt = token()
+        if args.comando == "workspace":
+            print(workspace(jwt))
+            return 0
+        if args.comando == "ativos":
+            ativos = em_curso(jobs(jwt))
+            for item in ativos:
+                print(f"  job {item.get('jobId')}: {item.get('status', '?')} · conexão {item.get('connectionId')}")
+            print("airbyte: nenhum job em curso" if not ativos else f"ERRO: {len(ativos)} job(s) do Airbyte em curso")
+            return 1 if ativos else 0
+        connection_id = conexao(args.connection, jwt)
+        if args.comando == "status":
+            print(f"{args.connection}: {connection_id}")
+            return 0
+        # `reset` descarta o estado do cursor e o dado em `raw`, forçando a
+        # próxima carga a ser completa. É o que a recarga do gerador exige: a
+        # geração é determinística, então `updated_at` não muda entre execuções
+        # e o incremental **não enxerga** dado regerado.
+        tipo = "reset" if args.comando == "reset" else "sync"
+        print(f"{args.comando} de {args.connection} ({connection_id})")
+        certificado = None
+        # O `sync` da conexão legada **sempre** passa pelo fluxo certificado,
+        # com ou sem a flag: o ramo direto era a entrada que escapava da guarda
+        # (RV12-4-03), e deixá-lo aberto com um aviso só adiaria o problema. A
+        # flag deixa de ser o que decide e passa a ser redundante para essa
+        # conexão — o que ela pede é o que ela já recebe.
+        legada = args.connection == _identidade.CONEXAO_LEGADA
+        if tipo == "sync" and (args.certificar_legado or legada):
+            job, certificado = sincronizar_certificando(connection_id, args.connection, jwt)
+        else:
+            nascido = disparar(args.connection, connection_id, jwt, tipo)["jobId"]
+            job = acompanhar(nascido, jwt) | {"jobId": nascido}
+    except AirbyteIndisponivel as erro:
+        print(f"ERRO: {erro}", file=sys.stderr)
+        return 2
+    except (_identidade.IdentidadeReutilizada, _identidade.ResetDoLegadoRecusado) as erro:
+        print(f"RECUSADO: {erro}", file=sys.stderr)
+        return 3
+
+    if job.get("status") != "succeeded":
+        print(f"ERRO: sincronização terminou como {job.get('status')}", file=sys.stderr)
+        return 1
+    print(f"concluída: {job.get('rowsSynced', 0):,} linhas".replace(",", "."))
+    if certificado is not None:
+        por_estado: dict[str, int] = {}
+        for estado in certificado["tabelas"].values():
+            por_estado[estado] = por_estado.get(estado, 0) + 1
+        print(
+            f"certificado {certificado['capture_attempt_id'][:12]}: {certificado['status']} "
+            f"· snapshot {certificado['snapshot_id']} · tabelas {por_estado}"
+        )
+        if certificado["status"] != "complete":
+            print("ERRO: a captura não é elegível; ver governance.legacy_captures", file=sys.stderr)
+            return 1
+    if args.job_em:
+        # Só a sincronização concluída — e certificada, quando é a do legado —
+        # deixa o seu job: o passo 9 confere a captura **deste** job, e não a
+        # que o banco disser que é a nova (RVE2-01).
+        with open(args.job_em, "w", encoding="utf-8") as arquivo:
+            arquivo.write(f"{job['jobId']}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

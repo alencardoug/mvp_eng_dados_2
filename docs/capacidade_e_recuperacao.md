@@ -1,0 +1,720 @@
+# Capacidade e Recuperação
+
+> **O que vive aqui:** como o ambiente local é dimensionado, o que é medido, e o único ponto de
+> recuperação do projeto.
+>
+> **O que não vive aqui:** o fator de escala e os parâmetros do gerador (ver
+> [Geração de Dados](geracao_de_dados.md)); as contagens por tabela (ver
+> [Modelo de Dados](modelo_de_dados.md)); o *snapshot* imutável do legado, que tem outra finalidade
+> (ver [Origem Legada](origem_legada.md#4-snapshot-imutável)).
+
+| Campo | Informação |
+|---|---|
+| Critério de dimensionamento | **Cobertura**, não volume — [ADR-0014](adr/0014-volume-por-proporcoes-e-fator-de-escala.md) |
+| Abrangência | `source_db` + `legacy_db` + `warehouse_db` + ponto de recuperação |
+| Versão | 2.17 |
+| Situação | Medições históricas até a Etapa 9 preservadas; o ciclo do zero medido no B5 (§2.12) e a regeneração da v1.1.0 (§2.13); o ponto de recuperação **entregue em 25/09/2026**, substituído pelo da v1.1.0 em 04/11/2026, cada um restaurado de ponta a ponta antes da promoção (§3) |
+| Última revisão | 07/11/2026 — §2.14, a estimativa da janela da Etapa 13 |
+
+---
+
+## 1. O ambiente local é dimensionado por cobertura
+
+O orçamento de 4 GB foi **aposentado em 04/09/2026**. Ele nunca foi medido, e a premissa que o
+sustentava — trabalhar volume alto localmente — mudou: o volume alto pertence à fase GCP.
+
+O ambiente local não é dimensionado por tamanho. É dimensionado pelo que precisa **exercitar**, e o
+[ADR-0014](adr/0014-volume-por-proporcoes-e-fator-de-escala.md) fixa o piso que garante isso em
+qualquer escala:
+
+- toda tabela populada — nenhuma das 40 vazia;
+- todo valor de enumeração presente ao menos uma vez;
+- todo tipo de falha do [catálogo do legado](origem_legada.md) representado;
+- toda invariante de negócio do [Modelo de Dados](modelo_de_dados.md#4-invariantes-de-negócio)
+  exercida ao menos uma vez, incluindo os casos que devem falhar.
+
+**Consequência prática:** não há limite de bytes, não há alerta de 3,7 GB e não há bloqueio em
+4 GB. Tamanho deixou de ser restrição e passou a ser observação.
+
+## 2. O que continua sendo medido
+
+Sem limite, a medição continua — por dois motivos. O primeiro é o princípio **P5**: o projeto
+distingue planejado de medido, e não pode afirmar tamanho que não conferiu. O segundo é que a fase
+GCP precisa de números reais para calibrar o fator `cloud`.
+
+Ao final de cada etapa, registra-se:
+
+- tamanho por banco, schema, tabela e índice, via `pg_database_size`, `pg_total_relation_size` e
+  `pg_indexes_size`;
+- linhas por tabela, conferidas contra as proporções declaradas;
+- tempo de execução do pipeline completo.
+
+Nada disso interrompe execução. Os valores alimentam a definição do fator `cloud`, na Etapa 13, e a
+tabela de reconciliação do schema `governance`
+([ADR-0023](adr/0023-escopo-do-schema-governance.md)).
+
+### 2.1 Medido na Etapa 4 — origem transacional
+
+Primeira medição real do projeto. Ambiente limpo: `make reset` → `make up` → `make migrate` →
+`make seed-data`, sem carga anterior no volume — a distinção importa, porque uma carga sobre tuplas
+mortas de uma execução abortada mediu 86 MB onde havia 55.
+
+| Medida | Valor |
+|---|---:|
+| Linhas carregadas em `oltp`, fator `dev` | 253.414 |
+| Tamanho do schema `oltp` (dados + índices) | 54,5 MB |
+| Tamanho do `source_db`, incluindo catálogo | 63,1 MB |
+| Soma dos três bancos, dois deles vazios | 77,8 MB |
+| **Média por linha, incluindo índices** | **225 bytes** |
+| Tempo de geração em memória | 5,1 s |
+| Tempo de carga por `COPY` | 26,0 s |
+| **Tempo total de `make seed-data`** | **31,1 s** |
+
+Bytes por linha varia mais de uma ordem de grandeza entre as tabelas, e a média esconde isso: 154
+bytes em `cart_items` e 528 em `inventory_movements`, que carrega três `uuid`, um `jsonb` e seis
+índices. Nas tabelas de domínio fechado o número perde sentido — `sales_channels` marca 13 kB por
+linha porque três linhas pagam o custo fixo de oito páginas de índice. **Para projetar volume, use
+as tabelas grandes; a média serve para comparar execuções, não para extrapolar.**
+
+O detalhe por tabela e por índice não é copiado para cá: ele sai de `make size-report`, que é o dono
+do número, e muda a cada execução.
+
+*Naquele corte ainda não medidos:* `legacy_db`, `warehouse_db`, tempo do pipeline completo e
+tamanho das camadas analíticas. As medições posteriores estão nas seções seguintes (**P5**).
+
+### 2.2 Medido na Etapa 5 — ingestão `oltp` → `raw`
+
+Primeira sincronização completa do corte comercial, doze tabelas, em máquina de 4 CPUs com o
+dimensionamento de [`airbyte/values.yaml`](../airbyte/values.yaml).
+
+| Medida | Valor |
+|---|---:|
+| Linhas ingeridas | 165.553 |
+| Bytes transferidos | 41,2 MB |
+| **Tempo da sincronização** | **2 min 6 s** |
+| Reconciliação `raw` ↔ `staging` | 12 de 12 tabelas exatas |
+| `dbt build` da camada `staging` | 12 modelos + 69 testes em 5,0 s |
+
+As contagens em `raw` batem exatamente com a origem em todas as tabelas, incluindo as 110.000 linhas
+de `cart_items`. As linhas com exclusão lógica atravessam como marca e são contáveis: 6 clientes,
+8 SKUs, 2 produtos e 1 endereço.
+
+### 2.3 Medido na Etapa 5 — fluxo completo pelo orquestrador
+
+A DAG do caminho frio executada de ponta a ponta, em máquina de 4 CPUs com Airbyte e Airflow
+simultaneamente de pé. A primeira coluna é a medição da Etapa 5, com 12 fluxos de ingestão; a
+segunda é a da Etapa 6, com 27; a terceira é a da Etapa 8, com 30 e uma tarefa a mais — a
+quarentena, que estreou como camada.
+
+| Tarefa | Etapa 5 | Etapa 6 | Etapa 8 | Etapa 9 | Etapa 10 | Etapa 11 |
+|---|---:|---:|---:|---:|---:|---:|
+| `sincronizar_oltp_para_raw` (incremental) | 1 min 20 s | 1 min 32 s | 1 min 37 s | 1 min 31 s | 2 min 37 s | 3 min 9 s |
+| `sincronizar_legado_para_raw_legacy` | — | — | — | — | 2 min 7 s, em paralelo | 3 min 29 s, em paralelo |
+| `dbt_seed` · `dbt_staging` · `dbt_trusted` | 16 s · 13 s · 11 s | 18 s · 15 s · 10 s | 15 s · 15 s · 13 s | 16 s · 16 s · 12 s | 19 s · 34 s · 32 s | 29 s · 60 s · 47 s |
+| `dbt_quarantine` | — | — | 7 s | 7 s | 9 s | 14 s |
+| `dbt_snapshots` · `dbt_analytics` · `dbt_consumption` | 10 s · 15 s · 10 s | 8 s · 18 s · 10 s | 8 s · 21 s · 10 s | 8 s · 20 s · 9 s | 8 s · 22 s · 11 s | 11 s · 29 s · 15 s |
+| `dbt_fronteiras` (testes de fronteira, novo) | — | — | — | — | — | 13 s |
+| `dbt_docs` | 13 s | 16 s | 13 s | 16 s | 22 s | 30 s |
+| **Total da execução** | **2 min 53 s** | **3 min 12 s** | **3 min 25 s** | **3 min 21 s** | **5 min 20 s** | **7 min 58 s** |
+| **Tarefas** | 8 | 8 | 9 | 9 | 10 | 11 |
+
+A coluna da Etapa 11 é a execução de **18/09/2026**, no fechamento da etapa, com Airbyte e Airflow de
+pé e o streaming em baixo: 13 tarefas no Airflow (as 11 acima mais as duas fases do certificado de
+captura), todas `success`; a captura 43 certificada nas 40 tabelas; `dbt_fronteiras` é a tarefa nova
+que executa os 14 testes de fronteira depois da última camada. As duas sincronizações estão mais
+lentas que na Etapa 10 (3 min 9 s e 3 min 29 s) porque a conexão do `oltp` tinha sido recriada por
+`make sync-airbyte RESET=1` horas antes e releu tudo, e as duas correram em paralelo com o Airflow e
+o Airbyte no mesmo teto de memória; o dbt inteiro, de `seed` a `docs`, levou 4 min 14 s.
+
+A Etapa 10 é a primeira em que o total **salta**: 5 min 20 s contra 3 min 21 s. A causa não é a
+transformação — é a segunda origem. As duas capturas correm em paralelo e a mais lenta define o
+piso, e a do `oltp` passou a levar 2 min 37 s por reler tudo depois da conexão ter sido recriada.
+O `dbt` inteiro, agora com 812 objetos e os 40 modelos do legado, roda em 2 min 17 s.
+
+Dobrar o número de fluxos e passar de 36 para 53 modelos custou **19 segundos** entre as Etapas 5 e
+6. A Etapa 8 acrescentou três fluxos de ingestão, catorze modelos, uma *seed* e a camada
+`quarantine`, e custou **13 segundos** sobre a Etapa 6. A Etapa 9 acrescentou seis fluxos, dezoito
+modelos, dois *snapshots* SCD tipo 2 e mais uma *seed*, e **não custou nada** — 4 segundos a menos,
+dentro da variação entre execuções.
+
+É a evidência do que as três medições vinham sugerindo: o que domina é a **sincronização**, não a
+transformação. Na medição da Etapa 9 ela era 45% do tempo total, e o `dbt` inteiro — 485 objetos,
+371 testes — rodou em menos de 30 segundos. Foi essa proporção que o caminho quente da Etapa 7
+atacou, tirando o estoque do caminho crítico.
+
+Memória com o *batch* de pé — três bancos, cluster do Airbyte e os quatro contêineres do Airflow:
+cerca de **6 GB**. Com o caminho quente junto, o número da Etapa 7 é **8 GB** (§2.4).
+
+### 2.4 Medido na Etapa 7 — o caminho quente
+
+O [ADR-0020](adr/0020-debezium-sobre-kafka-connect.md) aceitou o Kafka Connect prevendo *"cerca de
+1 GB de memória a mais"*. A previsão era pessimista por quase o dobro:
+
+| Serviço | Memória residente |
+|---|---|
+| Redpanda | **51 MB** |
+| Kafka Connect com o conector Debezium | **434 MB** |
+| **Os dois juntos** | **485 MB** |
+
+O Redpanda reserva 1 GB por configuração (`--memory=1G` em `docker-compose.streaming.yml`), e usa
+5% disso nesta escala; o Connect roda com teto de heap de 768 MB declarado no mesmo arquivo. Sem
+esses dois limites os dois serviços dimensionam-se pela memória da máquina, e aí a previsão do ADR
+estaria certa.
+
+O `pipeline` Beam roda **fora** dos contêineres, no processo Python do host, e leva junto o
+executor Prism em processo próprio.
+
+| Observação do fluxo | Valor |
+|---|---|
+| Movimentos entregues pelo *snapshot* inicial | 13.746 |
+| Tempo para atravessar o *snapshot* inteiro | ~4 min, em lotes de 500 |
+| Eventos ao vivo produzidos | 2.200, a 43–55 eventos/s |
+| Linhas em `raw.inventory_movements_stream` | 15.946 |
+| Objetos dbt construídos, com os dois caminhos | **262, zero erro** |
+| DAG `fluxo_batch` com o caminho quente em operação | 3 min 10 s — contra 3 min 12 s na Etapa 6 |
+
+**Memória com tudo simultaneamente de pé** — três bancos, cluster do Airbyte, quatro contêineres do
+Airflow, Redpanda, Kafka Connect e o *pipeline* Beam com o Prism: cerca de **8 GB**. É o número a
+usar para dimensionar uma máquina que sustente tudo de pé — o que **nenhuma etapa exige** desde o
+[ADR-0046](adr/0046-validar-a-fase-local-por-partes.md): a Etapa 12 valida por partes, e a
+[Execução Local §5](execucao_local.md#5-executando-por-partes) diz o que basta subir em cada cenário.
+
+O tempo do *snapshot* é dominado pela escrita em lote e pelo autocheckpoint do executor local, não
+pelo transporte. Como avisa o [Streaming §2.1](streaming.md#21-limites-honestos-da-execução-local),
+medição de latência no executor local vale como ordem de grandeza, nunca como desempenho.
+
+### 2.5 A restrição real passou a ser memória — e, na Etapa 5, CPU
+
+**Correção do que estava escrito aqui.** Até a Etapa 5, este documento afirmava que a restrição do
+ambiente local era memória. A ingestão mostrou que é **CPU**: o *pod* de replicação do Airbyte pede
+4 CPUs por padrão, a máquina tem 4, e a plataforma já segura 1,1 — o job nunca é agendado. Memória
+nunca chegou a ser o limite.
+
+O tratamento está em [`airbyte/values.yaml`](../airbyte/values.yaml): pedidos de 100m por
+contêiner, limites altos. Pedido é reserva do agendador, limite é teto — baixar o pedido não torna
+a carga mais lenta em máquina ociosa.
+
+#### Memória
+
+Com o disco fora de questão, a memória é o segundo limite do ambiente local. O
+[ADR-0020](adr/0020-debezium-sobre-kafka-connect.md) adotou Kafka Connect, que custa cerca de 1 GB
+de RAM a mais que a alternativa autônoma — custo aceito por **P10**.
+
+Tratamento, que é o do risco **R11**: os alvos do `Makefile` sobem apenas o subconjunto necessário à
+etapa em curso. *Batch* e *streaming* não precisam estar no ar simultaneamente — nem na validação
+final: a Etapa 12 valida por partes ([ADR-0046](adr/0046-validar-a-fase-local-por-partes.md)).
+
+### 2.6 Custo da janela na nuvem
+
+O [ADR-0024](adr/0024-airbyte-e-airflow-no-gcp.md) escolheu Cloud Composer e Airbyte em contêiner,
+que cobram por hora ligada. A contenção é temporal, não técnica: os dois existem **apenas durante a
+janela de demonstração da Etapa 13**, criados e destruídos pelo mesmo Terraform.
+
+O custo estimado é registrado antes de subir e o custo real depois — planejado e medido, rotulados
+como tais. É o tratamento do risco **R9**.
+
+### 2.7 Re-medição da D31 — 05/09/2026
+
+Esta é uma **nova execução**, não uma substituição das medições históricas das Etapas 4 a 9 ou dos
+ADRs aceitos. Comparação em memória: revisão anterior `509c532` contra a correção posteriormente
+registrada em `522a8fc`, com `seed=20260904`, `as_of_date=2026-09-01` e fator `dev=1` iguais.
+Hashes SHA-256 das colunas graváveis, ordenadas por conteúdo, localizaram mudanças em **oito**
+tabelas; as outras **32** permaneceram idênticas. Contagem igual não significa conteúdo igual.
+
+| Tabela cujo conteúdo mudou | Antes | Corrigida |
+|---|---:|---:|
+| `shipments` | 3.647 | 3.595 |
+| `shipment_items` | 7.329 | 7.305 |
+| `delivery_events` | 17.633 | 17.340 |
+| `inventory_movements` | 13.746 | 13.700 |
+| `inventory_balances` | 2.910 | 2.911 |
+| `stock_reservations` | 4.200 | 4.200 |
+| `support_tickets` | 400 | 400 |
+| `ticket_events` | 1.723 | 1.723 |
+| **Total das 40 tabelas** | **253.369** | **252.955** |
+
+Dos 3.010 pedidos com remessa, **637 → 585** têm divisão; a cobertura do caso permaneceu e é
+testada também no fator reduzido. O total anterior em memória não é o total da primeira medição da
+Etapa 4 (253.414), nem o da origem viva antes desta manutenção (255.578): eram revisões/cortes
+distintos. Não atribuir essas diferenças prévias à D31.
+
+| Medida da nova carga inicial, antes do produtor ao vivo | Valor |
+|---|---:|
+| Linhas carregadas nas 40 tabelas | 252.955 |
+| Remessas sem item na origem | 0 |
+| Tempo de geração em memória, medido no `seed-data` | 6,5 s |
+| Tempo de carga por `COPY` | 23,0 s |
+| **Total do `seed-data`** | **29,5 s** |
+| `source_db`, por `pg_database_size` | 60,7 MB |
+| Schema `oltp`, dados + índices | 51,2 MB |
+| Média por linha, com índices | 212 bytes |
+
+Os tamanhos dessa tabela foram coletados antes de reiniciar o CDC e reconstruir o dbt, pelo
+formatador de `make size-report` (divisão por 1024). O banco foi recarregado por
+truncamento das tabelas, **sem** apagar seus volumes; catálogo e alocação anteriores continuam no
+tamanho do banco. A saída por tabela desse alvo consulta `oltp`: “sem tabelas com dados” no
+warehouse **não** significa warehouse vazio. Suas camadas precisam ser consultadas por schema.
+
+Após o cenário ao vivo e a DAG final, a origem tinha **255.161 linhas**. A medição de banco por
+`pg_database_size` deu `source_db` **62,4 MB**, `legacy_db` **7,5 MB** (sem tabelas de aplicação) e
+`warehouse_db` **180,3 MB** — soma **250,2 MB**. `oltp` ocupava 55.214.080 bytes com índices.
+No warehouse, a soma de `pg_total_relation_size` das relações físicas por schema foi:
+
+| Schema | Dados + índices, bytes | Índices, bytes |
+|---|---:|---:|
+| `raw` | 88.915.968 | 14.958.592 |
+| `trusted` | 36.995.072 | 0 |
+| `snapshots` | 811.008 | 0 |
+| `analytics` | 47.685.632 | 0 |
+| `quarantine` | 8.192 | 0 |
+
+Views de `staging`/`consumption` não têm armazenamento próprio. Os bytes não são uma medida isolada
+do custo da correção: esta manutenção também descartou histórico SCD e estado antigo da ingestão.
+
+| Execução observada | Tempo |
+|---|---:|
+| Snapshot CDC, do estado `RUNNING` do Beam até a última gravação histórica | 44,6 s |
+| Intervalo entre primeira e última gravação do snapshot | 37,7 s |
+| `dbt build RESET=1`, carga inicial | 56,12 s |
+| `dbt build` incremental após eventos ao vivo | 36,07 s |
+| Reconstrução dirigida da fato e descendentes, 20 objetos | 2,53 s |
+| DAG final, início até fim no metadado do Airflow | **257,10 s — 4 min 17 s** |
+
+Os tempos de dbt são os do `run_results.json`, não incluem a inicialização do comando; o do
+snapshot não inclui a subida do Compose e não é benchmark de latência. Não generalizar uma
+execução local como ganho ou regressão de desempenho do gerador.
+
+A DAG foi `manual__2026-09-05T22:21:30.899526+00:00`, em sucesso, com nove tarefas na primeira
+tentativa. Durações em segundos, preservadas do metadado:
+
+| Tarefa | Segundos |
+|---|---:|
+| `sincronizar_oltp_para_raw` | 107,40 |
+| `dbt_seed` | 23,77 |
+| `dbt_staging` | 20,71 |
+| `dbt_trusted` | 13,27 |
+| `dbt_quarantine` | 10,29 |
+| `dbt_snapshots` | 10,39 |
+| `dbt_analytics` | 29,61 |
+| `dbt_consumption` | 12,94 |
+| `dbt_docs` | 21,25 |
+
+As evidências brutas e a salvaguarda da origem anterior ficam em `data/validacoes/d31/`, ignorado
+pelo Git. O dump é uma salvaguarda desta manutenção, **não** o pacote aprovado e testado da
+Etapa 12. Os resultados do cenário com eventos novos, saldos e idempotência pertencem a
+[Streaming §7.2](streaming.md#72-revalidação-da-d31).
+
+### 2.8 O número de dimensionamento não incluía o ambiente de trabalho — 07/09/2026
+
+**Correção do alcance do que está medido acima, não dos valores.** Os ~6 GB da §2.3 e os ~8 GB da
+§2.4 medem o **ambiente**: contêineres, cluster e *pipeline*. Nenhum deles conta as ferramentas com
+que se trabalha nesse ambiente, e é sobre a mesma memória que elas correm.
+
+Medido durante um travamento real da máquina, com Airbyte e *streaming* simultâneos:
+
+| Consumidor | Memória residente |
+|---|---|
+| Cluster do Airbyte (contêiner `kind`, `docker stats`) | **4,5 GB** |
+| VS Code | 3,0 GB |
+| Duas sessões de agente | 0,6 GB |
+| Navegador | 0,4 GB |
+| **Ambiente de trabalho, fora dos contêineres** | **~4,0 GB** |
+
+O total do ambiente de trabalho **não é folga disponível**: numa máquina de 11,5 GB, os 8 GB de
+tudo de pé (o que a Etapa 12 exigia até o ADR-0046) mais esses 4 GB são 12 GB. É déficit, não margem apertada — e foi o que se observou: o
+`kswapd` em atividade contínua, o *load average* em 32,4 sobre 4 CPUs, o OOM *killer* disparando
+151 vezes em uma hora e a sessão gráfica congelando até o botão de reinício.
+
+Duas consequências, uma tratada e uma em aberto:
+
+- **Tratada.** O tratamento do **R11** deixou de depender de quem lê a [Execução Local
+  §5](execucao_local.md#5-executando-por-partes): `make airbyte-up`, `airflow-up` e `stream-up`
+  passam por `docker/preflight.sh`, que **pausa o ambiente conflitante** antes de subir o pedido —
+  ciclo de troca medido em 18 s. Recusa só resta quando nem pausar basta, e aí `FORCE=1` autoriza,
+  no mesmo idioma de `seed-data` e `reset`.
+- **Fechada em 15/09/2026.** A Etapa 12 exigia tudo de pé ao mesmo tempo, e nessa máquina isso
+  não cabe com o ambiente de trabalho aberto: a pendência **D36** foi decidida pelo
+  [ADR-0046](adr/0046-validar-a-fase-local-por-partes.md) — a validação é por partes, e a
+  concorrência entre *batch* e *streaming* é medida na fase GCP.
+
+Um segundo achado, estrutural, sobre o custo do Airbyte: as JVMs permanentes do cluster rodam com
+`-XX:MaxRAMPercentage=75.0` dentro de um contêiner `kind` **sem limite de memória**, de modo que
+cada uma dimensiona o próprio *heap* pela memória da máquina inteira. É a mesma armadilha que a §2.4
+descreve para o Redpanda e o Kafka Connect — lá, resolvida por limite declarado no
+`docker-compose.streaming.yml`. Foi fechada no mesmo dia pelo
+[ADR-0041](adr/0041-teto-de-memoria-nos-servicos-do-airbyte.md), e o resultado está na §2.9.
+
+### 2.9 O teto de memória do Airbyte, medido — 07/09/2026
+
+Aplicados os tetos do [ADR-0041](adr/0041-teto-de-memoria-nos-servicos-do-airbyte.md), com
+`make sync-airbyte` completando **26.093 linhas** e o contêiner do cluster amostrado a cada 10 s:
+
+| Medida | Sem teto | Com teto |
+|---|---|---|
+| `server` | 662 MB | 634 MB |
+| `cron` | 624 MB | 605 MB |
+| `workload-api-server` | 553 MB | 455 MB |
+| `workload-launcher` | 484 MB | 437 MB |
+| `worker` | 480 MB | 466 MB |
+| **JVMs permanentes, ocioso** | **2.803 MB** | **2.596 MB** |
+| **Pico do cluster durante a sincronização** | 4,47 GiB | **4,95 GiB** |
+
+Nenhum *pod* morto por limite, nenhum disparo do OOM *killer* na janela, sincronização bem-sucedida.
+O único reinício foi do `workload-launcher`, e a causa foi conferida: `ConnectException` ao servidor
+que ainda subia — ordem de inicialização, não memória. A verificação importava porque o `JAVA_OPTS`
+do *chart* traz `-XX:+ExitOnOutOfMemoryError`, e OOM de *heap* apareceria como saída de código 1, não
+como `OOMKilled`.
+
+**As duas conclusões que contrariam a expectativa**, e é por isso que estão registradas:
+
+1. **O ocioso cai pouco — 7%.** Aritmética simples: o RSS já estava abaixo dos tetos declarados, e
+   teto acima do consumo não aperta nada.
+2. **O pico não cai.** Ele é dominado pelos *pods de job* da sincronização, cujos limites vivem em
+   `global.workloads.resources` e não foram tocados — `replication` 2Gi + `mainContainer` 2Gi +
+   `sidecar` 512Mi somam mais que toda a plataforma permanente.
+
+O número que sai daqui e muda o comportamento do ambiente é o **pico de 5,0 GB**, que passou a
+dimensionar o `docker/preflight.sh`. Autorizar a subida do Airbyte pelo consumo ocioso seria
+autorizar um travamento alguns minutos depois, quando a sincronização começasse.
+
+### 2.10 O JIT do PostgreSQL sobre os modelos do legado — 08/09/2026
+
+A estação travou duas vezes na madrugada de 08/09/2026 — 23:12 e 01:25 —, e as duas vezes o OOM
+*killer* escolheu um `backend` do `warehouse_db`, com **7,7 e 7,85 GB de RSS anônimo** numa máquina
+de 11,5 GB. O armazém reiniciou em recuperação de *crash*; o ambiente de trabalho ficou inutilizável
+por minutos antes disso, com o núcleo empurrando tudo para o *zram*.
+
+Não é volume: cada relação envolvida tem **uma linha**. O que custa é a forma do SQL. Os modelos de
+limpeza do legado são código gerado — 60 a 120 kB por modelo, 3,1 MB no conjunto —, com dezenas de
+expressões regulares por coluna.
+
+Medições, com o contêiner amostrado a cada 0,2–0,3 s e teto de *cgroup* de 2 GB para que a falha
+coubesse na máquina. O valor lido é o `memory.current` do *cgroup*, que **soma anônima e cache de
+página** — para consulta que passa, ele superestima; o que não é ambíguo é a linha que **estoura**,
+porque ali o `backend` morreu de fato: conexão perdida, e o registro do núcleo apontando 7,85 GB de
+`anon-rss` no episódio que travou a estação.
+
+| Consulta | Contexto | Pico |
+|---|---|---|
+| `stg_legacy__carts`, todas as colunas | sessão nova, `jit=on` | **estourou 2 GB** |
+| `stg_legacy__carts`, todas as colunas | sessão nova, `jit=off` | **281 MB** |
+| as 40 views, uma por vez, mesma sessão | `jit=on` | estourou 2 GB na 4ª |
+| as 40 views, uma por vez, mesma sessão | `jit=off` | **475 MB** |
+| `union all` de 40 braços sobre as **views** | `jit=on` | **7,7 GB** — matou a estação |
+| `union all` de 40 braços sobre as **views** | `jit=off` | estourou 2 GB |
+| `union all` de 40 braços sobre **tabelas** | `jit=off` | **179 MB** |
+| `union all` de 40 braços sobre **tabelas** | `jit=on` | **180 MB** |
+
+**As três conclusões**, e é por isso que estão registradas:
+
+1. **A causa raiz é o JIT.** Isolada com uma variável só — mesma view, mesma consulta, sessão
+   recém-aberta —, a diferença é 281 MB contra mais de 2 GB. O LLVM compila a árvore de expressão e
+   não devolve o que alocou, e o ganho que o JIT existe para dar, amortizar compilação sobre muitas
+   linhas, não se aplica quando a expressão é enorme e as linhas são poucas.
+2. **Desligar o JIT não basta sozinho.** O `union all` de quarenta braços do `legacy_records` embute
+   as quarenta definições de view numa árvore de três megabytes e passa de 2 GB **mesmo com o JIT
+   desligado**. Materializar resolve isso — e, materializado, o JIT deixa de importar: 179 contra
+   180 MB.
+3. **Sem teto de *cgroup*, a falha não era do banco, era da máquina.** Os três contêineres subiam com
+   `mem_limit=0`. Com teto, a consulta desgovernada morre e o contêiner reinicia; foi o que permitiu
+   medir tudo acima sem travar a estação de novo.
+
+As três medidas decorrentes estão no
+[ADR-0043](adr/0043-impedir-que-o-tratamento-do-legado-esgote-a-estacao.md).
+
+**Depois das três medidas aplicadas**, `make dbt-build` completo — 136 modelos de tabela, 52 de
+view, 4 *snapshots*, 3 *seeds* e 666 testes de dados, 862 nós ao todo — terminou em **23 min 17 s**
+com `PASS=862 ERROR=0`. A memória **anônima** do armazém, que é a que não se recupera, teve pico de
+**433 MB**, e o *cgroup* registrou **zero** disparos de OOM. É o mesmo comando que travava a estação.
+
+Um efeito colateral que vale registrar: os `timeouts` que a segunda e a terceira revisões anotaram
+como "detecção integral no banco não medida" eram esta falha. O achado **R13** estava bloqueado por
+ela, não por falta de teste.
+
+### 2.11 O CTE `limpo` embutido em cada referência — 15/09/2026
+
+Medido ao executar os 40 modelos de limpeza compilados sobre o lote gerado, num armazém efêmero e
+com `jit=off` (contraprova (b) de `tests/test_legado_contraprovas.py`). Cada modelo tem dois CTEs —
+`captura` e `limpo` — e o `case` de achados referencia `l."coluna"` (o valor já limpo) muitas vezes:
+a validação de uma data, dezenas. O PostgreSQL embute um CTE referenciado uma só vez, e o plano
+mostra a junção direta entre duas varreduras de `captura`, sem `limpo` — a expressão inteira de
+limpeza é reavaliada em cada referência.
+
+| Consulta (`select legacy_row_id, …`) | `carts` (2.000 linhas) | `cart_items` (5.500 linhas) |
+|---|---:|---:|
+| só as colunas limpas | 2,2 s | 7,1 s |
+| só `achados` | 97,7 s | 272,6 s |
+| tudo, como o modelo entrega | 94,1 s | 295,1 s |
+| tudo, com `limpo as materialized` | 8,7 s | 25,5 s |
+| tudo, `materialized`, `jit=on` | 8,7 s | 23,0 s |
+
+Não é o JIT (a D38 já o desligou; ligado ou desligado, o `materialized` dá o mesmo) — é a forma do
+SQL, e é anterior à do §2.10: uma árvore em que cada referência carrega a expressão inteira é
+também o que o LLVM tentava compilar. A pendência **D42** foi fechada no mesmo dia pelo
+[ADR-0047](adr/0047-materializar-o-cte-de-limpeza-do-legado.md): o CTE é `materialized` no
+PostgreSQL, e a contraprova (b) sobre as 40 tabelas caiu de 656 s para 47 s.
+
+### 2.12 O ciclo do zero, medido — B5, 25/09/2026
+
+Cada linha é um `make medir` no clone recém-preparado, sobre bancos, Airbyte e Airflow instalados do
+zero, na estação de trabalho do Owner — o que mais rodava nela não foi controlado, e o `MemAvailable`
+inclui tudo. Os extremos são **amostrados**, uma amostra a cada ~4,1 s (pausa de 2 s); a soma dos
+contêineres não inclui o Beam nem o produtor, que rodam no *host*. O tamanho é a soma dos três
+bancos pelo `make size-report`, depois do intervalo medido (D59). As quatro tentativas que falharam
+e as correções que as seguiram estão no diário do B5; aqui só as que passaram.
+
+| Linha do B5 | Alvo | De pé no início | Duração | `MemAvailable` mínimo | Contêineres, máximo | Amostras | Bancos, soma |
+|---|---|---|---:|---:|---:|---:|---:|
+| 1 | `up` | nada | 0m 07s | 8,0 GB | 0,1 GB | 2 | 22,0 MB |
+| 1 | `migrate` | bancos | 0m 02s | não medido | não medido | 0 | 24,9 MB |
+| 1 | `seed-data` | bancos | 0m 21s | 7,8 GB | 0,1 GB | 5 | 78,5 MB |
+| 1 | `seed-legacy` | bancos | 0m 04s | 7,9 GB | 0,2 GB | 1 | 84,1 MB |
+| 2 | `airbyte-up` — instalação nova, com as imagens baixadas | bancos | 12m 47s | 5,3 GB | 3,7 GB | 175 | 81,4 MB |
+| 2 | `sync-airbyte` — a primeira carga | Airbyte, bancos | 3m 18s | 2,4 GB | 5,3 GB | 48 | 152,2 MB |
+| 2 | `sync-legacy` — a primeira captura certificada | Airbyte, bancos | 2m 34s | 2,8 GB | 4,9 GB | 37 | 158,5 MB |
+| 3 | `CENARIO=streaming` — o *snapshot*, 13.700 eventos | bancos | 1m 12s | 5,5 GB | 1,4 GB | 17 | 165,3 MB |
+| 4 | `dbt-build` — o primeiro *build* completo | Airbyte, bancos | 1m 41s | 3,8 GB | 3,6 GB | 24 | 303,5 MB |
+| 4 | `check` | Airbyte, bancos | 6m 49s | 3,4 GB | 3,6 GB | 100 | 308,6 MB |
+| 5 | `dag-run` até `dag-wait` — as 13 tarefas | Airbyte, Airflow, bancos | 6m 41s | **1,1 GB** | **6,5 GB** | 95 | 325,1 MB |
+| 6 | `CENARIO=streaming LIMITE=200` | Airbyte, Airflow, bancos | 1m 24s | 2,8 GB | 4,8 GB | 20 | 325,9 MB |
+| 6 | `CENARIO=streaming LIMITE=2200` — 11 alertas | *streaming*, bancos | 0m 57s | 6,4 GB | 1,3 GB | 14 | 328,8 MB |
+| 7 | `sync-airbyte` — os eventos novos | Airbyte, bancos | 1m 37s | 3,0 GB | 4,7 GB | 23 | 332,0 MB |
+| 7 | `dbt-build` | Airbyte, bancos | 1m 41s | 3,6 GB | 3,7 GB | 24 | 334,5 MB |
+| 8 | `docs-generate` | Airbyte, bancos | 0m 22s | 3,9 GB | 3,7 GB | 5 | 334,6 MB |
+| 9 | `recovery-restore` — a sequência inteira (§3.4) | Airbyte, bancos | 16m 59s | 2,4 GB | 5,0 GB | 247 | 627,9 MB |
+
+"De pé no início" é o estado antes do preflight: nas linhas 3 e 6 ele pausou a outra família antes
+de subir o *streaming*. O `migrate` durou menos que a pausa do amostrador, e por isso não tem amostra.
+
+**O que os números dizem:**
+
+1. **O pico foi a DAG, e não a sincronização.** Airbyte, Airflow e os *pods* de *job* somaram 6,5 GB
+   nos contêineres, com 1,1 GB livres no *host*: o par que o preflight permite cabe, com pouca folga,
+   numa estação que começou o ciclo com 8,0 GB livres e nada de pé.
+2. **Uma instalação nova do Airbyte custa 12m 47s**, a maior parte baixando as imagens, porque o
+   `/var` do nó sai com ele no `make airbyte-down` (conferido no desmonte do B5). Retomar o *cluster*
+   pausado levou 1m 29s e 1m 49s nas linhas 4 e 7, fora do `medir`, pelo diário.
+3. **A restauração inteira custa 17 minutos**, com as duas sincronizações e o `check` como o grosso
+   dela. O armazém restaurado tem quase o dobro do ciclo novo — 628 MB contra 335 MB —, e o que muda
+   entre os dois é a memória do legado. O ciclo novo tinha **duas** capturas, as certificadas 2 e 3
+   (diário do B5, 13:52). O restaurado traz no bruto **28** capturas retidas do *checkout* antigo —
+   11 delas certificadas no pacote, a maior a 43 — e a 49, certificada na restauração: 29 `sync_id`
+   distintos em `raw_legacy`, contados em 03/10/2026. **Não medido:** quanto dos 293 MB de diferença
+   vem do bruto retido, e quanto do resto da memória. Até 03/10/2026 esta frase dizia "43 capturas"
+   e "3": eram os identificadores da maior captura de cada lado, lidos como quantidade (RVF12-08).
+
+### 2.13 A regeneração da v1.1.0, medida — 04/11/2026
+
+Cada linha é um `make medir` do
+[roteiro de regeneração](https://github.com/alencardoug/bi-como-codigo/blob/3c9ab4e/docs/regeneration_runbook.md#4-the-cycle)
+da v1.1.0, que aplicou o gerador corrigido às duas origens **mantendo a memória do armazém**. Não é
+um ciclo do zero, como o §2.12: o Airbyte e o Airflow já estavam instalados, e o armazém começou com
+a memória da fase local — 31 capturas retidas no bruto e 600 linhas de certificado. Por isso a soma
+dos bancos parte de ~650 MiB, e não dos ~150 MiB do B5 no mesmo ponto. As condições de medida são as do
+§2.12: a estação do Owner sem controle do resto, uma amostra a cada 4,1–4,2 s (pausa de 2 s), a soma
+dos contêineres sem o Beam e o produtor. **As unidades são binárias:** o medidor, o `size-report` e
+o `docker stats` dividem por 1024, e o que as saídas rotulam "GB" e "MB" é GiB e MiB — é assim que
+esta seção os escreve. O diário, com cada comando, a saída e os desvios, está em
+`data/medicoes/diario_v1_1_0.md`, e as saídas, em `data/medicoes/v1_1_0/`, os dois fora do Git.
+
+| Linha do roteiro | Alvo | De pé no início | Duração | `MemAvailable` mínimo | Contêineres, máximo | Amostras | Bancos, soma |
+|---|---|---|---:|---:|---:|---:|---:|
+| C2 | `sync-airbyte RESET=1` — 247.902 linhas | Airbyte, bancos | 3m 22s | 3,4 GiB | 5,3 GiB | 49 | 648,4 MiB |
+| C3 | `CENARIO=streaming` — o *snapshot* ([*Streaming* §7.3](streaming.md#73-a-regeneração-da-v110--04112026)) | Airbyte, bancos | 1m 24s | 4,7 GiB | 1,7 GiB | 19 | 654,2 MiB |
+| D2 | `sync-legacy` — a captura 59, certificada | Airbyte, bancos | 1m 45s | 4,1 GiB | 4,6 GiB | 25 | 654,1 MiB |
+| D3 | `dbt-build RESET=1` — o SCD refeito | Airbyte, bancos | 1m 34s | 4,4 GiB | 3,8 GiB | 23 | 659,5 MiB |
+| E9 | `sync-airbyte` — os eventos novos, 27.547 linhas | Airbyte, bancos | 1m 41s | 4,1 GiB | 4,7 GiB | 24 | 662,9 MiB |
+| E9 | `dbt-build` | Airbyte, bancos | 1m 54s | 4,6 GiB | 3,9 GiB | 27 | 667,1 MiB |
+| F1 | `check` | Airbyte, bancos | 8m 26s | 4,2 GiB | 3,9 GiB | 123 | 665,3 MiB |
+| F3 | `dag-run` até `dag-wait` — tentativa 1, `failed` em `dbt_analytics` | Airbyte, Airflow, bancos | 5m 49s | 2,2 GiB | 7,0 GiB | 83 | 674,5 MiB |
+| F3 | `dag-run` até `dag-wait` — tentativa 2, as 15 tarefas | Airbyte, Airflow, bancos | 6m 18s | 2,4 GiB | 7,0 GiB | 89 | 685,6 MiB |
+| F4 | `docs-generate` | Airbyte, Airflow, bancos | 0m 33s | 4,0 GiB | 5,1 GiB | 8 | 685,9 MiB |
+| G7 | `recovery-restore` — a sequência inteira (§3.4) | Airbyte, bancos | 19m 51s | 3,6 GiB | 5,1 GiB | 288 | 723,8 MiB |
+
+As linhas fora do `medir` — a recarga das origens, o produtor, as pausas e as retomadas — estão no
+diário. A recarga da origem principal levou 18,6 s para 252.987 linhas, e `source_db` ficou com
+63,8 MiB; a do legado, 0,56 s para 12.741 linhas.
+
+**O conteúdo que mudou.** Das 40 tabelas da origem principal, **17** mudam de conteúdo com as três
+correções do gerador — a árvore de categorias, a faixa de preço por folha e o lançamento antes da
+venda ([Geração §5](geracao_de_dados.md#5-realismo-e-coerência)): `product_categories`, `products`,
+`product_variants`, `product_prices`, `orders`, `order_items`, `cart_items`, `coupon_redemptions`,
+`payments`, `payment_transactions`, `refunds`, `purchase_orders`, `purchase_order_items`,
+`goods_receipt_items`, `inventory_movements`, `inventory_balances` e `stock_reservations`; as outras
+23 saem iguais. No legado, as mesmas 17 e mais `campaigns` e `customers`, **19**: as duas últimas
+porque a recarga do lote desfez as mutações de teste da Etapa 11, que o legado de antes carregava
+pelo diário de mutações. Nas chaves do legado, `customers` +3 (as removidas na Etapa 11, de volta),
+`product_categories` +4 (a árvore), `inventory_balances` −2 e `inventory_movements` −8 — 12.744
+linhas antes, 12.741 depois. As transições de chave e a memória de exclusões que elas produzem estão
+na [Origem Legada §4.3](origem_legada.md#43-o-livro-retido-da-memória-v110).
+
+**O que os números dizem:**
+
+1. **O pico continua sendo a DAG**: 7,0 GiB nos contêineres e 2,2 GiB livres, contra 6,5 GiB e 1,1 GiB no
+   B5. A DAG tem agora 15 tarefas: a v1.1.0 acrescentou `retomar_capturas_do_legado` e
+   `registrar_captura_do_legado`, as duas pontas do portão da memória do legado
+   ([ADR-0050](adr/0050-guardar-a-memoria-do-legado-num-livro-retido.md)). O *host* começou o ciclo
+   com 7,47 GiB livres, menos que os 8,0 GiB do B5. **Não medido:** por que o mínimo livre durante a
+   DAG foi maior, e quanto do 0,5 GiB a mais nos contêineres é das tarefas novas.
+2. **A restauração custou 19m 51s**, 2m 52s a mais que no B5, sobre um armazém (`WAREHOUSE_DB`) de
+   646,4 MiB contra 553,0 MiB no fim de cada uma — na soma dos três bancos, 723,8 MiB contra 627,9 MiB.
+   O que a restauração traz a mais é memória: 34 capturas retidas no bruto e 720 linhas de
+   certificado na linha de base que ela abriu, contra as 28 capturas e as 11 certificadas do pacote
+   do B5. **Não medido:** quanto do tempo a mais vem dessa memória e quanto do `check` do passo 8,
+   que rodou 886 testes Python contra 579.
+3. **O `check` cresceu de 6m 49s para 8m 26s**, com o mesmo `PASS` do dbt mais dois — a invariante 14
+   e a reconciliação da P09 — e 306 testes Python a mais que no B5.
+
+---
+
+### 2.14 A estimativa da janela da Etapa 13 — 07/11/2026
+
+**[estimado]** antes do primeiro `apply` cobrável, como pede o critério da Etapa 13 e o plano
+transitório (§6.3). **Aprovada pelo Owner em 08/11/2026**, como está abaixo (US$ 40–70). Os preços foram **lidos** em 07/11/2026 — Compute pela Cloud Billing Catalog API,
+os demais nas páginas oficiais —, e a história da leitura está no
+[Registro da fase GCP §6](registro_fase_gcp.md#6-preços-lidos-para-a-estimativa-07112026). As
+durações são as do cronograma do plano, não medidas. O real é registrado depois, ao lado: as
+**durações [medido]**, no fechamento (13/11/2026); o **custo, pendente** até a leitura do faturamento
+por serviço, em 16/11/2026 ([plano da Etapa 13 §11.4](../PLANO_etapa_13.md#114-as-decisões-do-owner)).
+
+| Serviço | Configuração | Preço-hora | Duração planejada | Estimado (US$) | Real |
+|---|---|---|---|---|---|
+| Cloud SQL | Enterprise, 2 vCPU / 7,5 GB, zona única, SSD 20 GB | 2 × 0,0413 + 7,5 × 0,007 ≈ 0,135 | seg 09 08:00 → qui 12 09:00, ~73 h | ~10 | seg 09 11:30 → sex 13 00:56, **~85 h**; custo pendente |
+| GKE — nós | zonal, 2 × `e2-standard-4` (4 vCPU, 16 GB cada) | 2 × (4 × 0,021812 + 16 × 0,002924) ≈ 0,268 | ter 10 08:00 → qui 12 09:00, ~49 h | ~13 | ter 10 12:47 → sex 13 00:52, **~60 h**; custo pendente |
+| GKE — *cluster* | taxa de gerenciamento | 0,10 (o crédito de US$ 74,40/mês por conta cobre um zonal; contado aqui como custo, no pior caso) | ~49 h | ~5 | ~60 h, as do *cluster*; custo pendente |
+| GKE — discos, LB interno, NAT | 2 × 50 GB `pd-balanced`; 1 *forwarding rule*; NAT de 2 VMs | ≈ 0,014 + 0,025 + 0,003 | ~49 h | ~2 | ~60 h; além dos 2 × 50 GB, três PVCs: os dois do Airbyte viraram discos `pd-balanced` de **1 GB** cada [medido], o do Debezium pediu 1 Gi `standard-rwo` (pedido, não disco medido) — ~3 GB a mais ([Registro §48](registro_fase_gcp.md#48-o-roteiro-de-terça-parado-pela-conta-de-faturamento-fechada-10112026), RVPC-5-01); custo pendente |
+| Composer 3 | *small*; o exemplo oficial usa 12 DCUs, 15 com mais *workers* | 12–15 × 0,06 = 0,72–0,90 | qua 11 07:00 → 22:00, ~15 h, mais ~0,5 h para nascer | ~11–14 | qua 11 15:20 → 21:33, **~6,2 h**, 50 min delas nascendo; custo pendente |
+| Dataflow | 1 *worker* `n1-standard-2` (2 vCPU, 7,5 GB), Streaming Engine | 2 × 0,069 + 7,5 × 0,003557 ≈ 0,165 | ~15 h na janela + ~1 h de ensaio na terça (D83) | ~3 | pendente |
+| BigQuery, Pub/Sub, Cloud Storage, Secret Manager | volume `dev` (D68) | dentro do nível gratuito (1 TiB de consulta, 10 GiB de armazenamento, 10 GiB de Pub/Sub por mês) | toda a semana | ~0–2 | pendente |
+| **Total** | | | | **~44–49**, com margem para reexecução: **US$ 40–70** | pendente |
+
+O crédito da conta era de R$ 1.740,37 em 06/11/2026; a estimativa usa uma fração dele, à taxa de
+câmbio da fatura (não medida aqui). O orçamento do projeto (Terraform, `fundacao.tf`) alerta em
+R$ 120, 240 e 360 com os créditos **excluídos** do cálculo — senão o gasto líquido seria zero e
+nenhum alerta dispararia. **Não estimado:** saída de rede (o tráfego fica na região) e o
+armazenamento do banco do Composer (centavos por GiB-mês).
+
+## 3. Ponto único de recuperação
+
+O projeto mantém **um único pacote *last known good***: as duas fontes e a memória do armazém, em
+formato customizado e comprimido do `pg_dump`, com um manifesto que diz o que o estado restaurado tem
+de ser. Ele devolve as fontes e a memória, e a partir delas o resto é reconstruído e provado igual.
+
+**Entregue em 25/09/2026**, no B5: o candidato montado com o corte `2026-09-25T12:32:21Z` e o *commit*
+`7b0bea6`, restaurado de ponta a ponta num ambiente recém-instalado — os nove passos e os oráculos
+do §3.4, em 16m 59s (§2.12) — e promovido. O aprovado vive no `data/recovery/aprovado` do *checkout*
+de trabalho, o caminho padrão (D46, D60); uma segunda cópia fora dos *checkouts* é recomendada, e o
+roteiro do B5 fez uma.
+
+**Substituído em 04/11/2026 pelo pacote da v1.1.0**, depois da regeneração das duas origens: corte
+`2026-11-04T14:21:05Z`, *commit* `6d93d72`, manifesto com SHA-256 `3b93d594…`, pela primeira vez com
+a geração da origem principal registrada. O candidato foi restaurado pelos nove passos por cima do
+ambiente povoado, em 19m 51s (§2.13), e só então promovido. A segunda cópia está em
+`~/mvp_ed1-recovery-v1.1.0`. Os dois pacotes da v1.0.0 ficaram **fora do *checkout***, porque a
+promoção remove o aprovado anterior: o do B5 em `~/mvp_ed1-recovery-20260925T123221Z`
+(`7b0bea6`, restaurado no B5) e o **corte de recuo** da regeneração em
+`~/mvp_ed1-recovery-pre-v1.1.0` (`33d6451`, `2026-11-04T06:30:16Z`, conferido contra os bancos e
+nunca restaurado), que guarda o estado anterior a ela. Os três foram conferidos por *checksum* depois
+da promoção.
+
+### 3.1 Conteúdo do pacote
+
+- `source_db.dump` e `legacy_db.dump` — as duas fontes, inteiras;
+- `warehouse_memoria.dump` — a **memória do armazém**, o que nenhuma reconstrução reproduz (D49, D51):
+  `raw_legacy`, com as capturas retidas; `governance`, com os certificados e as versões; `snapshots`,
+  com o histórico SCD; e `quarantine`, com a auditoria dos registros rejeitados;
+- `manifesto.json`, no formato 2 dos oráculos: o corte e o *commit*; as contagens por tabela dos três
+  bancos, as revisões do Alembic, as versões de `governance` e o `max(event_sequence)` do livro; as
+  capturas certificadas e a partição por geração de cada tabela do bruto; a quarentena, fatia a
+  fatia, por contagem e *digest*; o *digest* canônico de cada *snapshot* SCD; e a memória de exclusões;
+- os artefatos de trabalho que o estado restaurado pede — os manifestos do legado em `data/legacy/` e
+  o cursor do produtor em `.stream/producer_state.json` —, com a lista dos que estavam ausentes no
+  corte, porque a ausência também volta;
+- `checksums.sha256` e `RESTAURAR.md`, as instruções de restauração gravadas no próprio pacote.
+
+No corte de 25/09/2026: 32 MB, dos quais 20,7 MB são a memória do armazém — a base dessas duas
+medidas não foi registrada. No de 04/11/2026: 37,4 MiB (39.214.755 bytes), dos quais 25,4 MiB
+(26.624.372 bytes) são a memória do armazém.
+
+**O que o pacote não traz**, e por quê: `raw`, `staging`, `trusted`, `analytics` e `consumption` são
+reconstruídos pelas sincronizações e pelo dbt e conferidos contra o manifesto; o cursor do CDC não
+entra (§3.2); o estado do Airbyte e do Airflow é reinstalado — o contador de *jobs* do Airbyte é
+refeito pela D50, e as gerações do bruto, pela D52 (§3.4). O próprio manifesto guarda essa lista no
+campo `limite`.
+
+### 3.2 O cursor de CDC não está no pacote — e por quê
+
+O [ADR-0019](adr/0019-saldo-em-deltas-com-entrega-idempotente.md) colocou *offsets*, histórico de
+schema e status nos tópicos internos do Redpanda, geridos pelo conector. Guardar uma cópia no pacote
+criaria duas verdades sobre a mesma posição.
+
+Há uma consequência operacional que não é óbvia: **restaurar `source_db` de um dump invalida o
+cursor do conector.** A posição de WAL gravada nos tópicos internos aponta para um ponto do log que
+o banco restaurado não tem. Por isso a sequência de restauração (§3.4) **descarta o estado do
+conector** — tópicos, *offsets* e o *slot* de replicação, enquanto a origem antiga ainda existe — e
+esvazia o destino quente antes de o conector refazer o *snapshot* inicial.
+
+Como o destino do *streaming* é idempotente por chave de evento
+([ADR-0019](adr/0019-saldo-em-deltas-com-entrega-idempotente.md)), refazer o *snapshot* não duplica
+eventos de **mesmo conteúdo**. Isso não remove eventos posteriores ao dump nem substitui conteúdo
+sob chave reutilizada numa regeração — é por isso que o destino é esvaziado antes. O procedimento de
+desenvolvimento para regerar uma origem está em
+[Execução Local §3.2](execucao_local.md#32-regerar-uma-origem-que-já-alimenta-streaming); ele não se
+confunde com uma restauração.
+
+### 3.3 Regras
+
+- O `warehouse_db` entra **só pela memória** (§3.1): o resto é refeito por Airbyte e dbt a partir
+  das fontes e da memória restauradas, e provado igual. Guardá-lo inteiro duplicaria o que se
+  reconstrói.
+- O pacote **não é versionado no Git**: vive em `data/recovery/`, ignorado, com o `RECOVERY_DIR`
+  absoluto e sobrescrevível (D46).
+- Um candidato só substitui o aprovado depois de uma **restauração validada** — os nove passos e os
+  oráculos do §3.4 — e da promoção (`make recovery-promote`). Durante a troca, o anterior e o
+  candidato coexistem; ao final, só o aprovado fica.
+- A restauração **altera o estado dos três bancos** e só roda com a autorização explícita do
+  responsável técnico: `RESTAURAR=1`, que não é o `FORCE` — os passos de subida recebem `FORCE=`
+  vazio, com o preflight obrigatório. A variável, porém, segue no ambiente até o `check` do passo 8:
+  quem roda a restauração de verdade dentro dele precisa tirá-la (medido no B5).
+
+### 3.4 A sequência de restauração
+
+`RESTAURAR=1 make recovery-restore` executa a sequência inteira, na ordem, e para na primeira falha:
+
+1. confere o pacote — *checksums*, o manifesto no formato atual, os três dumps listáveis;
+2. para a janela: nenhum trabalho em andamento, a DAG pausada;
+3. descarta o CDC enquanto a origem antiga ainda existe (§3.2);
+4. restaura os três dumps, cada um numa transação só — qualquer erro desfaz o dump inteiro —, sobre
+   um destino povoado ou recém-criado: os papéis do armazém, que os `GRANT`s da memória nomeiam, são
+   criados antes do primeiro dump;
+   - **4b.** re-baseia as gerações retidas do bruto para a faixa negativa, preservando a equivalência
+     de geração por tabela (D52): um Airbyte novo recomeça as gerações em 1, e sem isso a primeira
+     captura depois da restauração dividiria a geração com uma retida;
+5. confere o conteúdo restaurado contra o manifesto — contagens, Alembic, versões, corte do livro,
+   quarentena, SCD e capturas;
+6. devolve os artefatos de trabalho, e a ausência deles;
+7. refaz o *snapshot* do caminho quente;
+8. sobe o Airbyte e avança o contador de *jobs* para além da maior captura retida **antes** de
+   qualquer disparo (D50); sincroniza a carga principal antes da legada, para que a guarda de
+   identidade encontre o *job* novo na listagem; abre a época seguinte do livro retido da memória
+   do legado, com a linha de base do estado restaurado, antes da captura legada
+   ([ADR-0050](adr/0050-guardar-a-memoria-do-legado-num-livro-retido.md)) — sem ela, a recuperação
+   pararia na memória que a restauração substituiu, e uma restauração repetida abre outra;
+   reconstrói com `dbt-rebuild` — **nunca**
+   `dbt-build RESET=1`, que derrubaria o histórico SCD que acabou de voltar — e roda o `check`;
+9. confere os oráculos explícitos: as fontes iguais ao manifesto, a memória contida e intacta, a
+   captura nova certificada acima da retida, a auditoria dela igual ao que a classificação rejeitou,
+   a memória de exclusões renascida igual e o livro da origem inteiro e igual nos dois caminhos.
+
+No B5 a sequência inteira passou num Airbyte e num armazém novos, depois de um desmonte completo;
+os passos 1, 3, 4, 4b e 5 foram medidos também num destino recém-criado por `make up`, com e sem as
+migrações das fontes.
+
+### 3.5 O que o pacote não garante
+
+- **O que aconteceu depois do corte.** A restauração devolve o estado do corte: sincronizações,
+  capturas e gerações posteriores a ele se perdem.
+- **A cópia única.** O aprovado vive no *checkout* de trabalho; um `rm` do diretório ou um
+  `git clean -x` o levam junto. A segunda cópia fora dele é o que protege disso — não da perda do
+  disco.
+- **A fase GCP.** O pacote é da fase local; o ponto de recuperação na nuvem é da Etapa 13.

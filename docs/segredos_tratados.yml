@@ -1,0 +1,121 @@
+# Achados históricos já resolvidos — o registro que o ADR-0048 (D48) exige.
+#
+# O que vive aqui: cada ocorrência de forma de credencial que a varredura
+# histórica (`python -m mvp_ed1.secrets_review --historico`) encontra e que já
+# foi tratada, com o tratamento e o motivo. O veredito da varredura é "nada
+# **não tratado**", nunca "nada encontrado": segredo que já entrou no histórico
+# continua lá para sempre, e reescrever o histórico é decisão do Owner.
+#
+# O que não vive aqui: a política de tratamento — o ADR-0048,
+# docs/adr/0048-tratar-segredo-achado-no-historico-pelo-tipo-da-credencial.md,
+# aplicado na Governança de Dados §9. Este arquivo é o registro.
+#
+# Cada entrada é identificada por (commit, caminho, chave) — é o que a
+# varredura compara. Linhas diferentes da mesma chave no mesmo blob são a
+# mesma entrada.
+
+tratados:
+  - commit: 310c9781df0ed936c49225a87f23baec6d384acf
+    caminho: tests/test_secrets_review.py
+    chave: nWAREHOUSE_DB_PASSWORD
+    tratamento: nenhum — valor fictício, nunca usado em lugar nenhum
+    motivo: >-
+      Fixture do próprio teste da revisão de segredos, escrita para ser achada.
+      Não corresponde a credencial de nenhum serviço, passado ou presente. Em
+      20/09/2026 o arquivo passou a montar esses valores em partes, para que o
+      modo rastreado deixe de acusá-lo; os blobs antigos permanecem.
+  - commit: 310c9781df0ed936c49225a87f23baec6d384acf
+    caminho: tests/test_secrets_review.py
+    chave: password
+    tratamento: nenhum — valor fictício, nunca usado em lugar nenhum
+    motivo: >-
+      A mesma fixture, na forma YAML que o teste usa para provar o detector.
+  - commit: 310c9781df0ed936c49225a87f23baec6d384acf
+    caminho: tests/test_secrets_review.py
+    chave: forma genérica
+    tratamento: nenhum — cabeçalho sem material de chave
+    motivo: >-
+      Cabeçalho `-----BEGIN … PRIVATE KEY-----` escrito inteiro para provar o
+      detector de formas conhecidas. Não acompanha chave alguma. O teste já o
+      monta em partes hoje; o blob antigo permanece.
+  - commit: a0a076702859229b353d3d15ed2e3a59787304d1
+    caminho: tests/test_secrets_review.py
+    chave: nWAREHOUSE_DB_PASSWORD
+    tratamento: nenhum — valor fictício, nunca usado em lugar nenhum
+    motivo: >-
+      A mesma fixture, num commit anterior do mesmo arquivo.
+  - commit: a0a076702859229b353d3d15ed2e3a59787304d1
+    caminho: tests/test_secrets_review.py
+    chave: password
+    tratamento: nenhum — valor fictício, nunca usado em lugar nenhum
+    motivo: >-
+      A mesma fixture, na forma YAML, no commit anterior.
+  - commit: 4ff3be951074c4d3719dcebba85971316534b141
+    caminho: docker/docker-compose.airflow.yml
+    chave: credencial de airflow
+    tratamento: >-
+      rotacionada — saiu da composição para o .env em 0b89b3d (20/09/2026),
+      com ALTER ROLE no banco de então; o banco de metadados atual nasceu no B5
+      (volume mvp_ed1_airflow_db_data criado em 25/09/2026 10:35:44 -03:00) com
+      a senha sorteada por `make env`, diferente desta (conferido em 03/10/2026)
+    motivo: >-
+      Senha igual ao usuário — o par de fábrica do banco de metadados do Airflow,
+      na URL de conexão, desde a Etapa 5. Interno à rede do Compose e nunca
+      exposto. Credencial local: pela D48 regenera-se e registra-se, sem
+      reescrever o histórico. Achada por inspeção em 0b89b3d; a varredura
+      passou a achá-la em 03/10/2026, depois da revisão final da Etapa 12
+      (RVF12-01).
+  - commit: 4ff3be951074c4d3719dcebba85971316534b141
+    caminho: docker/docker-compose.airflow.yml
+    chave: POSTGRES_PASSWORD
+    tratamento: >-
+      rotacionada — a mesma rotação da credencial de airflow deste commit
+    motivo: >-
+      A mesma senha, no POSTGRES_PASSWORD do contêiner do banco de metadados.
+  - commit: ea91a49809808f62dbb9dd4d2ab67f038d86049e
+    caminho: docker/docker-compose.airflow.yml
+    chave: credencial de airflow
+    tratamento: >-
+      rotacionada — a mesma rotação da credencial de airflow de 4ff3be9
+    motivo: >-
+      A mesma credencial, na versão seguinte da composição.
+  - commit: ea91a49809808f62dbb9dd4d2ab67f038d86049e
+    caminho: docker/docker-compose.airflow.yml
+    chave: POSTGRES_PASSWORD
+    tratamento: >-
+      rotacionada — a mesma rotação da credencial de airflow de 4ff3be9
+    motivo: >-
+      A mesma senha, no POSTGRES_PASSWORD da versão seguinte da composição.
+  - commit: e3c226c44291b1bdca89ab9d085797ac1aa21f22
+    caminho: Makefile
+    chave: PGPASSWORD
+    tratamento: nenhum — referência a variável, não valor
+    motivo: >-
+      Falso positivo. A linha da receita dos alvos do `pgcli` de 13/10/2026
+      dá ao PGPASSWORD a expansão, no shell, da variável `<BANCO>_DB_PASSWORD`
+      que o `.env` acabou de carregar, escrita como `$$$(1)` seguido do resto
+      do nome: o texto no blob é o nome dela, e nenhuma senha entrou no
+      Makefile. A varredura lê os 18 caracteres depois de `$$` como valor
+      literal. (A linha não é citada aqui por inteiro porque a revisão dos
+      arquivos rastreados a acusaria neste registro.) ba8244a (14/10/2026)
+      reescreveu a referência com chaves e o arquivo atual deixou de ser
+      acusado; o blob antigo permanece, e `make secrets-history` saía com erro
+      desde então (medido em 22/10/2026, §5.6 do plano do `bi-como-codigo`).
+  - commit: 4a0b2215fdc4d6d205b389d2f1fd46f16eb1b9a2
+    caminho: terraform/cloud_sql.tf
+    chave: secret_id
+    tratamento: nenhum — nome de recurso, não valor
+    motivo: >-
+      Falso positivo. O campo é o identificador do segredo do Secret Manager que
+      guarda a senha de uma origem do Cloud SQL, montado com o nome da origem; a
+      senha mesma nasce no `apply` (`random_password`) e só existe no estado
+      local, fora do Git. 05df480 (07/11/2026) passou a montar o nome num `local`
+      e o arquivo atual deixou de ser acusado; o blob antigo permanece.
+  - commit: 898a8bc6c651000c265671ab5c7585298f0a5269
+    caminho: docs/registro_fase_gcp.md
+    chave: secret_id
+    tratamento: nenhum — citação do falso positivo acima, não valor
+    motivo: >-
+      O registro da fase GCP citou, entre crases, a linha acusada em
+      terraform/cloud_sql.tf ao contar o episódio. 00c19ec (07/11/2026) reescreveu
+      a frase sem o literal; o blob antigo permanece.

@@ -1,0 +1,1222 @@
+version: 2
+
+# As views de consumo têm **contrato aplicado** (ADR-0018): coluna, tipo e
+# obrigatoriedade declarados aqui e verificados pela máquina a cada `build`.
+#
+# É atrito deliberado. Contrato que nada verifica é documentação — diverge do
+# modelo real na primeira alteração e ninguém fica sabendo. Com `enforced`, o
+# *build* quebra quando a forma muda, e a mudança quebrante precisa nascer como
+# nova versão da view em vez de quebrar quem consome.
+#
+# Cada view responde **uma** pergunta do Glossário de Negócio e é nomeada por
+# ela. Nas views de razão, numerador e denominador vão ao lado do resultado:
+# taxa não se soma, e quem reagregar precisa dos dois.
+
+models:
+  - name: monthly_revenue_by_channel_and_category
+    meta:
+      domain: vendas
+    description: 'P01 — Receita líquida por mês, canal e categoria. {{ doc("net_revenue") }}'
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: channel_type
+        description: "Natureza do canal: web, app ou store."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: root_category_name
+        description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: category_name
+        description: "Nome comercial da categoria."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: order_count
+        description: "Não aditiva entre categorias — pedidos realizados distintos, contados pela origem e pelo número; um pedido com itens de duas categorias conta nas duas."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: unit_count
+        description: "Aditiva — unidades vendidas em pedidos realizados, por mês, canal e categoria."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: gross_revenue_amount
+        description: "Aditiva — receita bruta, antes do desconto, dos itens de pedidos realizados, por mês, canal e categoria."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: discount_amount
+        description: "Aditiva — desconto concedido nos itens de pedidos realizados, por mês, canal e categoria."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: net_revenue_amount
+        description: "Aditiva — receita líquida dos itens de pedidos realizados, por mês, canal e categoria."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+
+  - name: average_order_value_by_channel_and_segment
+    meta:
+      domain: vendas
+    description: 'P02 — Ticket médio por canal e segmento. {{ doc("average_order_value") }}'
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: customer_segment_name
+        description: "Nome do segmento do cliente; 'Sem segmento' quando ele não tem um."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: order_count
+        description: "Aditiva — pedidos realizados distintos, contados pela origem e pelo número, por mês, canal e segmento do cliente."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: net_revenue_amount
+        description: "Aditiva — receita líquida dos itens de pedidos realizados, por mês, canal e segmento do cliente."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: average_order_value
+        meta:
+          sensitivity: confidential
+        description: Não aditiva — razão entre as duas colunas anteriores.
+        data_type: numeric
+
+  - name: top_skus_by_revenue
+    meta:
+      domain: vendas
+    description: P03 — Os 25 SKUs de maior receita e o peso de cada um na sua categoria.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: revenue_rank
+        description: "Posição do SKU pela receita líquida no período, de 1 a 25; empates dividem a posição."
+        meta:
+          sensitivity: confidential
+        data_type: bigint
+        constraints: [{type: not_null}]
+      - name: product_natural_key
+        description: "Identificador da variante do produto (o SKU) na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: bigint
+      - name: sku
+        description: "Código de estoque da variante; chave natural do SKU."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: product_name
+        description: "Nome comercial do produto."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: category_name
+        description: "Nome comercial da categoria do SKU."
+        meta:
+          sensitivity: public
+        data_type: text
+      - name: root_category_name
+        description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: brand_name
+        description: "Nome da marca."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: is_deleted
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: SKU saiu do catálogo; a venda histórica dele continua contando (ADR-0029).
+        data_type: boolean
+      - name: unit_count
+        description: "Aditiva — unidades do SKU vendidas em pedidos realizados, no período inteiro."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: net_revenue_amount
+        description: "Aditiva — receita líquida do SKU em pedidos realizados, no período inteiro."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: category_net_revenue_amount
+        description: "Não aditiva entre SKUs — receita líquida de toda a categoria do SKU no período, repetida em cada SKU dela."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: category_revenue_share_pct
+        meta:
+          sensitivity: confidential
+        description: Não aditiva — só se soma dentro da mesma categoria.
+        data_type: numeric
+
+  - name: new_and_repeat_customers_by_month
+    meta:
+      domain: clientes
+    description: 'P04 — Estreias por mês e recompra na janela. {{ doc("repeat_purchase") }}'
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: customer_segment_name
+        description: "Nome do segmento do cliente; 'Sem segmento' quando ele não tem um."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: new_customer_count
+        description: "Aditiva — clientes cuja primeira compra realizada caiu no mês, por canal e segmento."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: returning_customer_count
+        description: "Aditiva — desses estreantes, os que fizeram a segunda compra realizada em até 90 dias da primeira."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: repeat_purchase_rate_pct
+        meta:
+          sensitivity: internal
+        description: Não aditiva.
+        data_type: numeric
+
+  - name: revenue_by_delivery_region
+    meta:
+      domain: vendas
+    description: P05 — Receita e pedidos por estado e região de entrega, por trimestre.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: quarter_number
+        description: "Trimestre do ano, de 1 a 4."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: year_quarter
+        description: "Ano e trimestre, no formato AAAA-Tn."
+        meta:
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: state_code
+        description: "Unidade federativa em sigla de duas letras."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: state_name
+        description: "Nome da unidade federativa por extenso."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: order_count
+        description: "Aditiva — pedidos realizados distintos, contados pela origem e pelo número, por estado e região de entrega e trimestre."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: customer_version_count
+        description: "Não aditiva — versões de cliente distintas no grupo: um cliente que mudou de versão conta mais de uma vez, e um que comprou em dois grupos conta nos dois."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: unit_count
+        description: "Aditiva — unidades vendidas em pedidos realizados, por estado e região de entrega e trimestre."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: net_revenue_amount
+        description: "Aditiva — receita líquida dos itens de pedidos realizados, por estado e região de entrega e trimestre."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+
+  - name: discount_share_by_channel
+    meta:
+      domain: vendas
+    description: P06 — Desconto concedido como fração da receita bruta, por canal e mês.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: channel_type
+        description: "Natureza do canal: web, app ou store."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: root_category_name
+        description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: order_count
+        description: "Aditiva — pedidos realizados distintos, contados pela origem e pelo número, por canal e mês."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: gross_revenue_amount
+        description: "Aditiva — receita bruta, antes do desconto, dos itens de pedidos realizados, por canal e mês."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: discount_amount
+        description: "Aditiva — desconto concedido nos itens de pedidos realizados, por canal e mês."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: net_revenue_amount
+        description: "Aditiva — receita líquida dos itens de pedidos realizados, por canal e mês."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: discount_share_pct
+        meta:
+          sensitivity: confidential
+        description: Não aditiva.
+        data_type: numeric
+
+  - name: cart_conversion_rate_by_channel
+    meta:
+      domain: vendas
+    description: 'P07 — Conversão de carrinho em pedido. {{ doc("cart_conversion_rate") }}'
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: "Mês em que o **carrinho foi criado**, não em que converteu."
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: channel_type
+        description: "Natureza do canal: web, app ou store."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: cart_count
+        meta:
+          sensitivity: internal
+        description: Carrinhos abertos — topo do funil.
+        data_type: bigint
+      - name: closed_cart_count
+        meta:
+          sensitivity: internal
+        description: Denominador da conversão. Carrinho ainda aberto não entra.
+        data_type: bigint
+      - name: converted_cart_count
+        description: "Aditiva — carrinhos convertidos em pedido, por canal e mês."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: abandoned_cart_count
+        meta:
+          sensitivity: internal
+        description: '{{ doc("abandoned_cart") }}'
+        data_type: bigint
+      - name: cart_conversion_rate_pct
+        meta:
+          sensitivity: internal
+        description: Não aditiva.
+        data_type: numeric
+      - name: cart_value_amount
+        description: "Aditiva — valor dos carrinhos criados, por canal e mês."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: abandoned_value_amount
+        description: "Aditiva — valor dos carrinhos fechados sem compra, por abandono ou expiração, por canal e mês."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+
+  # ── Etapa 6: financeiro e estoque ─────────────────────────────────────────
+  - name: gross_margin_by_category
+    meta:
+      domain: vendas
+    description: >
+      P08 — Lucro bruto e margem por categoria e mês. Receita e custo vêm de
+      fatos diferentes, combinadas por *drill across* na granularidade comum
+      (ADR-0030). Mês com custo e sem receita é o descasamento entre venda e
+      expedição, e aparece de propósito.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM — o da receita, ou o do custo quando o grupo só tem custo."
+        meta:
+          sensitivity: internal
+        data_type: text
+      - name: year_number
+        description: "Ano — o da receita, ou o do custo quando o grupo só tem custo."
+        meta:
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12 — o da receita, ou o do custo quando o grupo só tem custo."
+        meta:
+          sensitivity: internal
+        data_type: integer
+      - name: root_category_name
+        description: "Nome da categoria raiz — o da receita, ou o do custo quando o grupo só tem custo."
+        meta:
+          sensitivity: public
+        data_type: text
+      - name: category_name
+        description: "Nome da categoria — o da receita, ou o do custo quando o grupo só tem custo."
+        meta:
+          sensitivity: public
+        data_type: text
+      - name: net_revenue_amount
+        description: "Aditiva — receita líquida dos itens de pedidos realizados, por categoria e mês; zero quando o grupo só tem custo."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: cost_of_goods_sold
+        description: "Aditiva — custo das mercadorias vendidas, das saídas de venda do livro de estoque, por categoria e mês; zero sem saída (ADR-0030)."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: gross_profit_amount
+        description: "Aditiva — lucro bruto: a receita líquida menos o custo das mercadorias vendidas, por categoria e mês."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: gross_margin_pct
+        description: "Não aditiva — margem bruta, em %: o lucro bruto sobre a receita líquida; nula sem receita. Recalcula-se a cada recorte."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: unit_count
+        description: "Aditiva — unidades vendidas em pedidos realizados, por categoria e mês; zero quando o grupo só tem custo."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: dispatched_unit_count
+        description: "Aditiva — unidades que saíram em venda no livro de estoque, por categoria e mês."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+  - name: inventory_turnover_by_sku_and_warehouse
+    meta:
+      domain: estoque
+    description: >
+      P11 — Giro por SKU e armazém. `quantity_on_hand` é **semiaditiva**:
+      soma por armazém e SKU, nunca ao longo do tempo — três meses somados
+      dariam um estoque que nunca existiu.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: quarter_number
+        description: "Trimestre do ano, de 1 a 4."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: year_quarter
+        description: "Ano e trimestre, no formato AAAA-Tn."
+        meta:
+          sensitivity: internal
+        data_type: text
+      - name: sku
+        description: "Código de estoque da variante; chave natural do SKU."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: product_name
+        description: "Nome comercial do produto."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: category_name
+        description: "Nome comercial da categoria."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: warehouse_name
+        description: "Nome do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: warehouse_region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: quantity_out
+        description: "Aditiva — unidades do SKU que saíram em venda do armazém, no trimestre."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: cost_of_goods_sold
+        description: "Aditiva — custo das saídas de venda do SKU no armazém, no trimestre (ADR-0030)."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: quantity_on_hand
+        description: "Semiaditiva — saldo atual do SKU no armazém; zero sem saldo. Soma-se entre armazéns, nunca entre trimestres."
+        meta:
+          sensitivity: internal
+        data_type: integer
+      - name: inventory_value_amount
+        description: "Semiaditiva — valor do estoque: o saldo atual vezes o custo unitário médio de todos os movimentos do SKU no armazém que têm custo, de qualquer tipo e de todo o período; soma-se entre SKUs e armazéns, nunca entre trimestres."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: inventory_turnover
+        description: "Não aditiva — giro: o custo das mercadorias vendidas sobre o valor do estoque, no trimestre; nulo sem estoque valorado."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+  - name: payment_approval_rate_by_method
+    meta:
+      domain: pagamentos
+    description: >
+      P09 — Taxa de aprovação por meio e parcelamento. O denominador é a
+      tentativa de autorização, não o pagamento: é o atrito que se quer ver.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: payment_method_name
+        description: "Nome do meio de pagamento."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: method_type
+        description: "Natureza do meio: cartão, pix, boleto, carteira ou vale."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: installments
+        description: "Número de parcelas acordadas."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: integer
+      - name: is_instalment_plan
+        description: "Verdadeiro quando o pagamento é parcelado, em mais de uma parcela."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: boolean
+      - name: authorization_attempt_count
+        description: "Aditiva — autorizações tentadas, por mês, meio de pagamento e parcelas."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: approved_authorization_count
+        description: "Aditiva — autorizações aprovadas, por mês, meio de pagamento e parcelas."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: approval_rate_pct
+        description: "Não aditiva — autorizações aprovadas sobre as tentadas, em %; nula sem tentativa. Recalcula-se a cada recorte."
+        meta:
+          sensitivity: internal
+        data_type: numeric
+      - name: authorized_amount
+        description: "Aditiva — valor autorizado nas autorizações bem-sucedidas, por mês, meio de pagamento e parcelas."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: captured_amount
+        description: "Aditiva — valor capturado dos pagamentos, no grupo da primeira autorização aprovada de cada um, por mês, meio de pagamento e parcelas; zero sem captura."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+  - name: refund_rate_by_reason
+    meta:
+      domain: pagamentos
+    description: >
+      P10 — Reembolsado como fração do capturado, por motivo e mês.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: payment_method_name
+        description: "Nome do meio de pagamento."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: refund_reason
+        description: "Motivo do reembolso; 'Sem motivo registrado' quando a origem não o informa."
+        meta:
+          sensitivity: internal
+        data_type: text
+      - name: refund_count
+        description: "Aditiva — reembolsos, por mês, meio de pagamento e motivo."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: refunded_amount
+        description: "Aditiva — valor dos reembolsos concluídos, por mês, meio de pagamento e motivo."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: captured_amount
+        description: "Não aditiva entre motivos — valor capturado no mês e no meio de pagamento, de todos os motivos, repetido em cada motivo; zero sem captura."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+      - name: refund_rate_pct
+        description: "Não aditiva — valor reembolsado sobre o capturado no mês e no meio de pagamento, em %; nula sem captura. Recalcula-se a cada recorte."
+        meta:
+          sensitivity: confidential
+        data_type: numeric
+
+  # ── Etapa 7: estoque em tempo real ────────────────────────────────────────
+  - name: skus_below_reorder_point
+    meta:
+      domain: estoque
+    description: >
+      P12 — SKUs abaixo do ponto de reposição agora, por armazém. É a única view
+      do projeto que compõe o caminho frio com o quente (ADR-0031): o saldo é o
+      da fato mais os deltas que ela ainda não absorveu, e por isso é a única
+      cuja resposta muda entre duas execuções seguidas sem ninguém rodar nada.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: warehouse_name
+        description: "Nome do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: warehouse_region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: sku
+        description: "Código de estoque da variante; chave natural do SKU."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: product_name
+        description: "Nome comercial do produto."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: category_name
+        description: "Nome comercial da categoria."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: brand_name
+        description: "Nome da marca do produto; 'Sem marca' quando ele não tem uma."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: quantity_on_hand
+        meta:
+          sensitivity: internal
+        description: >
+          **Semiaditiva** — soma por armazém e SKU, nunca ao longo do tempo.
+          Fotografia não se empilha.
+        data_type: integer
+      - name: quantity_reserved
+        description: "Semiaditiva — unidades do SKU reservadas agora no armazém; zero sem reserva."
+        meta:
+          sensitivity: internal
+        data_type: integer
+      - name: quantity_available
+        meta:
+          sensitivity: internal
+        description: '{{ doc("stock_availability") }}'
+        data_type: integer
+      - name: quantity_from_batch
+        meta:
+          sensitivity: internal
+        description: Parcela do saldo já absorvida pela fato — o caminho frio.
+        data_type: integer
+      - name: quantity_from_stream
+        meta:
+          sensitivity: internal
+        description: Parcela ainda só no caminho quente, que a próxima execução do dbt absorve.
+        data_type: integer
+      - name: stream_movement_count
+        description: "Aditiva — movimentos do SKU no armazém que chegaram pelo caminho quente (ADR-0031)."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: reorder_point
+        description: "Ponto de reposição, em unidades: 25 para todo SKU (variável `reorder_point_units`)."
+        meta:
+          sensitivity: internal
+        data_type: integer
+      - name: is_stockout
+        meta:
+          sensitivity: internal
+        description: '{{ doc("stockout") }}'
+        data_type: boolean
+      - name: daily_demand_units
+        meta:
+          sensitivity: internal
+        description: Demanda diária média na janela de cobertura; só venda entra.
+        data_type: numeric
+      - name: days_of_cover
+        meta:
+          sensitivity: internal
+        description: '{{ doc("days_of_cover") }}'
+        data_type: numeric
+      - name: last_movement_at
+        description: "Instante do último movimento do SKU no armazém."
+        meta:
+          sensitivity: internal
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
+
+  # ── Etapa 8 — entrega e logística ──────────────────────────────────────────
+  # As duas medem entrega e **não se cruzam**: a primeira conta remessas, a
+  # segunda conta pedidos (ADR-0033). O contrato de cada uma declara o grão no
+  # nome das colunas, e a descrição diz qual população cada uma contém.
+  - name: on_time_delivery_rate_by_carrier
+    meta:
+      domain: logistica
+    description: >
+      P13 — Fração de entregas dentro do prazo prometido, por transportadora e
+      modalidade, mês a mês. **Grão da remessa**: pedido dividido conta duas
+      vezes, de propósito. Conta as remessas entregues que têm pelo menos um
+      item aceito na fato: uma remessa legada entregue cujos itens foram todos
+      rejeitados em cascata fica de fora (D66).
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: carrier_name
+        description: "Nome da transportadora."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: service_level
+        meta:
+          sensitivity: public
+          description_reason: "liga a coluna ao conceito do glossário de negócio que ela determina"
+        description: '{{ doc("promised_lead_time") }}'
+        data_type: text
+      - name: warehouse_name
+        description: "Nome do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: warehouse_region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: delivered_count
+        meta:
+          sensitivity: internal
+        description: Denominador — remessas **entregues**, não despachadas.
+        data_type: bigint
+      - name: on_time_count
+        description: "Aditiva — remessas entregues até o prazo prometido, por mês, transportadora, modalidade e armazém."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: late_count
+        description: "Aditiva — remessas entregues depois do prazo prometido, por mês, transportadora, modalidade e armazém."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: split_order_shipment_count
+        description: "Aditiva — remessas entregues de pedidos divididos em mais de uma remessa."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: on_time_rate
+        meta:
+          sensitivity: internal
+          description_reason: o conceito do glossário define a medida e a marca de que ela é feita, com o mesmo bloco
+        description: '{{ doc("on_time_delivery") }}'
+        data_type: numeric
+      - name: avg_delay_days_when_late
+        meta:
+          sensitivity: internal
+        description: '**Não aditiva** — média sobre as atrasadas; positivo é atraso.'
+        data_type: numeric
+      - name: avg_transit_days
+        description: "Não aditiva — média de dias entre o despacho e a entrega das remessas do grupo; não se recompõe a partir de outras linhas."
+        meta:
+          sensitivity: internal
+        data_type: numeric
+      - name: failed_attempt_count
+        description: "Aditiva — tentativas de entrega que falharam, nas remessas entregues do grupo."
+        meta:
+          sensitivity: public
+        data_type: numeric
+
+  - name: order_to_delivery_time_by_region
+    meta:
+      domain: logistica
+    description: >
+      P14 — Tempo médio entre pedido e entrega, por região e modalidade.
+      **Grão do pedido**: fecha na última remessa a chegar, e pedido com remessa
+      em aberto ou extraviada fica de fora.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: state_code
+        description: "Unidade federativa em sigla de duas letras."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: service_level
+        meta:
+          sensitivity: public
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: Modalidade da remessa que **fechou** o ciclo.
+        data_type: text
+      - name: carrier_name
+        description: "Nome da transportadora."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: order_count
+        description: "Aditiva — pedidos com o ciclo de entrega fechado, por mês, região, unidade federativa, modalidade e transportadora."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: split_order_count
+        description: "Aditiva — desses pedidos, os divididos em mais de uma remessa."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: shipment_count
+        description: "Aditiva — remessas desses pedidos."
+        meta:
+          sensitivity: internal
+        data_type: numeric
+      - name: avg_order_to_delivery_days
+        meta:
+          sensitivity: internal
+          description_reason: o conceito do glossário define a medida e a marca de que ela é feita, com o mesmo bloco
+        description: '{{ doc("order_to_delivery_cycle") }}'
+        data_type: numeric
+      - name: median_order_to_delivery_days
+        meta:
+          sensitivity: internal
+        description: A mediana ao lado da média separa operação lenta de operação irregular.
+        data_type: numeric
+      - name: max_order_to_delivery_days
+        description: "Não aditiva — o maior ciclo de entrega do grupo, em dias, do pedido à entrega da última remessa."
+        meta:
+          sensitivity: internal
+        data_type: numeric
+
+  # ── Etapa 9 — relacionamento e atendimento ─────────────────────────────────
+  - name: support_tickets_per_hundred_orders
+    meta:
+      domain: atendimento
+    description: >
+      P15 — Chamados por 100 pedidos, por categoria e canal, mês a mês. O mês é
+      o da **abertura** do chamado. `channel_order_count` é do canal e se repete
+      em cada categoria — o nome diz o grão, e somá-lo entre categorias
+      multiplica os pedidos. Há linha só onde houve chamado, e a taxa é nula no
+      canal "Sem canal", que não tem pedidos para servir de denominador.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: channel_type
+        description: "Natureza do canal: web, app ou store."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: support_category_name
+        description: "Nome da categoria de chamado."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: support_category_group
+        description: "Grupo que reúne categorias de chamado afins."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: ticket_count
+        description: "Aditiva — chamados abertos, por mês, canal e categoria de chamado."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: high_priority_ticket_count
+        description: "Aditiva — chamados de prioridade alta ou urgente."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: reopened_ticket_count
+        description: "Aditiva — chamados reabertos pelo menos uma vez."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: solved_first_time_count
+        description: "Aditiva — chamados resolvidos sem reabertura."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: channel_order_count
+        meta:
+          sensitivity: internal
+        description: Denominador do **canal**, repetido em cada linha de categoria.
+        data_type: numeric
+      - name: tickets_per_hundred_orders
+        description: "Não aditiva — chamados por 100 pedidos realizados do canal no mês. Recalcula-se a cada recorte."
+        meta:
+          sensitivity: internal
+        data_type: numeric
+      - name: avg_hours_to_resolution
+        meta:
+          sensitivity: internal
+        description: '**Não aditiva** — média por chamado aberto no mês.'
+        data_type: numeric
+
+  - name: repeat_purchase_rate_after_support
+    meta:
+      domain: atendimento
+    description: >
+      P16 — Recompra em 90 dias depois do pedido, comparando pedidos que geraram
+      chamado com os que não geraram. {{ doc("post_order_repeat_purchase") }}
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: year_number
+        description: "Ano da data."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: month_number
+        description: "Mês do ano, de 1 a 12."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: integer
+      - name: year_month
+        description: "Ano e mês, no formato AAAA-MM."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: sales_channel_name
+        description: "Nome do canal de venda."
+        meta:
+          description_inherited: true
+          sensitivity: public
+        data_type: text
+      - name: has_support_ticket
+        meta:
+          sensitivity: internal
+        description: A linha `false` é o grupo de comparação, uma por mês e canal.
+        data_type: boolean
+      - name: support_category_name
+        meta:
+          sensitivity: public
+        description: '"Sem chamado" no grupo de comparação.'
+        data_type: text
+      - name: order_count
+        meta:
+          sensitivity: internal
+        description: >
+          Pedidos com janela fechada. Um pedido que gerou chamados de duas
+          categorias aparece nas duas linhas — somar entre categorias o conta
+          duas vezes.
+        data_type: bigint
+      - name: repeat_order_count
+        description: "**Não aditiva entre categorias** — pedidos com janela fechada que tiveram recompra em até 90 dias, por mês, canal, ter ou não chamado e categoria do chamado. Um pedido com chamados de duas categorias conta nas duas linhas: somar entre categorias o conta duas vezes."
+        meta:
+          sensitivity: internal
+        data_type: bigint
+      - name: repeat_purchase_rate
+        meta:
+          sensitivity: internal
+        description: '{{ doc("post_order_repeat_purchase") }}'
+        data_type: numeric
+      - name: avg_days_to_next_order
+        meta:
+          sensitivity: internal
+        description: '**Não aditiva** — média entre os que voltaram.'
+        data_type: numeric

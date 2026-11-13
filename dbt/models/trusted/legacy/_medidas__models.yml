@@ -1,0 +1,55 @@
+# Escrito à mão: não é derivado do catálogo, e o que descreve é uma medida, não
+# um contrato de tratamento.
+
+version: 2
+
+models:
+  - name: legacy_order_totals_divergence
+    description: >
+      Pedidos cujo total não fecha com os itens empilhados, com a contrapartida
+      em quarentena quando existe (D33). É **medida**, não regra: quem rejeita é
+      `invariante_02_total_do_pedido_reconcilia`. A classificação continua
+      conferindo contra a origem inteira, porque conferir contra o empilhado
+      seria circular.
+    meta:
+      domain: legado
+      owner: data_custodian
+    columns:
+      - name: source_system
+        description: Origem do pedido; a principal aparece aqui com zero linhas por não ter quarentena.
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        data_tests: [not_null]
+      - name: divergence_amount
+        description: Total declarado menos a soma dos itens que chegaram ao armazém.
+        meta:
+          sensitivity: confidential
+        data_tests: [not_null]
+      - name: explicada_pela_quarentena
+        description: Há ao menos um item deste pedido em quarentena explicando a diferença.
+        meta:
+          sensitivity: personal
+        data_tests: [not_null]
+      - name: order_id
+        description: "Identificador do pedido na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: subtotal_amount
+        description: "Soma dos itens antes de desconto, frete e imposto."
+        meta:
+          description_inherited: true
+          sensitivity: confidential
+      - name: items_gross_revenue_amount
+        meta:
+          sensitivity: confidential
+      - name: itens_empilhados
+        meta:
+          sensitivity: internal
+      - name: itens_rejeitados
+        meta:
+          sensitivity: internal
+      - name: motivos_da_rejeicao
+        meta:
+          sensitivity: internal

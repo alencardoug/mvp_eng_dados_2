@@ -1,0 +1,674 @@
+"""Geração dos modelos dbt de limpeza, a partir do catálogo.
+
+O ADR-0022 diz que do catálogo saem três coisas: o injetor, as regras de
+limpeza e os testes. As duas primeiras já existem em Python; esta é a terceira
+ponta — as regras viram **modelos dbt gerados**, um por tabela do legado.
+
+Por que gerar em vez de escrever à mão: são 40 tabelas e 416 colunas, e cada
+coluna se sujeita às falhas do seu arquétipo. Escrever isso uma vez por tabela
+seria repetição que envelhece na primeira coluna nova; escrever um modelo
+genérico em SQL não é possível, porque a lógica é **por coluna** e o SQL não
+tem como aplicá-la dinamicamente sem SQL dinâmico.
+
+O que se revisa é este arquivo e o catálogo. Os 40 modelos são derivado, e a
+§5 do `CLAUDE.md` os põe em amostragem — corrigi-los à mão seria perder o
+conserto na próxima geração.
+"""
+
+from __future__ import annotations
+
+import pathlib
+
+from mvp_ed1.generator import enums
+from mvp_ed1.legacy import schema
+from mvp_ed1.legacy.catalogo import Catalogo
+from mvp_ed1.legacy.regras import (
+    DOMINIO_BOOLEANO,
+    Regra,
+    regra_delimitador,
+    regra_enum,
+    regra_faixa,
+    regra_truncado,
+    regras,
+)
+from mvp_ed1.legacy.bigquery import dois_dialetos
+
+#: Onde os modelos gerados moram. Diretório próprio: são derivados, e misturá-los
+#: com os escritos à mão faria a fronteira da revisão desaparecer.
+DESTINO = pathlib.Path("dbt/models/staging/legacy")
+
+#: Falhas que não são de valor: precisam de contexto que uma coluna não tem —
+#: outras linhas, outras tabelas, ou o resultado do tratamento do pai.
+DE_CONTEXTO = frozenset(
+    {"FK_ORPHAN", "DUP_EXACT", "DUP_PARTIAL", "TOTAL_MISMATCH", "PARENT_REJECTED"}
+)
+
+AVISO = """-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║  GERADO por `make legacy-models` a partir de src/mvp_ed1/legacy/         ║
+-- ║  catalogo.yml. Não edite este arquivo: a próxima geração o sobrescreve.  ║
+-- ║  Erro aqui é sintoma — corrija no catálogo ou em `regras.py`.            ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
+"""
+
+
+def _aplicaveis(
+    catalogo: Catalogo, tabela: str, coluna: str, promessas: frozenset[str], limites
+) -> list[Regra]:
+    """Regras que alcançam a coluna, na ordem de precedência do catálogo.
+
+    A ordem **é** a de declaração, e não é acaso: `NUM_TEXT_EQUIV` precisa vir
+    antes de `NUM_AMBIGUOUS`, porque `244,0` casa com os dois e só o primeiro
+    sabe o que fazer com ele. Reordenar o catálogo muda o tratamento.
+    """
+    arquetipo = schema.arquetipo(tabela, coluna, promessas)
+    valor = regras(catalogo.nulos_disfarcados, catalogo.delimitador)
+    saida: list[Regra] = []
+    for falha in catalogo.injetaveis:
+        if falha.codigo in DE_CONTEXTO or not schema.alcanca(falha.arquetipo, arquetipo):
+            continue
+        if falha.codigo == "TEXT_TRUNCATED":
+            largura = limites.get((tabela, coluna))
+            if largura:
+                saida.append(regra_truncado(largura))
+            continue
+        if falha.codigo == "ENUM_UNKNOWN":
+            # Coluna booleana tem domínio de dois valores e nenhuma `CHECK` que
+            # o escreva. Sem esta linha o domínio vinha vazio e a regra era
+            # descartada em silêncio — a metade do R05 que o alcance sozinho
+            # não resolve.
+            dominio = enums.enumeracoes().get(tabela, {}).get(coluna) or (
+                DOMINIO_BOOLEANO if arquetipo == "booleano" else None
+            )
+            if dominio:
+                saida.append(regra_enum(dominio))
+            continue
+        if falha.codigo == "NUM_OUT_OF_RANGE":
+            saida.append(regra_faixa(f"{tabela}.{coluna}" in catalogo.quantidades_com_sinal))
+            continue
+        if falha.codigo == "TEXT_DELIMITER":
+            colunas = [c for c in schema.colunas(tabela)]
+            posicao = colunas.index(coluna)
+            saida.append(
+                regra_delimitador(catalogo.delimitador, tuple(colunas[posicao + 1 : posicao + 3]))
+            )
+            continue
+        if falha.codigo in valor:
+            saida.append(valor[falha.codigo])
+    return saida
+
+
+#: Rejeições que julgam **o valor**, e por isso valem também para o resultado
+#: da conversão. É o segundo lado do R06: uma conversão bem-sucedida não pode
+#: esconder que o que ela produziu é inválido.
+#:
+#: `-1.0` casa `NUM_TEXT_EQUIV`, vira `-1`, e `-1` está fora de faixa;
+#: `01/01/2030` casa `DATE_FORMAT_KNOWN`, vira ISO, e continua no futuro. Nos
+#: dois casos a checagem contra o original não vê nada, porque o original não
+#: tem a forma que a rejeição procura.
+#:
+#: Ficam de fora, de propósito, as rejeições que julgam **como o valor foi
+#: guardado** e não o que ele vale: `TEXT_TRUNCATED` é heurística sobre a
+#: largura da coluna antiga e `TEXT_DELIMITER` é sobre a linha ter vindo
+#: deslocada. Aplicá-las ao valor já normalizado inventaria rejeição.
+JULGAM_O_RESULTADO = frozenset(
+    {
+        "NUM_OUT_OF_RANGE", "NUM_AMBIGUOUS", "DATE_FUTURE", "DATE_IMPOSSIBLE",
+        "DATE_UNPARSEABLE", "MONEY_NEGATIVE", "MONEY_AMBIGUOUS",
+        "EMAIL_MALFORMED", "ENUM_UNKNOWN",
+    }
+)
+
+
+def _referencia(coluna: str) -> str:
+    """A coluna, citada — o Python 3.11 não aceita barra invertida dentro de f-string."""
+    return 'c."' + coluna + '"'
+
+
+def _achado(coluna: str, aplicaveis: list[Regra]) -> str:
+    """`case` que devolve o **primeiro** código que casa, ou nulo.
+
+    Duas passagens, nesta ordem:
+
+    1. as rejeições que julgam o valor, conferidas contra o **resultado** da
+       limpeza (`l`). Se a conversão produziu algo inválido, é isso que vale —
+       e a rejeição vence a correção, porque o registro não pode ser empilhado;
+    2. todas as regras contra o valor **original** (`c`), como antes.
+
+    A primeira passagem é o que faltava. O comentário do modelo prometia essa
+    conferência e o SQL emitido nunca a fez: `_achado` só olhava `c`.
+    """
+    original = _referencia(coluna)
+    convertido = 'l."' + coluna + '"'
+
+    do_resultado = [
+        r for r in aplicaveis
+        if r.conversao is None and r.codigo in JULGAM_O_RESULTADO and not r.precisa_da_linha
+    ]
+    ramos = [
+        "            when " + r.deteccao.format(v=convertido) + f" then '{r.codigo}'"
+        for r in do_resultado
+    ]
+    ramos += [
+        "            when " + r.deteccao.format(v=original) + f" then '{r.codigo}'"
+        for r in aplicaveis
+    ]
+    return "        case\n" + "\n".join(ramos) + "\n        end"
+
+
+def _limpo(coluna: str, aplicaveis: list[Regra]) -> str:
+    """Valor tratado: converte quando há regra, mantém o original quando não há.
+
+    A rejeição interrompe o `case` preservando o original. Pular esses ramos
+    faria uma regra de conversão posterior tratar o mesmo valor: por exemplo,
+    `DATE_FORMAT_KNOWN` tentaria converter `31/02/2024`, apesar do achado
+    `DATE_IMPOSSIBLE`, e derrubaria a consulta antes da quarentena.
+    """
+    alvo = _referencia(coluna)
+    ramos = [
+        "            when " + r.deteccao.format(v=alvo) + " then "
+        + (r.conversao.format(v=alvo) if r.conversao is not None else alvo)
+        for r in aplicaveis
+    ]
+    if not ramos:
+        return "        " + alvo
+    return "        case\n" + "\n".join(ramos) + "\n            else " + alvo + "\n        end"
+
+
+def modelo(catalogo: Catalogo, tabela: str, promessas: frozenset[str], limites) -> str:
+    """SQL de um modelo de limpeza."""
+    colunas = [c for c in schema.colunas(tabela)]
+    por_coluna = {c: _aplicaveis(catalogo, tabela, c, promessas, limites) for c in colunas}
+
+    limpos = ",\n".join(_limpo(c, por_coluna[c]) + ' as "' + c + '"' for c in colunas)
+    referencias = ",\n".join('    l."' + c + '"' for c in colunas)
+    achados = ",\n".join(
+        f"            '{c}', {_achado(c, por_coluna[c]).strip()}"
+        for c in colunas
+        if por_coluna[c]
+    )
+    original = ", ".join(f"'{column}', c.\"{column}\"" for column in colunas)
+
+    return f"""{AVISO}
+-- Limpeza de `legacy.{tabela}` — camada `staging` (ADR-0016).
+--
+-- Uma linha por ocorrência física da **captura mais recente**. Reter capturas
+-- antigas (ADR-0037) não significa somá-las: o tratamento olha a última, e as
+-- anteriores existem para comparação e reprocessamento.
+--
+-- Duas saídas por coluna: o valor tratado e o **achado**, que é o código da
+-- primeira falha que casa. O valor original permanece acessível em
+-- `raw_legacy`, que é imutável.
+
+with captura as (
+
+    select *
+    from {{{{ source('legacy', '{tabela}') }}}}
+    -- A captura é escolhida **uma vez**, em `legacy_selected_capture`, e não
+    -- aqui. O máximo por tabela parecia equivalente e não é: uma tabela que
+    -- não veio na carga nova cairia para a geração anterior sozinha, e o
+    -- modelo serviria linhas velhas sem que nada dissesse isso.
+    where {schema.CAPTURA_SQL} = (
+        select snapshot_id from {{{{ ref('legacy_selected_capture') }}}}
+    )
+
+),
+
+-- A limpeza vem **antes** dos achados, e não junto: o achado de rejeição
+-- precisa ser conferido contra o valor já convertido, senão uma conversão
+-- bem-sucedida esconde a invalidade do resultado dela.
+--
+-- `materialized`: sem isto o PostgreSQL embute este CTE em **cada** referência
+-- `l."coluna"` do case de achados — a validação de uma data referencia a
+-- coluna limpa dezenas de vezes — e reavalia a limpeza inteira a cada uma.
+-- Medido em 15/09/2026: `carts` 94 s → 8,7 s (D42). O BigQuery não tem a
+-- palavra, e lá o CTE fica como estava.
+limpo as {{{{ 'materialized ' if target.type == 'postgres' else '' }}}}(
+
+    select
+        c.legacy_row_id,
+{limpos}
+    from captura c
+
+)
+
+select
+    c.legacy_row_id,
+    (c._airbyte_meta->>'sync_id')::bigint       as snapshot_id,
+    c._airbyte_extracted_at                     as snapshot_at,
+    '{schema.SCHEMA}'                                    as source_system,
+
+    -- ── Valores tratados ─────────────────────────────────────────────────────
+{referencias},
+
+    -- ── Achados por coluna, sem os nulos ─────────────────────────────────────
+    jsonb_strip_nulls(
+        jsonb_build_object(
+{achados}
+        )
+    )                                           as achados,
+    jsonb_build_object({original})              as original_payload
+from captura c
+join limpo l on l.legacy_row_id = c.legacy_row_id
+"""
+
+
+def gerar(catalogo: Catalogo, promessas: frozenset[str], destino: pathlib.Path = DESTINO) -> list[pathlib.Path]:
+    """Escreve um modelo por tabela e devolve os caminhos."""
+    destino.mkdir(parents=True, exist_ok=True)
+    limites = schema.limites(catalogo.limite_de_texto, catalogo.colunas_estreitadas)
+    escritos = []
+    for tabela in schema.tabelas():
+        caminho = destino / f"stg_legacy__{tabela}.sql"
+        caminho.write_text(dois_dialetos(modelo(catalogo, tabela, promessas, limites)), encoding="utf-8")
+        escritos.append(caminho)
+
+    selecao = destino / "legacy_selected_capture.sql"
+    selecao.write_text(dois_dialetos(captura_selecionada()), encoding="utf-8")
+    escritos.append(selecao)
+
+    testes = pathlib.Path("dbt/tests")
+    testes.mkdir(parents=True, exist_ok=True)
+    for nome, conteudo in (
+        ("legacy_captura_existe", teste_captura_existe()),
+        ("legacy_captura_completa", teste_captura_completa()),
+    ):
+        caminho = testes / f"{nome}.sql"
+        caminho.write_text(dois_dialetos(conteudo), encoding="utf-8")
+        escritos.append(caminho)
+    return escritos
+
+
+#: Dicionário do certificado (ADR-0044), coluna a coluna, na ordem do DDL de
+#: `mvp_ed1.governance`. Nada aqui é dado de negócio: contagens, hashes e
+#: identificadores de execução — classificação `internal` em todas. O teste
+#: `test_captura_legado` confere que esta lista e o DDL não divergem.
+COLUNAS_DO_CERTIFICADO: tuple[tuple[str, str], ...] = (
+    ("capture_attempt_id", "Identificador da tentativa de captura, aberto na fase 1; uma tentativa tem 40 linhas."),
+    ("source_table", "Tabela do legado a que a linha se refere."),
+    ("connection_name", "Conexão do Airbyte que fez a captura (`legacy_para_raw_legacy`)."),
+    ("job_id", "Job do Airbyte, gravado assim que ele nasce; nulo se a tentativa nunca ganhou job."),
+    ("snapshot_id", "Identidade da captura = o job (`_airbyte_meta.sync_id`); é o que os modelos leem como `legacy_snapshot_id`."),
+    ("source_rows_before", "Contagem na origem antes de o job nascer (fase 1)."),
+    ("source_hash_before", "Hash de conteúdo da tabela na origem antes do job (`legacy/conteudo.py`)."),
+    ("source_rows_after", "Contagem na origem depois de o job terminar (fase 2)."),
+    ("source_hash_after", "Hash de conteúdo da tabela na origem depois do job."),
+    ("received_rows", "Linhas no bruto com o `sync_id` deste job."),
+    ("received_hash", "Hash de conteúdo do que chegou ao bruto com o `sync_id` deste job."),
+    ("sync_id_matches", "A geração desta tabela só tem linhas deste job, e o job só escreveu uma geração nela."),
+    ("status", "Veredito por tabela: `pending`, `complete`, `unstable`, `incomplete`, `inconsistent` ou `abandoned`."),
+    ("started_at", "Instante da fase 1 (medição \"antes\")."),
+    ("completed_at", "Instante da fase 2, ou do abandono."),
+)
+
+
+def sources_yml() -> str:
+    """Declaração das 40 fontes do legado, gerada da mesma lista dos modelos.
+
+    Escrever à mão daria uma segunda lista de tabelas, que divergiria da
+    primeira no dia em que uma entrasse ou saísse. O certificado é declarado
+    coluna a coluna, com classificação: é a *source* de `governance` que o
+    fluxo lê, e campo lido sem dicionário nem sensibilidade é o que a
+    definição de pronto proíbe (`CLAUDE.md` §7; achado RV10-11).
+    """
+    import json
+
+    from mvp_ed1.models.descriptions import source_texts
+    from mvp_ed1.models.sensitivity import source_leaves
+
+    # Coluna a coluna, com a sensibilidade e a descrição declaradas nos modelos
+    # SQLAlchemy — a mesma folha que a linhagem dos modelos usa
+    # (`models/sensitivity.py`, `models/descriptions.py`) —, e o texto das
+    # colunas que o Airbyte e a identidade do legado acrescentam.
+    _, niveis = source_leaves()
+    textos = source_texts()
+    linhas = "\n".join(
+        f"      - name: {t}\n        columns:\n" + "\n".join(
+            f"          - name: {c}\n"
+            + (f"            description: {json.dumps(textos[(camada, tabela, c)], ensure_ascii=False)}\n" if (camada, tabela, c) in textos else "")
+            + f"            meta:\n              sensitivity: {n}"
+            for (camada, tabela, c), n in niveis.items() if camada == "raw_legacy" and tabela == t
+        )
+        for t in schema.tabelas()
+    )
+    # O veredito e a chave do certificado como teste da fonte: no PostgreSQL o `check` e a chave
+    # primária já os impõem, e no BigQuery nenhum dos dois é imposto (`governance.MIGRACOES_BIGQUERY`).
+    # A regra fica uma só, e roda nos dois alvos.
+    from mvp_ed1.legacy.captura import ABANDONED, COMPLETE, INCOMPLETE, INCONSISTENT, PENDING, UNSTABLE
+
+    vereditos = ", ".join((PENDING, COMPLETE, UNSTABLE, INCOMPLETE, INCONSISTENT, ABANDONED))
+    certificado = "\n".join(
+        f"          - name: {nome}\n"
+        f"            description: >\n"
+        f"              {descricao}\n"
+        f"            meta:\n"
+        f"              sensitivity: internal"
+        + (f"\n            data_tests:\n              - accepted_values:\n                  values: [{vereditos}]"
+           if nome == "status" else "")
+        for nome, descricao in COLUNAS_DO_CERTIFICADO
+    )
+    return f"""# Gerado por `make legacy-models`. Não edite: a lista sai dos modelos.
+
+version: 2
+
+sources:
+  - name: legacy
+    description: >
+      Capturas retidas da origem legada, escritas pelo Airbyte em modo
+      `full_refresh_append` (ADR-0037). **Imutável**: cada carga acrescenta uma
+      captura, nenhuma sobrescreve a anterior, e é comparando duas que a
+      exclusão física da origem antiga é detectada.
+
+      Os valores chegam como texto, com os defeitos preservados. Tipar aqui
+      recusaria justamente as linhas que a etapa existe para tratar.
+    database: "{{{{ target.database }}}}"
+    schema: raw_legacy
+    loader: airbyte
+    # Governança §8 e ADR-0037: cada captura é retida por acréscimo; o
+    # descarte de capturas antigas é decisão futura, não consequência.
+    # Acesso (Governança §7): o Airbyte escreve, o dbt lê — `grants` aqui vale
+    # para cada tabela desta fonte e é aplicado pelo `on-run-end`.
+    meta:
+      retention: permanent
+      writers: [ingestor]
+      grants:
+        select: [transformer]
+
+    # Sem `freshness`: a origem legada é capturada sob demanda, e não há
+    # promessa de atualidade a cobrar dela — ela é um sistema que ninguém mexe.
+    tables:
+{linhas}
+
+  - name: governance
+    description: >
+      Controle e auditoria (ADR-0023). O fluxo lê **uma** tabela daqui, e só
+      para uma pergunta: esta captura do legado é elegível? É a exceção
+      delimitada que o ADR-0044 abre — o certificado por stream de cada
+      captura, escrito em duas fases por `mvp_ed1.legacy.captura`.
+    database: "{{{{ target.database }}}}"
+    schema: governance
+    loader: mvp_ed1.legacy.captura
+    # Log de execução e controle (ADR-0023): evidência de auditoria, permanente.
+    # Acesso (Governança §7): quem escreve é o certificado de captura, parte
+    # da ingestão (`ingestor`); leem o dbt, para a elegibilidade, e o auditor.
+    meta:
+      retention: permanent
+      writers: [ingestor]
+      grants:
+        select: [auditor, transformer]
+    tables:
+      - name: legacy_captures
+        description: >
+          Uma linha por tentativa e tabela: origem antes e depois do job
+          (contagem e hash de conteúdo), bruto recebido com o `sync_id` do job,
+          e o veredito — `complete`, `unstable`, `incomplete`, `inconsistent`,
+          `pending`, `abandoned`. Captura elegível = `complete` nas 40 tabelas.
+        meta:
+          domain: legado
+          owner: data_custodian
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: [capture_attempt_id, source_table]
+        columns:
+{certificado}
+      - name: _versions
+        description: >
+          Migrações do schema `governance` já aplicadas (`mvp_ed1.governance`):
+          nome e instante. Controle, não dado de negócio.
+        meta:
+          domain: legado
+          owner: data_custodian
+        columns:
+          - name: nome
+            description: Nome da migração, na ordem da lista de `MIGRACOES`.
+            meta:
+              sensitivity: internal
+          - name: aplicada_em
+            description: Instante em que foi aplicada.
+            meta:
+              sensitivity: internal
+"""
+
+
+def certificadas_sql() -> str:
+    """CTE com os `snapshot_id` certificados: `complete` nas 40 tabelas (ADR-0044)."""
+    return f"""certificadas as (
+
+    select snapshot_id
+    from {{{{ source('governance', 'legacy_captures') }}}}
+    where status = 'complete'
+    group by snapshot_id
+    having count(distinct source_table) = {len(schema.tabelas())}
+
+)"""
+
+
+def captura_selecionada() -> str:
+    """A captura que a execução inteira lê, resolvida uma vez.
+
+    ── Por que existe ────────────────────────────────────────────────────────
+    Antes, cada um dos 40 modelos resolvia o máximo da geração na sua
+    própria tabela. Parecia equivalente a uma escolha só e não é: a tabela que
+    não veio na carga nova tem o seu máximo na geração **anterior**, e serviria
+    linhas velhas ao lado das novas sem que nada acusasse a mistura.
+
+    ── Só captura certificada ────────────────────────────────────────────────
+    Desde o ADR-0044 "a mais recente" é a mais recente **certificada**: a que
+    tem `complete` nas 40 tabelas em `governance.legacy_captures`. O máximo de
+    geração aceitava a geração 15 — 39 tabelas, job `succeeded`, total exato.
+    Sem nenhuma certificada (as capturas 1–16 não têm certificado nem podem
+    ter), a seleção é nula e `legacy_captura_existe` acusa — de propósito.
+
+    ── Materializada, e não view ─────────────────────────────────────────────
+    Quarenta modelos a referenciam. Como *view*, cada referência reexecutaria a
+    varredura das 40 origens. Como tabela, o valor é decidido uma vez por
+    execução — e é isso que também impede que uma carga que chegue no meio do
+    `build` mude a captura entre uma camada e a seguinte.
+    """
+    return f"""{AVISO}
+-- A captura do legado que esta execução lê.
+--
+-- `legacy_snapshot_id` escolhe explicitamente, para reprocessar uma captura
+-- antiga; sem ele, vale a mais recente **certificada** — `complete` nas 40
+-- tabelas em `governance.legacy_captures` (ADR-0044). Que a escolhida exista
+-- e seja íntegra não se assume: é o que `legacy_captura_existe` e
+-- `legacy_captura_completa` conferem.
+
+{{{{ config(materialized='table') }}}}
+
+with {certificadas_sql()}
+
+select coalesce(
+    {{{{ legacy_snapshot_id() }}}},
+    (select max(snapshot_id) from certificadas)
+)::bigint                                       as snapshot_id
+"""
+
+
+def teste_captura_existe() -> str:
+    """Selecionar uma captura que não existe não pode passar em silêncio."""
+    ramos = "\n    union all\n".join(
+        f"    select 1 from {{{{ source('legacy', '{tabela}') }}}}"
+        f" where {schema.CAPTURA_SQL} = (select snapshot_id from selecionada)"
+        for tabela in schema.tabelas()
+    )
+    return f"""{AVISO}
+-- A captura selecionada existe em `raw_legacy`.
+--
+-- ── O buraco que este teste fecha ─────────────────────────────────────────
+-- Um `legacy_snapshot_id` inexistente selecionava zero linhas nas 40 origens,
+-- e o teste de consistência devolvia zero violações — porque ele agrupa o que
+-- está presente, e não havia nada presente para desmentir. Pipeline vazio
+-- passando por pipeline correto é o pior resultado possível: nada falha, e
+-- nada aconteceu.
+--
+-- Duas violações, uma consulta: a seleção não resolveu para número nenhum, ou
+-- resolveu para um número que não está em lugar nenhum do bruto.
+
+with selecionada as (
+
+    select snapshot_id from {{{{ ref('legacy_selected_capture') }}}}
+
+),
+
+presente as (
+
+{ramos}
+
+)
+
+select
+    (select snapshot_id from selecionada)       as snapshot_id,
+    'a captura selecionada não existe em raw_legacy' as violacao
+where not exists (select 1 from presente)
+
+union all
+
+select
+    null::bigint,
+    'nenhuma captura foi selecionada'
+where (select snapshot_id from selecionada) is null
+"""
+
+
+def teste_captura_completa() -> str:
+    """Captura selecionada sem certificado `complete` numa tabela é captura não íntegra."""
+    contagens = "\n    union all\n".join(
+        f"    select '{tabela}' as tabela, count(*) as linhas"
+        f" from {{{{ source('legacy', '{tabela}') }}}}"
+        f" where {schema.CAPTURA_SQL} = (select snapshot_id from selecionada)"
+        for tabela in schema.tabelas()
+    )
+    tabelas = ", ".join(f"('{t}')" for t in schema.tabelas())
+    return f"""{AVISO}
+-- A captura selecionada é **certificada** em todas as tabelas declaradas.
+--
+-- Até 14/09/2026 este teste perguntava se cada tabela tinha ao menos uma linha
+-- na captura — e isso aceitava a geração 15: 39 tabelas, job `succeeded`,
+-- total exato. Agora ele lê o certificado do ADR-0044, escrito em duas fases
+-- em volta da sincronização: origem antes e depois do job (contagem e hash de
+-- conteúdo), bruto recebido com o `sync_id` do job. Tabela com zero na origem
+-- e zero no bruto é completa — "legitimamente vazia" é medida, não lista.
+--
+-- Cada linha do resultado é uma tabela em que a captura selecionada não tem
+-- certificado `complete`, ou em que o bruto de hoje não tem mais as linhas que
+-- o certificado disse ter recebido.
+
+with selecionada as (
+
+    select snapshot_id from {{{{ ref('legacy_selected_capture') }}}}
+
+),
+
+declaradas (tabela) as (
+
+    values {tabelas}
+
+),
+
+certificado as (
+
+    select source_table as tabela, status, received_rows
+    from {{{{ source('governance', 'legacy_captures') }}}}
+    where snapshot_id = (select snapshot_id from selecionada)
+
+),
+
+no_bruto as (
+
+{contagens}
+
+)
+
+select
+    d.tabela,
+    (select snapshot_id from selecionada)       as snapshot_id,
+    coalesce(c.status, 'sem certificado')       as status,
+    c.received_rows,
+    b.linhas                                    as linhas_no_bruto
+from declaradas d
+left join certificado c on c.tabela = d.tabela
+left join no_bruto b on b.tabela = d.tabela
+where c.status is distinct from 'complete'
+   or c.received_rows is distinct from b.linhas
+"""
+
+
+def impressao_digital(catalogo: Catalogo, promessas: frozenset[str]) -> str:
+    """Identidade do **tratamento**, derivada do que ele produz.
+
+    ── O problema que ela resolve (D34) ──────────────────────────────────────
+    `catalog_version` é o rótulo humano da política de tratamento, e a
+    quarentena substitui a auditoria anterior quando captura e versão
+    coincidem. Só que mudar `regras.py` ou `classification.sql` altera o
+    resultado **sem** mexer nesse número: duas auditorias diferentes passam a
+    caber sob a mesma identidade, e a segunda apaga a primeira em silêncio.
+
+    ── Por que o texto gerado, e não o código-fonte ──────────────────────────
+    Hashear `regras.py` diretamente seria mais simples e pior: renomear uma
+    variável ou corrigir um comentário mudaria a impressão sem que uma única
+    linha do armazém mudasse, e a auditoria seria invalidada por nada.
+
+    O que se hasheia aqui é o **derivado**: os 40 modelos de limpeza e o SQL de
+    classificação, que são o tratamento escrito por extenso. Refatoração que
+    não muda o resultado não muda a impressão; mudança de uma casa decimal numa
+    regra muda.
+
+    A versão continua sendo o rótulo legível e continua avançando à mão. A
+    impressão só responde a uma pergunta: *este resultado é o mesmo que a
+    auditoria guardada afirma?*
+    """
+    import hashlib
+
+    from mvp_ed1.legacy import classification
+
+    limites = schema.limites(catalogo.limite_de_texto, catalogo.colunas_estreitadas)
+    textos = [modelo(catalogo, t, promessas, limites) for t in schema.tabelas()]
+    # O contrato por registro — obrigatoriedade, chaves e FKs derivadas dos
+    # modelos — decide rejeição tanto quanto uma regra de valor. Sem ele no
+    # material, tornar uma coluna opcional mudaria o veredito de registros sem
+    # mover a impressão, e a auditoria seria substituída em silêncio.
+    textos.append(classification.records_sql())
+    # A classificação entra com o marcador ainda no lugar: a impressão não pode
+    # depender de si mesma.
+    textos.append(classification.classification_sql(catalogo))
+    textos.append(_parametros(textos))
+
+    digest = hashlib.sha256("".join(textos).encode("utf-8")).hexdigest()
+    return digest[:16]
+
+
+def parametros_do_tratamento(textos: list[str]) -> dict[str, str]:
+    """Os `var()` que o tratamento lê, com o valor declarado hoje no projeto.
+
+    Devolve o mapa porque ele tem **dois** consumidores: a impressão digital,
+    que o hasheia, e a guarda emitida no modelo, que compara o valor efetivo da
+    execução contra este. Um só lugar decide quais variáveis contam.
+    """
+    import re
+
+    import yaml
+
+    nomes = sorted(set(re.findall(r"""var\(\s*["']([a-z_]+)["']""", "".join(textos))))
+    projeto = yaml.safe_load(
+        pathlib.Path("dbt/dbt_project.yml").read_text(encoding="utf-8")
+    )
+    variaveis = projeto.get("vars") or {}
+    return {nome: str(variaveis.get(nome, "<ausente>")) for nome in nomes}
+
+
+def _parametros(textos: list[str]) -> str:
+    """Os `var()` que o tratamento lê, com o **valor** que eles têm hoje.
+
+    O material hasheado é SQL com Jinja por resolver, e `DATE_FUTURE` compara a
+    data contra `var("as_of_date")`. Sem esta parte, mudar o "hoje" da simulação
+    mudaria quem é rejeitado por data futura **sem** mover a impressão digital:
+    dois resultados diferentes sob a mesma identidade, que é exatamente o que a
+    D34 existe para impedir.
+
+    Os nomes são descobertos no próprio texto em vez de listados aqui. Uma
+    variável nova entra na impressão sozinha, e ninguém precisa lembrar dela.
+    """
+    return "".join(
+        f"{nome}={valor}\n" for nome, valor in parametros_do_tratamento(textos).items()
+    )

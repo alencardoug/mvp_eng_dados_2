@@ -1,0 +1,374 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Catálogo de falhas da origem legada — a fonte única do ADR-0022.
+#
+# Dele saem **três** coisas, e nenhuma delas é escrita à mão de forma
+# independente: o injetor que produz o defeito, a regra que o trata e o teste
+# que confere o resultado. Injetar e tratar não podem divergir porque são o
+# mesmo arquivo.
+#
+# ── Como as falhas encontram as colunas ──────────────────────────────────────
+# Nenhuma entrada nomeia coluna. Cada uma declara o **arquétipo** de campo a que
+# se aplica, e o injetor resolve o arquétipo contra os modelos SQLAlchemy — que
+# são a fonte de verdade do schema (ADR-0009). Listar 400 colunas aqui seria
+# repetição que envelhece no dia em que um campo mudar de tipo.
+#
+# ── O que cada entrada declara (ADR-0022) ────────────────────────────────────
+#   arquetipo    a que tipo de campo se aplica
+#   deteccao     como o valor defeituoso é reconhecido, **sem** o manifesto
+#   conversao    a regra determinística, quando a equivalência é inequívoca
+#   recuperacao  o que a conversão devolve, medido contra o valor que havia
+#                antes do defeito: `original` quando a informação foi
+#                preservada e a limpeza a restaura; `nulo` quando o alvo
+#                canônico é o nulo de verdade (o original não volta, e não deve)
+#   rejeicao     o motivo, quando não há regra válida
+#   injecao      como o gerador produz o defeito, e com que frequência
+#
+# `conversao` e `rejeicao` são mutuamente exclusivas: o critério é o da Origem
+# Legada §3.1 — converte-se quando existe **uma** interpretação possível.
+# `recuperacao` acompanha toda `conversao`, e é o contrato que o oráculo do
+# manifesto usa para dizer qual valor **esperar** depois da limpeza — sem ele o
+# teste exigiria "voltar ao original" de uma conversão cujo alvo correto é
+# outro, e acusaria tratamento certo (achado P06 da revisão do plano, 14/09/2026).
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Versão do contrato aplicado, inclusive regras de contexto. A versão 2 da
+# primeira execução de classificação fica retida para auditoria; a 3 respeita
+# também os predicados dos índices únicos parciais declarados nos modelos; a 4
+# acrescenta `treatment_fingerprint` à saída da classificação (D34); a 5 confere
+# as rejeições de valor também contra o resultado da conversão (R06) e passa a
+# cobrir o contrato por registro e os `var()` na impressão digital (R24); a 6
+# fecha os quatro achados de valor da segunda revisão — valida ano, relógio e a
+# string inteira antes de qualquer conversão de data (R02); exige que a célula
+# **inteira** sobreviva à volta de codificação e rejeita o que não sobrevive
+# (R03); despacha a conversão monetária pelo formato reconhecido, e não pela
+# cauda da string (R04); e faz `ENUM_UNKNOWN` alcançar colunas booleanas, com
+# `BOOL_VARIANT` entregando forma canônica (R05).
+#
+# A 7 fecha o que a terceira revisão mostrou que a 6 não tinha fechado — os três
+# achados foram reabertos como parcialmente resolvidos, e cada um continuava
+# derrubando consulta ou rejeitando valor bom: o momento passa a ser lido por
+# componente, e não por posição fixa, com o deslocamento de fuso validado antes
+# do `cast` (R02); a gramática de reversibilidade passa a ser a do UTF-8 da RFC
+# 3629, recusando codificação longa, substituto e ponto acima de U+10FFFF (R03);
+# e a moeda que cabe em dois formatos com valores diferentes é **rejeitada**, em
+# vez de convertida por uma das duas leituras em silêncio (R04).
+#
+# A 8 muda a **identidade da captura** que sai na classificação: `snapshot_id`
+# passa a ser o job de sincronização (`_airbyte_meta.sync_id`), não a geração
+# do Airbyte — a geração é por stream, e um stream reabilitado desalinhou as
+# quarenta (captura F do plano de fechamento da Etapa 10, 15/09/2026). Nenhuma
+# regra de valor mudou; mudou o que o tratamento grava como captura, e isso é
+# resultado diferente sob o mesmo dado.
+#
+# A 9 não muda regra, conversão nem coluna: o CTE `limpo` dos modelos de
+# limpeza passou a ser `materialized` no PostgreSQL (ADR-0047), e a impressão
+# digital da D34 — que hasheia o SQL gerado, de propósito — moveu com o texto.
+# Sob a D34, impressão nova exige versão nova, ainda que o resultado seja o
+# mesmo linha a linha; a leitura literal foi decidida pelo Owner em 15/09/2026,
+# como na 8.
+#
+# **Quando avançar:** sempre que o tratamento passar a produzir resultado
+# diferente — regra nova, conversão alterada, coluna nova na classificação —
+# ou sempre que a impressão digital mover. É a pergunta que
+# `legacy_versao_do_tratamento_e_univoca` faz em voz alta quando alguém
+# esquece: sob uma versão, um tratamento.
+versao: 9
+
+# ── Geração desta origem ──────────────────────────────────────────────────────
+# Semente **própria**, distinta da origem principal (Origem Legada §3.2): as
+# duas não podem compartilhar sequência, senão o legado deixa de ser uma origem
+# independente e passa a ser um espelho deslocado da outra.
+#
+# O fator é pequeno de propósito. O legado existe para exercitar **tratamento**,
+# não volume: o que precisa estar coberto são os 23 tipos de falha, e isso não
+# depende de quantas linhas limpas existem em volta.
+geracao:
+  semente: 20260906
+  fator: 0.05
+  # Largura das colunas de texto no sistema antigo. A origem legada não é a
+  # atual com defeitos: é **outro sistema**, mais velho e mais apertado, e é daí
+  # que o truncamento vem de verdade — um `varchar(24)` recebendo um endereço de
+  # 40 caracteres. Sem isso, "cortar no limite" só produzia o valor repetido até
+  # encher a coluna moderna, que não se parece com nada que exista.
+  limite_de_texto: 24
+
+# Delimitador do arquivo de importação que a origem legada simula. É o que torna
+# `TEXT_DELIMITER` detectável: numa coluna PostgreSQL o delimitador não desloca
+# nada sozinho — quem desloca é o carregador de CSV que a origem antiga usava, e
+# o efeito observável é o campo carregar o resto da linha e os seguintes ficarem
+# vazios.
+delimitador: ";"
+
+# Marcadores textuais que a origem usa no lugar de nulo.
+#
+# A string vazia **saiu da lista**, e o motivo foi medido: o destino do Airbyte
+# a entrega como `NULL` de verdade em `raw_legacy`. Um marcador que não
+# sobrevive ao transporte é indistinguível de nulo do outro lado, e injetá-lo
+# produziria um achado que o tratamento nunca poderia encontrar — falha do
+# oráculo, não do tratamento. Espaços em branco sobrevivem, e continuam.
+nulos_disfarcados: ["NULL", "null", "N/A", "-", "#N/D", "   "]
+
+# Colunas de data e hora que registram **promessa**, não fato consumado. Elas
+# ficam de fora do `DATE_FUTURE` porque cair depois do corte é o comportamento
+# correto delas — o prazo prometido de uma remessa despachada ontem está no
+# futuro, e isso não é defeito. A lista é curta e explícita de propósito: a
+# regra geral é que data de fato consumado não acontece no futuro, e cada
+# exceção precisa de nome.
+promessas:
+  - carts.expires_at
+  - shipments.estimated_delivery_at
+  - purchase_orders.expected_at
+  - campaigns.valid_to
+  - coupons.valid_to
+  - price_lists.valid_to
+  - product_prices.valid_to
+
+# Colunas de quantidade em que o negativo é **legítimo**. `quantity_delta` é
+# assinado por natureza: saída de estoque é negativa, e rejeitá-la como fora de
+# faixa condenaria 388 movimentos corretos. Faixa impossível depende do que a
+# coluna significa, e o significado é declarado, não inferido do tipo.
+quantidades_com_sinal:
+  - inventory_movements.quantity_delta
+
+# Colunas que o sistema antigo guardava mais estreitas que o atual, e que por
+# isso perdem o fim do valor. **Não são todas**: `currency` sempre teve três
+# caracteres, `state` sempre teve dois, e aplicar truncamento a elas produziria
+# 987 rejeições de valores perfeitos — medido antes de esta lista existir.
+#
+# Truncamento é de campo **livre e longo**, que é onde o limite de uma coluna
+# antiga realmente aperta.
+# Tabelas de **domínio fechado** — as que guardam valores, não coisas. Elas não
+# recebem injeção, e o motivo é de proporção, não de princípio.
+#
+# O injetor sorteia alvos uniformemente, então acerta uma tabela de três linhas
+# com a mesma facilidade com que acerta `cart_items`, que tem milhares. E todo
+# carrinho e todo pedido referenciam um canal: rejeitar **uma** das três linhas
+# de `sales_channels` cascateou para 3.564 carrinhos e itens, e sozinha
+# respondia por 64% das 5.530 rejeições em cascata da captura.
+#
+# A cascata existe para demonstrar o custo real de um defeito de dado, e esse
+# número deixava de demonstrar isso: descrevia o azar de um sorteio numa tabela
+# minúscula. O custo aceito é o exercício deixar de cobrir "linha de referência
+# corrompida", que existe em sistema legado real.
+dominios_fechados:
+  - sales_channels
+  - payment_methods
+  - customer_segments
+  - carriers
+
+colunas_estreitadas:
+  - customer_addresses.street
+  - customer_addresses.district
+  - products.name
+  - campaigns.name
+  - suppliers.legal_name
+  - suppliers.trade_name
+  - support_tickets.subject
+  - warehouses.name
+
+falhas:
+  NULL_DISGUISED:
+    grupo: texto
+    arquetipo: qualquer
+    deteccao: Valor pertence à lista declarada de nulos disfarçados.
+    conversao: Converter para nulo de verdade.
+    recuperacao: nulo
+    injecao: {frequencia: 7, formas: [marcador_textual]}
+
+  # ── Domínios e formatos ───────────────────────────────────────────────────
+  EMAIL_MALFORMED:
+    grupo: dominios
+    arquetipo: email
+    deteccao: Sem arroba, com espaço interno, ou domínio sem ponto.
+    rejeicao: Endereço inválido; não há correção segura.
+    injecao: {frequencia: 4, formas: [sem_arroba, com_espaco, dominio_invalido]}
+
+  # ── Integridade e consistência ────────────────────────────────────────────
+  BOOL_VARIANT:
+    grupo: dominios
+    arquetipo: booleano
+    deteccao: Valor booleano escrito fora de `true`/`false`.
+    conversao: Mapear somente as variantes declaradas; `sim`, `S` e `1` são verdadeiro.
+    recuperacao: original
+    injecao: {frequencia: 5, formas: [sim_nao, s_n, um_zero]}
+  ENUM_UNKNOWN:
+    grupo: dominios
+    arquetipo: enumerado
+    deteccao: Valor fora do domínio declarado do campo.
+    rejeicao: Estado desconhecido; mapear exigiria inventar equivalência.
+    injecao: {frequencia: 4, formas: [valor_inexistente]}
+  DATE_IMPOSSIBLE:
+    grupo: datas
+    arquetipo: data
+    deteccao: Componentes fora de faixa, data inexistente no calendário ou incompleta.
+    rejeicao: Data impossível ou incompleta; não há valor único a inferir.
+    injecao: {frequencia: 4, formas: [mes_invalido, dia_inexistente, so_mes_e_ano]}
+  DATE_FUTURE:
+    grupo: datas
+    arquetipo: data_de_fato_consumado
+    deteccao: Data posterior a `as_of_date` em campo que registra fato já ocorrido.
+    rejeicao: Fato consumado não acontece no futuro.
+    injecao: {frequencia: 3, formas: [depois_do_corte]}
+  DATE_FORMAT_KNOWN:
+    grupo: datas
+    arquetipo: data
+    deteccao: Data em formato reconhecido diferente do ISO.
+    conversao: Interpretar pelo formato declarado e normalizar para ISO.
+    recuperacao: original
+    injecao: {frequencia: 5, formas: [dd_mm_aaaa, aaaa_ponto_mm_dd]}
+  DATE_TZ_MISSING:
+    grupo: datas
+    arquetipo: momento
+    deteccao: Timestamp sem deslocamento de fuso.
+    conversao: Aplicar o fuso declarado da origem — `America/Sao_Paulo`.
+    recuperacao: original
+    injecao: {frequencia: 5, formas: [sem_fuso]}
+
+  # ── Texto ─────────────────────────────────────────────────────────────────
+  DATE_UNPARSEABLE:
+    grupo: datas
+    arquetipo: data
+    deteccao: Valor em campo de tempo que não casa com nenhum formato reconhecido.
+    rejeicao: Não há data a inferir de um texto que não é data.
+    injecao: {frequencia: 3, formas: [texto_no_lugar_da_data]}
+  NUM_OUT_OF_RANGE:
+    grupo: numericos
+    arquetipo: quantidade
+    deteccao: Inteiro fora da faixa fisicamente possível do campo.
+    rejeicao: Quantidade impossível; corrigir exigiria adivinhar o valor certo.
+    injecao: {frequencia: 4, formas: [negativo, absurdamente_alto]}
+  NUM_TEXT_EQUIV:
+    grupo: numericos
+    arquetipo: quantidade
+    deteccao: Valor não é inteiro literal, mas equivale a um sem ambiguidade.
+    conversao: Interpretar por extenso ou com casa decimal nula; `oito`, `8.0` e `8,0` são 8.
+    recuperacao: original
+    injecao: {frequencia: 5, formas: [por_extenso, decimal_zero, decimal_virgula_zero]}
+  NUM_AMBIGUOUS:
+    grupo: numericos
+    arquetipo: quantidade
+    deteccao: Valor não inteiro sem equivalência única — fracionário, com unidade, ou vazio.
+    rejeicao: Não há regra determinística válida para o grão.
+    injecao: {frequencia: 4, formas: [fracionario, com_unidade, vazio]}
+  MONEY_NEGATIVE:
+    grupo: monetarios
+    arquetipo: dinheiro
+    deteccao: Valor negativo em campo que não admite estorno.
+    rejeicao: Valor negativo onde o domínio não o permite.
+    injecao: {frequencia: 3, formas: [negativo]}
+
+  # ── Datas e tempo ─────────────────────────────────────────────────────────
+  # `MONEY_AMBIGUOUS` e `DATE_UNPARSEABLE` nasceram da revisão de 07/09/2026, e
+  # a ausência delas era **omissão**, não decisão. O critério da §3.1 já dizia
+  # o que fazer — converte-se quando existe uma interpretação possível, rejeita-se
+  # quando existe mais de uma —, e `NUM_AMBIGUOUS` já o aplicava à quantidade.
+  # Faltava aplicá-lo ao dinheiro e à data.
+  #
+  # Sem elas, um valor sem interpretação possível **saía corrigido**: `abc` num
+  # campo monetário e `sem data` num campo de tempo passavam pelo tratamento e
+  # chegavam a `trusted` intactos, marcados como se tivessem sido consertados.
+  MONEY_LOCALE:
+    grupo: monetarios
+    arquetipo: dinheiro
+    deteccao: Valor monetário com separadores ou símbolo de moeda, em qualquer locale.
+    conversao: Normalizar locale e moeda antes da conversão decimal; `R$ 1.234,56` é 1234.56.
+    recuperacao: original
+    injecao: {frequencia: 6, formas: [pt_br, en_us, com_simbolo]}
+  MONEY_AMBIGUOUS:
+    grupo: monetarios
+    arquetipo: dinheiro
+    deteccao: Valor monetário que não casa com nenhum formato reconhecido.
+    rejeicao: Não há interpretação única para o valor; converter exigiria adivinhar o separador.
+    injecao: {frequencia: 3, formas: [texto_no_lugar_do_valor, separador_ambiguo]}
+  TEXT_TRUNCATED:
+    grupo: texto
+    arquetipo: texto_com_limite
+    # Detecção por heurística declarada, e a limitação é assumida: um valor
+    # legítimo de comprimento exatamente igual ao limite é indistinguível de um
+    # cortado. É por isso que o gerador produz, de propósito, casos válidos
+    # nesse comprimento — o controle mede o falso positivo em vez de escondê-lo.
+    deteccao: Comprimento exatamente igual ao limite declarado da coluna legada.
+    rejeicao: O que foi perdido no corte não se restaura.
+    injecao: {frequencia: 4, formas: [cortado_no_limite]}
+  TEXT_DELIMITER:
+    grupo: texto
+    arquetipo: texto
+    deteccao: Campo contém o delimitador declarado **e** os campos seguintes da linha estão vazios.
+    rejeicao: A linha veio deslocada na importação; o conteúdo dos campos seguintes se perdeu.
+    injecao: {frequencia: 3, formas: [absorve_os_seguintes]}
+  TEXT_ENCODING:
+    grupo: texto
+    arquetipo: texto
+    deteccao: Sequência de codificação dupla reconhecível — UTF-8 lido como Latin-1.
+    conversao: Reverter o par de codificações quando ele é identificável; `JosÃ©` é `José`.
+    recuperacao: original
+    injecao: {frequencia: 5, formas: [utf8_como_latin1]}
+  # Nasceu da segunda revisão (R03), e a ausência era **omissão**: a §3.1 já
+  # dizia "reparar quando o par de codificações é conhecido; rejeitar se
+  # ambíguo", e só a metade reparável existia. A metade que faltava não era
+  # inofensiva — a conversão derrubava a consulta inteira quando a célula
+  # misturava mojibake com acento legítimo (SQLSTATE 22021) ou com emoji
+  # (22P05), porque detectar um par autorizava recodificar tudo.
+  TEXT_ENCODING_AMBIGUOUS:
+    grupo: texto
+    arquetipo: texto
+    deteccao: Dupla codificação numa célula que não se reverte por inteiro.
+    rejeicao: Reverter só o trecho reconhecido corromperia o resto da célula.
+    injecao: {frequencia: 3, formas: [utf8_como_latin1_parcial]}
+  TEXT_WHITESPACE_CASE:
+    grupo: texto
+    arquetipo: texto
+    deteccao: Espaços à volta, espaços internos repetidos ou caixa inconsistente em chave.
+    conversao: Padronizar espaçamento e caixa conforme a convenção do campo.
+    recuperacao: original
+    # `caixa_alterada` **não** é injetada, e a razão é honesta: caixa
+    # inconsistente só é reconhecível contra uma convenção declarada do campo, e
+    # em texto livre não há nenhuma — `MÊS DO CLIENTE` é tão legítimo quanto
+    # `Mês do Cliente`. Injetar um defeito que o tratamento não tem como
+    # reconhecer faria o oráculo falhar por culpa da injeção, não da limpeza.
+    # A conversão continua padronizando espaçamento, que é o que se detecta.
+    injecao: {frequencia: 6, formas: [espaco_a_volta, espaco_duplo]}
+  FK_ORPHAN:
+    grupo: integridade
+    arquetipo: chave_estrangeira
+    deteccao: Referência a chave que não existe na tabela referenciada, dentro da mesma captura.
+    rejeicao: A linha aponta para um registro que não existe.
+    injecao: {frequencia: 5, formas: [id_inexistente]}
+  DUP_EXACT:
+    grupo: integridade
+    arquetipo: registro
+    # ADR-0038: a canônica é a de menor identificador físico e segue como
+    # `accepted`/`corrected`; cada excedente é uma linha `rejected` própria.
+    deteccao: Duas ou mais ocorrências físicas com todos os campos iguais na mesma captura.
+    rejeicao: Ocorrência excedente de duplicata exata; a canônica foi mantida.
+    injecao: {frequencia: 4, formas: [linha_repetida]}
+  DUP_PARTIAL:
+    grupo: integridade
+    arquetipo: chave_natural
+    deteccao: Mesma chave natural com atributos divergentes na mesma captura.
+    rejeicao: Não há critério de desempate seguro entre as versões.
+    injecao: {frequencia: 3, formas: [mesma_chave_outro_atributo]}
+  TOTAL_MISMATCH:
+    grupo: integridade
+    arquetipo: total_do_pedido
+    deteccao: Total declarado difere da soma dos itens além da tolerância de arredondamento.
+    rejeicao: O total não reconcilia com os itens; corrigir exigiria escolher qual lado vale.
+    tolerancia: "0.01"
+    injecao: {frequencia: 3, formas: [total_alterado]}
+  NULL_REQUIRED:
+    grupo: integridade
+    arquetipo: qualquer
+    # ADR-0040: achado posterior à limpeza; não substitui NULL_DISGUISED.
+    # A obrigatoriedade sai de nullable nos modelos, nunca de outra lista.
+    deteccao: Campo obrigatório permanece nulo após a limpeza, inclusive nulo recebido sem marcador.
+    rejeicao: Ausência de valor obrigatório; preencher exigiria inventar um valor de negócio.
+    injecao: {frequencia: 0, derivado_de: [NULL_DISGUISED, TEXT_DELIMITER]}
+  PARENT_REJECTED:
+    grupo: integridade
+    arquetipo: registro_filho
+    # Único código que não descreve defeito do próprio registro (ADR-0038).
+    # Não é injetado: **emerge** do tratamento, e por isso os pais são
+    # classificados antes dos filhos.
+    deteccao: O registro é íntegro, e o pai a que ele pertence foi rejeitado.
+    rejeicao: O pai foi rejeitado; empilhar o filho produziria fato sem a entidade que o explica.
+    injecao: {frequencia: 0, derivado_de: [TOTAL_MISMATCH, FK_ORPHAN, DUP_PARTIAL, NULL_REQUIRED]}

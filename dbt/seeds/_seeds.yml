@@ -1,0 +1,113 @@
+version: 2
+
+seeds:
+  - name: brazilian_states
+    meta:
+      domain: transversal
+    description: >
+      As 27 unidades federativas e a região de cada uma. É dado de referência
+      geográfico, não dado gerado: entra por *seed* porque é estável, pequeno e
+      precisa estar versionado para que `dim_geography` seja reprodutível.
+
+      As 27 estão aqui, e não só as 14 que os endereços sintéticos usam — uma
+      tabela de referência incompleta falha calada no dia em que a geração
+      passar a produzir a 15ª.
+    config:
+      # O BigQuery não tem `varchar(n)`: `string`, e o tamanho fica no teste de valores.
+      column_types:
+        state_code: "{{ 'varchar(2)' if target.type != 'bigquery' else 'string' }}"
+    columns:
+      - name: state_code
+        meta:
+          sensitivity: public
+        data_tests: [unique, not_null]
+      - name: region
+        description: "Região do IBGE a que a unidade federativa pertence."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [Norte, Nordeste, Centro-Oeste, Sudeste, Sul]
+      - name: state_name
+        description: "Nome da unidade federativa por extenso."
+        meta:
+          sensitivity: public
+
+  - name: order_status_transitions
+    meta:
+      domain: vendas
+    description: >
+      As transições legais da máquina de estados do pedido — de qual estado para
+      qual, e qual delas é a criação. É **regra**, não dado observado: o teste
+      `transicao_de_estado_e_declarada` confronta o que aconteceu na origem com
+      o que está aqui, e um `pytest` confere que esta lista e os caminhos do
+      gerador declaram a mesma máquina.
+
+      Está em *seed* e não em `case` dentro de modelo porque regra escondida em
+      SQL é regra que ninguém revisa. Aqui ela cabe numa olhada.
+    config:
+      column_types:
+        from_status: "{{ 'varchar(16)' if target.type != 'bigquery' else 'string' }}"
+        to_status: "{{ 'varchar(16)' if target.type != 'bigquery' else 'string' }}"
+    columns:
+      - name: to_status
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [pending, paid, picking, shipped, delivered, cancelled, returned]
+      - name: from_status
+        meta:
+          sensitivity: public
+        description: Vazio na transição inicial — o pedido não vem de estado nenhum.
+        data_tests:
+          - accepted_values:
+              values: [pending, paid, picking, shipped, delivered, '']
+      - name: is_initial
+        meta:
+          sensitivity: public
+      - name: description
+        meta:
+          sensitivity: public
+
+  - name: support_categories
+    meta:
+      domain: atendimento
+    description: >
+      As seis categorias de chamado, com nome legível e agrupamento. É a fonte
+      de `dim_support_category`, que é **derivada**: a origem não tem tabela
+      para ela — a lista vive no `CHECK` de `support_tickets.category`, e um
+      `CHECK` não guarda nome de exibição nem agrupamento.
+
+      Um `pytest` confere que esta lista e o modelo transacional declaram as
+      mesmas seis. Se a origem ganhar uma sétima, o teste avisa antes de a
+      dimensão perder uma linha em silêncio.
+    config:
+      column_types:
+        category_code: "{{ 'varchar(20)' if target.type != 'bigquery' else 'string' }}"
+    columns:
+      - name: category_code
+        description: "Código estável da categoria de chamado; chave natural."
+        meta:
+          sensitivity: public
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: [delivery, payment, product, return, account, other]
+      - name: category_name
+        description: "Nome da categoria de chamado."
+        meta:
+          sensitivity: public
+        data_tests: [not_null]
+      - name: category_group
+        description: "Grupo que reúne categorias de chamado afins."
+        meta:
+          sensitivity: public
+        data_tests: [not_null]
+      - name: description
+        description: "O que a categoria de chamado cobre."
+        meta:
+          sensitivity: public

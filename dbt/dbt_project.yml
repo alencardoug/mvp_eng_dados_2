@@ -1,0 +1,233 @@
+# Projeto dbt do armazém (ADR-0003).
+#
+# A camada é o **schema**, nunca o prefixo do nome (ADR-0013), e a
+# materialização de cada camada está fixada pelo ADR-0016 — não é escolha por
+# modelo. Um modelo que precise fugir do padrão declara a exceção no próprio
+# arquivo, e a exceção precisa de motivo escrito.
+
+name: mvp_ed1
+version: 1.0.0
+config-version: 2
+profile: mvp_ed1
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+
+# O glossário de negócio é importado como documentação: a definição do conceito
+# e a coluna que o implementa ficam navegáveis juntas no `dbt docs`.
+docs-paths: ["models", "../docs/glossario_de_negocio"]
+
+clean-targets: ["target", "dbt_packages"]
+
+# Acesso por camada, nível de schema (Governança §7). O `+grants` de cada camada
+# abaixo é aplicado pelo dbt objeto a objeto; `usage` e `create` no schema, os
+# grants das fontes e o `revoke` do que não está declarado saem desta macro.
+on-run-end:
+  - "{{ aplicar_acesso_por_camada() }}"
+
+vars:
+  # O "hoje" da simulação. Precisa ser igual ao `periodo.as_of_date` de
+  # `src/mvp_ed1/generator/geracao.yml`, e um teste do `pytest` confere que são —
+  # o dono do valor é o gerador, este é o espelho que o dbt consegue ler.
+  #
+  # Nenhum modelo usa `current_date`: a janela de "cliente ativo" contada do
+  # relógio do banco daria resultado diferente a cada execução sobre o mesmo
+  # dado, e a reprodutibilidade do projeto (P2) deixaria de existir.
+  as_of_date: '2026-09-01'
+  period_start: '2024-01-01'
+
+  # Janelas dos conceitos do Glossário de Negócio.
+  active_customer_window_days: 180
+  repeat_purchase_window_days: 90
+
+  # Horizonte do calendário além do "hoje" da simulação.
+  #
+  # `dim_date` ia até `as_of_date`, e o caminho quente da Etapa 7 produz evento
+  # com `occurred_at` no relógio real — depois do fim do calendário. O `join`
+  # interno da fato descartava esses eventos **em silêncio**, que é exatamente o
+  # que a regra 4 do CLAUDE.md proíbe.
+  #
+  # Dimensão de data que acaba onde os fatos acabam é defeito, não escolha: ela
+  # existe para receber o fato seguinte, e o primeiro evento ao vivo prova isso.
+  calendar_horizon_days: 365
+
+  # Janela de demanda usada para calcular cobertura de estoque (P12). Um
+  # trimestre: curto o bastante para refletir a demanda corrente, longo o
+  # bastante para não transformar uma semana fraca em ruptura iminente.
+  cover_window_days: 90
+
+  # Ponto de reposição, em unidades, por par armazém/SKU (P12).
+  #
+  # **Espelho.** O dono do valor é `streaming/fluxo.yml`, que é quem alerta ao
+  # cruzá-lo; aqui está a cópia que o dbt consegue ler, e um teste do `pytest`
+  # confere que as duas concordam. Mesmo arranjo de `as_of_date`, pelo mesmo
+  # motivo: dois runtimes precisam do número e só um pode ser o dono.
+  reorder_point_units: 25
+
+  # Margem de atraso da única fato incremental do projeto (ADR-0016). É o quanto
+  # de atraso entre `occurred_at` e a carga o filtro tolera: evento mais velho
+  # que isto não é recuperado pelo incremental, e depende do `--full-refresh`.
+  # Sete dias porque o produtor da Etapa 7 gera atraso na casa de minutos, e uma
+  # ordem de grandeza de folga é o que separa margem de aposta.
+  atraso_maximo_dias: 7
+
+models:
+  mvp_ed1:
+    +persist_docs:
+      relation: true
+      columns: true
+    # Estatística fresca antes do próximo modelo ler a tabela: sem isto duas
+    # fatos de 7 mil linhas levavam 11 e 4 min no build (macro e pendências §5).
+    +post-hook:
+      - "{{ analisar_apos_materializar() }}"
+      # `domain`, `owner` e `retention` como *labels* no BigQuery (G5, D80); vazio no local.
+      - "{{ rotulos_no_bigquery() }}"
+    # Retenção por camada (Governança §8), declarada onde a camada é declarada.
+    # `rebuildable`: reconstruível do que está antes dela, nunca fonte de
+    # verdade — descartável a qualquer momento. `permanent`: evidência ou
+    # histórico que não se reconstrói — só sai por decisão registrada. Um
+    # inteiro seria dias, para quando um objeto ganhar prazo (nenhum tem hoje).
+    # `tests/test_retencao.py` cobra que todo objeto materializado tenha uma.
+    #
+    # Acesso (Governança §7, ADR-0011), declarado onde a camada é declarada,
+    # como a retenção. `+grants` é quem **lê** — o dbt concede objeto a objeto
+    # ao materializar; a lista é a completa de cada camada, não um acréscimo.
+    # `writers` é quem **escreve** o schema (`create`, via `on-run-end`). O
+    # padrão das camadas do pipeline é ninguém além do `transformer`, que é o
+    # dbt: é ele quem lê o que acabou de escrever, nos testes e no modelo
+    # seguinte. `tests/test_acesso.py` assume cada papel e cobra a tabela.
+    +grants:
+      select: [transformer]
+    # Dono (Governança §5.1, N46): um só no projeto, o mesmo dos modelos
+    # SQLAlchemy (`models/base.py::OWNER`) — declarado uma vez por camada, como
+    # a retenção; o `domain` de cada objeto vem do `.yml` dele.
+    +meta:
+      retention: rebuildable
+      writers: [transformer]
+      owner: data_custodian
+    staging:
+      +schema: staging
+      +materialized: view
+      # Exceção por origem, aberta pelo ADR-0043. O `staging` é view por
+      # ADR-0016 — passagem, não destino —, e para o ramo `retail` continua
+      # sendo. O ramo legado não cabe nessa regra: cada modelo dele é código
+      # gerado de 60 a 120 kB de limpeza, e view faz o banco replanejar essa
+      # árvore inteira a cada leitura. O `legacy_records` lê as quarenta de uma
+      # vez, num `union all`; medido em 08/09/2026, sobre views isso passa de
+      # 2 GB e sobre tabelas custa 180 MB.
+      legacy:
+        +materialized: table
+    trusted:
+      +schema: trusted
+      +materialized: table
+    analytics:
+      +schema: analytics
+      +materialized: table
+      # ── Fase GCP (Etapa 13, G1.4; arquitetura §5) ────────────────────────────
+      # Particionamento pelo instante do evento de cada fato, por mês, e
+      # *clustering* pela origem e pelas chaves de filtro mais frequentes. Só o
+      # BigQuery lê estas chaves; o dbt-postgres as ignora, e o caminho local não
+      # muda (oráculo de compilação). Mês, e não dia: o período simulado tem
+      # ~24 meses e as fatos têm de 120 a 81 mil linhas — partição diária daria
+      # centenas de partições minúsculas, e o BigQuery recomenda o contrário.
+      # Instante nulo (remessa não despachada, reembolso sem data) vai para a
+      # partição `__NULL__`, sem perda.
+      fact_cart_event:
+        +partition_by: {field: occurred_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, sales_channel_key, customer_key]
+      fact_coupon_redemption:
+        +partition_by: {field: redeemed_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, coupon_key, customer_key]
+      fact_inventory_movement:
+        +partition_by: {field: occurred_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, warehouse_key, product_key]
+      fact_order_status_event:
+        +partition_by: {field: changed_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, sales_channel_key, customer_key]
+      fact_payment_transaction:
+        +partition_by: {field: occurred_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, payment_method_key, customer_key]
+      fact_purchase_order_item:
+        +partition_by: {field: ordered_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, supplier_key, product_key]
+      fact_refund:
+        +partition_by: {field: refunded_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, payment_method_key, customer_key]
+      fact_sales_order_item:
+        +partition_by: {field: placed_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, sales_channel_key, product_key]
+      fact_shipment_item:
+        +partition_by: {field: shipped_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, carrier_key, warehouse_key]
+      fact_support_ticket_event:
+        +partition_by: {field: occurred_at, data_type: timestamp, granularity: month}
+        +cluster_by: [source_system, support_category_key, customer_key]
+    consumption:
+      +schema: consumption
+      +materialized: view
+      # A única camada que o perfil de análise alcança: o contrato de consumo
+      # é a view (ADR-0008), e a view lê `analytics` com os privilégios de quem
+      # a criou — o `analyst` não precisa, e não tem, acesso ao que está atrás.
+      +grants:
+        select: [analyst, transformer]
+      # ── Fase GCP (Etapa 13, G1.5; RV13-1-09) ────────────────────────────────
+      # No BigQuery a view lê com a permissão de quem consulta, não de quem a
+      # criou: sem mais nada, o `analyst` precisaria ler `analytics`. A *authorized
+      # view* inverte isso — a view é autorizada nos datasets que ela lê, e o
+      # `analyst` só precisa de `consumption`. Os três que as views de consumo
+      # leem: `analytics`, `trusted` (saldos e movimentos) e `raw` (a aterrissagem
+      # do caminho quente). O dbt-postgres ignora a chave.
+      +grant_access_to:
+        - {project: "{{ env_var('GCP_PROJECT_ID', 'sem-projeto') }}", dataset: analytics}
+        - {project: "{{ env_var('GCP_PROJECT_ID', 'sem-projeto') }}", dataset: trusted}
+        - {project: "{{ env_var('GCP_PROJECT_ID', 'sem-projeto') }}", dataset: raw}
+    # Destino, não passagem (ADR-0008): tabela porque é evidência de auditoria e
+    # precisa sobreviver à queda do modelo que a produziu — e por isso permanente.
+    quarantine:
+      +schema: quarantine
+      +materialized: table
+      +meta:
+        retention: permanent
+      # Evidência de auditoria: o `auditor` lê; ninguém além do dbt escreve.
+      +grants:
+        select: [auditor, transformer]
+
+snapshots:
+  mvp_ed1:
+    +target_schema: snapshots
+    # Descrição de coluna no banco, como nos modelos (N47): só `COMMENT`, sem
+    # tocar no dado nem na memória SCD.
+    +persist_docs:
+      relation: true
+      columns: true
+    +post-hook: "{{ rotulos_no_bigquery() }}"
+    # Histórico SCD (ADR-0017): o que foi capturado num instante não se
+    # reconstrói depois. Permanente. Mantido só pelo dbt, lido por ninguém
+    # fora do pipeline (Governança §7).
+    +meta:
+      retention: permanent
+      writers: [transformer]
+      owner: data_custodian
+    +grants:
+      select: [transformer]
+
+seeds:
+  mvp_ed1:
+    +schema: trusted
+    # Descrição de coluna no banco, como nos modelos e snapshots: sem isto as
+    # sete colunas descritas das seeds ficavam sem comentário (RVL3-08).
+    +persist_docs:
+      relation: true
+      columns: true
+    +post-hook: "{{ rotulos_no_bigquery() }}"
+    # Versionadas no Git: reconstruíveis de qualquer commit. Vivem em
+    # `trusted` e seguem o acesso da camada.
+    +meta:
+      retention: rebuildable
+      writers: [transformer]
+      owner: data_custodian
+    +grants:
+      select: [transformer]

@@ -1,0 +1,158 @@
+# Airflow local — sobe separado dos bancos, de propósito.
+#
+# O risco R11 é memória, e o tratamento declarado é subir só o subconjunto
+# necessário a cada etapa (Execução Local §5). Por isso `make airflow-up` é um
+# alvo próprio: `make up` não arrasta o orquestrador junto.
+#
+# `LocalExecutor` em vez de `CeleryExecutor`: três contêineres em vez de seis,
+# e nenhum ganho de paralelismo que se justifique com uma DAG em uma máquina.
+# O que o ADR-0003 foi buscar no Airflow — dependência explícita, reexecução
+# parcial e histórico — o `LocalExecutor` entrega igual.
+#
+# O projeto é declarado aqui como nas outras duas composições. Sem isto, com o
+# `.env` sem o nome, o Compose chamaria o projeto pela pasta — `docker` —, e o
+# preflight, que acha os contêineres pelo rótulo do projeto, não veria o
+# Airflow (achado na aplicação do RVE4-01).
+name: ${COMPOSE_PROJECT_NAME:-mvp_ed1}
+
+x-airflow-comum: &airflow-comum
+  build:
+    context: ..
+    dockerfile: docker/airflow.Dockerfile
+  image: mvp_ed1/airflow:3.2.2
+  environment: &airflow-ambiente
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/mvp_ed1/airflow/dags
+    # A pasta que contém `dbt/` e o glossário, como o Composer tem `/home/airflow/gcs/data`:
+    # a DAG a lê do ambiente desde a Etapa 13 (G2.4).
+    MVP_PROJECT_DIR: /opt/mvp_ed1
+    # A credencial vem do `.env`, como a dos outros três bancos (regra
+    # inviolável nº 1). `make env` sorteia a senha em `A-Za-z0-9`, que é segura
+    # de embutir numa URL sem escapar.
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:?defina AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD:?defina AIRFLOW_DB_PASSWORD}@airflow_db:5432/${AIRFLOW_DB_NAME:?defina AIRFLOW_DB_NAME}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?defina AIRFLOW_JWT_SECRET}
+
+    # No Airflow 3 a tarefa **não** fala com o banco de metadados: ela fala com
+    # o api-server pela API de execução. O padrão aponta para `localhost:8080`,
+    # que dentro do contêiner do scheduler não é ninguém — e a tarefa morre com
+    # `Connection refused` sem dizer que era isso.
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow_apiserver:8080/execution/
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:?defina AIRFLOW_FERNET_KEY}
+
+    # ── Como o contêiner alcança o resto ─────────────────────────────────────
+    # O armazém e o Airbyte estão fora desta composição: o primeiro em outra, o
+    # segundo em um cluster Kubernetes próprio. Os dois são alcançados pelo
+    # gateway do host, que é o único endereço comum às três redes.
+    WAREHOUSE_DB_HOST: host.docker.internal
+    WAREHOUSE_DB_PORT: ${WAREHOUSE_DB_PORT}
+    WAREHOUSE_DB_NAME: ${WAREHOUSE_DB_NAME}
+    WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER}
+    WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
+    # A origem legada, pelo mesmo caminho: o certificado de captura (ADR-0044)
+    # mede a origem antes e depois do job, e a medição é da DAG, não do Airbyte.
+    LEGACY_DB_HOST: host.docker.internal
+    LEGACY_DB_PORT: ${LEGACY_DB_PORT}
+    LEGACY_DB_NAME: ${LEGACY_DB_NAME}
+    LEGACY_DB_USER: ${LEGACY_DB_USER}
+    LEGACY_DB_PASSWORD: ${LEGACY_DB_PASSWORD}
+    AIRBYTE_URL: http://host.docker.internal:8000/api/public/v1
+    AIRBYTE_CLIENT_ID: ${AIRBYTE_CLIENT_ID:-}
+    AIRBYTE_CLIENT_SECRET: ${AIRBYTE_CLIENT_SECRET:-}
+    # O livro retido da memória do legado (v1.1.0, H6): o portão da DAG
+    # registra nele cada tentativa de captura. Este é o caminho no contêiner;
+    # o do host vem do `.env`, e sem ele o compose se recusa a subir.
+    LEGACY_LEDGER_DIR: /opt/mvp_ed1_ledger
+  volumes:
+    # ── Montagem por diretório, não o repositório inteiro ────────────────────
+    # Montar `..` inteiro colocaria o `.env` dentro do contêiner. Ele é 600 e
+    # pertence a outro usuário, então o `dbt` morria com `Permission denied` ao
+    # varrer o diretório — e, pior, o segredo estaria lá para ser lido se a
+    # permissão fosse outra. Least privilege resolve os dois de uma vez.
+    #
+    # Todos somente leitura: desde a Etapa 13 (G2.4) a DAG manda o `target/` e os `logs/` do
+    # dbt para um temporário por tarefa, como precisa no Composer, e não escreve mais em `dbt/`.
+    - ../dbt:/opt/mvp_ed1/dbt:ro
+    - ../src:/opt/mvp_ed1/src:ro
+    - ../airflow:/opt/mvp_ed1/airflow:ro
+    - ../airbyte:/opt/mvp_ed1/airbyte:ro
+    - ../docs/glossario_de_negocio:/opt/mvp_ed1/docs/glossario_de_negocio:ro
+    - airflow_logs:/opt/airflow/logs
+    - ${LEGACY_LEDGER_DIR:?defina LEGACY_LEDGER_DIR — a raiz do livro retido da memória do legado (make airflow-up a acrescenta)}:/opt/mvp_ed1_ledger
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  # O uid do host, não o 50000 da imagem: o portão escreve no livro retido, que
+  # pertence a quem clonou o repositório (até o G2.4, também `dbt/target` e `dbt/logs`).
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    airflow_db:
+      condition: service_healthy
+
+services:
+  airflow_db:
+    image: postgres:16.15-alpine
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:?defina AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:?defina AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:?defina AIRFLOW_DB_NAME}
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 12
+    restart: unless-stopped
+
+  # Só a migração. O login da interface é do SimpleAuthManager, o padrão do
+  # Airflow 3: usuário `admin`, senha gerada por ele no primeiro início do
+  # api-server — `make airflow-up` diz onde lê-la. Até 03/10/2026 havia aqui um
+  # `users create` com senha de fábrica que nunca rodou (o bloco dobrado partia
+  # o comando, e um `|| true` engolia a falha, a da migração inclusive) e que
+  # criaria um usuário que esse gerenciador não consulta.
+  airflow_init:
+    <<: *airflow-comum
+    command: db migrate
+    restart: "no"
+
+  airflow_apiserver:
+    <<: *airflow-comum
+    command: api-server
+    ports:
+      - "${AIRFLOW_PORT:-8081}:8080"
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      airflow_init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow_scheduler:
+    <<: *airflow-comum
+    command: scheduler
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      airflow_init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow_dag_processor:
+    <<: *airflow-comum
+    command: dag-processor
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      airflow_init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  airflow_db_data:
+  airflow_logs:
+
+# A rede do projeto é externa (D55): o `Makefile` a cria antes de qualquer `up`
+# (`GARANTIR_REDE`), e nenhum `down` a remove. O porquê está lá.
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-mvp_ed1}_default
+    external: true

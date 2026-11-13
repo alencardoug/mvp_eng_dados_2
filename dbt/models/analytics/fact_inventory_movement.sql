@@ -1,0 +1,146 @@
+-- Fato de movimentação de estoque.
+--
+-- **Grão: um movimento de um SKU em um armazém.**
+--
+-- ═══ A única exceção incremental do projeto ═══════════════════════════════════
+-- O [ADR-0016](docs/adr/0016-materializacao-por-camada.md) fixou `table` em
+-- `analytics` e declarou esta a **única** exceção — concedida porque a Etapa 7
+-- alimenta esta fato por *streaming*, e reconstruí-la por inteiro a cada
+-- execução contradiria o propósito do fluxo contínuo.
+--
+-- ═══ Uma exceção, duas estratégias — uma por origem ══════════════════════════
+-- O [ADR-0042](docs/adr/0042-reconciliar-a-captura-legada-na-fato-incremental.md)
+-- partiu a exceção em duas, porque as duas origens têm naturezas diferentes:
+--
+--   * **`retail` chega por evento**, em ordem aproximada, e continua entrando
+--     por `merge` com filtro por tempo de evento e margem de atraso;
+--   * **`legacy` chega por captura** — um lote inteiro e retroativo, que pode
+--     mudar de veredito entre capturas. Entra por `delete+insert`: a partição
+--     legada é apagada e reescrita pela captura corrente a cada execução.
+--
+-- **Por que o `config` diz `merge` e o ADR diz `delete+insert`.** O dbt admite
+-- uma estratégia por modelo, e a do `config` é a do ramo `retail`. O
+-- `delete+insert` do ramo legado é literalmente isso, escrito em duas partes: o
+-- `pre_hook` apaga a partição, e o `select` abaixo a reinsere inteira. Não é
+-- rodeio — é a única forma de ter as duas no mesmo modelo.
+--
+-- **O que a estratégia antiga não reconciliava.** O filtro usava
+-- `max(occurred_at)` **global**, e o `retail` está dias à frente da captura
+-- legada: medido em 08/09/2026, a janela de sete dias alcançava 7 dos 553
+-- movimentos legados. Ficavam de fora dois caminhos — o registro que se torna
+-- apto fora da janela, que nunca era relido, e o que deixa de vir na captura
+-- seguinte, que o `merge` nunca apagaria porque `merge` só faz *upsert*.
+--
+-- ═══ As quatro proteções obrigatórias ════════════════════════════════════════
+-- Sem elas a exceção não é concedida, e por isso as quatro estão aqui,
+-- nomeadas — com a ressalva que o ADR-0042 registra:
+--
+--   1. `unique_key` no identificador do evento — logo abaixo. **Vale para o
+--      ramo `retail`.** A idempotência do ramo legado não vem daqui: vem do
+--      recorte por captura, que reescreve a partição inteira.
+--   2. Filtro por **tempo de evento** com margem de atraso, nunca por tempo de
+--      carga. Está no bloco `is_incremental()`, e agora **só se aplica ao
+--      `retail`** — a marca d'água é lida das linhas de `retail`, não do
+--      máximo global, que era o que arrastava a janela do legado.
+--   3. `--full-refresh` agendado e registrado no plano — Etapa 12.
+--   4. Teste de reconciliação contra a reconstrução completa — em
+--      `_analytics__models.yml`. A remoção ganhou prova própria em
+--      `dbt/tests/legado_na_fato_segue_a_captura_corrente.sql`.
+--
+-- **Por que tempo de evento e não tempo de carga.** Filtrar por `recorded_at`
+-- pareceria mais simples e perderia o evento atrasado: um movimento que ocorreu
+-- ontem e chegou hoje tem `recorded_at` novo e `occurred_at` velho. A margem
+-- abaixo é o quanto de atraso o filtro tolera, e é ela que decide o que se
+-- perde — não o acaso.
+
+{{
+    config(
+        materialized='incremental',
+        unique_key=['source_system', 'movement_id'],
+        incremental_strategy='merge',
+        on_schema_change='fail',
+        pre_hook="{% if is_incremental() %}delete from {{ this }} where source_system = 'legacy'{% endif %}",
+    )
+}}
+
+with movimentos as (
+
+    select * from {{ ref('inventory_movements') }}
+
+    {% if is_incremental() %}
+    -- Uma condição por origem, e é o ADR-0042 que as separa.
+    --
+    -- `legacy` entra **inteiro**: o `pre_hook` já apagou a partição, e o que
+    -- chega aqui é a captura corrente por completo — é assim que o registro que
+    -- se tornou apto fora da janela aparece, e que o ausente não volta.
+    -- A relação de origem já está recortada pela captura selecionada, então
+    -- "tudo que vem do legado" e "a captura corrente" são o mesmo conjunto.
+    --
+    -- `retail` mantém a margem de atraso: reprocessa a janela inteira em vez de
+    -- confiar que o evento chegou em ordem. `merge` com `unique_key` torna esse
+    -- reprocessamento idempotente, então reler é barato e perder não é.
+    --
+    -- A marca d'água sai das linhas de `retail`, e não do máximo global: era o
+    -- máximo global que deixava o `retail`, dias à frente, empurrar a janela
+    -- para fora de quase toda a captura legada.
+    where source_system = 'legacy'
+       or occurred_at >= {{ dias_no_calendario(
+              "(select coalesce(max(occurred_at), " ~ meia_noite(var("period_start")) ~ ") from " ~ this ~ " where source_system = 'retail')",
+              -var("atraso_maximo_dias")) }}
+    {% endif %}
+
+)
+
+select
+    {{ dbt_utils.generate_surrogate_key(['m.source_system', 'm.movement_id']) }}
+                                                    as movement_key,
+    m.source_system,
+
+    -- ── Chaves de dimensão ───────────────────────────────────────────────────
+    d.date_key,
+    p.product_key,
+    w.warehouse_key,
+
+    -- ── Dimensões degeneradas ────────────────────────────────────────────────
+    m.movement_id,
+    m.event_sequence,
+    m.idempotency_key,
+    m.movement_type,
+    m.source_type,
+    m.source_id,
+    m.correlation_id,
+    m.aggregate_version,
+    m.occurred_at,
+    m.recorded_at,
+    {{ data_em_sao_paulo('m.occurred_at') }} as movement_date,
+    m.is_inbound,
+    m.is_outbound,
+    m.is_sale,
+
+    -- ── Medidas ──────────────────────────────────────────────────────────────
+    -- `quantity_delta` é **aditiva**: é delta assinado, e a soma num período é a
+    -- variação líquida do estoque nele (RVL3-10). Semiaditivo é o saldo, que é
+    -- fotografia — esse não se soma ao longo do tempo. `quantity_in` e
+    -- `quantity_out` são aditivas em qualquer recorte e separam entrada de saída.
+    m.quantity_delta,
+    m.quantity_in,
+    m.quantity_out,
+    m.unit_cost,
+    m.movement_cost_amount,
+    -- Custo do produto vendido (ADR-0030): zero em tudo que não é venda.
+    m.cogs_amount,
+    m.recording_delay_seconds
+from movimentos m
+join {{ ref('dim_date') }} d
+  on d.full_date = {{ data_em_sao_paulo('m.occurred_at') }}
+
+-- Versão do SKU vigente no instante do movimento.
+join {{ ref('dim_product') }} p
+  on p.source_system = m.source_system
+ and p.product_natural_key = m.product_variant_id
+ and m.occurred_at >= p.valid_from
+ and (p.valid_to is null or m.occurred_at < p.valid_to)
+
+join {{ ref('dim_warehouse') }} w
+  on w.source_system = m.source_system
+ and w.warehouse_natural_key = m.warehouse_id

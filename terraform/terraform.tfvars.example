@@ -1,0 +1,19 @@
+# Copie para terraform.tfvars (ignorado pelo Git) e preencha.
+# Nenhum segredo aqui: só identificadores.
+project_id         = "mvp-ed1-gcp"
+billing_account_id = "<id da conta de faturamento>"
+
+# Degraus (PLANO_etapa_13.md §0, regra 4): ligue um por vez, na ordem.
+enable_cheap     = false
+enable_cloud_sql = false
+enable_gke       = false
+enable_composer  = false
+
+# Prova de acesso por papel (iam.tf): quem personifica as contas analyst e auditor.
+owner_member = "user:voce@exemplo.com"
+
+# Cloud SQL (cloud_sql.tf): os mesmos nomes de banco e de usuário do `.env` local.
+cloud_sql_origens = {
+  source = { database = "<SOURCE_DB_NAME>", user = "<SOURCE_DB_USER>" }
+  legacy = { database = "<LEGACY_DB_NAME>", user = "<LEGACY_DB_USER>" }
+}

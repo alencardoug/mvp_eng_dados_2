@@ -1,0 +1,340 @@
+"""O pacote de recuperação: o que ele guarda, e por quê.
+
+[Capacidade §3](../../docs/capacidade_e_recuperacao.md) foi escrita antes dos
+ADRs 0037, 0044 e 0045, e dizia "o `warehouse_db` **não** entra". Depois deles
+o armazém virou guardião de memória que **nenhuma reconstrução reproduz**, e
+o pacote passou a guardar as fontes **e** a memória (D49, ampliada por D51):
+
+| Conteúdo | Por que não se reconstrói |
+|---|---|
+| `source_db` e `legacy_db` | são as fontes |
+| `raw_legacy` | as capturas retidas, de onde a memória de exclusões renasce (ADR-0045) |
+| `governance` | os certificados de cada captura (ADR-0037/0044) |
+| `snapshots` | o histórico SCD; `dbt_project.yml` os declara não reconstruíveis |
+| `quarantine` | 60.595 das 63.802 linhas nenhum rebuild da captura corrente recalcula |
+| `data/legacy/manifesto.json` e o diário | os oráculos do dump do legado; sem eles os testes pulam ou usam o manifesto de outra geração |
+| `.stream/producer_state.json` | o cursor do produtor que corresponde ao livro |
+
+**Fora do pacote, por construção:** `raw` (o Airbyte refaz do `source_db`
+restaurado, e a reconciliação dos dois caminhos prova), `staging`, `trusted`,
+`analytics`, `consumption` (o dbt refaz), o cursor do CDC, o estado do Airbyte
+e do Airflow. Uma restauração devolve **as fontes e a memória**; o resto é
+reconstruído e provado igual — e o que ela não leva está escrito aqui, não
+descoberto depois.
+
+**O corte é estável porque a janela está parada.** `pack` recusa com
+sincronização, DAG, Beam ou produtor no ar, como o preflight; cada `pg_dump` é
+consistente por si (é um *snapshot* de transação) e as contagens do manifesto
+saem numa transação `repeatable read` por banco, no mesmo instante.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+from dataclasses import dataclass, field
+from typing import Any
+
+#: Os schemas do armazém que são memória. O resto do armazém se reconstrói.
+SCHEMAS_DE_MEMORIA = ("raw_legacy", "governance", "snapshots", "quarantine")
+
+#: Arquivos de trabalho, fora do Git, que os oráculos usam — por **padrão**, e
+#: não por nome fixo. `data/legacy/` guarda o manifesto corrente e os de
+#: gerações anteriores (`manifesto-<hash>.json`), e nomear só um deixaria os
+#: outros para trás. Medido ao montar o primeiro pacote: a lista fixa citava um
+#: `diario.json` que não existe e ignorava dois manifestos que existem.
+ARTEFATOS = ("data/legacy/*.json", "data/source/geracao.json", ".stream/producer_state.json")
+
+#: O sufixo com que a restauração tira do caminho o estado de trabalho que o
+#: pacote não traz (RVE2-05). Fica fora de todo padrão de `ARTEFATOS`: o
+#: próximo pacote não o leva, e nada o lê como estado corrente.
+SUFIXO_AFASTADO = ".anterior-a-restauracao-"
+
+NOME_DO_MANIFESTO = "manifesto.json"
+NOME_DOS_CHECKSUMS = "checksums.sha256"
+NOME_DO_ROTEIRO = "RESTAURAR.md"
+
+#: O que um manifesto precisa afirmar para o pacote ser dado como apto
+#: (RVE-15). Campo ausente é pacote incompleto — não "campo opcional".
+CAMPOS_OBRIGATORIOS = (
+    "corte", "commit", "oraculo_formato", "alembic", "governance_versions",
+    "max_event_sequence", "contagens", "tamanhos", "geracao",
+    "oraculo_scd", "oraculo_capturas", "oraculo_quarentena", "oraculo_particao",
+    "oraculo_exclusoes", "artefatos_copiados", "artefatos_ausentes", "artefatos_links", "limite",
+)
+
+
+class PacoteRecusado(Exception):
+    """O pacote não foi montado, e o motivo é dito por extenso."""
+
+
+@dataclass
+class Destino:
+    """Onde o pacote vive. **Absoluto**, sempre (RV12-09).
+
+    Um `RECOVERY_DIR` relativo num alvo composto resolve contra o diretório de
+    quem chama, e em B5 quem chama é o clone: o pacote do *checkout* antigo
+    seria procurado dentro do clone novo, onde ele não está.
+    """
+
+    raiz: pathlib.Path
+
+    def __post_init__(self) -> None:
+        if not self.raiz.is_absolute():
+            raise PacoteRecusado(
+                f"RECOVERY_DIR precisa ser absoluto, e é {self.raiz!r}. "
+                "Num alvo composto o relativo resolve contra quem chama, e em B5 "
+                "quem chama é o clone — o pacote do checkout antigo não está lá dentro."
+            )
+
+    @property
+    def candidato(self) -> pathlib.Path:
+        return self.raiz / "candidato"
+
+    @property
+    def aprovado(self) -> pathlib.Path:
+        return self.raiz / "aprovado"
+
+    @property
+    def em_montagem(self) -> pathlib.Path:
+        """Onde o candidato **novo** nasce — nunca por cima do anterior (RVE-10)."""
+        return self.raiz / "candidato.em-montagem"
+
+    @property
+    def descartado(self) -> pathlib.Path:
+        return self.raiz / "candidato.anterior"
+
+
+def sha256(caminho: pathlib.Path) -> str:
+    acumulador = hashlib.sha256()
+    with caminho.open("rb") as arquivo:
+        for bloco in iter(lambda: arquivo.read(1024 * 1024), b""):
+            acumulador.update(bloco)
+    return acumulador.hexdigest()
+
+
+def escrever_checksums(pasta: pathlib.Path) -> pathlib.Path:
+    """Um `sha256` por arquivo do pacote, menos o próprio arquivo de checksums."""
+    destino = pasta / NOME_DOS_CHECKSUMS
+    linhas = []
+    for arquivo in sorted(pasta.rglob("*")):
+        if not arquivo.is_file() or arquivo.name == NOME_DOS_CHECKSUMS:
+            continue
+        linhas.append(f"{sha256(arquivo)}  {arquivo.relative_to(pasta)}")
+    destino.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+    return destino
+
+
+def conferir_checksums(pasta: pathlib.Path) -> list[str]:
+    """As diferenças entre o que foi gravado e o que está no disco.
+
+    Confere os dois sentidos: arquivo alterado **e** arquivo que apareceu
+    depois. Só o primeiro deixaria passar um dump trocado por outro ao lado.
+    """
+    arquivo = pasta / NOME_DOS_CHECKSUMS
+    if not arquivo.exists():
+        return [f"{NOME_DOS_CHECKSUMS} não existe — o pacote não está completo"]
+
+    problemas: list[str] = []
+    declarados: dict[str, str] = {}
+    for linha in arquivo.read_text(encoding="utf-8").splitlines():
+        if not linha.strip():
+            continue
+        esperado, relativo = linha.split("  ", 1)
+        declarados[relativo] = esperado
+        alvo = pasta / relativo
+        if not alvo.exists():
+            problemas.append(f"{relativo}: declarado no pacote e ausente do disco")
+        elif sha256(alvo) != esperado:
+            problemas.append(f"{relativo}: checksum não confere — o arquivo mudou")
+
+    presentes = {
+        str(a.relative_to(pasta))
+        for a in pasta.rglob("*")
+        if a.is_file() and a.name != NOME_DOS_CHECKSUMS
+    }
+    for extra in sorted(presentes - set(declarados)):
+        problemas.append(f"{extra}: está no pacote e não foi declarado")
+    return problemas
+
+
+@dataclass
+class Manifesto:
+    """O que o pacote afirma sobre o estado que guardou."""
+
+    dados: dict[str, Any] = field(default_factory=dict)
+
+    def gravar(self, pasta: pathlib.Path) -> pathlib.Path:
+        destino = pasta / NOME_DO_MANIFESTO
+        destino.write_text(
+            json.dumps(self.dados, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return destino
+
+    @classmethod
+    def ler(cls, pasta: pathlib.Path) -> "Manifesto":
+        caminho = pasta / NOME_DO_MANIFESTO
+        if not caminho.exists():
+            raise PacoteRecusado(f"{caminho} não existe — isto não é um pacote de recuperação")
+        return cls(json.loads(caminho.read_text(encoding="utf-8")))
+
+    def campos_ausentes(self) -> list[str]:
+        return [campo for campo in CAMPOS_OBRIGATORIOS if campo not in self.dados]
+
+    def problemas_de_forma(self, formato_atual: int) -> list[str]:
+        """O que impede de comparar este manifesto com o que o código lê hoje."""
+        problemas = [f"manifesto sem o campo obrigatório `{c}`" for c in self.campos_ausentes()]
+        formato = self.dados.get("oraculo_formato")
+        if formato is not None and formato != formato_atual:
+            problemas.append(
+                f"manifesto escrito com o formato de oráculo {formato}; este código lê o "
+                f"{formato_atual} — os hashes não são comparáveis. Refaça o pack."
+            )
+        return problemas
+
+
+def arvore_suja(raiz: pathlib.Path) -> str:
+    """O que `git status --porcelain` acusa. Vazio é árvore limpa.
+
+    O pacote grava `git rev-parse HEAD` como a versão do código que o produziu.
+    Com a árvore suja esse *commit* descreve outro código, e a restauração
+    reconstruiria com modelos que ninguém tem.
+    """
+    return subprocess.run(
+        ["git", "status", "--porcelain"], cwd=raiz, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def commit_atual(raiz: pathlib.Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=raiz, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def copiar_artefatos(
+    raiz: pathlib.Path, destino: pathlib.Path
+) -> tuple[list[str], list[str], dict[str, str]]:
+    """Os arquivos de trabalho que os oráculos usam.
+
+    Devolve `(copiados, padrões sem nenhum arquivo, links)`. Padrão vazio é
+    **dito**, não suposto: sem o manifesto do legado os testes pulam ou usam o
+    de outra geração, e um pacote que não avisa disso parece completo.
+
+    **Link é registrado como link.** `data/legacy/manifesto.json` aponta para o
+    manifesto do lote corrente, e o diário de mutações grava no arquivo
+    apontado. A cópia segue o link — o pacote guarda o conteúdo, legível —, e o
+    destino dele vai em `links`, para a restauração refazer o link em vez de
+    deixar um arquivo avulso que o diário passaria a usar sozinho.
+    """
+    copiados: list[str] = []
+    vazios: list[str] = []
+    links: dict[str, str] = {}
+    for padrao in ARTEFATOS:
+        encontrados = sorted(raiz.glob(padrao))
+        if not encontrados:
+            vazios.append(padrao)
+            continue
+        for origem in encontrados:
+            relativo = origem.relative_to(raiz)
+            alvo = destino / relativo
+            alvo.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(origem, alvo)
+            copiados.append(str(relativo))
+            if origem.is_symlink():
+                links[str(relativo)] = os.readlink(origem)
+    return copiados, vazios, links
+
+
+def links_sem_destino(copiados: list[str], links: dict[str, str]) -> list[str]:
+    """Os links cujo destino o pacote não traz — um pacote assim não se restaura."""
+    trazidos = set(copiados)
+    return [
+        relativo for relativo, apontado in links.items()
+        if os.path.normpath(os.path.join(os.path.dirname(relativo), apontado)) not in trazidos
+    ]
+
+
+def afastar_o_que_o_pacote_nao_traz(raiz: pathlib.Path, trazidos: list[str], instante: str) -> list[str]:
+    """Tira do caminho — renomeando, nunca apagando — o estado que o pacote não traz.
+
+    **A ausência também é estado (RVE2-05).** Um arquivo de trabalho que existe
+    no *checkout* e não no pacote é de outra carga: em B5, o `seed-data` que
+    roda antes da restauração cria `data/source/geracao.json`, e o próximo
+    pacote atribuiria à origem restaurada os parâmetros de uma carga que a
+    restauração acabou de desfazer. Renomeado com `SUFIXO_AFASTADO`, ele sai de
+    todo padrão de `ARTEFATOS` e continua legível para quem quiser saber o que
+    dizia. Devolve os caminhos afastados, relativos à raiz.
+    """
+    manter = set(trazidos)
+    afastados: list[str] = []
+    for padrao in ARTEFATOS:
+        for caminho in sorted(raiz.glob(padrao)):
+            relativo = str(caminho.relative_to(raiz))
+            if relativo in manter:
+                continue
+            novo = caminho.with_name(f"{caminho.name}{SUFIXO_AFASTADO}{instante}")
+            sequencia = 1
+            while novo.exists() or novo.is_symlink():
+                sequencia += 1
+                novo = caminho.with_name(f"{caminho.name}{SUFIXO_AFASTADO}{instante}-{sequencia}")
+            caminho.rename(novo)
+            afastados.append(relativo)
+    return afastados
+
+
+def comecar_montagem(destino: Destino) -> pathlib.Path:
+    """Um diretório limpo para o candidato novo, ao lado do anterior.
+
+    O anterior fica intocado até o novo estar inteiro: um `rmtree` antes do
+    primeiro `pg_dump` deixava a única volta perdida se o dump falhasse
+    (RVE-10). Resto de uma montagem interrompida é descartado aqui — ele nunca
+    foi conferido.
+    """
+    if destino.em_montagem.exists():
+        shutil.rmtree(destino.em_montagem)
+    destino.em_montagem.mkdir(parents=True)
+    return destino.em_montagem
+
+
+def concluir_montagem(destino: Destino) -> pathlib.Path:
+    """O novo vira `candidato/`; o anterior sai só depois — e por último."""
+    if not destino.em_montagem.exists():
+        raise PacoteRecusado(f"não há montagem em {destino.em_montagem}")
+    if destino.descartado.exists():
+        shutil.rmtree(destino.descartado)
+    if destino.candidato.exists():
+        destino.candidato.rename(destino.descartado)
+    destino.em_montagem.rename(destino.candidato)
+    if destino.descartado.exists():
+        shutil.rmtree(destino.descartado)
+    return destino.candidato
+
+
+def abandonar_montagem(destino: Destino) -> None:
+    if destino.em_montagem.exists():
+        shutil.rmtree(destino.em_montagem)
+
+
+def promover(destino: Destino) -> pathlib.Path:
+    """`candidato/` → `aprovado/`, e o anterior é apagado.
+
+    Só depois de `verify` **e** de uma restauração validada — a decisão é de
+    quem opera, e este módulo só executa o que ela mandou.
+    """
+    if not destino.candidato.exists():
+        raise PacoteRecusado(f"não há candidato em {destino.candidato}")
+    if (destino.aprovado).exists():
+        shutil.rmtree(destino.aprovado)
+    destino.candidato.rename(destino.aprovado)
+    return destino.aprovado
+
+
+def diretorio_padrao(raiz: pathlib.Path) -> Destino:
+    """`RECOVERY_DIR` do ambiente, ou `<raiz>/data/recovery` (D46)."""
+    bruto = os.environ.get("RECOVERY_DIR")
+    return Destino(pathlib.Path(bruto) if bruto else (raiz / "data" / "recovery").resolve())

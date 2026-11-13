@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Ambiente / segredos
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+service-account*.json
+credentials*.json
+
+# Dados
+*.csv
+*.parquet
+*.duckdb
+data/
+!data/.gitkeep
+
+# Exceção: os *seeds* do dbt são **código**, não dado. São dado de referência
+# pequeno e estável que os modelos leem — `brazilian_states` alimenta
+# `dim_geography`, `order_status_transitions` é a regra que a invariante 9
+# testa. Sem eles versionados, o `dbt seed` de um clone limpo não roda, e a
+# reprodutibilidade que o P2 exige deixa de existir. O `*.csv` acima os pegava
+# em silêncio desde a Etapa 5.
+!dbt/seeds/*.csv
+
+# Ferramentas
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+.tools/
+
+# Terraform — o cache do provider e o estado ficam fora; o `.terraform.lock.hcl`
+# é versionado de propósito: ele é a trava de versão do provider, e o projeto
+# fixa imagem por digest e dependência por lock (ADR-0026).
+.terraform/
+terraform.tfstate*
+# Os valores de cada execução (projeto, conta de faturamento, interruptores dos degraus);
+# o modelo versionado é o `terraform.tfvars.example`. Os planos salvos (`-out`) ficam em data/.
+terraform.tfvars
+*.tfplan
+dbt/.user.yml
+# O alvo `gcp` compila para outro diretório, para não misturar com o artefato local que o
+# catálogo e a linhagem leem (Etapa 13).
+dbt/target_gcp/
+
+# Estado de execução do produtor de streaming (Etapa 7) — não é código.
+.stream/

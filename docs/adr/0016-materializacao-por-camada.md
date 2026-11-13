@@ -1,0 +1,90 @@
+# ADR-0016 — Materializar por camada, com incremental como exceção justificada
+
+| Campo | Informação |
+|---|---|
+| Estado | Aceita |
+| Data | 04/09/2026 |
+| Decisor | Owner principal |
+| Decisão pendente resolvida | D23 |
+
+> **Nota — 06/11/2026.** A revisão "sob volume" prometida nas Consequências não acontece na Etapa 13:
+> pela D68 ([Pendências §2](../pendencias.md#d68--a-fase-gcp-roda-no-fator-dev-decidida-em-06112026)),
+> a fase GCP roda no fator `dev`. A materialização continua decidida sem pressão de volume.
+
+## Contexto
+
+A materialização decide, para cada modelo dbt, se o resultado é recalculado a cada leitura, gravado
+inteiro a cada execução, ou combinado com o que já existe. É a escolha que mais afeta correção — não
+desempenho — porque o modelo incremental é a única das três que carrega **estado entre execuções**.
+
+O [ADR-0014](0014-volume-por-proporcoes-e-fator-de-escala.md) retirou a pressão de volume do
+ambiente local. Sem ela, o incremental deixa de se justificar por custo e passa a precisar de
+justificativa própria.
+
+A fundamentação completa — as cinco materializações, as quatro estratégias de incremental, os quatro
+modos de falhar em silêncio e os quatro critérios de robustez — está em
+[Materialização no dbt](../materializacao.md), escrita para que esta decisão pudesse ser tomada com
+conhecimento de causa.
+
+## Alternativas consideradas
+
+| Alternativa | A favor | Contra |
+|---|---|---|
+| **Views + tabelas + um incremental blindado** | Aplica o critério que a fundamentação deriva: três dos quatro testes de robustez apontam para `table`, e só o custo em escala aponta para `incremental`. O único incremental fica onde ele é **semântico** — `fact_inventory_movement` é alimentada por um fluxo contínuo cujo propósito é não reprocessar o passado | Um modelo com estado a manter e a testar, quando zero seria mais seguro |
+| Incremental blindado nas nove fatos | Exercita em nove lugares o padrão que mais causa incidente em produção; nenhuma surpresa quando o volume subir no GCP | Nove blocos `is_incremental()` e nove testes de reconciliação para revisar, sem pressão de desempenho que os justifique — complexidade sem valor demonstrável, vedada pelo Termo §8 |
+| Views + tabelas, zero incremental | Pontua melhor em três dos quatro critérios: todo *rebuild* é completo, determinístico e sem estado | A fato alimentada por *streaming* seria reconstruída por inteiro a cada execução, o que contradiz o propósito do fluxo contínuo do [ADR-0006](0006-streaming-de-estoque-com-cdc-e-beam.md) |
+| Tabelas em todas as camadas | Facilita inspecionar o estado intermediário, útil para depurar o tratamento do legado | Mascara erro de dependência: tabela desatualizada não reclama, apenas responde errado |
+
+## Decisão
+
+| Camada | Materialização | Razão |
+|---|---|---|
+| `staging` | `view` | Só renomeia e tipa; reexecutar é barato e nunca serve dado velho — **exceto o ramo legado**, ver abaixo |
+| `trusted` | `table` | Aplica invariantes e trata o legado; é lógica pesada e muito referenciada |
+| `analytics` | `table` | O datamart é lido por gente e por BI; o custo se paga uma vez no *build* |
+| `consumption` | `view` | O contrato é interface, não cópia |
+
+**Exceção de camada:** o `staging` do ramo legado é `table`, não `view`, pelo
+[ADR-0043](0043-impedir-que-o-tratamento-do-legado-esgote-a-estacao.md). A razão da regra — "reexecutar
+é barato" — é justamente o que deixa de valer ali: os modelos de limpeza do legado são código gerado
+de 60 a 120 kB, e replanejar essa árvore a cada leitura esgotou a memória da estação. A exceção é
+**por origem**; o ramo `retail` continua sendo view.
+
+**Exceção de estratégia:** `fact_inventory_movement` é `incremental`, e vem com as quatro proteções
+obrigatórias — sem elas a exceção não é concedida:
+
+1. `unique_key` declarada no identificador do evento;
+2. filtro por **tempo de evento**, com margem de atraso, nunca por tempo de carga;
+3. `--full-refresh` agendado e registrado no plano;
+4. teste de reconciliação que compara a tabela incremental com o resultado da reconstrução completa.
+
+**A exceção tem duas estratégias, uma por origem**, desde o
+[ADR-0042](0042-reconciliar-a-captura-legada-na-fato-incremental.md). O ramo `retail` chega por
+evento e entra por `merge`, com as quatro proteções na forma escrita acima. O ramo `legacy` chega por
+**captura** — lote inteiro, retroativo, que pode mudar de veredito entre capturas — e entra por
+`delete+insert`: a partição legada é apagada e reescrita pela captura corrente a cada execução.
+
+Para o ramo legado, portanto, a proteção nº 1 **não** é o mecanismo de idempotência — o recorte por
+captura é —, e a proteção nº 2 não se aplica: a janela por tempo de evento é o que impedia reler a
+captura inteira. As proteções nº 3 e nº 4 valem para os dois ramos, e a nº 4 ganhou uma prova por
+linha só do ramo legado, em `dbt/tests/legado_na_fato_segue_a_captura_corrente.sql`, mais a prova de
+reprocessamento em `tests/test_fato_incremental.py` — a que o achado R25 cobrava, porque agregado
+que fecha não distingue reconstrução de reconciliação.
+
+A regra geral que decorre disto: **`incremental` é exceção justificada, nunca padrão.**
+
+## Consequências
+
+- **Positivas:** uma única fonte de estado no projeto inteiro, e ela é testada contra a
+  reconstrução completa; a razão da exceção é semântica e está escrita, então revisá-la no futuro
+  não exige reconstituir o raciocínio.
+- **Negativas:** a decisão foi tomada **sem** pressão de volume, por consequência direta do
+  ADR-0014. Se na fase GCP as demais fatos precisarem de incremental, esta decisão será revista —
+  e o motivo será volume, que hoje não existe. Fica registrado para que a revisão não seja lida como
+  erro de julgamento.
+- **Paridade com o GCP:** `view` e `table` funcionam igual no BigQuery. O incremental muda de
+  estratégia — `merge` local, `insert_overwrite` particionado no BigQuery —, diferença configurável
+  por perfil do dbt, mas que **precisa** ser traduzida e não replicada.
+- **Documentos a atualizar:** [Arquitetura](../arquitetura.md) §2;
+  [Qualidade de Dados](../qualidade_de_dados.md) — o teste de reconciliação da exceção;
+  [Materialização no dbt](../materializacao.md) §4 — marcar a decisão como tomada.

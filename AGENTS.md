@@ -1,0 +1,59 @@
+# Instruções para agentes neste repositório
+
+As convenções deste projeto — idioma, nomenclatura, formato de *commit*, o que exige ADR e a
+definição de pronto — estão em **[`CLAUDE.md`](CLAUDE.md)**, e valem para qualquer agente, não só
+para o Claude Code. **Leia-o antes de escrever a primeira linha.** Elas não são repetidas aqui: a
+regra do projeto é que cada assunto tem um dono documental, e duplicar é defeito.
+
+O mapa dos documentos está no [README](README.md). O que está parado esperando o Owner está em
+[`docs/pendencias.md`](docs/pendencias.md).
+
+## Quatro coisas que costumam ser descobertas tarde
+
+1. **Você não decide o que exige ADR** (`CLAUDE.md` §5). Escolha de ferramenta, mudança de camada,
+   alteração de modelagem central ou de tratamento de dados são do Owner. Na dúvida, registre como
+   pendência e devolva — não implemente.
+2. **Não invente número.** Métrica, volume ou resultado que não foi medido é marcado como pendente
+   (princípio **P5**). "Planejado" e "medido" são rótulos diferentes e nunca se misturam.
+3. **ADR aceito nunca é reescrito.** Se uma medição citada dentro de um ADR mudar, o ADR fica como
+   está e a mudança é registrada onde o número vive hoje.
+4. **Dois ambientes pesados nunca ficam de pé juntos** (`CLAUDE.md` §5). Airbyte, Airflow e
+   *streaming* não cabem na mesma máquina (**R11**), e os alvos `airbyte-up`, `airflow-up` e
+   `stream-up` **trocam sozinhos**: pausam o conflitante e retomam o que estiver pausado. Você não
+   precisa orquestrar isso — nem temer que a troca mate trabalho: com sincronização, DAG ou
+   *pipeline* no ar ela recua sem tocar em nada. Se ainda assim vier recusa, é falta de memória real — **pausa para o
+   Owner**, não obstáculo a contornar com `FORCE=1` por conta própria.
+
+## Trabalho encaminhado
+
+Ordens de serviço específicas, **quando houver**, ficam em `encaminhamentos/`. São transitórias:
+cada arquivo é apagado no *commit* que entrega o trabalho dele, e o diretório deixa de existir
+quando nada está encaminhado — que é o estado atual. Por isso não aparecem no mapa de documentação
+do README.
+
+### Passagem entre agentes
+
+Este projeto é trabalhado por dois agentes com orçamentos de esforço diferentes:
+um gera, outro revisa. A passagem entre eles tem skill própria, `revisao`, e o
+procedimento vive lá — não é repetido aqui.
+
+**Nenhum agente tem papel fixo, e o papel de cada sessão vem do pedido do
+Owner.** Se ele pede código, você escreve código; se pede parecer, você revisa.
+Um `REVISAO.md` parado na raiz é um convite em aberto, **não** uma ordem: ele
+não substitui o que foi pedido na conversa, e começar a revisar quando pediram
+implementação é trocar a instrução viva por um arquivo esquecido.
+
+### Quando um encaminhamento existir
+
+Ao receber um pedido de **avaliação**, confronte o plano com o código, os ADRs e o estado
+observado. Entregue um parecer com viabilidade, lacunas, ajustes propostos e validações ainda não
+executadas. Avaliar um plano não significa executar seus comandos nem encerrar suas pendências.
+
+Ao receber um pedido de **execução**, use a autorização já existente na conversa, cumpra os
+pré-requisitos e avance; não peça de novo uma decisão já registrada. Uma autorização para executar
+também não é aceite da implementação: distinga validação técnica, revisão do declarativo e
+encerramento formal, conforme `CLAUDE.md` §5 e §7.
+
+Ao concluir um encaminhamento, remova o arquivo **e** a sua entrada no índice, e aponte as
+referências restantes para o registro permanente da entrega. A exclusão do arquivo, sozinha, não é
+evidência de conclusão.
