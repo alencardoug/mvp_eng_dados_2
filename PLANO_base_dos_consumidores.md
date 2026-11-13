@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); revisão do Codex conta 1, rodada 1, respondida (§9); **aguarda a rodada 2 da revisão** antes de executar |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); revisão do Codex, rodadas 1 e 2, respondidas (§9); **aguarda a rodada 3 da revisão** antes de executar |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -65,7 +65,7 @@ Cada linha aponta para o dono do conteúdo. **G** = `gdados`, **N** = `nl_sql` (
 | # | Item | Dono do conteúdo | Serve a | Pede decisão? |
 |---|---|---|---|---|
 | 1 | F1 — o denominador de `support_tickets_per_hundred_orders` | Achados §1 | B (número na vitrine), G, N | Não: correção de defeito |
-| 2 | F2 — o estoque do denominador de `inventory_turnover_by_sku_and_warehouse` | Achados §1 | B, G, N | **Sim, Q2** (respondida) e **Q8** — o histórico incompleto |
+| 2 | F2 — o estoque do denominador de `inventory_turnover_by_sku_and_warehouse` | Achados §1 | B, G, N | **Sim, Q2** (respondida) e **Q8** — a regra completa do cálculo, antes do SQL |
 | 3 | F3 — a população de `dim_customer` contra a de `fact_sales_order_item` | Achados §1 | G, N | Depois da causa: se a causa for regra, sim |
 | 4 | F4 — descrições erradas e cortadas pelo limite do BigQuery | Achados §1 | G, N | Não |
 | 5 | F5 — o glossário de receita sem a regra do pedido realizado | Achados §1 | G, N, B | Não |
@@ -124,19 +124,24 @@ depois o que é texto e teste sem decisão; o pacote do portal quando houver con
   aceito; o fuso da primeira compra também entra. Com a causa medida,
   ou reconciliar, ou documentar o recorte de cada fonte — se a causa for regra, vira pergunta.
   Em qualquer caso, um teste de reconciliação dimensão × fato com a exceção declarada.
-- **F2:** pela Q2-a, em dois passos (RVC-1-02).
+- **F2:** pela Q2-a, em quatro passos (RVC-1-02, rodadas 1 e 2). O F1 e o F3 não esperam por ele.
   1. **Diagnóstico, sem mudar nada:** a diferença entre o saldo e a soma dos movimentos, por origem,
      par SKU × armazém e captura, separando o tempo de evento (`occurred_at`) do recorte de ingestão
      (`recorded_at <= ingested_at`, de `trusted.inventory_balances`). O estoque de abertura já é um
      movimento (`adjustment_in` em `motor.inicio`, `generator/domains/estoque.py`) e não se soma de
      novo. Os movimentos rejeitados do legado ficam em `quarantine` e não voltam; a diferença que eles
      explicam está na regra `explicado_pela_quarentena`.
-  2. **A regra, especificada antes do SQL:** abertura, média no tempo (diária? por evento?), limites do
-     trimestre no fuso, período sem movimento, custo — hoje `avg(unit_cost)` de **todos** os
-     movimentos, inclusive os posteriores — e o tratamento do histórico incompleto, sem abertura
-     residual silenciosa. O tratamento do histórico incompleto e a necessidade de ADR são a **Q8**.
-     Testes: movimento e custo posteriores não mudam trimestre fechado; evento atrasado; par legado
-     incompleto.
+  2. **A proposta da regra, escrita e com o diagnóstico ao lado:** a média no tempo (diária? ponderada
+     pelo tempo entre eventos?), os limites do trimestre no fuso, o período sem movimento, o evento
+     atrasado, a valorização — hoje `avg(unit_cost)` de **todos** os movimentos, inclusive os
+     posteriores; o ADR-0030 define o CMV da saída, não o valor do estoque médio — e o histórico
+     incompleto, sem abertura residual silenciosa. A proposta separa o que já decorre de regra vigente
+     do que é escolha nova.
+  3. **A decisão do Owner, a Q8**, sobre a proposta: as escolhas novas e se a regra pede ADR. O F2
+     para aqui até a resposta.
+  4. **O SQL e as provas:** movimento e custo posteriores não mudam trimestre fechado; evento atrasado;
+     par legado incompleto. A regra aprovada vive no dono dela — o glossário (`giro_de_estoque.md`) e o
+     ADR, se houver —, e o plano só aponta para lá.
 
 ### Bloco 2 — os testes que faltam (F6)
 
@@ -263,7 +268,7 @@ As opções como foram apresentadas:
 | **Q5** | A primeira *tag* deste repositório: o nome (`v2.1.0`, `v3.0.0`) e o que ela fecha |
 | **Q6** | A O1 do `PLANO_revisao_governanca.md`: renomear para inglês as três colunas de `trusted.legacy_order_totals_divergence`, ou registrar como exceção |
 | **Q7** | O F3, se a causa medida for regra |
-| **Q8** | O F2: como tratar o par cujo histórico de movimentos não reconstrói o saldo (legado com movimento rejeitado), e se a regra nova do giro pede ADR (RVC-1-02) |
+| **Q8** | O F2, sobre a proposta do passo 2: a média no tempo, a valorização do estoque médio, os cortes do trimestre e o fuso, o evento atrasado, o par cujo histórico não reconstrói o saldo (legado com movimento rejeitado) — e se a regra pede ADR. Perguntada **no Bloco 1**, logo depois do diagnóstico, e não com as outras (RVC-1-02) |
 
 ## 7. Definição de pronto aplicada
 
@@ -277,11 +282,12 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 
 ## 8. Ordem
 
-1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodada 1, §9). Rodada 2 da revisão, sobre as respostas.
+1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 e 2, §9). Rodada 3 da revisão, sobre a resposta ao RVC-1-02.
 2. Bloco 0.
-3. Blocos 1, 2 e 3, cada um revisado antes do seguinte.
+3. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
+   e da proposta, até a **Q8**; o F1 e o F3 seguem.
 4. Bloco 4.
-5. Rodada 2; Blocos 5 e 6, com os ADRs.
+5. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs.
 6. Fechamento.
 
 **Estimativa:** não há. O G06 sozinho foi estimado em 2 a 3 h de escrita mais a revisão do Owner
@@ -317,4 +323,15 @@ da resposta.
 - o dossiê (`REVISAO.md` §6) dizia que o `catalog.json` tinha sido regerado pelo `make check` e dava
   ~04:47 como hora do *manifest*: o `catalog.json` não existe, e o *manifest* é de 07:33Z (04:33).
   Corrigido no dossiê.
+
+### Rodada 2 — Codex conta 2, sobre `fc04cd9` (13/11/2026, 05:07)
+
+`gpt-6.1-sol`, esforço *high*, só leitura; a conta 1 bateu no limite de uso no começo da rodada e não
+gravou relatório. Veredito: **mudanças necessárias** — RVC-1-01 e RVC-1-03 a 09 **resolvidos**, nenhum
+achado novo; o RVC-1-02 **parcial**. Relatório, pedido e *log* em `data/medicoes/base_consumidores/`
+(`codex2_plano_r2*`).
+
+| # | Onde | Achado | Veredito | Situação |
+|---|---|---|---|---|
+| RVC-1-02 | Bloco 1 / F2; Q8; §8 | A aprovação da regra completa (média no tempo, valorização, cortes, atraso) não ia ao Owner; a Q8 ficava depois dos blocos que dependem dela | bloqueante | **Aceito.** Reproduzido: o glossário (`giro_de_estoque.md`) diz "média do período" sem o cálculo; o §8 punha a rodada 2 de perguntas depois do Bloco 4. O F2 tem agora quatro passos — diagnóstico, proposta, Q8, SQL —; a Q8 cobre a regra inteira e é perguntada no Bloco 1; o §8 diz que o F2 para ali e o F1 e o F3 seguem |
 
