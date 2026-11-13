@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abre a rodada 3 de perguntas (Q9 a Q11, §6) e pede a revisão da emenda; **aguarda a sua autorização** para começar pelo Bloco 0 |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda **aguarda a revisão** por outro agente e depois a sua autorização para começar pelo Bloco 0 |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -82,8 +82,8 @@ Fora desta fase: o `airbyte_internal` da V2 (só existia no GCP), a V3 inteira (
 tem data própria: 16/11), D43, D63 e D64, por não servirem aos consumidores. A **D66** serve a eles —
 ela recorta a população da P13, que o portal precisa exibir (G08) e a vitrine mostra —, mas fica fora
 por ser decisão de modelagem adiada; a limitação dela vai no aviso do Bloco 0 e no pacote, e o
-fechamento desta fase não declara os consumidores livres dela (RVC-1-09). Se ela entra nesta fase é
-a **Q10**.
+fechamento desta fase não declara os consumidores livres dela (RVC-1-09). **Pela Q10-a, a D66 entra
+nesta fase**: é perguntada antes do Bloco 4 (§8), e o que está acima vale até a resposta.
 
 ### 2.1 O que a leitura dos consumidores acrescenta (emenda de 13/11/2026)
 
@@ -100,9 +100,9 @@ o que eles leem daqui, e cada lacuna abaixo tem um destino.
 | L3 | Não há caminho para achado novo durante a fase: os próximos passos do `nl_sql` (grão e colunas, regras globais, data local de `date_key`, membros "desconhecido") vão gerar F11 em diante, e o inventário para em F10 | N, G, B | `nl_sql/CLAUDE.md` §4, "Próximos passos" | Bloco 0, item 3: a regra de entrada |
 | L4 | A página de estrutura e ambientes do portal (infraestrutura local, Terraform, mapa de paridade, batch e *streaming*, diagramas entidade-relacionamento) não tem fonte declarada: a D91 leva metadados de dados e nada disso | G | `gdados/PLANO.md` §3 | Bloco 4, no contrato do pacote |
 | L5 | Nada prova qual *commit* construiu o armazém que o BI lê: a procedência da D91 é a dos artefatos do dbt, não a do banco | B, G | `bi-como-codigo/PLAN.md` §3.5, linha "Version": "has no evidence today" | Bloco 4, diagnóstico e proposta; se pedir objeto novo no armazém, volta ao Owner |
-| L6 | Só duas das 16 views são examinadas (F1 e F2), e por achado externo, não por auditoria. A etapa 2.11 do BI exige auditar cada view (não aditividade, saldo dependente do tempo, população recortada). A verificação do Bloco 5 confere a métrica contra a própria view e não acharia defeito nela. Não conferido: se alguma auditoria anterior cobriu as outras 14 | B, G | `bi-como-codigo/PLAN.md` §6.2, etapa 2.11 | **Q9** |
-| L7 | A D66 fica fora, e a primeira publicação do BI leva o relatório da P13, que ela recorta | B, G | D66 nas Pendências; `bi-como-codigo/PLAN.md` §6.3 item 3 e N43 | **Q10** |
-| L8 | Dois portais para a mesma governança: a etapa 2.7 do BI ("reading portal of the data governance") e o `gdados`, sem decisão sobre se são duas coisas nem se leem a mesma fonte | G, B | `bi-como-codigo/PLAN.md` §6.2, 2.7; `gdados/PLANO.md` §1 | **Q11** |
+| L6 | Só duas das 16 views são examinadas (F1 e F2), e por achado externo, não por auditoria. A etapa 2.11 do BI exige auditar cada view (não aditividade, saldo dependente do tempo, população recortada). A verificação do Bloco 5 confere a métrica contra a própria view e não acharia defeito nela. Não conferido: se alguma auditoria anterior cobriu as outras 14 | B, G | `bi-como-codigo/PLAN.md` §6.2, etapa 2.11 | **Q9-a**: Bloco 1b |
+| L7 | A D66 fica fora, e a primeira publicação do BI leva o relatório da P13, que ela recorta | B, G | D66 nas Pendências; `bi-como-codigo/PLAN.md` §6.3 item 3 e N43 | **Q10-a**: pergunta própria antes do Bloco 4 |
+| L8 | Dois portais para a mesma governança: a etapa 2.7 do BI ("reading portal of the data governance") e o `gdados`, sem decisão sobre se são duas coisas nem se leem a mesma fonte | G, B | `bi-como-codigo/PLAN.md` §6.2, 2.7; `gdados/PLANO.md` §1 | **Q11-a**: um contrato; a pergunta vai no aviso do Bloco 0 |
 | L9 | O efeito no BigQuery fica sem medição: o F4 e o F10 só se provam no PostgreSQL, e o GCP está desmontado. Para o `nl_sql`, o que importa é o que o Gemini lê no BigQuery | N | Blocos 3 e 6; D92 | Fechamento: limitação declarada |
 
 A retenção foi examinada e **não é lacuna**: está declarada por objeto (Governança §8,
@@ -128,7 +128,8 @@ depois o que é texto e teste sem decisão; o pacote do portal quando houver con
    `mvp_eng_dados_1` — e diz quais views mudam de valor e quando (RVC-1-05). Para o `nl_sql`, só o
    canal de volta muda: a regra 2 do `CLAUDE.md` de lá proíbe reimportar. O aviso dele sai
    **primeiro**, porque o canal está quebrado agora (L1). O do `gdados` leva a D91 decidida, para a
-   D03 de lá (L2), e a resposta da Q11, se ela for perguntar às duas sessões.
+   D03 de lá (L2). O do `gdados` e o do BI levam a pergunta da Q11-a, de quantos portais existem e
+   se os dois leem o mesmo pacote, para cada sessão decidir (L8).
 3. **A regra de entrada de achado novo** (L3): todo achado que chegar durante a fase — do `nl_sql`
    pelos Achados ou do BI pela auditoria da 2.11 — ganha um ID (F11 em diante) no dono dele, os Achados,
    e uma linha no §2 deste plano com o bloco de destino. Defeito de número ou texto já lido entra no
@@ -175,6 +176,29 @@ depois o que é texto e teste sem decisão; o pacote do portal quando houver con
   4. **O SQL e as provas:** movimento e custo posteriores não mudam trimestre fechado; evento atrasado;
      par legado incompleto. A regra aprovada vive no dono dela — o glossário (`giro_de_estoque.md`) e o
      ADR, se houver —, e o plano só aponta para lá.
+
+### Bloco 1b — a auditoria das 16 views (Q9-a)
+
+Depois do F1 e do F2, as 16 views de `consumption` passam pelos três critérios da etapa 2.11 do BI:
+não aditividade, saldo que depende do tempo e população recortada. Cada view ganha um **cálculo
+independente** sobre `analytics`, escrito a partir do glossário e do ADR da pergunta, **nunca** do SQL
+da view, e é comparada com ele no armazém local. O F1 e o F2 entram também, já corrigidos, como
+contraprova de que a auditoria acha o que já se sabe errado.
+
+- Defeito achado vira F novo pela regra de entrada (Bloco 0, item 3). Correção sem decisão entra
+  neste bloco; o que pede regra vira pergunta.
+- View sem defeito ganha o resultado escrito: "auditada em `<commit>`, critérios, cálculo de
+  referência". Esse resultado vai nos Achados, no pacote (Bloco 4) e no fechamento.
+- Os cálculos de referência ficam versionados e rodam como teste. São o modelo da verificação do
+  Bloco 5, que também deixa de comparar a métrica com a própria view.
+- O efeito no BI é o mesmo do F1: o esquema não muda, os valores mudam, e o aviso diz quais.
+
+### D66 — antes do Bloco 4 (Q10-a)
+
+A D66 é perguntada com as alternativas dela (Pendências) e com o que já foi medido (M27 do BI). Se a
+resposta for a fato no grão da remessa (ADR-0033), ela vira bloco próprio, com ADR, antes do Bloco 5,
+e o pacote leva a limitação até lá. Se a definição mudar, o glossário e a descrição da view mudam no
+Bloco 3 ou num *commit* próprio.
 
 ### Bloco 2 — os testes que faltam (F6)
 
@@ -228,7 +252,9 @@ Pela Q3-a. O ADR do formato preserva as chaves de `meta` que já existem (`sensi
 `description_from`, `description_inherited`, `description_reason`); o significado nasce no `.yml`
 declarativo, nunca no `_derived.yml`. Em qualquer formato, cada valor e cada métrica é conferido contra o dado ou
 contra a view por teste — a verificação do `nl_sql` (23 de 23 gabaritos reproduzidos só a partir
-das definições) é o modelo, e aqui a referência seria a view de `consumption`.
+das definições) é o modelo. A referência é a view de `consumption` **auditada no Bloco 1b**, cujo
+resultado já foi conferido contra o cálculo independente; métrica sem view auditada não se dá por
+conferida (Q9-a).
 
 ### Bloco 6 — as chaves declaradas (F10)
 
@@ -320,9 +346,10 @@ As opções como foram apresentadas:
 | **Q7** | O F3, se a causa medida for regra |
 | **Q8** | O F2, sobre a proposta do passo 2: a média no tempo, a valorização do estoque médio, os cortes do trimestre e o fuso, o evento atrasado, o par cujo histórico não reconstrói o saldo (legado com movimento rejeitado) — e se a regra pede ADR. Perguntada **no Bloco 1**, logo depois do diagnóstico, e não com as outras (RVC-1-02) |
 
-### Rodada 3 — Q9 a Q11, da emenda (§2.1), antes do Bloco 0
+### Rodada 3 — Q9 a Q11, da emenda (§2.1): respondida em 13/11/2026
 
-Elas mudam o escopo, por isso vêm antes de executar.
+Elas mudam o escopo, por isso vieram antes de executar. **Decisão do Owner: Q9-a, Q10-a e Q11-a**, as
+recomendadas. As opções, como foram apresentadas:
 
 | | Pergunta | Recomendação | Alternativas |
 |---|---|---|---|
@@ -347,7 +374,7 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 3. Bloco 0, com o aviso ao `nl_sql` primeiro.
 4. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
    e da proposta, até a **Q8**; o F1 e o F3 seguem. Pela Q9-a, o Bloco 1b vem depois do F1 e do F2.
-   Pela Q10-a, a D66 é perguntada antes do Bloco 4.
+   Pela Q10-a, a D66 é perguntada antes do Bloco 4 (§3, "D66").
 5. Bloco 4.
 6. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs.
 7. Fechamento.
