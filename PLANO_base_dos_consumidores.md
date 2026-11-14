@@ -777,3 +777,25 @@ views, que o `bi-como-codigo` fixa (N85 de lá), é o `4da9e60`; o anúncio em C
 *push*, que espera a revisão do `8742a59` (os campos novos do pacote) e do Bloco 3, intercalados no
 `main`.
 
+
+### Rodada 18 — Codex conta 2, sobre o Bloco 3 (14/11/2026)
+
+Relatório em `codex2_bloco3_r1.md`. Três bloqueantes e um ajuste, todos aceitos:
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVB3-1-01 | A palavra "gerado" no cabeçalho de `_entregas__models.yml` e `_captura__models.yml` os fazia `generator`, fora da herança | bloqueante | Feito (`b2360d6`): gerado é só o `.yml` cuja 1ª linha começa com `GENERATED_MARK`; a sonda de propagação do revisor virou teste |
+| RVB3-1-02 | `payments.net_captured_amount` prometia reconciliar com a receita | bloqueante | Feito (`b22fdcb`): saldo de capturas menos reembolsos aprovados, no universo do valor cobrado; não é receita de produto |
+| RVB3-1-03 | O texto curto de recompra, ciclo e pontualidade deixava regras que mudam o número depois do marcador | bloqueante | Feito (`7ad2943`; residual na rodada 19) |
+| RVB3-1-04 | A guarda do F4 exercitava uma cópia Python da macro | ajuste | Feito (`4d9cb73`): o teste renderiza a macro real com o Jinja do dbt e mata quatro mutantes |
+
+### Rodada 19 — Codex conta 1, sobre `b2360d6`..`4d9cb73` (14/11/2026)
+
+Relatório em `codex1_bloco3_r2.md`. RVB3-1-01, 02 e 04 resolvidos; 03 parcial. Um bloqueante, feito: o texto
+curto da pontualidade passa a dizer que a chegada é o `delivered` **mais recente** (RVB3-2-01, `f5b34b5`).
+
+### Rodada 20 — Codex conta 1, sobre `f5b34b5` (14/11/2026)
+
+Relatório em `codex1_bloco3_r3.md`. RVB3-2-01 e RVB3-1-03 resolvidos, nenhum achado novo. **A revisão do
+Bloco 3 está fechada.** Seguem com o Owner a revisão integral dos textos e a confirmação da dispensa de ADR
+do RVG-1-01. O `0ecf270` (o `::` na revisão de segredos) e o `68b1535` (Bloco 4) vão à revisão juntos.
