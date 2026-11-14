@@ -718,3 +718,11 @@ a conferência do denominador da P15 deixou de descartar os nulos (RVB1b-2-01, b
 acusa 1 linha); os resumos de fonte da abertura comercial e do cabeçalho da P15 (RVB1b-2-02); o limite das
 referências de construção parecida (P05, P07, P13, P14) no teste e aqui (RVB1b-2-03).
 
+### Rodada 17 — Codex conta 2, sobre `4da9e60` (14/11/2026)
+
+Relatório em `codex2_bloco1b_r3.md`. RVB1b-2-01 a 03 e os parciais RVB1b-1-01, 03 e 05 resolvidos, nenhum
+achado novo. **A revisão do Bloco 1b e do Bloco 2 está fechada.** O *commit* do fim da auditoria das 16
+views, que o `bi-como-codigo` fixa (N85 de lá), é o `4da9e60`; o anúncio em Consumidores §6 sai com o
+*push*, que espera a revisão do `8742a59` (os campos novos do pacote) e do Bloco 3, intercalados no
+`main`.
+
