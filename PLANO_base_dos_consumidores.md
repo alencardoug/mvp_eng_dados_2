@@ -458,6 +458,48 @@ Três coisas entram no contrato, vindas da emenda e da rodada 4 de revisão:
   sanitizadas como, **é pergunta ao Owner**;
 - tamanho: 4,3 MB, versionado como a D91 decidiu.
 
+### L5 e Q6 — depois do Bloco 4 (decisões de 15/11/2026, §6 rodada 5)
+
+**L5, a procedência do armazém — desenho, para revisão antes de implementar.** A [ADR-0023](docs/adr/0023-escopo-do-schema-governance.md)
+já declarou em `governance` o conjunto *log de execução* ("cada execução de pipeline: início, fim,
+resultado, versão do código"); esta entrega o materializa para o dbt, como a ADR-0044 materializou
+`legacy_captures`, e a ADR nova registra a materialização.
+
+1. **A tabela** `governance.dbt_invocations`, pela migração `0003_dbt_invocations` de `governance.py`
+   (nunca editar as anteriores): `invocation_id` (chave), `command` (`build`, `run`, `seed`, `snapshot`),
+   `git_commit` (40 hexadecimais, **nulo** quando a execução não o informa), `git_tree_dirty` (nulo idem),
+   `dbt_version`, `target`, `started_at` e `finished_at` (`timestamptz`), `node_count`, `error_count` e
+   `status` (`success` quando nenhum nó terminou em erro, `error` senão). Escrita pelo `transformer`, lida
+   pelo `auditor`, como o resto de `governance`; o `analyst` não a lê (o contrato de consumo é a view).
+2. **A escrita**, no `on-run-end`, depois de `aplicar_acesso_por_camada`: uma macro registra a linha só nos
+   comandos que escrevem o armazém (`build`, `run`, `seed`, `snapshot`; o `test` e o `docs generate` não).
+   O *commit* e a árvore suja chegam por ambiente (`MVP_GIT_COMMIT`, `MVP_GIT_TREE_DIRTY`), que o
+   `CARIMBO_ANTES` do `Makefile` exporta; a DAG do Airflow, que roda o dbt sem eles, registra a execução
+   com o *commit* nulo — o que é verdade: ela não sabe.
+3. **Quem lê.** O BI captura como custodiante, numa transação de leitura (o `PLAN.md` dele, §3.5): na mesma
+   transação lê a última linha da tabela e tem "este armazém foi construído por esta execução, deste
+   *commit*, com ou sem mudança local". É a resposta que a L5 pedia, e não depende do pacote.
+4. **O pacote.** `provenance.warehouse` passa a dizer o que a tabela registra **da execução que produziu o
+   *manifest***: `status: verified` quando há a linha com o mesmo `invocation_id` e *commit* informado,
+   com `built_by_invocation_id`, `built_from_commit`, `built_tree_dirty` e `built_at` (campos novos; o
+   formato continua o 1, regra 3, e o esquema troca o `const not_verified` por `verified | not_verified`).
+   Sem a linha, sem *commit* ou sem o banco de pé, `not_verified`, com aviso, e nada de recusa. **O
+   significado é estreito, e o contrato o diz:** a execução que produziu os artefatos do pacote está
+   registrada no armazém, deste *commit*; não que o armazém continue igual depois. O pacote passa a **ler
+   uma tabela do banco** — a regra "o pacote não lê o banco" muda para essa exceção.
+5. **A comparação do `--check`** tira os campos de execução de `warehouse` (já tira o `built_by_invocation_id`)
+   e compara o `status`.
+6. **Os testes:** a migração aplicada do zero e sobre o armazém existente; a macro registra a linha de um
+   `make dbt-build` e não a de um `dbt test` (integração, com o `invocation_id` do *manifest*); o gerador com
+   um leitor substituto (linha igual, linha de outra execução, *commit* nulo, banco fora); o esquema aceita
+   `verified` só com os campos preenchidos. Aviso em Consumidores §5 (campo novo e valor novo do pacote).
+
+**Q6, as três colunas em português** de `trusted.legacy_order_totals_divergence` (`itens_empilhados`,
+`itens_rejeitados`, `motivos_da_rejeicao`): passam a `accepted_item_count` (o `.yml` a descreve como os itens aceitos), `rejected_item_count` e
+`rejection_reasons`. Só o modelo e o `.yml` dele as leem (conferido), nenhuma view; o pacote as publica em
+`relations`. A linha `prevista` em Consumidores §5 sai num *commit* antes do que renomeia, e vira `feita`
+com o *build*.
+
 ### Bloco 5 — domínios e métricas (F7, F9)
 
 Pela Q3-a. O ADR do formato preserva as chaves de `meta` que já existem (`sensitivity`,
@@ -588,7 +630,7 @@ recomendadas. As opções, como foram apresentadas:
 | **Q6** | A O1: as três colunas em português de `trusted.legacy_order_totals_divergence` | **Renomear para inglês**, em entrega própria, com o que as lê, e o aviso de mudança de esquema em Consumidores §5 (`prevista` antes, `feita` depois). Era a recomendada | Registrar como exceção |
 | **Q5** | A primeira *tag* deste repositório | **`v2.1.0`, no fim da fase**, depois dos Blocos 5 e 6: continua a numeração do `v2.0.0`, porque nada quebra para quem lê. Era a recomendada | `v3.0.0` no fim da fase; `v2.1.0` já, em `7d9548f` |
 
-A revisão integral dos textos do Bloco 3 continua com o Owner (CLAUDE.md §5).
+**Os textos do Bloco 3: aprovados pelo Owner em 15/11/2026**, sem a revisão integral, que ele declarou não poder fazer; a aprovação se apoia nas três rodadas de revisão do Bloco 3 (§9, rodadas 18 a 20).
 
 ## 7. Definição de pronto aplicada
 
