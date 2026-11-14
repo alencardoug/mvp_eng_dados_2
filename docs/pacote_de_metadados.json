@@ -90558,7 +90558,7 @@
       "tests/test_verificador_adr.py",
       "tests/test_vigencia_em_utc.py"
     ],
-    "inputs_sha256": "abe32293a915dc196ab14d0a47d0d925e43e4d564aed349690faaabb15cdd6cb",
+    "inputs_sha256": "802b9ed4274593d28c137864a8027e18e672938af9ea3e0954581995f6a46896",
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {

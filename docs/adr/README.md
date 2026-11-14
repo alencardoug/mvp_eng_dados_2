@@ -90,6 +90,7 @@ decisão.
 | [0051](0051-cdc-da-fase-gcp-pelo-debezium-server.md) | Levar o CDC da fase GCP ao Pub/Sub pelo Debezium Server | Aceita | D69 |
 | [0052](0052-giro-pelo-estoque-medio-do-trimestre.md) | Calcular o giro pelo estoque médio do trimestre, a custo médio móvel | Aceita | — (Q2 e Q8 do `PLANO_base_dos_consumidores.md`) |
 | [0053](0053-fato-no-grao-da-remessa.md) | Medir a pontualidade numa fato no grão da remessa | Aceita | D66 |
+| [0054](0054-procedencia-do-armazem-no-log-de-execucao.md) | Provar a procedência do armazém pelo log de execução do dbt | Aceita | L5 do plano da base dos consumidores |
 
 ---
 
