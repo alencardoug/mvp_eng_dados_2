@@ -118,7 +118,7 @@ aqui como `prevista` antes do *commit* que a faz.
 | `v2.0.0`, herdada | `f86b9fb`, só no `mvp_eng_dados_1` | Referência histórica |
 | Especificação do pacote, formato 1 | Anunciado no aviso que acompanha a publicação (o documento não cita o próprio *commit*) | `gdados` (E1), BI (2.7) |
 | Fim da auditoria das 16 views (Bloco 1b, com a P13 depois da D66) | `4da9e60` | BI (N85: as etapas 2.4 a 2.10 fixam este) |
-| Primeira versão do pacote (Bloco 4) | A marcar | `gdados`, BI |
+| Primeira versão do pacote (Bloco 4) | `acb26d0` | `gdados`, BI |
 
 ---
 
