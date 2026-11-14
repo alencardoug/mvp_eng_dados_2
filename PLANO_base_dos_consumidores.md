@@ -689,3 +689,9 @@ Relatório em `codex2_d66_r2.md`. RVD-1-01, 03 e 04 resolvidos; RVD-1-02 parcial
 feitos: `failed_attempt_count` herda o texto de `shipments`, que já dizia a aditividade (RVD-2-01); os
 cabeçalhos das duas fatos de remessa dizem que a P14 lê `fact_shipment` desde o F17 (RVD-2-02).
 
+### Rodada 14 — Codex conta 2, sobre `697fcd7` (14/11/2026)
+
+Relatório em `codex2_d66_r3.md`. RVD-1-02, RVD-2-01 e RVD-2-02 resolvidos, nenhum achado novo. **A
+revisão do bloco da D66 está fechada.** O *push* espera o fechamento da revisão do 1b, porque os
+*commits* dos dois blocos se intercalam no `main`.
+
