@@ -173,3 +173,14 @@ def test_a_imagem_do_debezium_e_entrada_do_release_e_o_airbyte_sai_antes_do_seu_
     dependencias = airbyte.split("depends_on = [", 1)[1].split("]", 1)[0]
     assert "google_bigquery_dataset.airbyte_internal" in dependencias
     assert "google_project_iam_member.ingestor_criar_dataset" in dependencias
+
+
+def test_a_concessao_por_tabela_do_log_de_execucao_nao_vai_ao_terraform_do_dataflow():
+    """ADR-0054: o `insert`/`update` do `transformer` no log é por tabela, e o `dataflow.tf` só traduz o
+    caminho quente; no BigQuery o IAM do log vai com `garantir_bigquery`, e a fase GCP está encerrada (Q14)."""
+    manifest = {"nodes": {}, "sources": {"source.p.governance.dbt_invocations": {
+        "schema": "governance", "name": "dbt_invocations",
+        "source_meta": {"writers": ["ingestor"], "grants": {"select": ["auditor", "transformer"]}},
+        "meta": {"grants": {"select": ["auditor", "transformer"], "insert": ["transformer"], "update": ["transformer"]}},
+    }}}
+    assert acesso.derivar(manifest)["pendentes_por_tabela"] == []

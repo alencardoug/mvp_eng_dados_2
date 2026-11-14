@@ -2683,6 +2683,127 @@ sources:
               Instante da fase 2, ou do abandono.
             meta:
               sensitivity: internal
+      - name: dbt_invocations
+        description: >
+          O log de execução (ADR-0023, ADR-0054): cada execução do dbt que escreve
+          o armazém e cada escrita suportada fora dele, em duas fases — aberta antes
+          de escrever, fechada no fim. Linha aberta bloqueia a procedência.
+        meta:
+          domain: transversal
+          owner: data_custodian
+          # O dbt abre e fecha a linha (`transformer`); a escrita fora do dbt usa o mesmo login.
+          # A identidade da `sequence` dispensa *grant* de sequência para inserir (medido, ADR-0054).
+          grants:
+            select: [auditor, transformer]
+            insert: [transformer]
+            update: [transformer]
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: [invocation_id]
+        columns:
+          - name: sequence
+            description: "A ordem de abertura, dada pelo banco (identidade); é por ela que a última execução se escolhe."
+            meta:
+              sensitivity: internal
+          - name: invocation_id
+            description: "O `invocation_id` do dbt, ou `<comando>-<uuid>` da escrita fora dele."
+            meta:
+              sensitivity: internal
+          - name: command
+            description: "O comando do dbt (`build`, `run`, `seed`, `snapshot`) ou da escrita fora dele (`drop_snapshots`, `test_fato`, `recovery_restore`, `airbyte_sync`)."
+            meta:
+              sensitivity: internal
+          - name: git_commit
+            description: "O `HEAD` que o `Makefile` exportou antes da execução; nulo quando ela não o informa (a DAG)."
+            meta:
+              sensitivity: internal
+          - name: git_tree_dirty
+            description: "Havia mudança rastreada, ou arquivo não rastreado nos insumos do dbt; nulo quando não informado."
+            meta:
+              sensitivity: internal
+          - name: inputs_confirmed
+            description: "Depois do dbt, commit, sujeira e digest dos insumos eram os de antes (o `CARIMBO_DEPOIS`)."
+            meta:
+              sensitivity: internal
+          - name: dbt_version
+            description: "A versão do dbt da execução; nula na escrita fora dele."
+            meta:
+              sensitivity: internal
+          - name: target
+            description: "O *target* do *profile* do dbt; nulo na escrita fora dele."
+            meta:
+              sensitivity: internal
+          - name: started_at
+            description: "Instante da abertura, do relógio do banco."
+            meta:
+              sensitivity: internal
+          - name: finished_at
+            description: "Instante do fecho, do relógio do banco; nulo enquanto aberta ou se abandonada."
+            meta:
+              sensitivity: internal
+          - name: abandoned_at
+            description: "Instante em que o custodiante a marcou abandonada (`make governance-abandonar`)."
+            meta:
+              sensitivity: internal
+          - name: full_build
+            description: "Os resultados cobriram todo nó executável do grafo (medido no fecho, não lido dos argumentos)."
+            meta:
+              sensitivity: internal
+          - name: status
+            description: "`started`, `success`, `failed` ou `abandoned`."
+            meta:
+              sensitivity: internal
+            data_tests:
+              - accepted_values:
+                  values: [started, success, failed, abandoned]
+          - name: result_counts
+            description: "Quantos nós em cada estado do dbt (`success`, `pass`, `warn`, `error`, `fail`…)."
+            meta:
+              sensitivity: internal
+          - name: job_id
+            description: "O job do Airbyte, na sincronização registrada (`airbyte_sync`)."
+            meta:
+              sensitivity: internal
+      - name: warehouse_provenance
+        description: >
+          A procedência do armazém (ADR-0054): `verified` só quando a última execução
+          é um build integral, aprovado, de commit conhecido e limpo, com os insumos
+          confirmados, sem nada aberto nem sobreposto; senão `not_verified`, com o motivo.
+          É o que o BI lê na transação de captura, e o pacote de metadados também.
+        meta:
+          domain: transversal
+          owner: data_custodian
+          grants:
+            select: [auditor, transformer]
+        columns:
+          - name: status
+            description: "`verified` ou `not_verified`."
+            meta:
+              sensitivity: internal
+            data_tests:
+              - accepted_values:
+                  values: [verified, not_verified]
+          - name: reason
+            description: "Por que não é verificada (`open_execution`, `partial_execution`, `dirty_tree`…); nulo quando é."
+            meta:
+              sensitivity: internal
+          - name: invocation_id
+            description: "A última execução, a candidata."
+            meta:
+              sensitivity: internal
+          - name: built_from_commit
+            description: "O commit da candidata."
+            meta:
+              sensitivity: internal
+          - name: built_at
+            description: "Quando a candidata terminou."
+            meta:
+              sensitivity: internal
+          - name: sequence
+            description: "A ordem da candidata no log."
+            meta:
+              sensitivity: internal
       - name: _versions
         description: >
           Migrações do schema `governance` já aplicadas (`mvp_ed1.governance`):

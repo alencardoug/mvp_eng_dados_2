@@ -14,7 +14,7 @@ from mvp_ed1 import governance
 #: O tipo do PostgreSQL e o do BigQuery que guardam o mesmo valor. `integer` vira INT64: o BigQuery
 #: só tem um inteiro, e o certificado nunca conta mais que o `integer` local aceita.
 EQUIVALENTE = {"TEXT": "TEXT", "BIGINT": "BIGINT", "INT": "BIGINT", "BOOLEAN": "BOOLEAN",
-               "TIMESTAMPTZ": "TIMESTAMPTZ"}
+               "TIMESTAMPTZ": "TIMESTAMPTZ", "JSONB": "JSON"}
 
 
 def _colunas(sql: str, dialeto: str) -> dict[str, tuple[str, bool]]:
@@ -27,8 +27,8 @@ def _colunas(sql: str, dialeto: str) -> dict[str, tuple[str, bool]]:
     return saida
 
 
-def _create(migracoes) -> str:
-    return next(c for c in dict(migracoes)["0001_legacy_captures"] if "create table" in c)
+def _create(migracoes, migracao: str = "0001_legacy_captures") -> str:
+    return next(c for c in dict(migracoes)[migracao] if "create table" in c)
 
 
 def test_as_migracoes_tem_os_mesmos_nomes_na_mesma_ordem():
@@ -38,6 +38,14 @@ def test_as_migracoes_tem_os_mesmos_nomes_na_mesma_ordem():
 def test_o_certificado_tem_as_mesmas_colunas_tipos_e_nulidade():
     local = _colunas(_create(governance.MIGRACOES), "postgres")
     nuvem = _colunas(_create(governance.MIGRACOES_BIGQUERY).format(projeto="p", dataset="governance"), "bigquery")
+    assert list(local) == list(nuvem) and local == nuvem
+
+
+def test_o_log_de_execucao_tem_as_mesmas_colunas_tipos_e_nulidade():
+    """ADR-0054: o log nasce nos dois armazéns, com as mesmas colunas, na mesma ordem."""
+    local = _colunas(_create(governance.MIGRACOES, "0003_dbt_invocations"), "postgres")
+    nuvem = _colunas(_create(governance.MIGRACOES_BIGQUERY, "0003_dbt_invocations").format(projeto="p", dataset="governance"),
+                     "bigquery")
     assert list(local) == list(nuvem) and local == nuvem
 
 

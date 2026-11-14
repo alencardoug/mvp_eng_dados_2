@@ -57,8 +57,13 @@ DBT := set -a; . ./.env; set +a; cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt
 # invocação que a de antes (pelo relógio não se sabe, RVB4-2-05). O pacote recusa o manifest de
 # outra execução ou de outros insumos. Se o dbt não reescreveu o manifest, o carimbo antigo sai.
 # O código de saída é sempre o do dbt; o `cd` volta porque o `$(DBT)` entra em `dbt/`.
-CARIMBO_ANTES := dig=$$(.venv/bin/python -m mvp_ed1.models.pacote --digest-do-dbt) || exit 1; ant=$$(.venv/bin/python -m mvp_ed1.models.pacote --invocacao-do-manifest) || exit 1
-CARIMBO_DEPOIS := st=$$?; cd "$(CURDIR)" && .venv/bin/python -m mvp_ed1.models.pacote --carimbar "$$dig" "$$ant"; exit $$st
+#
+# O log de execução (ADR-0054) usa o mesmo par: antes, o commit e a sujeira do build vão ao
+# ambiente (`MVP_GIT_COMMIT`, `MVP_GIT_TREE_DIRTY`), que a abertura do log lê; depois, se o dbt
+# escreveu um manifest novo, `confirmar-insumos` mede de novo commit, sujeira e digest e só marca
+# `inputs_confirmed` se os três são os de antes. O `.env` já foi lido pelo `$(DBT)`, no mesmo shell.
+CARIMBO_ANTES := dig=$$(.venv/bin/python -m mvp_ed1.models.pacote --digest-do-dbt) || exit 1; ant=$$(.venv/bin/python -m mvp_ed1.models.pacote --invocacao-do-manifest) || exit 1; set -- $$(.venv/bin/python -m mvp_ed1.models.pacote --git-do-build) || exit 1; export MVP_GIT_COMMIT="$$1" MVP_GIT_TREE_DIRTY="$$2"
+CARIMBO_DEPOIS := st=$$?; cd "$(CURDIR)" && .venv/bin/python -m mvp_ed1.models.pacote --carimbar "$$dig" "$$ant"; inv=$$(.venv/bin/python -m mvp_ed1.models.pacote --invocacao-do-manifest); [ "$$inv" = "$$ant" ] || .venv/bin/python -m mvp_ed1.governance confirmar-insumos "$$inv" "$$MVP_GIT_COMMIT" "$$MVP_GIT_TREE_DIRTY" "$$dig"; exit $$st
 
 # Credenciais do Airbyte no momento da execução; nunca gravadas em arquivo.
 CREDENCIAIS = eval "$$($(ABCTL) local credentials 2>/dev/null \
@@ -159,7 +164,7 @@ endef
         migrate migrate-down migrate-new migrate-status migrate-legacy migrate-legacy-down \
         migrate-legacy-status migrate-legacy-new catalog seed-data seed-plan size-report test test-carga \
         tools airbyte-up airbyte-down airbyte-credentials airbyte-config airbyte-plan sync-airbyte \
-        dbt-build dbt-drop-snapshots dbt-test dbt-docs airflow-up airflow-down dag-run dag-status \
+        dbt-build dbt-drop-snapshots governance-abandonar dbt-test dbt-docs airflow-up airflow-down dag-run dag-status \
         stream-up stream-down stream-connector stream-status stream-run stream-produce \
         stream-duplicate stream-alerts stream-reset-sink \
         preflight airbyte-pause airbyte-resume stream-pause stream-resume \
@@ -304,7 +309,8 @@ catalog: require-venv ## Regenera dicionário, inventário, diagrama ER, a class
 	@# do dbt, ou com o manifest de outra execução que não a do carimbo sobre os insumos de agora,
 	@# não escreve nada; o `check-offline` confere que ele está em dia com os insumos, e o `check`
 	@# completo, com os resultados.
-	@.venv/bin/python -m mvp_ed1.models.pacote
+	@# A procedência do armazém (ADR-0054) é a única leitura do banco que o pacote faz: o `.env` dá a conexão.
+	@set -a; [ -f .env ] && . ./.env; set +a; .venv/bin/python -m mvp_ed1.models.pacote
 
 seed-data: require-env require-venv ## Gera e carrega os dados sintéticos; SCALE, SEED, AS_OF, FORCE=1
 	@$(GERADOR) seed \
@@ -810,13 +816,14 @@ dbt-rebuild: require-env require-venv ## Reconstrói TUDO sem derrubar os snapsh
 
 dbt-drop-snapshots: require-env require-venv ## DESTRÓI o histórico SCD; use depois de regerar a origem
 	@echo "descartando o schema 'snapshots' — o histórico SCD será refeito do zero"
-	@set -a; . ./.env; set +a; \
-		PGPASSWORD="$$WAREHOUSE_DB_PASSWORD" .venv/bin/python -c "\
-import os, sqlalchemy as sa; \
-from mvp_ed1.db import database_url, WAREHOUSE; \
-e = sa.create_engine(database_url(WAREHOUSE)); \
-c = e.connect(); c.execute(sa.text('drop schema if exists snapshots cascade')); c.commit(); \
-print('  schema snapshots descartado')"
+	@# Registrado no log de execução antes de apagar (ADR-0054): interrompido, deixa a linha aberta.
+	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.governance descartar-snapshots
+
+governance-abandonar: require-env require-venv ## Marca abandonada uma execução aberta do log; INVOCACAO= (ato do custodiante)
+	@# A linha aberta bloqueia a procedência (ADR-0054). Abandoná-la é afirmar que a execução não
+	@# escreve mais — o custodiante confere antes; nunca a dá por sucesso.
+	@test -n "$(INVOCACAO)" || { echo "INVOCACAO= é obrigatório: o invocation_id da linha aberta"; exit 2; }
+	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.governance abandonar "$(INVOCACAO)"
 
 dbt-test: require-env require-venv ## Somente os testes de dados
 	@$(CARIMBO_ANTES); $(DBT) test $(DBT_ARGS); $(CARIMBO_DEPOIS)
@@ -871,7 +878,7 @@ check: require-env require-venv ## Verificação completa, parando na primeira f
 	@# Depois do pytest, e não dentro dele: o JUnit só existe inteiro quando a suíte termina, e uma
 	@# asserção na mesma execução leria o relatório anterior (RVB4-1-01). Não escreve nada.
 	@echo "── 5/5 pacote de metadados em dia com os resultados desta execução ──"
-	@.venv/bin/python -m mvp_ed1.models.pacote --check
+	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.models.pacote --check
 	@echo "check: as cinco etapas passaram"
 
 check-offline: require-env require-venv ## O que se confere sem nada de pé: segredos, documentos e a suíte sem os testes de integração

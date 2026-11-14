@@ -16,7 +16,11 @@ O que **não** sai daqui:
 - a concessão por tabela que substitui a da fonte (`raw.inventory_movements_stream`, do
   `streamer`): a tabela nasce com o caminho quente (`streaming/nuvem.py::garantir_tabela`, pelo
   `make gcp-dataflow-tabela`), e o IAM dela vai com ela, no degrau do Dataflow
-  (`terraform/dataflow.tf`, que lê `pendentes_por_tabela` deste arquivo).
+  (`terraform/dataflow.tf`, que lê `pendentes_por_tabela` deste arquivo);
+- a concessão por tabela de `governance` — a do log de execução (ADR-0054), que o `transformer`
+  abre e fecha. No BigQuery a tabela nasce com `governance.garantir_bigquery`, e o IAM dela vai com
+  ela, como o da tabela do *stream* vai com o Dataflow. A fase GCP está encerrada e nada novo se cria
+  nela (Q14): fica declarada no dbt, aplicada no PostgreSQL e fora deste arquivo, até a fase voltar.
 """
 
 from __future__ import annotations
@@ -48,6 +52,8 @@ LEITURA = "roles/bigquery.dataViewer"
 #: o `create or replace view` da `skus_below_reorder_point` foi negado no `raw` (Registro §55,
 #: passo 9). Não é papel predefinido: o Terraform troca o nome pelo id do papel do projeto.
 AUTORIZAR = "mvpAutorizarViews"
+#: Schemas cuja concessão **por tabela** não sai daqui (ver a docstring): o log de execução.
+FORA_DO_GCP = frozenset({"governance"})
 
 
 def derivar(manifest: dict) -> dict:
@@ -76,7 +82,7 @@ def derivar(manifest: dict) -> dict:
             leitores.setdefault(fonte["schema"], set()).update(papeis)
         # `meta` da tabela herda o da fonte no manifest; o que difere é a substituição.
         proprio = (fonte.get("meta") or {}).get("grants")
-        if proprio is not None and proprio != meta_fonte.get("grants"):
+        if proprio is not None and proprio != meta_fonte.get("grants") and fonte["schema"] not in FORA_DO_GCP:
             pendentes.append({"tabela": f"{fonte['schema']}.{fonte['name']}",
                               "grants": {k: sorted(v) for k, v in sorted(proprio.items())}})
 

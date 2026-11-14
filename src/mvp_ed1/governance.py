@@ -27,11 +27,13 @@ histórico; até lá, é o que impede DDL solto.
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import hmac
 import os
 import re
 import secrets
+import uuid
 
 from sqlalchemy import Engine, text
 
@@ -137,7 +139,85 @@ MIGRACOES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "'Identidade da captura = job de sincronização (_airbyte_meta.sync_id); desde 15/09/2026, não a geração, que é por stream.'",
         ),
     ),
+    (
+        # O log de execução da ADR-0023 materializado para o dbt e para as escritas do armazém fora
+        # dele (ADR-0054): duas fases por linha, como `legacy_captures`.
+        "0003_dbt_invocations",
+        (
+            f"""
+            create table if not exists {SCHEMA}.dbt_invocations (
+                sequence             bigint      not null generated always as identity primary key,
+                invocation_id        text        not null unique,
+                command              text        not null,
+                git_commit           text,
+                git_tree_dirty       boolean,
+                inputs_confirmed     boolean     not null default false,
+                dbt_version          text,
+                target               text,
+                started_at           timestamptz not null default clock_timestamp(),
+                finished_at          timestamptz,
+                abandoned_at         timestamptz,
+                full_build           boolean,
+                status               text        not null default 'started',
+                result_counts        jsonb,
+                job_id               bigint,
+                constraint ck_dbt_invocations_status check (status in ('started', 'success', 'failed', 'abandoned')),
+                constraint ck_dbt_invocations_commit check (git_commit is null or git_commit ~ '^[0-9a-f]{{40}}$'),
+                constraint ck_dbt_invocations_fecho check (
+                    (status = 'started' and finished_at is null and abandoned_at is null)
+                    or (status in ('success', 'failed') and finished_at is not null and abandoned_at is null)
+                    or (status = 'abandoned' and abandoned_at is not null and finished_at is null)
+                )
+            )
+            """,
+            f"""
+            comment on table {SCHEMA}.dbt_invocations is
+            'Log de execução (ADR-0023, ADR-0054): cada execução do dbt que escreve o armazém e cada escrita suportada fora dele, em duas fases — aberta antes de escrever, fechada no fim. Linha aberta bloqueia a procedência.'
+            """,
+            f"""
+            create or replace view {SCHEMA}.warehouse_provenance as
+            with ultima as (
+                select * from {SCHEMA}.dbt_invocations order by sequence desc limit 1
+            ), abertas as (
+                select count(*) as n from {SCHEMA}.dbt_invocations where status = 'started'
+            ), sobrepostas as (
+                select count(*) as n from {SCHEMA}.dbt_invocations i, ultima u
+                where i.sequence < u.sequence and coalesce(i.finished_at, i.abandoned_at) >= u.started_at
+            ), motivo as (
+                select u.*, case
+                    when u.sequence is null then 'no_execution'
+                    when a.n > 0 then 'open_execution'
+                    when u.status = 'abandoned' then 'abandoned_execution'
+                    when u.status <> 'success' then 'failed_execution'
+                    when u.full_build is not true then 'partial_execution'
+                    when u.git_commit is null then 'unknown_commit'
+                    when u.git_tree_dirty is not false then 'dirty_tree'
+                    when not u.inputs_confirmed then 'inputs_not_confirmed'
+                    when s.n > 0 then 'overlapping_execution'
+                end as reason
+                from (select 1) as x left join ultima u on true cross join abertas a cross join sobrepostas s
+            )
+            select case when reason is null then 'verified' else 'not_verified' end as status,
+                   reason,
+                   invocation_id,
+                   git_commit                as built_from_commit,
+                   finished_at               as built_at,
+                   sequence
+            from motivo
+            """,
+            f"""
+            comment on view {SCHEMA}.warehouse_provenance is
+            'A procedência do armazém (ADR-0054): verified só quando a última execução é um build integral, aprovado, de commit conhecido e limpo, com os insumos confirmados, sem nada aberto nem sobreposto; senão not_verified, com o motivo.'
+            """,
+        ),
+    ),
 )
+
+#: O que a regra de leitura pode responder, na ordem em que a *view* testa (ADR-0054).
+MOTIVOS = ("no_execution", "open_execution", "abandoned_execution", "failed_execution", "partial_execution",
+           "unknown_commit", "dirty_tree", "inputs_not_confirmed", "overlapping_execution")
+LOG = f"{SCHEMA}.dbt_invocations"
+PROCEDENCIA = f"{SCHEMA}.warehouse_provenance"
 
 
 def _garantir_papeis(conexao) -> None:
@@ -346,6 +426,34 @@ MIGRACOES_BIGQUERY: tuple[tuple[str, tuple[str, ...]], ...] = (
             "(description = 'Identidade da captura = job de sincronização (_airbyte_meta.sync_id); desde 15/09/2026, não a geração, que é por stream.')",
         ),
     ),
+    (
+        # Sem identidade nem `check` no BigQuery: a ordem vem de quem escreve (o maior `sequence` mais
+        # um, numa transação de várias instruções), e as regras de estado e de fecho, de testes da fonte.
+        "0003_dbt_invocations",
+        (
+            """
+            create table if not exists `{projeto}.{dataset}.dbt_invocations` (
+                sequence             int64     not null,
+                invocation_id        string    not null,
+                command              string    not null,
+                git_commit           string,
+                git_tree_dirty       bool,
+                inputs_confirmed     bool      not null,
+                dbt_version          string,
+                target               string,
+                started_at           timestamp not null,
+                finished_at          timestamp,
+                abandoned_at         timestamp,
+                full_build           bool,
+                status               string    not null,
+                result_counts        json,
+                job_id               int64,
+                primary key (sequence) not enforced
+            )
+            options (description = 'Log de execução (ADR-0023, ADR-0054): cada execução do dbt que escreve o armazém e cada escrita suportada fora dele, em duas fases.')
+            """,
+        ),
+    ),
 )
 
 
@@ -425,6 +533,83 @@ def garantir(engine: Engine, leitor: tuple[str, str] | None = None) -> list[str]
     return aplicadas
 
 
+# ── O log de execução (ADR-0054) ──────────────────────────────────────────────
+
+def _git_do_ambiente(ambiente: dict[str, str] | None = None) -> tuple[str | None, bool | None]:
+    """`(commit, sujo)` que o `CARIMBO_ANTES` do `Makefile` exporta; `None` quando não informados."""
+    ambiente = os.environ if ambiente is None else ambiente
+    commit = ambiente.get("MVP_GIT_COMMIT") or None
+    sujo = {"true": True, "false": False}.get((ambiente.get("MVP_GIT_TREE_DIRTY") or "").lower())
+    return (commit if commit and re.fullmatch(r"[0-9a-f]{40}", commit) else None), sujo
+
+
+def abrir(engine: Engine, invocation_id: str, command: str, ambiente: dict[str, str] | None = None) -> None:
+    """A primeira fase: a linha `started`, **confirmada** antes de qualquer escrita (o `begin()` sai com `commit`)."""
+    commit, sujo = _git_do_ambiente(ambiente)
+    with engine.begin() as conexao:
+        conexao.execute(text(f"insert into {LOG} (invocation_id, command, git_commit, git_tree_dirty, full_build) "
+                             "values (:i, :c, :g, :s, false)"),
+                        {"i": invocation_id, "c": command, "g": commit, "s": sujo})
+
+
+def fechar(engine: Engine, invocation_id: str, status: str, job_id: int | None = None) -> int:
+    """A segunda fase de uma escrita fora do dbt: `success` ou `failed`. Só fecha linha aberta."""
+    with engine.begin() as conexao:
+        return conexao.execute(text(f"update {LOG} set status = :s, finished_at = clock_timestamp(), "
+                                    "job_id = coalesce(:j, job_id) where invocation_id = :i and status = 'started'"),
+                               {"s": status, "i": invocation_id, "j": job_id}).rowcount
+
+
+@contextlib.contextmanager
+def registrar_mutacao(engine: Engine, command: str, ambiente: dict[str, str] | None = None):
+    """Toda escrita suportada do armazém **fora do dbt** passa por aqui (ADR-0054): a linha abre e confirma
+    antes, e fecha depois — `success`, ou `failed` se a escrita levantou. Interrompida (o processo morto),
+    a linha fica aberta e bloqueia a procedência até `make governance-abandonar`. Devolve o identificador."""
+    invocacao = f"{command}-{uuid.uuid4()}"
+    abrir(engine, invocacao, command, ambiente)
+    try:
+        yield invocacao
+    except BaseException:
+        fechar(engine, invocacao, "failed")
+        raise
+    fechar(engine, invocacao, "success")
+
+
+def abandonar(engine: Engine, invocation_id: str) -> int:
+    """O ato explícito do custodiante: a linha aberta passa a `abandoned`, com o instante — nunca a sucesso."""
+    with engine.begin() as conexao:
+        return conexao.execute(text(f"update {LOG} set status = 'abandoned', abandoned_at = clock_timestamp() "
+                                    "where invocation_id = :i and status = 'started'"), {"i": invocation_id}).rowcount
+
+
+def confirmar_insumos(engine: Engine, invocation_id: str, antes: tuple[str, str, str],
+                      depois: tuple[str, str, str]) -> str:
+    """`inputs_confirmed` só vira verdadeiro se *commit*, sujeira e digest dos insumos do dbt são, depois do
+    dbt, os mesmos de antes (RVL5-3-02). Senão fica falso, e a execução não é verificada.
+
+    Devolve `confirmados`, `mudaram` ou `sem_linha` (o comando não registra: `dbt test`, `docs generate`)."""
+    if antes != depois:
+        return "mudaram"
+    with engine.begin() as conexao:
+        n = conexao.execute(text(f"update {LOG} set inputs_confirmed = true where invocation_id = :i"),
+                            {"i": invocation_id}).rowcount
+    return "confirmados" if n else "sem_linha"
+
+
+def descartar_snapshots(engine: Engine) -> None:
+    """O descarte do histórico SCD (`dbt-build RESET=1`, `dbt-drop-snapshots`), registrado como escrita fora
+    do dbt (ADR-0054, RVL5-3-01): a linha abre **antes** de apagar, e uma interrupção a deixa aberta."""
+    with registrar_mutacao(engine, "drop_snapshots"):
+        with engine.begin() as conexao:
+            conexao.execute(text("drop schema if exists snapshots cascade"))
+
+
+def procedencia(engine: Engine) -> dict:
+    """A regra de leitura, que é uma só: a *view* `governance.warehouse_provenance`."""
+    with engine.connect() as conexao:
+        return dict(conexao.execute(text(f"select * from {PROCEDENCIA}")).mappings().one())
+
+
 def versoes(engine: Engine) -> list[str]:
     with engine.connect() as conexao:
         try:
@@ -447,9 +632,40 @@ def main(argv: list[str] | None = None) -> int:
     from mvp_ed1.db import WAREHOUSE, database_url
 
     parser = argparse.ArgumentParser(prog="python -m mvp_ed1.governance")
-    parser.add_argument("comando", choices=["garantir", "versoes"])
+    parser.add_argument("comando", choices=["garantir", "versoes", "procedencia", "abandonar", "confirmar-insumos",
+                                                  "descartar-snapshots"])
+    parser.add_argument("argumentos", nargs="*")
     args = parser.parse_args(argv)
     engine = create_engine(database_url(WAREHOUSE))
+    if args.comando == "descartar-snapshots":
+        descartar_snapshots(engine)
+        print("  schema snapshots descartado (registrado em governance.dbt_invocations)")
+        return 0
+    if args.comando == "procedencia":
+        estado = procedencia(engine)
+        print(" · ".join(f"{k}={v}" for k, v in estado.items()))
+        return 0
+    if args.comando == "abandonar":
+        if len(args.argumentos) != 1:
+            parser.error("abandonar INVOCATION_ID")
+        n = abandonar(engine, args.argumentos[0])
+        print(f"governance: {n} execução aberta marcada abandoned" if n else
+              f"governance: nenhuma execução aberta com o id {args.argumentos[0]}")
+        return 0 if n else 1
+    if args.comando == "confirmar-insumos":
+        # INVOCATION COMMIT_ANTES SUJO_ANTES DIGEST_ANTES: o depois é medido aqui.
+        if len(args.argumentos) != 4:
+            parser.error("confirmar-insumos INVOCATION_ID COMMIT SUJO DIGEST")
+        from mvp_ed1.models import pacote
+
+        invocacao, *antes = args.argumentos
+        depois = (pacote.commit_atual(), pacote.sujeira_do_build(), pacote.digest_do_dbt())
+        resultado = confirmar_insumos(engine, invocacao, tuple(antes), depois)
+        print({"confirmados": "governance: insumos do build confirmados no log",
+               "mudaram": "governance: aviso — o commit, a sujeira ou os insumos mudaram durante o build; "
+                          "a execução não é verificada",
+               "sem_linha": "governance: esta execução não escreve o armazém; nada a confirmar"}[resultado])
+        return 0
     if args.comando == "garantir":
         leitor = leitor_do_ambiente()
         aplicadas = garantir(engine, leitor)

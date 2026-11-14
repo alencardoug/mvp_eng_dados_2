@@ -62,6 +62,9 @@ POLITICA: dict[str, dict[str, list[str]]] = {
 #: caminho quente é escrita pelo Beam, e o `returning` do `insert` lê a chave.
 EXCECOES: dict[tuple[str, str], dict[str, list[str]]] = {
     ("raw", "inventory_movements_stream"): {"select": ["streamer", "transformer"], "insert": ["streamer"]},
+    # O log de execução (ADR-0054): o dbt o abre e fecha; leem o auditor e o dbt.
+    ("governance", "dbt_invocations"): {"select": ["auditor", "transformer"], "insert": ["transformer"],
+                                        "update": ["transformer"]},
 }
 
 ATERRISSAGEM = ("raw", "inventory_movements_stream")
@@ -475,12 +478,24 @@ def test_o_que_fica_aberto_ao_leitor_e_o_classificado(motor) -> None:
 def test_o_servidor_recusa_o_que_verifica_por_dentro(motor, leitor) -> None:
     """As famílias de "verificadas pelo servidor", chamadas pelo leitor: cada uma recusada, e nada fica."""
     with motor.connect() as conexao:
-        objetos = conexao.execute(text(
-            "select (select count(*) from pg_class c join pg_am a on a.oid = c.relam"
-            "        where c.relkind = 'i' and a.amname in ('brin', 'gin')),"
-            "       (select count(*) from pg_class where relkind = 'S')"
-        )).one()
-    assert tuple(objetos) == (0, 0), "índice BRIN/GIN ou sequência no armazém: sonde as \"verificadas no objeto\""
+        indices = conexao.execute(text(
+            "select count(*) from pg_class c join pg_am a on a.oid = c.relam"
+            " where c.relkind = 'i' and a.amname in ('brin', 'gin')"
+        )).scalar_one()
+        # A identidade do log de execução (ADR-0054) é uma sequência: a primeira do armazém. Ela não muda
+        # a família — o leitor não alcança `nextval` nem `setval` de sequência nenhuma, e é o que se sonda.
+        sequencias = conexao.execute(text(
+            "select c.oid::regclass::text from pg_class c where c.relkind = 'S' order by 1"
+        )).scalars().all()
+    assert indices == 0, "índice BRIN/GIN no armazém: sonde as \"verificadas no objeto\""
+    for sequencia in sequencias:
+        for comando in (f"select nextval('{sequencia}')", f"select setval('{sequencia}', 1)"):
+            with leitor.connect() as conexao:
+                conexao.execute(text("set transaction read write"))
+                with pytest.raises(DBAPIError) as erro:
+                    conexao.execute(text(comando))
+                assert erro.value.orig.sqlstate == "42501", (comando, str(erro.value.orig))
+                conexao.rollback()
     aceitas: list[str] = []
     try:
         with motor.connect() as alvo:

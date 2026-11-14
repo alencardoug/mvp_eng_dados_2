@@ -918,7 +918,13 @@ def test_dbt_docs_gera_e_serve(tmp_path):
 
 #: O `python` que responde o digest dos insumos do dbt e a invocação do manifest anterior, como o real.
 PYTHON_DO_DIGEST = (REGISTRADOR + 'case "$*" in *--digest-do-dbt*) echo "d1g357";; '
-                    '*--invocacao-do-manifest*) echo "inv-0";; esac\n')
+                    '*--invocacao-do-manifest*) echo "inv-0";; '
+                    '*--git-do-build*) echo "' + "c" * 40 + ' false";; esac\n')
+#: O mesmo, com o dbt escrevendo um manifest novo: a segunda leitura da invocação é outra.
+PYTHON_DO_MANIFEST_NOVO = (REGISTRADOR + 'case "$*" in *--digest-do-dbt*) echo "d1g357";; '
+                           '*--invocacao-do-manifest*) if [ -f "$SIM_LOG.inv" ]; then echo "inv-1"; '
+                           'else echo "inv-0"; touch "$SIM_LOG.inv"; fi;; '
+                           '*--git-do-build*) echo "' + "c" * 40 + ' false";; esac\n')
 #: O `dbt` que falha como um build com teste vermelho: o código tem de chegar ao `make`.
 DBT_QUE_FALHA = REGISTRADOR + "exit 1\n"
 
@@ -937,9 +943,22 @@ def test_todo_comando_do_dbt_que_escreve_o_manifest_e_carimbado(tmp_path, alvo, 
     dbt = [c for c in chamadas if c.startswith("dbt ")]
     assert dbt == [comando], chamadas
     i = chamadas.index(comando)
-    assert chamadas[i - 2:i] == ["python -m mvp_ed1.models.pacote --digest-do-dbt",
-                                 "python -m mvp_ed1.models.pacote --invocacao-do-manifest"], chamadas
-    assert chamadas[i + 1] == "python -m mvp_ed1.models.pacote --carimbar d1g357 inv-0", chamadas
+    assert chamadas[i - 3:i] == ["python -m mvp_ed1.models.pacote --digest-do-dbt",
+                                 "python -m mvp_ed1.models.pacote --invocacao-do-manifest",
+                                 "python -m mvp_ed1.models.pacote --git-do-build"], chamadas
+    assert chamadas[i + 1:i + 3] == ["python -m mvp_ed1.models.pacote --carimbar d1g357 inv-0",
+                                     "python -m mvp_ed1.models.pacote --invocacao-do-manifest"], chamadas
+    # O manifest não mudou (o dublê do dbt não escreve): nada a confirmar no log.
+    assert not any("confirmar-insumos" in c for c in chamadas), chamadas
+
+
+def test_o_manifest_novo_confirma_os_insumos_com_o_que_foi_exportado(tmp_path):
+    """ADR-0054: depois do dbt, a confirmação dos insumos recebe a invocação nova e o commit e a sujeira
+    que o `CARIMBO_ANTES` exportou ao dbt."""
+    r, chamadas = _make(tmp_path, "dbt-build", simulados={".venv/bin/python": PYTHON_DO_MANIFEST_NOVO})
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert chamadas[-1] == f"python -m mvp_ed1.governance confirmar-insumos inv-1 {'c' * 40} false d1g357", chamadas
 
 
 def test_o_carimbo_nao_esconde_a_falha_do_dbt(tmp_path):

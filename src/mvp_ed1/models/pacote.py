@@ -140,6 +140,22 @@ def digest_do_dbt(raiz: pathlib.Path = ROOT) -> str:
     return digest([c for c in insumos(raiz) if c.startswith(INSUMOS_DO_DBT)], raiz)
 
 
+def commit_atual(raiz: pathlib.Path = ROOT) -> str:
+    """O `HEAD` do *checkout*: o *commit* que o `CARIMBO_ANTES` exporta ao dbt (ADR-0054)."""
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=raiz, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def sujeira_do_build(raiz: pathlib.Path = ROOT) -> str:
+    """`true` se o *build* não é o do `HEAD` limpo (ADR-0054, RVL5-2-04): mudança em arquivo **rastreado**,
+    em qualquer lugar, ou arquivo **não rastreado e não ignorado** nos insumos do dbt — o modelo novo fora
+    do Git entra no *build*. Os artefatos ignorados (`dbt/target`) não sujam. Texto, para o ambiente."""
+    rastreado = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=raiz,
+                               capture_output=True, text=True, check=True).stdout.strip()
+    solto = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", *INSUMOS_DO_DBT], cwd=raiz,
+                           capture_output=True, text=True, check=True).stdout.strip()
+    return "true" if rastreado or solto else "false"
+
+
 def invocacao_do_manifest(manifest: pathlib.Path = MANIFEST) -> str:
     """O `invocation_id` do *manifest* em `dbt/target`, ou `-` sem ele: o que havia **antes** do comando."""
     if not manifest.exists():
@@ -699,6 +715,9 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:1] == ["--invocacao-do-manifest"]:
         print(invocacao_do_manifest())
         return 0
+    if argv[:1] == ["--git-do-build"]:
+        print(commit_atual(), sujeira_do_build())
+        return 0
     if argv[:1] == ["--carimbar"] and len(argv) == 3:
         carimbar(argv[1], argv[2])
         return 0
@@ -707,7 +726,7 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:1] == ["--conferir-pytest"]:
         return conferir_pytest()
     if argv:
-        print(f"uso: python -m mvp_ed1.models.pacote [--check | --conferir-pytest | --digest-do-dbt | --invocacao-do-manifest | --carimbar DIGEST INVOCACAO_ANTES]; recebido {argv}",
+        print(f"uso: python -m mvp_ed1.models.pacote [--check | --conferir-pytest | --digest-do-dbt | --invocacao-do-manifest | --git-do-build | --carimbar DIGEST INVOCACAO_ANTES]; recebido {argv}",
               file=sys.stderr)
         return 2
     pacote = _montar_conferido()

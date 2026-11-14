@@ -25,8 +25,14 @@ clean-targets: ["target", "dbt_packages"]
 # Acesso por camada, nível de schema (Governança §7). O `+grants` de cada camada
 # abaixo é aplicado pelo dbt objeto a objeto; `usage` e `create` no schema, os
 # grants das fontes e o `revoke` do que não está declarado saem desta macro.
+# O log de execução (ADR-0054): a abertura antes de qualquer nó; o fecho **por último**, depois do
+# acesso — se um *hook* anterior falha, o dbt pula o fecho, e a linha aberta bloqueia a procedência.
+on-run-start:
+  - "{{ registrar_abertura() }}"
 on-run-end:
   - "{{ aplicar_acesso_por_camada() }}"
+  - "{{ falha_de_teste_antes_do_fecho() }}"
+  - "{{ registrar_fecho(results) }}"
 
 vars:
   # O "hoje" da simulação. Precisa ser igual ao `periodo.as_of_date` de

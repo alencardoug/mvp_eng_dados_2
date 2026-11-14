@@ -301,6 +301,46 @@ COLUNAS_DO_CERTIFICADO: tuple[tuple[str, str], ...] = (
 )
 
 
+#: O log de execução (ADR-0054), coluna a coluna, na ordem do DDL da `0003_dbt_invocations`.
+COLUNAS_DO_LOG: tuple[tuple[str, str], ...] = (
+    ("sequence", "A ordem de abertura, dada pelo banco (identidade); é por ela que a última execução se escolhe."),
+    ("invocation_id", "O `invocation_id` do dbt, ou `<comando>-<uuid>` da escrita fora dele."),
+    ("command", "O comando do dbt (`build`, `run`, `seed`, `snapshot`) ou da escrita fora dele (`drop_snapshots`, `test_fato`, `recovery_restore`, `airbyte_sync`)."),
+    ("git_commit", "O `HEAD` que o `Makefile` exportou antes da execução; nulo quando ela não o informa (a DAG)."),
+    ("git_tree_dirty", "Havia mudança rastreada, ou arquivo não rastreado nos insumos do dbt; nulo quando não informado."),
+    ("inputs_confirmed", "Depois do dbt, commit, sujeira e digest dos insumos eram os de antes (o `CARIMBO_DEPOIS`)."),
+    ("dbt_version", "A versão do dbt da execução; nula na escrita fora dele."),
+    ("target", "O *target* do *profile* do dbt; nulo na escrita fora dele."),
+    ("started_at", "Instante da abertura, do relógio do banco."),
+    ("finished_at", "Instante do fecho, do relógio do banco; nulo enquanto aberta ou se abandonada."),
+    ("abandoned_at", "Instante em que o custodiante a marcou abandonada (`make governance-abandonar`)."),
+    ("full_build", "Os resultados cobriram todo nó executável do grafo (medido no fecho, não lido dos argumentos)."),
+    ("status", "`started`, `success`, `failed` ou `abandoned`."),
+    ("result_counts", "Quantos nós em cada estado do dbt (`success`, `pass`, `warn`, `error`, `fail`…)."),
+    ("job_id", "O job do Airbyte, na sincronização registrada (`airbyte_sync`)."),
+)
+
+#: A *view* da procedência (ADR-0054), coluna a coluna.
+COLUNAS_DA_PROCEDENCIA: tuple[tuple[str, str], ...] = (
+    ("status", "`verified` ou `not_verified`."),
+    ("reason", "Por que não é verificada (`open_execution`, `partial_execution`, `dirty_tree`…); nulo quando é."),
+    ("invocation_id", "A última execução, a candidata."),
+    ("built_from_commit", "O commit da candidata."),
+    ("built_at", "Quando a candidata terminou."),
+    ("sequence", "A ordem da candidata no log."),
+)
+
+
+def _colunas_yml(colunas: tuple[tuple[str, str], ...], testes: dict[str, str] | None = None) -> str:
+    import json
+
+    return "\n".join(
+        f"          - name: {nome}\n            description: {json.dumps(descricao, ensure_ascii=False)}\n"
+        f"            meta:\n              sensitivity: internal" + ((testes or {}).get(nome, ""))
+        for nome, descricao in colunas
+    )
+
+
 def sources_yml() -> str:
     """Declaração das 40 fontes do legado, gerada da mesma lista dos modelos.
 
@@ -346,6 +386,10 @@ def sources_yml() -> str:
            if nome == "status" else "")
         for nome, descricao in COLUNAS_DO_CERTIFICADO
     )
+    estados_do_log = "\n            data_tests:\n              - accepted_values:\n                  values: [started, success, failed, abandoned]"
+    estados_da_procedencia = "\n            data_tests:\n              - accepted_values:\n                  values: [verified, not_verified]"
+    log = _colunas_yml(COLUNAS_DO_LOG, {"status": estados_do_log})
+    procedencia = _colunas_yml(COLUNAS_DA_PROCEDENCIA, {"status": estados_da_procedencia})
     return f"""# Gerado por `make legacy-models`. Não edite: a lista sai dos modelos.
 
 version: 2
@@ -411,6 +455,39 @@ sources:
                 combination_of_columns: [capture_attempt_id, source_table]
         columns:
 {certificado}
+      - name: dbt_invocations
+        description: >
+          O log de execução (ADR-0023, ADR-0054): cada execução do dbt que escreve
+          o armazém e cada escrita suportada fora dele, em duas fases — aberta antes
+          de escrever, fechada no fim. Linha aberta bloqueia a procedência.
+        meta:
+          domain: transversal
+          owner: data_custodian
+          # O dbt abre e fecha a linha (`transformer`); a escrita fora do dbt usa o mesmo login.
+          # A identidade da `sequence` dispensa *grant* de sequência para inserir (medido, ADR-0054).
+          grants:
+            select: [auditor, transformer]
+            insert: [transformer]
+            update: [transformer]
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: [invocation_id]
+        columns:
+{log}
+      - name: warehouse_provenance
+        description: >
+          A procedência do armazém (ADR-0054): `verified` só quando a última execução
+          é um build integral, aprovado, de commit conhecido e limpo, com os insumos
+          confirmados, sem nada aberto nem sobreposto; senão `not_verified`, com o motivo.
+          É o que o BI lê na transação de captura, e o pacote de metadados também.
+        meta:
+          domain: transversal
+          owner: data_custodian
+          grants:
+            select: [auditor, transformer]
+        columns:
+{procedencia}
       - name: _versions
         description: >
           Migrações do schema `governance` já aplicadas (`mvp_ed1.governance`):
