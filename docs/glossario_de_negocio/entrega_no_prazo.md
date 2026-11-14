@@ -14,17 +14,19 @@ o pedido.
   `fact_shipment_item`.
 - **Relacionado:** ciclo de entrega, prazo prometido.
 
+**O denominador é o entregue, não o despachado.** Remessa em trânsito ainda não
+está atrasada — ela não chegou. Contá-la como fora do prazo trocaria "não chegou
+ainda" por "chegou tarde", que são coisas diferentes e levam a decisões
+diferentes. Remessa extraviada nunca entra no denominador, por não ter chegada.
+
+<!-- bigquery: fim do texto curto -->
+
 **O grão é a remessa porque a promessa é da remessa.** Transportadora e
 modalidade são atributos de quem leva a caixa, e um pedido dividido em duas
 remessas tem duas promessas — possivelmente de modalidades diferentes. Ele conta
 **duas vezes** aqui, e é o comportamento correto: foram duas promessas e duas
 chegadas. Quem quer a experiência do pedido inteiro usa o *ciclo de entrega*, que
 é outro conceito e não se soma a este.
-
-**O denominador é o entregue, não o despachado.** Remessa em trânsito ainda não
-está atrasada — ela não chegou. Contá-la como fora do prazo trocaria "não chegou
-ainda" por "chegou tarde", que são coisas diferentes e levam a decisões
-diferentes. Remessa extraviada nunca entra no denominador, por não ter chegada.
 
 **A data de chegada vem do livro de eventos**, não da coluna `delivered_at` da
 remessa (ADR-0034). A coluna guarda o estado corrente e é sobrescrita; o livro

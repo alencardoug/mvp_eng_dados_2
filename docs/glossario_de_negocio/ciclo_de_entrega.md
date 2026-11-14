@@ -13,15 +13,17 @@ o **pedido**.
   `order_to_delivery_days` em `fact_shipment` e `fact_shipment_item`.
 - **Relacionado:** entrega no prazo, prazo prometido.
 
-**O ciclo fecha na última remessa porque é quando o pedido chegou inteiro.** Um
-pedido dividido em duas caixas não está entregue quando a primeira chega — está
-pela metade. Medir pela primeira daria uma média sistematicamente otimista, e o
-erro cresceria com a fração de pedidos divididos.
-
 **Pedido sem ciclo fechado fica de fora.** Se qualquer remessa do pedido ainda
 está em trânsito, foi extraviada ou nunca saiu, o pedido não tem tempo até a
 entrega — tem tempo até agora, que é outra medida. Excluí-lo é o que impede a
 média de **melhorar** quando uma remessa se perde.
+
+<!-- bigquery: fim do texto curto -->
+
+**O ciclo fecha na última remessa porque é quando o pedido chegou inteiro.** Um
+pedido dividido em duas caixas não está entregue quando a primeira chega — está
+pela metade. Medir pela primeira daria uma média sistematicamente otimista, e o
+erro cresceria com a fração de pedidos divididos.
 
 **A modalidade é a da remessa que fechou o ciclo**, a última a chegar. É a única
 atribuição defensável quando um pedido viaja por duas transportadoras: foi ela

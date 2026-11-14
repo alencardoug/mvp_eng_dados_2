@@ -170,9 +170,9 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: event_type
-        description: "Estado do carrinho: open, converted, abandoned ou expired."
+        description: "Tipo do evento do ciclo de vida do carrinho: created (a criação), converted, abandoned ou expired. Não é o estado do carrinho, que usa open no lugar de created."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado é o do estado do carrinho, com open no lugar de created (F4)"
           sensitivity: internal
       - name: customer_id
         description: "Cliente dono do carrinho; nulo em sessão anônima."

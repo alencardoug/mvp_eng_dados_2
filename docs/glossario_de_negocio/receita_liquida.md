@@ -11,12 +11,12 @@ imposto: quantidade vendida × preço unitário praticado, menos o desconto conc
   `gross_revenue_amount`. Ambas são **aditivas**.
 - **Relacionado:** ticket médio, lucro bruto, desconto concedido.
 
-**Só pedido realizado conta.** Pedido realizado é o que chegou a ser pago: pago,
-em separação, enviado, entregue ou devolvido (`is_realised`). O pendente ainda
-pode não virar nada, e o cancelado não é venda. A regra vale para toda medida
-de venda: receita líquida e bruta, desconto, quantidade, número de pedidos,
-ticket médio, lucro bruto e o denominador de chamados por pedido. O pedido
-devolvido conta, porque houve venda; a devolução é outro fato.
+**Só pedido realizado conta**: o que chegou a ser pago (pago, em separação,
+enviado, entregue ou devolvido; `is_realised`). Pendente e cancelado não são
+venda. Vale para toda medida de venda: receitas, desconto, quantidade, pedidos,
+ticket médio, lucro bruto e o denominador de chamados por pedido.
+
+<!-- bigquery: fim do texto curto -->
 
 **Por que frete e imposto ficam de fora.** São duas razões independentes, e nenhuma é preferência
 de estilo. O imposto sobre venda é **dedução** na convenção contábil brasileira, não receita — e

@@ -10,6 +10,8 @@
 - **Implementado em:** view `cart_conversion_rate_by_channel`.
 - **Relacionado:** carrinho abandonado, ticket médio.
 
+<!-- bigquery: fim do texto curto -->
+
 **É medida não aditiva**, pelo mesmo motivo do ticket médio: taxas não se somam. A view entrega
 numerador e denominador ao lado do resultado.
 

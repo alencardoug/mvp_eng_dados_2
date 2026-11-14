@@ -811,7 +811,7 @@ models:
         data_tests:
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: event_type
-        description: "Estado do carrinho: open, converted, abandoned ou expired."
+        description: "Tipo do evento do ciclo de vida do carrinho: created (a criação), converted, abandoned ou expired. Não é o estado do carrinho, que usa open no lugar de created."
         meta:
           description_inherited: true
           sensitivity: internal
@@ -1727,9 +1727,9 @@ models:
         data_tests: [not_null]
       - name: service_level
         meta:
+          description_inherited: true
           sensitivity: public
-          description_reason: "liga a coluna ao conceito do glossário de negócio que ela determina"
-        description: '{{ doc("promised_lead_time") }}'
+        description: "Modalidade: standard, express ou same_day."
         data_tests:
           - not_null
           - accepted_values: {values: [standard, express, same_day]}
@@ -2952,7 +2952,8 @@ models:
       domain: atendimento
     description: >
       **Grão: um evento de um chamado.** Contar chamados aqui exige
-      `count(distinct support_ticket_id)`; `event_count` é o que se soma.
+      `count(distinct (source_system, support_ticket_id))` — o identificador se
+      repete entre as origens; `event_count` é o que se soma.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:

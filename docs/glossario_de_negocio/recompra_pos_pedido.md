@@ -13,6 +13,8 @@ pedido em até **90 dias**, contados de `placed_at`. A unidade de contagem é o
   `repeat_purchase_rate_after_support`.
 - **Relacionado:** recorrência de compra, churn.
 
+<!-- bigquery: fim do texto curto -->
+
 **Não é a recompra de P04.** Aquela conta **clientes** de uma coorte de estreia —
 quem comprou pela primeira vez em janeiro voltou até abril? Esta conta
 **pedidos** — depois deste pedido, houve outro em 90 dias? Os dois números nunca
