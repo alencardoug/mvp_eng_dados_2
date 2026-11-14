@@ -8,6 +8,8 @@ o **pedido**.
 
 - **Cálculo:** média de `order_to_delivery_days` sobre pedidos com ciclo fechado,
   por região de entrega, modalidade e mês de chegada.
+- **A modalidade é a da remessa que fechou o ciclo**, a última a chegar — também
+  no pedido dividido entre transportadoras.
 - **Implementado em:** view `order_to_delivery_time_by_region`, coluna
   `avg_order_to_delivery_days`, lida de `fact_shipment` (ADR-0053); medida
   `order_to_delivery_days` em `fact_shipment` e `fact_shipment_item`.
@@ -25,9 +27,9 @@ pedido dividido em duas caixas não está entregue quando a primeira chega — e
 pela metade. Medir pela primeira daria uma média sistematicamente otimista, e o
 erro cresceria com a fração de pedidos divididos.
 
-**A modalidade é a da remessa que fechou o ciclo**, a última a chegar. É a única
-atribuição defensável quando um pedido viaja por duas transportadoras: foi ela
-que determinou quando o pedido ficou completo.
+**Por que a modalidade da última.** É a única atribuição defensável quando um
+pedido viaja por duas transportadoras: foi ela que determinou quando o pedido
+ficou completo.
 
 **Não se cruza com a entrega no prazo.** Aquela conta remessas e esta conta
 pedidos (ADR-0033). Um pedido com uma remessa entregue e outra extraviada aparece

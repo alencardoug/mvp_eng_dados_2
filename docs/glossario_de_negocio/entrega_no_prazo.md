@@ -8,18 +8,21 @@ o pedido.
 
 - **Cálculo:** `on_time_count / delivered_count`, por transportadora, modalidade
   e mês de chegada.
+- **A chegada vem do livro de eventos** (o evento `delivered`, ADR-0034), não do
+  `delivered_at` corrente da remessa de origem, que é sobrescrito.
+- **O denominador é o entregue, não o despachado.** Em trânsito ainda não chegou;
+  extraviada nunca entra. **Devolvida conta:** chegou, e no prazo em que chegou.
 - **Implementado em:** view `on_time_delivery_rate_by_carrier`, coluna
   `on_time_rate`, lida de `fact_shipment` (uma linha por remessa, ADR-0053);
   sinalizador `is_on_time` em `trusted.shipments`, `fact_shipment` e
   `fact_shipment_item`.
 - **Relacionado:** ciclo de entrega, prazo prometido.
 
-**O denominador é o entregue, não o despachado.** Remessa em trânsito ainda não
-está atrasada — ela não chegou. Contá-la como fora do prazo trocaria "não chegou
-ainda" por "chegou tarde", que são coisas diferentes e levam a decisões
-diferentes. Remessa extraviada nunca entra no denominador, por não ter chegada.
-
 <!-- bigquery: fim do texto curto -->
+
+**Por que o entregue.** Remessa em trânsito ainda não está atrasada. Contá-la
+como fora do prazo trocaria "não chegou ainda" por "chegou tarde", que são coisas
+diferentes e levam a decisões diferentes.
 
 **O grão é a remessa porque a promessa é da remessa.** Transportadora e
 modalidade são atributos de quem leva a caixa, e um pedido dividido em duas
@@ -28,14 +31,12 @@ remessas tem duas promessas — possivelmente de modalidades diferentes. Ele con
 chegadas. Quem quer a experiência do pedido inteiro usa o *ciclo de entrega*, que
 é outro conceito e não se soma a este.
 
-**A data de chegada vem do livro de eventos**, não da coluna `delivered_at` da
-remessa (ADR-0034). A coluna guarda o estado corrente e é sobrescrita; o livro
-guarda o momento em que a chegada aconteceu. Medir prazo histórico contra a
+**Por que o livro de eventos.** A coluna da origem guarda o estado corrente; o
+livro guarda o momento em que a chegada aconteceu. Medir prazo histórico contra a
 coluna é medir contra o último `update`.
 
-**Devolução não desfaz a entrega.** A remessa devolvida registra `delivered` e
-depois `returned`: ela chegou, e no prazo em que chegou. A devolução é fato
-posterior, contado à parte.
+**Por que a devolvida conta.** Ela registra `delivered` e depois `returned`: a
+devolução não desfaz a entrega, é fato posterior, contado à parte.
 
 {% enddocs %}
 
