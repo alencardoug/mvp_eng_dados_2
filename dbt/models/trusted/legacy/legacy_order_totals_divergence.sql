@@ -40,7 +40,7 @@ itens_em_quarentena as (
         -- Canônica, e não bruta: agrupar pelo texto separaria `08` de `8`
         -- e a junção seguinte multiplicaria o pedido. Ver a macro.
         {{ identidade_canonica(campo_json('q.original_payload', "'order_id'")) }} as order_id,
-        count(*)                                            as itens_rejeitados,
+        count(*)                                            as rejected_item_count,
         string_agg(distinct q.rejection_origin, ', ')        as motivos
     from {{ ref('rejected_legacy_records') }} q
     join corrente c
@@ -59,13 +59,13 @@ select
     o.subtotal_amount,
     o.items_gross_revenue_amount,
     o.subtotal_amount - o.items_gross_revenue_amount        as divergence_amount,
-    o.item_count                                            as itens_empilhados,
-    coalesce(q.itens_rejeitados, 0)                         as itens_rejeitados,
-    q.motivos                                               as motivos_da_rejeicao,
+    o.item_count                                            as accepted_item_count,
+    coalesce(q.rejected_item_count, 0)                         as rejected_item_count,
+    q.motivos                                               as rejection_reasons,
 
     -- A diferença tem contrapartida em quarentena? É a mesma pergunta que a
     -- invariante faz para decidir se tolera; aqui ela é coluna, não veredito.
-    q.order_id is not null                                  as explicada_pela_quarentena
+    q.order_id is not null                                  as explained_by_quarantine
 from {{ ref('orders') }} o
 left join itens_em_quarentena q
     on q.source_system = o.source_system

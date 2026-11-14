@@ -26,7 +26,7 @@ models:
         meta:
           sensitivity: confidential
         data_tests: [not_null]
-      - name: explicada_pela_quarentena
+      - name: explained_by_quarantine
         description: Há ao menos um item deste pedido em quarentena explicando a diferença.
         meta:
           sensitivity: personal
@@ -46,16 +46,16 @@ models:
         meta:
           description_inherited: true
           sensitivity: confidential
-      - name: itens_empilhados
+      - name: accepted_item_count
         description: "Aditiva entre pedidos — número de itens (linhas) aceitos do pedido; zero no pedido cujos itens foram todos rejeitados."
         meta:
           description_inherited: true
           sensitivity: internal
-      - name: itens_rejeitados
+      - name: rejected_item_count
         description: "Itens do pedido na quarentena do legado, na captura corrente; zero sem rejeição."
         meta:
           sensitivity: internal
-      - name: motivos_da_rejeicao
+      - name: rejection_reasons
         description: "As origens da rejeição dos itens do pedido na quarentena (`own_invalid`, `parent_rejected`), separadas por vírgula; nulo sem rejeição."
         meta:
           sensitivity: internal
