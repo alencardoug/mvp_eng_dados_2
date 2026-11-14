@@ -9,8 +9,8 @@
 -- quarentena por defeito do produto, três níveis acima (D66). A remessa passou
 -- pelas regras; o que se rejeitou foi o conteúdo. Aqui ela tem a sua linha.
 --
--- A fato de item continua: é ela que diz **o que** foi enviado, e a P14 fecha o
--- ciclo do pedido nela. Os atributos de remessa e de pedido saem dos mesmos
+-- A fato de item continua: é ela que diz **o que** foi enviado. A P14 também lê
+-- esta fato desde a auditoria das views (F17), pela remessa que fecha o ciclo. Os atributos de remessa e de pedido saem dos mesmos
 -- modelos de `trusted` e com as mesmas expressões, para as duas fatos não
 -- divergirem. Nenhum teste compara as duas fatos atributo a atributo: esta se
 -- reconcilia com `shipments` (contagem e tentativas de entrega), a de item com

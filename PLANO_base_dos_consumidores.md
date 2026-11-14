@@ -676,3 +676,9 @@ observação:
 | RVD-1-03 | O comentário prometia uma reconciliação entre as duas fatos que não existe | ajuste | Feito: o comentário diz o que cada uma reconcilia, e o limite foi para o Modelo de Dados §3; o ADR-0053 fica como foi aceito |
 | RVD-1-04 | A D66 consta como `feita` em Consumidores §5 antes do *push* | observação | Sem mudança: a linha só se lê no GitHub junto com os *commits* que ela cita |
 
+### Rodada 13 — Codex conta 2, sobre `2b881d0` (14/11/2026)
+
+Relatório em `codex2_d66_r2.md`. RVD-1-01, 03 e 04 resolvidos; RVD-1-02 parcial; dois ajustes de texto,
+feitos: `failed_attempt_count` herda o texto de `shipments`, que já dizia a aditividade (RVD-2-01); os
+cabeçalhos das duas fatos de remessa dizem que a P14 lê `fact_shipment` desde o F17 (RVD-2-02).
+

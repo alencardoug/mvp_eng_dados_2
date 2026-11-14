@@ -2180,8 +2180,8 @@ models:
       - name: failed_attempt_count
         description: "Aditiva — tentativas de entrega da remessa que falharam."
         meta:
+          description_inherited: true
           sensitivity: public
-          description_reason: o texto herdado de `shipments` não diz a aditividade, e na fato de item a mesma coluna não é aditiva
       - name: delivery_delay_days
         description: "Dias entre a entrega e o prazo prometido: positivo é atraso, negativo é adiantamento; nulo sem entrega."
         meta:

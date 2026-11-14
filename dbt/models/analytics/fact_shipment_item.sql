@@ -32,8 +32,8 @@
 -- de item. Estão aqui porque o ciclo de entrega do ADR-0033 é medido no pedido
 -- e o consumo só lê `analytics`. **Média sobre elas no grão do item pesa cada
 -- pedido pelo número de itens que ele tem**: quem as usa reduz antes ao grão do
--- pedido, e é o que a view de P14 faz, pelas linhas em
--- `is_cycle_closing_shipment`.
+-- pedido. A view de P14 faz isso em `fact_shipment`, pela remessa que fecha o
+-- ciclo (F17), e não aqui.
 
 -- `not materialized`: `remessas` é lida três vezes (ciclo, fechamento, base),
 -- e com mais de uma referência o PostgreSQL materializa o CTE e o planejador
