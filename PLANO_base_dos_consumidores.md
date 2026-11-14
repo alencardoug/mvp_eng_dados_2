@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); próximo: o Bloco 1 |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); **alinhamento central** das pendências dos três consumidores em 14/11/2026 (§2.2), com a rodada 4 de perguntas respondida (Q12 a Q14, §6) e o **Bloco 0b entregue** (§3); próximo: o Bloco 1 |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -109,6 +109,26 @@ A retenção foi examinada e **não é lacuna**: está declarada por objeto (Gov
 `meta.retention`, `tests/test_retencao.py`), e o pacote da D91 leva o `meta`. O item 8 da V3 é a
 expiração dos *datasets* do BigQuery, fora desta fase como o resto da V3.
 
+### 2.2 O alinhamento central (14/11/2026)
+
+O Owner pediu às três sessões um arquivo com as pendências que envolvem outro projeto
+(`gdados/docs/alinhamento_entre_projetos.md`, `bi-como-codigo/docs/upstream_questions.md`,
+`nl_sql/PENDENCIAS.md`) e pediu a esta sessão que as respondesse de forma central. O que é comum
+ficou aqui; o que é de um projeto só foi autorizado para a sessão dele. As respostas estão nos avisos de
+14/11/2026 (`data/medicoes/base_consumidores/avisos/`, fora do Git), que apontam para os *commits*
+daqui. Entraram no plano, pela regra de entrada (Bloco 0, item 3):
+
+| # | Item | Consumidor | Evidência | Destino |
+|---|---|---|---|---|
+| F8+ | Além do grão: `dim_brand`, `dim_category` e `dim_payment_method` não têm descrição de tabela | N, G | Achados, F8; *manifest* de 13/11/2026 | Bloco 3, com o F8 |
+| F11 | A descrição de `fact_payment_transaction` cita "a pergunta P09" | N | `_analytics__models.yml:1069` | Bloco 3 |
+| F12 | Nada diz para agrupar pelo nome quando o mesmo membro conformado existe nas duas origens, nem que o código de SKU e de cliente se repete entre origens para entidades diferentes | N, G, B | Achados, F12 | Bloco 3, na descrição de cada dimensão conformada. A auditoria do Bloco 1b confere se alguma view agrupa pela chave |
+| F13 | `fact_shipment_item.date_key` é `coalesce(shipped_at, source_created_at)`, e a descrição diz "despacho": 346 das 7.556 linhas são de remessas não despachadas, **conferido aqui** no armazém local em 14/11/2026 | N, G, B | `fact_shipment_item.sql:131`; `_analytics__models.yml:1761` | Bloco 3, a descrição. Separar as duas datas é modelagem e só vira pergunta se a auditoria do Bloco 1b achar uma view que conte despacho por essa data |
+| L10 | As evidências coletadas no GCP antes do desmonte estão só no `mvp_eng_dados_1`, fora do Git e fora da D91 | G | `gdados/docs/verificacao_de_viabilidade.md` §7.5; `mvp_eng_dados_1/data/medicoes/etapa_13/evidencias/` | Bloco 4, com a L4: o que entra e sanitizado como. Até lá, `not_available` no pacote |
+| L11 | Os consumidores não tinham canal de saída daqui, nem regra para pedir o banco ou uma janela de leitura, nem registro das mudanças de valor (UQ-03 a UQ-07 do BI, O7 do `gdados`) | G, B | Os arquivos de pendências dos dois | Bloco 0b: [Consumidores](docs/consumidores.md) |
+| L12 | O `gdados` (E1) e a 2.7 do BI precisam do formato do pacote para começar, e o Bloco 4 não tem data | G, B | `gdados/docs/decisoes.md`, D03 (A5); UQ-09 do BI | **Q13**: Bloco 0b, a especificação |
+| L13 | O custo real da fase GCP entraria só no `mvp_eng_dados_1`, e os portais leem daqui (H2 do `gdados`) | G | `gdados/docs/alinhamento_entre_projetos.md` §4 | Em 16/11/2026, o custo entra também aqui, no mesmo dia ([Consumidores §7](docs/consumidores.md#7-o-gcp)) |
+
 ---
 
 ## 3. Blocos, na ordem proposta
@@ -147,6 +167,17 @@ depois o que é texto e teste sem decisão; o pacote do portal quando houver con
 - item 3: a regra de entrada vale a partir daqui.
 
 O que cada consumidor fará com o aviso é da sessão dele, e esta fase não o acompanha.
+
+### Bloco 0b — o canal e o formato (Q13, L11, L12)
+
+**Entregue em 14/11/2026**, revisado por outro agente antes do *commit* (§9):
+
+- [Consumidores](docs/consumidores.md): quem lê, as regras de leitura, o banco compartilhado e a janela
+  de leitura, os canais, o registro do que mudou para quem consome e os *commits* marcados para fixar;
+- [Pacote de Metadados](docs/pacote_de_metadados.md): o formato 1, com o esquema e um exemplo
+  copiado do *manifest* real, guardados por `tests/test_pacote_de_metadados.py` (o exemplo passa no
+  esquema; dez alterações dele são recusadas). O Bloco 4 **gera** conforme este formato e não o
+  redesenha. O que fica para ele está na §5 do documento.
 
 ### Bloco 1 — os números (F1, F3, F2)
 
@@ -251,7 +282,10 @@ outras. Os órfãos são medidos aqui antes, no armazém local.
   *manifest***, que mede o texto destinado ao BigQuery e recusa acima do limite, com contraprova. A
   macro pode recusar também, mas não é ela a prova. Onde a versão curta vive e como ela herda vão ao
   desenho junto com o do RVG-1-01. A aplicação real no BigQuery fica não medida.
-- **F8:** "**Grão:**" nas 15 dimensões.
+- **F8:** "**Grão:**" nas 15 dimensões, e a descrição de tabela que falta em `dim_brand`,
+  `dim_category` e `dim_payment_method` (F8+).
+- **F11, F12, F13** (§2.2): a citação da P09 trocada pela regra; a coluna pela qual se agrupa cada
+  dimensão conformada, ao lado da regra de identidade; a descrição de `fact_shipment_item.date_key`.
 - **G06:** o Bloco B do `PLANO_revisao_governanca.md`, na ordem que o RVG-1-02 corrigiu, com o
   desenho do RVG-1-01 revisado antes e os *snapshots* pelo RVG-1-03. A catraca baixa no mesmo
   *commit* de cada melhora.
@@ -262,7 +296,7 @@ outras. Os órfãos são medidos aqui antes, no armazém local.
 
 ### Bloco 4 — o pacote do portal (D91)
 
-A implementação da D91, com o contrato da guarda do RVG-1-04 e as contraprovas que ele pede (clone
+A implementação da D91, **no formato fixado pelo Bloco 0b** ([Pacote de Metadados](docs/pacote_de_metadados.md)), com o contrato da guarda do RVG-1-04 e as contraprovas que ele pede (clone
 sem artefatos, regeneração repetida, *commit* posterior sem mudança dos insumos), e antes dela a volta
 ao item 9 da V1 — a conferência de *manifest* atrasado, de que a guarda depende (RVC-1-06). Entra **depois**
 dos Blocos 1 a 3 para que a primeira versão do pacote já leve o texto corrigido, mas **antes** dos
@@ -275,7 +309,8 @@ Três coisas entram no contrato, vindas da emenda e da rodada 4 de revisão:
   entra no pacote e o que o `gdados` lê direto por *commit* fixado: `docker-compose`, Terraform, mapa
   de paridade, Arquitetura, modelo de dados. A regra é a da D91: compor o que já é declarado, sem
   reimplementar. A evidência do GCP é **datada e congelada**, porque a infraestrutura foi destruída, e
-  o pacote a rotula assim.
+  o pacote a rotula assim. As evidências coletadas no GCP, fora do Git no `mvp_eng_dados_1` (L10),
+  entram ou não aqui, e sanitizadas como, nesta decisão de desenho.
 - **A procedência do armazém** (L5). Primeiro o diagnóstico: se o banco já guarda alguma coisa da execução que
   o construiu, como o `invocation_id` do dbt ou um *commit* (não conferido). Depois a proposta, que liga o pacote e
   a leitura do BI ao mesmo *build*. Se ela pedir tabela ou *schema* novo, volta ao Owner antes de
@@ -400,6 +435,14 @@ recomendadas. As opções, como foram apresentadas:
 | **Q10** | L7: a D66 nesta fase | **(a)** Trazer a D66 para esta fase, como pergunta própria com as alternativas dela, decidida **antes do Bloco 4**, sobre o que já foi medido (M27 do BI). Se a resposta for a fato no grão da remessa (ADR-0033), ela vira bloco próprio, com ADR, antes do Bloco 5. **Por quê:** a primeira publicação do BI leva a P13, e o pacote nasceria com a limitação | (b) Manter adiada: a limitação segue declarada na descrição da view, no relatório da P13 (N43 do BI) e no pacote. São 12 remessas legadas em 3.310 entregues; o BI já se protege. É a opção de menor custo, e a lacuna continua aberta |
 | **Q11** | L8: um portal ou dois | **(a)** O contrato daqui é **um só**: o pacote da D91 serve a qualquer portal. Quantos portais existem é decisão das sessões do `gdados` e do BI, e o aviso do Bloco 0 leva a pergunta às duas. **Por quê:** este repositório não decide o escopo dos outros (§1.1), e um pacote só evita duas leituras da mesma governança que divergem | (b) Decidir aqui que o `gdados` é o portal e que a 2.7 do BI aponta para ele: o aviso leva a decisão, não a pergunta. É mais simples, mas decide no lugar das duas sessões. (c) Dois contratos: o BI continua lendo *manifest* e YAML por *commit* (§3.5 dele), e o `gdados` lê o pacote. Não dá trabalho aqui, e as duas leituras podem divergir |
 
+### Rodada 4 — Q12 a Q14, do alinhamento central (§2.2): respondida em 14/11/2026
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q12** | O `gdados` e a etapa 2.7 do BI são dois portais? Leem o mesmo pacote? (L8; A7/D05 do `gdados`; §7 do BI) | **Dois portais, um pacote**: cada um mantém o escopo do próprio plano e lê só o pacote daqui; a parte comum nasce do mesmo pacote e não diverge; os dois andam independentes. Era a recomendada | Dois com escopos divididos (o BI aponta para o `gdados`, e a vitrine pública passa a depender da D04 do `gdados`); um só, o `gdados`; um só, a 2.7 |
+| **Q13** | Quando sai o formato do pacote (L12) | **A especificação já**, no Bloco 0b: documento, esquema e exemplo, revisados; o Bloco 4 gera depois. Era a recomendada | Manter a ordem (os consumidores esperam o Bloco 4); adiantar o Bloco 4 inteiro |
+| **Q14** | Quando o `nl_sql` sobe o projeto GCP dele | **Nenhum recurso novo no GCP**, em nenhum projeto. O `nl_sql` constrói a estrutura dele e sobe em outras nuvens, não agora no GCP. Resposta do Owner fora das opções | Subir agora só com a C0; subir no passo 4 do `nl_sql` |
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
@@ -414,7 +457,8 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 
 1. ~~Rodada 1 (§6). Revisão deste plano por outro agente~~ (rodadas 1 a 3, §9; fechada sem achado aberto).
 2. ~~Rodada 3 de perguntas (Q9 a Q11)~~ (respondida) e revisão da emenda (§2.1) por outro agente (rodadas 4 e 5, §9; fechada sem achado aberto).
-3. ~~Bloco 0, com o aviso ao `nl_sql` primeiro~~ (entregue em 13/11/2026).
+3. ~~Bloco 0, com o aviso ao `nl_sql` primeiro~~ (entregue em 13/11/2026); ~~o alinhamento central (§2.2), a rodada 4 de
+   perguntas e o Bloco 0b~~ (entregues em 14/11/2026).
 4. Blocos 1, 2 e 3, cada um revisado antes do seguinte. No Bloco 1, o F2 para depois do diagnóstico
    e da proposta, até a **Q8**; o F1 e o F3 seguem. Pela Q9-a, o Bloco 1b vem depois do F1 e do F2:
    a definição (com o F5 e o texto do F9), a referência e a contraprova. Pela Q10-a, a D66 é
