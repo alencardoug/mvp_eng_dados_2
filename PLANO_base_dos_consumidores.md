@@ -496,12 +496,27 @@ explícito do custodiante.
      singular confere, de outra conexão e durante a execução, que a linha `started` desta invocação está
      visível e aberta.
    Comando que não escreve o armazém (`test`, `docs generate`, `compile`, `parse`) não registra nada.
-   **Mutação do armazém fora do dbt** (RVL5-3-01): o que o `Makefile` faz no armazém sem o dbt — o
-   descarte dos *snapshots* de `dbt-build RESET=1` e de `dbt-drop-snapshots` — registra-se do mesmo jeito,
-   em duas fases, com `command = drop_snapshots`: a linha abre e confirma **antes** do descarte, e fecha
-   depois. Interrompida no meio, fica aberta e bloqueia; concluída, é uma execução parcial mais nova que o
-   *build* anterior, e também tira dele o `verified`. Toda escrita nova fora do dbt entra pela mesma função
-   (`governance.registrar_mutacao`).
+   **Mutação do armazém fora do dbt** (RVL5-3-01, RVL5-4-01): toda escrita suportada nas camadas que o dbt
+   constrói, feita sem o dbt, registra-se em duas fases por `governance.registrar_mutacao(command)`: a linha
+   abre e confirma **antes** da escrita, e fecha depois. Interrompida no meio, fica aberta e bloqueia;
+   concluída, é uma execução parcial mais nova que o *build* anterior, e tira dele o `verified`. O
+   **inventário**, levantado no repositório inteiro em 15/11/2026:
+   - **registradas**: o descarte dos *snapshots* (`dbt-build RESET=1`, `dbt-drop-snapshots`;
+     `drop_snapshots`); a adulteração da fato de trabalho por `make test FATO=1` (`test_fato_incremental`,
+     aberta antes da adulteração e fechada depois do reparo; `test_fato`); a restauração da memória do
+     armazém (`recovery-restore`, o `pg_restore` do passo 4; `recovery_restore`);
+   - **fora, com o motivo**: os testes do legado que escrevem em `trusted`, `quarantine` e `staging`
+     (`test_legado_remocao`, `test_oraculo_da_memoria`) escrevem em **bancos efêmeros**; o DDL, os papéis
+     e os *grants* de `governance garantir` não mudam o conteúdo das camadas construídas; o `psql`
+     interativo é edição manual, que a regra inviolável 3 proíbe;
+   - **o limite da garantia**: as camadas de **entrada** (`raw` pelo Airbyte e pelo *streaming*, `raw_legacy`,
+     a captura do legado) mudam sem o dbt, e a garantia é sobre o **código** que construiu as camadas, não
+     sobre o dado de entrada estar parado; uma view de consumo, `skus_below_reorder_point`, lê o *stream*
+     ao vivo. O ADR o declara.
+   **Guarda do próximo escritor:** um teste estático varre `src/`, `tests/`, `Makefile`, `docker/` e
+   `airflow/` atrás de escrita SQL (`insert`, `update`, `delete`, `truncate`, `drop`, `alter`) nas camadas
+   construídas e de `pg_restore` no armazém, e exige que cada arquivo esteja numa lista declarada, com o
+   motivo (`registrar_mutacao` ou banco efêmero). O escritor novo não entra calado.
    **Os insumos estáveis** (RVL5-3-02): a coluna `inputs_confirmed` nasce falsa. O `CARIMBO_DEPOIS`, depois
    do dbt, refaz o *commit*, a sujeira e o digest dos insumos do dbt e, **só se os três são os de antes**,
    a marca verdadeira; se o passo não roda, ou se algo mudou, ela fica falsa e a execução não é verificada.
@@ -548,7 +563,8 @@ explícito do custodiante.
    (parciais), um `dbt test` (sem linha), o *hook* de acesso falhando antes do fecho (linha aberta, por uma
    variável só de teste), o descarte dos *snapshots* concluído sem o dbt chegar à abertura (não verificado) e
    o `RESET=1` bem-sucedido (verificado), um insumo alterado entre a coleta e o fim (`inputs_confirmed`
-   falso) —; o mapa de estados com um `build` que reprova teste e pula dependentes; a sujeira
+   falso), o teste da fato interrompido depois da adulteração e antes do dbt (não verificado) —; a guarda
+   estática com um escritor novo fora da lista (falha); o mapa de estados com um `build` que reprova teste e pula dependentes; a sujeira
    com modelo novo não rastreado, mudança rastreada e metadados ausentes; os papéis; o gerador com leitor
    substituto e sem conexão; o esquema aceitando `verified` só com os campos. Aviso em Consumidores §5. O
    ADR novo (o próximo número) registra a garantia estreita e a regra do abandono.
