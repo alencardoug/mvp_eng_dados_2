@@ -8,7 +8,7 @@
 -- **O pedido vem do grão do pedido**, `fact_order_status_event`, pelo evento de
 -- criação: lá está todo pedido, inclusive o que teve todos os itens rejeitados em
 -- cascata. A fato de item não o tem, e a estreia de um cliente cujo primeiro
--- pedido foi assim caía no pedido seguinte (7 clientes) ou sumia (1), na
+-- pedido foi assim caía num mês mais tarde (6 clientes) ou sumia (1), na
 -- auditoria das views de 14/11/2026 — o padrão da D66. A primeira compra passa a
 -- ser a da `dim_customer` (Q7).
 

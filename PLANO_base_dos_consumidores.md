@@ -287,6 +287,31 @@ A conclusão da **P13** espera a D66 (seção seguinte). Se a D66 trouxer fato n
   Bloco 5, que também deixa de comparar a métrica com a própria view.
 - O efeito no BI é o mesmo do F1: o esquema não muda, os valores mudam, e o aviso diz quais.
 
+**Entregue em 14/11/2026** (medições em `data/medicoes/base_consumidores/bloco1b/`, fora do Git):
+
+- **Passo 1, a definição:** a regra do pedido realizado na receita líquida (F5); a fórmula da conversão,
+  que dizia `cart_count` no denominador quando o texto ao lado tirava os abertos; e o "como se conta" da
+  P09, da P10 e da P15 nas Perguntas de Negócio (F9). Nenhuma escolha nova.
+- **Passo 2, a referência:** uma por view em `tests/auditoria/`, comparada com a view linha a linha
+  (`except all` nos dois sentidos) num corte `REPEATABLE READ READ ONLY`; e oito conferências de
+  população contra `trusted` em `tests/auditoria/populacao/` (a da P13 é o teste dbt do bloco da D66).
+  **Limite declarado:** o autor das referências leu o SQL das views antes (o passo 1 tirou de lá o F9);
+  a independência é de construção e de fonte, não de autoria.
+- **Passo 3, a contraprova:** o SQL compilado das versões defeituosas do F1, do F2, da P04 e da P14, em
+  `tests/auditoria/contraprova/`, roda como consulta somente leitura, e a referência tem de discordar
+  dele. Uma mutação na referência da P02 (sem o filtro de pedido realizado) fez o teste acusar 271
+  linhas.
+- **O que achou** (F17 a F20 nos Achados): a P14 e a P04 perdiam o pedido de itens rejeitados em
+  cascata, o padrão da D66 (13 pedidos; 1 estreia a menos e 6 em mês mais tarde). O Owner decidiu aplicar a mesma regra, e
+  as duas foram corrigidas em `12677a3`. Duas observações sem efeito nos números: 14 carrinhos
+  convertidos sem item no dado sintético (P07) e o ranking da P03, que se partiria se um produto mudasse
+  de atributo (hoje, nenhum). A não aditividade da P16 entre categorias já estava declarada. A P12 usa o
+  reservado da projeção, que diverge das reservas ativas em 97 pares, sempre para baixo, como a
+  invariante 8 prevê.
+- **O resultado:** as 16 views auditadas em `12677a3`, em `tests/auditoria/resultado.yml`, que é a
+  declaração de que o pacote tira o `view_audits`. `tests/test_auditoria_das_views.py`: 29 testes (as 16
+  referências, as 8 populações, as 4 contraprovas e a cobertura).
+
 ### D66 — antes do Bloco 4 (Q10-a)
 
 **Respondida em 14/11/2026: (a), uma fato no grão da remessa**, a recomendada. Remedida antes da

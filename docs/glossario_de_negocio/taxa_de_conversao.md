@@ -4,7 +4,9 @@
 
 **Taxa de conversão** é a fração dos carrinhos com item que resultaram em pedido, no mesmo recorte.
 
-- **Cálculo:** `converted_cart_count / cart_count`, **recalculado a cada recorte**.
+- **Cálculo:** `converted_cart_count / closed_cart_count`, **recalculado a cada
+  recorte**: os convertidos sobre os carrinhos **fechados** (convertidos ou
+  abandonados), pela data de **criação** do carrinho.
 - **Implementado em:** view `cart_conversion_rate_by_channel`.
 - **Relacionado:** carrinho abandonado, ticket médio.
 

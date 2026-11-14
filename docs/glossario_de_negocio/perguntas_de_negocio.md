@@ -164,6 +164,13 @@ Usa [lucro bruto](lucro_bruto.md) e
 | **Dimensões** | `dim_date` · `dim_payment_method` · `dim_sales_channel` |
 | **View** | `payment_approval_rate_by_method` |
 
+**Como se conta.** O denominador é a **tentativa de autorização**, não o pagamento: cada transação
+de autorização é uma tentativa, e o numerador são as aprovadas. É o atrito que se quer ver — um
+pagamento aprovado na terceira tentativa contribui com uma aprovação e três tentativas. O mês é o da
+tentativa. O valor capturado de cada pagamento vai para o grupo (meio e parcelamento) da sua
+**primeira** autorização aprovada, e só para ele, para que o capturado da view seja todo o capturado
+da fato, nem mais nem menos (D67).
+
 ### P10 — Qual o valor reembolsado como fração do capturado, por motivo e mês?
 
 | | |
@@ -172,6 +179,12 @@ Usa [lucro bruto](lucro_bruto.md) e
 | **Medidas** | `refunded_amount` (aditiva) · `captured_amount` (aditiva) · `refund_rate` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_payment_method` · `dim_category` |
 | **View** | `refund_rate_by_reason` |
+
+**Como se conta.** O numerador é o valor dos reembolsos **concluídos**, no mês do reembolso, por meio
+de pagamento e motivo; a contagem de reembolsos inclui também os solicitados e os recusados. O
+denominador é **todo o capturado do mês** naquele meio de pagamento, e não o capturado da transação
+reembolsada: a pergunta é quanto do que entrou no mês saiu de volta. Por isso o capturado se repete em
+cada linha de motivo do mesmo mês e meio, e não se soma entre motivos.
 
 ### P11 — Qual o giro de estoque por SKU e armazém no trimestre?
 
@@ -266,6 +279,11 @@ clientes de uma coorte de estreia, esta conta pedidos.
 | **Medidas** | `ticket_count` (aditiva) · `order_count` (aditiva) · `tickets_per_hundred_orders` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_support_category` · `dim_sales_channel` |
 | **View** | `support_tickets_per_hundred_orders` |
+
+**Como se conta.** O numerador são os chamados **abertos** no mês (o evento de criação), por canal e
+categoria de chamado, pelo **nome**. O denominador são os pedidos realizados distintos do mês e do
+canal pelo nome, somando todas as origens, tenham elas chamado ou não (F1 dos Achados do `nl_sql`). O
+chamado sem pedido fica no canal "Sem canal", sem denominador, e a taxa é nula ali.
 
 ### P16 — Qual a taxa de recompra em 90 dias dos clientes que abriram chamado, comparada à dos que não abriram?
 

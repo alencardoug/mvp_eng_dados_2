@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 14/11/2026 (`nl_sql@ce09526`) |
+| Última atualização | 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -277,6 +277,44 @@ construção da governança no `nl_sql`.
   armazém.
 - **No `nl_sql`:** "data de referência dos dados (01/09/2026)" nas 9 colunas.
 - **Replicar aqui:** "data de referência dos dados" (ou "do *data warehouse*").
+
+### F17 a F20 — o que a auditoria das 16 views daqui achou (Bloco 1b, 14/11/2026)
+
+Estes não vieram do `nl_sql`: são da auditoria das views deste repositório, pelos três critérios da
+etapa 2.11 do `bi-como-codigo` (não aditividade, saldo que depende do tempo, população recortada). Cada
+view foi comparada com uma referência independente e com a população da camada responsável
+(`tests/test_auditoria_das_views.py`, `tests/auditoria/`). O resultado por view está em
+`tests/auditoria/resultado.yml`. Entram aqui pela regra de entrada do plano, que os põe no mesmo
+inventário.
+
+### F17 — A P14 perdia o pedido cujos itens foram todos rejeitados · **Gravidade: média**
+
+- **Evidência:** 13 pedidos do legado com todas as remessas entregues e nenhum item aceito (os itens
+  na quarentena, em cascata) ficavam fora de `order_to_delivery_time_by_region`, que lia a fato de item.
+  É o padrão da D66 no grão do pedido.
+- **Corrigido aqui em `12677a3`**, por decisão do Owner de 14/11/2026: a view lê `fact_shipment`
+  (ADR-0053). Pedidos: 2.761 → 2.774.
+
+### F18 — A P04 perdia a estreia feita num pedido de itens rejeitados · **Gravidade: média**
+
+- **Evidência:** a estreia saía da fato de item. Para o cliente cujo primeiro pedido teve todos os
+  itens rejeitados, a view punha a estreia num mês mais tarde (6 clientes) ou não a contava (1), contra
+  a `dim_customer` (F3, Q7).
+- **Corrigido aqui em `12677a3`**, pela mesma decisão: a estreia e a recompra saem do grão do pedido,
+  `fact_order_status_event`. Estreias: 1.388 → 1.389, iguais às da dimensão.
+
+### F19 — Carrinho convertido sem item · **Gravidade: baixa (observação)**
+
+- **Evidência:** a P07 conta os carrinhos com item, como o glossário define. Ficam de fora 145 sem item
+  em `trusted.carts`, e 14 deles estão marcados como convertidos: um carrinho vazio que virou pedido.
+- **Efeito:** nenhum na view. É incoerência do dado sintético, e fica como observação de realismo.
+
+### F20 — O ranking da P03 se partiria se o produto mudasse de atributo · **Gravidade: baixa (observação)**
+
+- **Evidência:** `top_skus_by_revenue` agrupa o SKU também por nome, categoria e marca da versão do
+  produto. Um SKU que mudasse um desses atributos teria duas linhas e dividiria a receita no ranking.
+  Hoje, 0 dos 595 SKUs vendidos têm mais de uma combinação.
+- **Efeito:** nenhum no dado atual; risco latente, registrado.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
