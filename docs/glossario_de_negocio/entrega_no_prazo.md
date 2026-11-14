@@ -8,8 +8,8 @@ o pedido.
 
 - **Cálculo:** `on_time_count / delivered_count`, por transportadora, modalidade
   e mês de chegada.
-- **A chegada vem do livro de eventos** (o evento `delivered`, ADR-0034), não do
-  `delivered_at` corrente da remessa de origem, que é sobrescrito.
+- **A chegada vem do livro de eventos:** o evento `delivered` **mais recente** da
+  remessa (ADR-0034), não o `delivered_at` corrente da origem, que é sobrescrito.
 - **O denominador é o entregue, não o despachado.** Em trânsito ainda não chegou;
   extraviada nunca entra. **Devolvida conta:** chegou, e no prazo em que chegou.
 - **Implementado em:** view `on_time_delivery_rate_by_carrier`, coluna

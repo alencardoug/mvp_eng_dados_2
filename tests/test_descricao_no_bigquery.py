@@ -114,7 +114,7 @@ def test_a_versao_curta_da_receita_leva_a_regra_do_pedido_realizado() -> None:
         pytest.param("consumption.order_to_delivery_time_by_region.avg_order_to_delivery_days",
                      ("remessa que fechou o ciclo", "ciclo fechado"), id="ciclo"),
         pytest.param("consumption.on_time_delivery_rate_by_carrier.on_time_rate",
-                     ("livro de eventos", "Devolvida conta", "extraviada nunca entra"), id="pontualidade"),
+                     ("livro de eventos", "`delivered` **mais recente**", "Devolvida conta", "extraviada nunca entra"), id="pontualidade"),
     ],
 )
 def test_a_versao_curta_leva_as_regras_que_mudam_o_numero(coluna: str, trechos: tuple[str, ...]) -> None:
