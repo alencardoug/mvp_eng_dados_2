@@ -629,7 +629,7 @@ models:
           sensitivity: internal
         data_type: numeric
       - name: avg_inventory_value_amount
-        description: "Semiaditiva — média, sobre os dias do trimestre, do valor do estoque: a posição de fim de dia vezes o custo médio ponderado das entradas até aquele dia. Soma-se entre SKUs e armazéns, nunca entre trimestres."
+        description: "Semiaditiva — média, sobre os dias do trimestre, do valor do estoque: a posição de fim de dia vezes o custo médio ponderado das entradas até aquele dia; nulo quando algum dia do trimestre tem posição sem nenhuma entrada com custo até ele. Soma-se entre SKUs e armazéns, nunca entre trimestres."
         meta:
           sensitivity: confidential
         data_type: numeric
@@ -1302,7 +1302,14 @@ unit_tests:
       20, 12, 56, 56 (custo médio móvel 3,5 desde o dia 3) → média 36; giro
       8 ÷ 36 = 0,22. A compra de 100 a custo 100 no trimestre seguinte não muda
       nada. O par B tem a correção-relâmpago: entra e sai no mesmo dia, a
-      posição de fim de dia é zero, e o giro é nulo.
+      posição de fim de dia é zero, e o giro é nulo. O par C começa no dia 2
+      (10 a custo 1) e vende 2 no dia 3: os dias contam a partir do primeiro
+      movimento, 10, 8, 8 → média 8,67 e giro 0,23 (contando do dia 1 seria
+      6,50 e 0,31). O par D começa por uma venda, sem entrada: a posição −2 não
+      tem custo, e o valor médio e o giro são nulos. O par E também começa por
+      uma venda e só compra no dia 3: os dois primeiros dias não têm custo, e a
+      média dos outros dois (8, giro 0,25) passaria por completa; o valor e o
+      giro são nulos.
     model: inventory_turnover_by_sku_and_warehouse
     given:
       - input: ref('fact_inventory_movement')
@@ -1315,6 +1322,11 @@ unit_tests:
           d5,pa,w1,retail,100,true,100,10000,false,0,0
           d2,pb,w1,retail,3,true,3,3,false,0,0
           d2,pb,w1,retail,-3,false,0,3,true,3,3
+          d2,pc,w1,retail,10,true,10,10,false,0,0
+          d3,pc,w1,retail,-2,false,0,2,true,2,2
+          d2,pd,w1,retail,-2,false,0,2,true,2,2
+          d1,pe,w1,retail,-2,false,0,2,true,2,2
+          d3,pe,w1,retail,10,true,10,10,false,0,0
       - input: ref('dim_date')
         rows:
           - {date_key: d0, full_date: "2023-12-31", year_number: 2023, quarter_number: 4}
@@ -1327,6 +1339,9 @@ unit_tests:
         rows:
           - {product_key: pa, source_system: retail, product_natural_key: 1, sku: SKU-A, product_name: Produto A, product_category_id: 7}
           - {product_key: pb, source_system: retail, product_natural_key: 2, sku: SKU-B, product_name: Produto B, product_category_id: 7}
+          - {product_key: pc, source_system: retail, product_natural_key: 3, sku: SKU-C, product_name: Produto C, product_category_id: 7}
+          - {product_key: pd, source_system: retail, product_natural_key: 4, sku: SKU-D, product_name: Produto D, product_category_id: 7}
+          - {product_key: pe, source_system: retail, product_natural_key: 5, sku: SKU-E, product_name: Produto E, product_category_id: 7}
       - input: ref('dim_warehouse')
         rows:
           - {warehouse_key: w1, source_system: retail, warehouse_natural_key: 1, warehouse_name: CD Teste, warehouse_region: Sudeste}
@@ -1337,3 +1352,6 @@ unit_tests:
       rows:
         - {year_quarter: "2024-T1", sku: SKU-A, quantity_out: 4, cost_of_goods_sold: 8, avg_quantity_on_hand: "12.00", avg_inventory_value_amount: "36.00", inventory_turnover: "0.22"}
         - {year_quarter: "2024-T1", sku: SKU-B, quantity_out: 3, cost_of_goods_sold: 3, avg_quantity_on_hand: "0.00", avg_inventory_value_amount: "0.00", inventory_turnover: null}
+        - {year_quarter: "2024-T1", sku: SKU-C, quantity_out: 2, cost_of_goods_sold: 2, avg_quantity_on_hand: "8.67", avg_inventory_value_amount: "8.67", inventory_turnover: "0.23"}
+        - {year_quarter: "2024-T1", sku: SKU-D, quantity_out: 2, cost_of_goods_sold: 2, avg_quantity_on_hand: "-2.00", avg_inventory_value_amount: null, inventory_turnover: null}
+        - {year_quarter: "2024-T1", sku: SKU-E, quantity_out: 2, cost_of_goods_sold: 2, avg_quantity_on_hand: "3.00", avg_inventory_value_amount: null, inventory_turnover: null}

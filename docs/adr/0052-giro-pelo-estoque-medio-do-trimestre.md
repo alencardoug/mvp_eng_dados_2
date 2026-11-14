@@ -28,8 +28,10 @@ A Q2 do plano decidiu medir pelo estoque médio do período. A Q8 decidiu como, 
 - 16 pares ficam negativos em algum instante, 2 pares do legado divergem da projeção por movimentos
   na quarentena, e 166 pares não começam pelo estoque de abertura;
 - o gerador cria uma **correção-relâmpago**: quando uma saída não tem lastro, entra um
-  `adjustment_in` um minuto antes dela (`generator/domains/estoque.py`). São 1.514 ajustes, cerca de
-  um terço dos ajustes de entrada. Nesses pares a posição de fim de dia é zero mesmo com venda.
+  `adjustment_in` um minuto antes dela (`generator/domains/estoque.py`). São 1.851 ajustes pelo
+  `source_id` `AJU-CONFERENCIA` (1.792 no retail e 59 no legado), cerca de 40% dos ajustes de entrada.
+  A primeira contagem, 1.514, exigia uma saída de mesma quantidade em até 5 minutos e ficou estreita
+  (corrigida na revisão do Bloco 1, RVL1-1-05). Nesses pares a posição de fim de dia é zero mesmo com venda.
 
 ## Alternativas consideradas
 
@@ -60,7 +62,10 @@ das entradas até aquele dia.**
 - **Esquema:** as colunas passam a `avg_quantity_on_hand` e `avg_inventory_value_amount`. O giro
   continua indefinido (nulo) quando o valor médio é zero ou negativo.
 - **Histórico incompleto:** calcula-se com o livro como ele está. A posição negativa entra na média,
-  e a limitação fica escrita na descrição da view e no glossário.
+  e a limitação fica escrita na descrição da view e no glossário. O dia com posição e sem nenhuma
+  entrada com custo até ele não tem valor: com um dia assim no trimestre, o valor médio e o giro são
+  nulos, para que a média de parte do trimestre não passe por completa (RVL1-1-01; um par-trimestre
+  em 14/11/2026).
 - **A correção-relâmpago do gerador** fica registrada como trabalho adiado
   ([V4 das Pendências](../pendencias.md#v4--a-correção-relâmpago-do-gerador-de-estoque-registrada-em-14112026)).
 
@@ -71,7 +76,9 @@ das entradas até aquele dia.**
   elas são.
 - **Negativas:** a view fica mais cara: uma grade de dias por par, com janela acumulada. O estoque
   intradiário não aparece, e nos pares da correção-relâmpago o giro fica indefinido onde antes
-  aparecia (ou aparecia errado). Hoje são 1.216 linhas indefinidas de 6.990, contra 620. A mudança de
+  aparecia (ou aparecia errado). Hoje são 1.216 linhas indefinidas de 6.990, contra 620: em
+  1.212 delas o trimestre tem uma correção-relâmpago, 3 têm posição zero sem ela, e 1 tem dia sem custo
+  (abaixo). A mudança de
   esquema obriga o aviso prévio ao BI ([Consumidores §5](../consumidores.md#5-o-que-mudou-para-quem-consome)).
 - **Paridade com o GCP:** a mesma consulta no BigQuery, com `GENERATE_DATE_ARRAY` (ou a `dim_date`)
   para a grade de dias e `SUM() OVER (PARTITION BY … ORDER BY …)` para o acumulado. Nada de

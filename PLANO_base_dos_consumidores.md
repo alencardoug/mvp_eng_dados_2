@@ -235,8 +235,8 @@ mudança em [Consumidores §5](docs/consumidores.md#5-o-que-mudou-para-quem-cons
 - **F2**: diagnóstico e proposta em `bloco1/f2_diagnostico_e_proposta.md`; a **Q8** foi respondida pelas
   recomendações e registrada no [ADR-0052](docs/adr/0052-giro-pelo-estoque-medio-do-trimestre.md)
   (`3010ead`, com o aviso `prevista` ao BI); a view em `69ea446`. Antes e depois: 6.990 linhas e o mesmo
-  CMV, 1.449 giros mudam mais de 10%, e os indefinidos vão de 620 a 1.216 pela correção-relâmpago do
-  gerador, registrada como [V4](docs/pendencias.md#v4--a-correção-relâmpago-do-gerador-de-estoque-registrada-em-14112026).
+  CMV, 1.449 giros mudam mais de 10%, e os indefinidos vão de 620 a 1.216, 1.212 deles com uma
+  correção-relâmpago do gerador no trimestre (medido na revisão, RVL1-1-05), registrada como [V4](docs/pendencias.md#v4--a-correção-relâmpago-do-gerador-de-estoque-registrada-em-14112026).
   A primeira versão levava mais de 2 minutos por leitura. A final lê em 6 s: a grade só dos trimestres
   com venda, montada por `union all`.
 - **Não replicado ainda nos Achados**: a nota "replicado aqui em `<commit>`" do F1, F2 e F3 espera a

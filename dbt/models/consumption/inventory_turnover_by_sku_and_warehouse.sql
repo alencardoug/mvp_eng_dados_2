@@ -29,7 +29,8 @@
 -- inventário um minuto antes de toda saída sem lastro (Pendências, V4): nesses
 -- pares a posição de fim de dia é zero, e o giro fica indefinido. A posição
 -- negativa de um histórico incompleto entra na média como está: o livro é a
--- fonte da verdade.
+-- fonte da verdade. Mas se algum dia tem posição e nenhuma entrada com custo
+-- até ele, o valor médio é indefinido (nulo), e o giro também.
 --
 -- Giro indefinido não é giro zero: sem valor médio positivo, não havia estoque
 -- para girar, e o giro é nulo.
@@ -243,11 +244,17 @@ estoque_medio as (
         quarter_number,
         round(avg(cast(quantity_on_hand as numeric)), 2)    as avg_quantity_on_hand,
         -- Posição zero vale zero, com ou sem custo conhecido. O custo do dia é o
-        -- médio ponderado das entradas até ele.
-        round(avg(case
-            when quantity_on_hand = 0 then cast(0 as numeric)
-            else quantity_on_hand * inbound_cost_amount / nullif(inbound_quantity, 0)
-        end), 2)                                            as avg_inventory_value_amount
+        -- médio ponderado das entradas até ele. O dia com posição e sem nenhuma
+        -- entrada até ele não tem custo: a média do valor não se calcula sobre
+        -- parte do trimestre e passaria por completa, então ela fica indefinida.
+        case
+            when {{ contar_onde('quantity_on_hand <> 0 and inbound_quantity = 0') }} > 0
+            then null
+            else round(avg(case
+                when quantity_on_hand = 0 then cast(0 as numeric)
+                else quantity_on_hand * inbound_cost_amount / nullif(inbound_quantity, 0)
+            end), 2)
+        end                                                 as avg_inventory_value_amount
     from posicao_do_dia
     -- Só os dias da grade: o trimestre sem venda, que só tem movimento, e o dia
     -- antes do primeiro movimento do par ficam de fora.
@@ -269,7 +276,7 @@ select
     s.quantity_out,
     s.cost_of_goods_sold,
     coalesce(e.avg_quantity_on_hand, 0)             as avg_quantity_on_hand,
-    coalesce(e.avg_inventory_value_amount, 0)       as avg_inventory_value_amount,
+    e.avg_inventory_value_amount,
     case
         when e.avg_inventory_value_amount > 0
         then round(s.cost_of_goods_sold / e.avg_inventory_value_amount, 2)

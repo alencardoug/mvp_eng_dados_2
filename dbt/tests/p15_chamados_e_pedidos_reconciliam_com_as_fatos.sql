@@ -49,6 +49,10 @@ na_view as (
         year_month,
         sales_channel_name,
         sum(ticket_count)            as ticket_count,
+        count(*)                     as linhas,
+        -- `min` e `max` ignoram nulo: a contagem dos não nulos é o que acusa uma
+        -- linha sem denominador num canal que tem pedidos.
+        count(channel_order_count)   as linhas_com_denominador,
         min(channel_order_count)     as menor_denominador,
         max(channel_order_count)     as maior_denominador
     from {{ ref('support_tickets_per_hundred_orders') }}
@@ -74,3 +78,5 @@ left join pedidos_na_fato p
 where v.ticket_count is distinct from c.ticket_count
    or v.menor_denominador is distinct from p.channel_order_count
    or v.maior_denominador is distinct from p.channel_order_count
+   or (p.channel_order_count is not null and v.linhas_com_denominador <> v.linhas)
+   or (p.channel_order_count is null and v.linhas_com_denominador <> 0)

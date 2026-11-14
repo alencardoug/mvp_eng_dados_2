@@ -95,7 +95,8 @@ left join na_fato f
        on f.source_system = d.source_system and f.cliente = d.cliente
 left join pedidos_sem_item_aceito s
        on s.source_system = d.source_system and s.cliente = d.cliente
-where d.order_count <> coalesce(f.pedidos, 0) + coalesce(s.pedidos, 0)
+-- `is distinct from`, e não `<>`: a contagem nula na dimensão também é acusada.
+where d.order_count is distinct from coalesce(f.pedidos, 0) + coalesce(s.pedidos, 0)
    or d.first_order_at is distinct from
       case
           when f.primeira is null then s.primeira

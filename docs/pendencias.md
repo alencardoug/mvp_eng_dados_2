@@ -286,10 +286,11 @@ reaberta; o 9 fecha o critério de custo do M6.
 
 **Pergunta:** quando corrigir? Quando uma saída não tem lastro, o gerador cria um `adjustment_in` um
 minuto antes dela, com o motivo "Divergência de conferência" (`src/mvp_ed1/generator/domains/estoque.py`,
-em `AJU-CONFERENCIA`). Em 14/11/2026 eram 1.514 ajustes, 1.465 no retail e 49 no legado, cerca de um
-terço dos ajustes de entrada. O livro fica íntegro, mas o estoque aparece do nada um minuto antes de
+em `AJU-CONFERENCIA`). Em 14/11/2026 eram 1.851 ajustes, 1.792 no retail e 59 no legado, cerca de
+40% dos ajustes de entrada. O livro fica íntegro, mas o estoque aparece do nada um minuto antes de
 sair: a posição de fim de dia é zero, e o giro do [ADR-0052](adr/0052-giro-pelo-estoque-medio-do-trimestre.md)
-fica indefinido nesses pares (1.216 de 6.990 linhas, contra 620 antes dele). É o caso do dado
+fica indefinido nesses pares: das 1.216 linhas indefinidas de 6.990 (620 antes dele), 1.212 têm uma
+correção-relâmpago no trimestre. É o caso do dado
 sintético sem realismo: uma operação real repõe antes, por recebimento, e não um minuto antes da
 venda.
 
