@@ -51,9 +51,13 @@
    adiados*), com as pendentes do Registro entre eles. Cada item se escreve na forma canônica,
    `### ID — título`; em outra forma, ou copiado num exemplo, ele diverge da declaração e a geração recusa.
    Duas regras guardam a própria declaração: na seção 1 das Pendências, **linha que começa por um
-   identificador** (depois de qualquer marcação) tem de ser de um item que o cabeçalho nomeia — o item
-   novo não escapa junto com o cabeçalho que esqueceu dele, e o parágrafo que comece assim é reescrito;
-   e toda linha da tabela de pendentes do Registro dá exatamente um `Dnn` na primeira célula.
+   identificador** tem de ser de um item que o cabeçalho nomeia — o item novo não escapa junto com o
+   cabeçalho que esqueceu dele, e o parágrafo que comece assim é reescrito; e toda linha de dados da
+   tabela de pendentes do Registro, com ou sem a barra inicial, dá exatamente um `Dnn` na primeira
+   célula. **O alcance da primeira regra é lexical e declarado:** antes do identificador, recuo, `#`,
+   `>`, `*`, `_`, `` ` ``, `[`, `-`, `+` e marcador de lista numerada, em qualquer combinação. Ela não
+   certifica toda forma de Markdown: o que a garante é a forma de autoria, `### ID — título`, e o
+   cabeçalho mantido pelo verificador da skill `adr`.
 5. **Texto como dado.** As descrições são Markdown em português, como estão no dbt. O consumidor as
    exibe como texto ou como Markdown saneado, sem executar HTML. Links relativos resolvem contra
    `provenance.link_base` (`docs/`), no commit fixado.

@@ -260,6 +260,9 @@ def test_os_itens_em_aberto_sao_os_que_o_cabecalho_nomeia() -> None:
     pytest.param("### [D93](#d93) — nova\n\n", id="link"),
     # A regra é de autoria, e de propósito: parágrafo ou código que começa por um ID não declarado recusa.
     pytest.param("D93 é um parágrafo\n\n", id="paragrafo"), pytest.param("    **D93** é código\n\n", id="codigo"),
+    # RVB4-7-02: o sublinhado vizinho e a lista numerada estão no alcance declarado.
+    pytest.param("#### _D93_ — nova decisão\n\n", id="sublinhado"), pytest.param("1. D93 — nova decisão\n\n", id="lista-numerada"),
+    pytest.param("2) **D93** — nova decisão\n\n", id="lista-numerada-parentese"),
 ])
 def test_linha_que_comeca_por_id_nao_declarado_recusa(novo) -> None:
     with pytest.raises(SystemExit, match="D93|V5"):
@@ -273,10 +276,21 @@ def test_linha_que_comeca_por_id_nao_declarado_recusa(novo) -> None:
     pytest.param("| **D93** | nova |", "Registro tem", id="negrito"),
     pytest.param("| — | sem identificador |", "não tem um `Dnn`", id="sem-id"),
     pytest.param("| D93 e D94 | duas |", "não tem um `Dnn`", id="dois-ids"),
+    # RVB4-7-01: a linha sem a barra inicial é da mesma tabela, e conta.
+    pytest.param("D93 | nova decisão | 14/11/2026 |", "Registro tem", id="sem-barra-inicial"),
+    pytest.param("sem identificador | nova |", "não tem um `Dnn`", id="sem-barra-e-sem-id"),
 ])
 def test_toda_linha_da_tabela_do_registro_conta(linha, motivo) -> None:
     with pytest.raises(SystemExit, match=motivo):
         pacote._abertos(PENDENCIAS, REGISTRO.replace("| D43 |", linha + "\n| D43 |"))
+    with pytest.raises(SystemExit, match=motivo):                                  # também depois da última
+        pacote._abertos(PENDENCIAS, REGISTRO.replace("| D43 | a guarda |", "| D43 | a guarda |\n" + linha))
+
+
+def test_a_tabela_do_registro_tem_separador() -> None:
+    with pytest.raises(SystemExit, match="separadora"):
+        pacote._abertos(PENDENCIAS, REGISTRO.replace("|---|---|", "| x | y |"))
+    assert pacote._pendentes_do_registro(REGISTRO.replace("|---|---|", "| :--- | ---: |")) == {"D43"}
 
 
 @pytest.mark.parametrize("estranho", [

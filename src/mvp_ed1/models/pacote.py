@@ -256,28 +256,37 @@ CELULA_DO_CABECALHO = r"^\|[ \t]*{rotulo}[ \t]*\|[ \t]*(\d+)[ \t]*(?:\(([^)]*)\)
 
 
 def _pendentes_do_registro(registro: str) -> set[str]:
-    """As decisões da tabela do Registro §3: **toda** linha de dados dá exatamente um `Dnn` na primeira
-    célula, em qualquer marcação (`D93`, `**D93**`, código, link); a que não dá recusa — nenhuma linha
+    """As decisões da tabela do Registro §3. A tabela é o bloco de linhas não vazias que começa numa linha
+    com `|`: a segunda tem de ser o separador, e **toda** linha depois dele — com ou sem a barra inicial,
+    que o Markdown aceita (RVB4-7-01) — dá exatamente um `Dnn` na primeira célula, em qualquer marcação
+    (`D93`, `**D93**`, código, link). Linha que não dá, ou tabela sem separador, recusa: nenhuma linha
     some por não casar com uma expressão (RVB4-6-02)."""
     secao = registro.partition("## 3. Decisões pendentes")[2].partition("\n## ")[0]
-    saida, tabela = set(), []
+    saida, bloco = set(), []
     for linha in secao.split("\n") + [""]:
-        if linha.lstrip().startswith("|"):
-            tabela.append(linha)
+        if linha.strip() and (bloco or "|" in linha):
+            bloco.append(linha)
             continue
-        for dado in tabela[2:]:                      # o cabeçalho e o separador da tabela ficam de fora
-            primeira = dado.strip().strip("|").split("|")[0]
-            ids = re.findall(r"(?<![\w])(D\d+)(?![\w])", primeira)
-            if len(ids) != 1:
-                raise SystemExit(f"Registro §3: a linha {dado.strip()[:60]!r} não tem um `Dnn` só na primeira célula "
-                                 "— nenhum pacote é escrito")
-            saida.add(ids[0])
-        tabela = []
+        if bloco:
+            if len(bloco) < 2 or not re.fullmatch(r"[ \t]*\|?(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*(?::?-+:?[ \t]*)?", bloco[1]):
+                raise SystemExit(f"Registro §3: a tabela que começa em {bloco[0].strip()[:50]!r} não tem a linha "
+                                 "separadora — nenhum pacote é escrito")
+            for dado in bloco[2:]:
+                primeira = dado.strip().removeprefix("|").split("|")[0]
+                ids = re.findall(r"(?<![0-9A-Za-z])(D\d+)(?![0-9A-Za-z])", primeira)
+                if len(ids) != 1:
+                    raise SystemExit(f"Registro §3: a linha {dado.strip()[:60]!r} não tem um `Dnn` só na primeira "
+                                     "célula — nenhum pacote é escrito")
+                saida.add(ids[0])
+        bloco = []
     return saida
 
 
 #: Linha da seção 1 das Pendências que **começa** por um identificador, depois de qualquer marcação.
-LINHA_COM_ID = re.compile(r"^[ \t>*_`#+\-\[]*((?:D|V)\d+)(?![\w])", re.M)
+#: O alcance é este, e não "qualquer Markdown": recuo, `#`, `>`, `*`, `_`, `` ` ``, `[`, `-`, `+` e o
+#: marcador de lista numerada (`1.`, `1)`), em qualquer combinação; o ID termina onde não segue letra
+#: nem dígito (`_D93_` conta, RVB4-7-02).
+LINHA_COM_ID = re.compile(r"^(?:[ \t>*_`#+\-\[]|\d{1,9}[.)])*((?:D|V)\d+)(?![0-9A-Za-z])", re.M)
 
 
 def _declarados_nas_pendencias(texto: str, registro: str) -> list[str]:
