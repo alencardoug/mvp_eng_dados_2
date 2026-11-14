@@ -43,8 +43,9 @@ de banco; a pergunta é em português, como todo documento.
 
 ## 2. Núcleo comercial — Etapa 5
 
-Estas sete são as que viram view agora. Seis se apoiam em `fact_sales_order_item`, cujo grão é
-**uma linha de item de pedido**; a sétima, em `fact_cart_event`.
+Estas sete são as que viram view agora. Cinco se apoiam em `fact_sales_order_item`, cujo grão é
+**uma linha de item de pedido**; a P04, em `fact_order_status_event`, no grão do pedido (F18); a P07,
+em `fact_cart_event`.
 
 O ADR-0018 previa "12 a 15 perguntas". São 16 porque a decisão de acrescentar a fato de carrinho —
 tomada ao redigir esta lista, e registrada no

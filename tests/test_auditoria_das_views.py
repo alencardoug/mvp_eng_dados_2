@@ -29,7 +29,12 @@ referência **discorde** delas, rodando-as como consulta somente leitura.
 ── Limite declarado ─────────────────────────────────────────────────────────
 O autor das referências leu o SQL das views antes de escrevê-las (o passo 1 do
 bloco levou para o glossário as regras que só existiam lá, o F9). A
-independência é de construção e de fonte, não de autoria.
+independência é de construção e de fonte, não de autoria. Nas referências da
+P05, P07, P13 e P14 a construção é quase a da view (as mesmas fatos, os mesmos
+recortes, a mesma agregação): elas provam a igualdade e o critério de valor,
+mas o critério de população delas fica com as conferências de
+`tests/auditoria/populacao/` (P07, P13 e P14) e, na P05, só com a da receita
+(P01), que usa a mesma fato (RVB1b-1-05).
 """
 
 from __future__ import annotations

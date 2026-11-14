@@ -296,7 +296,9 @@ A conclusão da **P13** espera a D66 (seção seguinte). Se a D66 trouxer fato n
   (`except all` nos dois sentidos) num corte `REPEATABLE READ READ ONLY`; e oito conferências de
   população contra `trusted` em `tests/auditoria/populacao/` (a da P13 é o teste dbt do bloco da D66).
   **Limite declarado:** o autor das referências leu o SQL das views antes (o passo 1 tirou de lá o F9);
-  a independência é de construção e de fonte, não de autoria.
+  a independência é de construção e de fonte, não de autoria. Nas da P05, P07, P13 e P14 a construção
+  é quase a da view, e o critério de população delas fica com as conferências contra `trusted`
+  (RVB1b-1-05).
 - **Passo 3, a contraprova:** o SQL compilado das versões defeituosas do F1, do F2, da P04 e da P14, em
   `tests/auditoria/contraprova/`, roda como consulta somente leitura, e a referência tem de discordar
   dele. Uma mutação na referência da P02 (sem o filtro de pedido realizado) fez o teste acusar 271
@@ -708,4 +710,11 @@ observação, todos aceitos:
 | RVB1b-1-03 | As Perguntas de Negócio ainda citavam a fato de item na P04 e na P14 | ajuste | Feito, com a P15 |
 | RVB1b-1-04 | O plano dizia 54 → 61 `relationships`; são 51 → 58 | ajuste | Feito |
 | RVB1b-1-05 | Referências que reproduzem o cálculo; a da P03 conservava o grão do F20 | observação | Feito na P03 (chave natural, "VÁRIOS"); nas outras, limite declarado |
+
+### Rodada 16 — Codex conta 2, sobre `0471f6a`, `504271a` e `ba67981` (14/11/2026)
+
+Relatório em `codex2_bloco1b_r2.md`. RVB1b-1-02 e 04 resolvidos; 01, 03 e 05 parciais. Três achados, feitos:
+a conferência do denominador da P15 deixou de descartar os nulos (RVB1b-2-01, bloqueante; contraprova
+acusa 1 linha); os resumos de fonte da abertura comercial e do cabeçalho da P15 (RVB1b-2-02); o limite das
+referências de construção parecida (P05, P07, P13, P14) no teste e aqui (RVB1b-2-03).
 

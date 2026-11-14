@@ -11,9 +11,10 @@ with camada as (
     group by 1, 2
 ),
 na_view as (
+    -- Os nulos ficam: um denominador nulo num canal que tem pedidos em `trusted` é perda, e só o
+    -- "Sem canal", sem pedido nenhum, pode ser nulo (RVB1b-2-01).
     select distinct year_month, sales_channel_name, channel_order_count as n
     from consumption.support_tickets_per_hundred_orders
-    where channel_order_count is not null
 )
 select v.year_month, v.sales_channel_name, c.n, v.n
 from na_view v left join camada c using (year_month, sales_channel_name)

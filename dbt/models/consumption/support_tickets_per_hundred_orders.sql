@@ -3,8 +3,9 @@
 --
 -- ── Duas fatos, dois grãos, um *drill across* ───────────────────────────────
 -- O numerador vem de `fact_support_ticket_event` e o denominador de
--- `fact_sales_order_item`. Nenhuma das duas está no grão da resposta: a
--- primeira está no grão do **evento** e a segunda no do **item**. Cada uma é
+-- `fact_order_status_event`. Nenhuma das duas está no grão da resposta: as duas
+-- estão no grão do **evento** (do chamado e do pedido), e o denominador usa só o
+-- evento de criação de cada pedido realizado. Cada uma é
 -- reduzida ao seu grão de contagem antes de se encontrarem — que é o que o
 -- ADR-0030 chama de *drill across*, e o motivo de não haver `join` entre fatos
 -- aqui.
