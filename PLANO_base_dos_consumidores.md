@@ -470,51 +470,74 @@ resultado, versão do código"); esta entrega o materializa para o dbt, como a A
 o `build` completo, limpo, de *commit* conhecido, sem nada depois — sustenta "este armazém foi construído
 por este *commit*". Qualquer outra coisa deixa a procedência **não verificada**, e diz por quê.
 
+**Revisto de novo depois da rodada 2** (`codex1_l5_desenho_r2.md`, RVL5-2-01 a 05): o "completo" passa a ser
+medido, e não lido dos argumentos; cada fase confirma a própria escrita; a linha aberta só sai por ato
+explícito do custodiante.
+
 1. **A tabela** `governance.dbt_invocations`, pela migração `0003_dbt_invocations` de `governance.py`
    (nunca editar as anteriores), **escrita em duas fases**, como `legacy_captures` (ADR-0044):
-   - no `on-run-start`, a linha `started`: `sequence` (`bigserial`, a ordem de início, que o banco dá),
-     `invocation_id` (único), `command`, `full_build` (`build` sem `--select`, `--exclude`, `--selector`,
-     `--resource-type` nem `--empty`, lido de `invocation_args_dict`), `git_commit` e `git_tree_dirty` (do
-     ambiente; nulos quando a execução não os informa, como na DAG), `dbt_version`, `target`, `started_at`;
-   - no `on-run-end`, **por último**, depois do *hook* de acesso, o fecho da mesma linha: `finished_at`, as contagens
-     por estado dos `results` (`success`, `pass`, `warn`, `error`, `fail`, `runtime error`, `skipped`,
-     `partial success`) e `status`: `success` só sem nenhum de `error`, `fail`, `runtime error`, `skipped`
-     e `partial success`; `failed` senão (RVL5-1-03). `warn` não reprova, e fica contado.
+   - no `on-run-start`, a linha `started`: `sequence` (`bigint generated always as identity`: a ordem de
+     abertura, dada pelo banco, e sem *grant* de sequência para inserir, RVL5-2-05 — **medido** em 15/11/2026 no
+     armazém, numa transação desfeita: um papel só com `insert` insere na identidade, e no `bigserial` recebe
+     `permission denied for sequence`), `invocation_id`
+     (único), `command`, `git_commit` e `git_tree_dirty` (do ambiente; nulos quando a execução não os
+     informa, como na DAG), `dbt_version`, `target` e `started_at` com `clock_timestamp()` **do banco**;
+   - no `on-run-end`, **por último**, depois do *hook* de acesso, o fecho da mesma linha: `finished_at`
+     (`clock_timestamp()` do banco), as contagens por estado dos `results` (`success`, `pass`, `warn`,
+     `error`, `fail`, `runtime error`, `skipped`, `partial success`), `status` — `success` só sem nenhum de
+     `error`, `fail`, `runtime error`, `skipped` e `partial success`; `failed` senão (RVL5-1-03), e `warn`
+     contado sem reprovar — e `full_build`: **verdadeiro só se os resultados cobrem todo nó executável
+     do grafo** (modelos, *seeds*, *snapshots*, testes e testes de unidade habilitados). É uma medida, não
+     uma leitura de argumento: o `dbt retry` herda os argumentos e o comando do `build` e roda só o que
+     falhou, e é pela cobertura que ele não passa por completo (RVL5-2-01). O `--select` também não.
+   - **Cada fase confirma a própria escrita** (`commit` explícito no SQL do *hook*): o perfil PostgreSQL
+     não tem *autocommit*, e devolver o `insert` ao dbt não o persiste (RVL5-2-02). A falha da abertura
+     pula os nós (`skip_nodes_if_on_run_start_fails`, o padrão). **Prova em todo `build`:** um teste de dados
+     singular confere, de outra conexão e durante a execução, que a linha `started` desta invocação está
+     visível e aberta.
    Comando que não escreve o armazém (`test`, `docs generate`, `compile`, `parse`) não registra nada.
 2. **O que fica sem fecho é visível** (RVL5-1-02): falha do *hook* de acesso (o dbt pula os *hooks*
    seguintes, e o fecho é o último), do próprio registro, ou interrupção deixam a linha `started` sem
-   `finished_at`, e ela impede a procedência de dali em
-   diante. Linha `started` antiga não se "conserta": só um `build` completo novo, fechado, a supera.
-3. **A regra de leitura** — uma só, escrita numa função (`procedencia()` em `governance.py`) e numa *view*
-   do próprio schema, `governance.warehouse_provenance`, para o BI e o pacote lerem a mesma coisa
-   (RVL5-1-01): pega a linha de maior `sequence`. Ela é **verificada** se é `full_build`, `success`,
-   `git_commit` conhecido e `git_tree_dirty = false`, e nenhuma outra linha terminou depois de ela
-   começar ou está aberta (sobreposição). Senão, `not_verified`, com o motivo: execução parcial depois,
-   execução sem fecho, *commit* desconhecido, árvore suja, execução reprovada, sobreposição. A DAG, que roda
-   por camada, nunca sustenta procedência sozinha: o custodiante, antes de abrir a janela de leitura,
-   roda `make dbt-build` de um *commit* limpo.
-4. **Os papéis** (RVL5-1-04): a tabela é declarada como fonte de `governance` no gerador do legado, com
-   `meta.grants` próprio — `select` para `auditor` e `transformer`, `insert` e `update` para `transformer` —,
-   e a macro de acesso a mantém (ela revoga e repõe o declarado por tabela). O dbt hoje conecta como o
-   superusuário, então o registro não depende do grant; o grant é a política, e `tests/test_acesso.py`
-   passa a cobrá-la, com retenção (`permanent`) e descrição.
-5. **O pacote.** `provenance.warehouse` passa a ser o que a *view* diz **no momento da geração**, e só
+   `finished_at`. **E ela bloqueia** (RVL5-2-03): enquanto houver linha aberta, nada é verificado — uma
+   execução antiga ainda pode estar escrevendo, e a `sequence` ordena aberturas, não certifica que um
+   executor morreu. A linha sai do caminho só por um ato explícito do custodiante, `make governance-abandonar
+   INVOCACAO=…`, que a marca `abandoned` com o instante e nunca a dá por sucesso. É regra operacional
+   nova, e vai ao ADR para o Owner.
+3. **A regra de leitura** — uma só, numa *view* do próprio schema, `governance.warehouse_provenance`, que o BI
+   e o pacote leem (RVL5-1-01): a candidata é a linha de maior `sequence`. É **verificada** se é
+   `full_build`, `success`, de `git_commit` conhecido e `git_tree_dirty = false`, se não há linha aberta, e
+   se toda linha anterior terminou (ou foi abandonada) **antes** de ela começar — os dois instantes do
+   relógio do banco. Senão, `not_verified`, com o motivo (execução parcial, sem fecho, *commit*
+   desconhecido, árvore suja, reprovada, sobreposta). A DAG, que roda por camada, nunca sustenta procedência
+   sozinha: o custodiante, antes de abrir a janela de leitura, roda `make dbt-build` de um *commit* limpo.
+4. **O produtor dos metadados Git** (RVL5-2-04): o `CARIMBO_ANTES` do `Makefile` exporta, antes do dbt,
+   `MVP_GIT_COMMIT` (`git rev-parse HEAD`) e `MVP_GIT_TREE_DIRTY`: `true` se há mudança em arquivo
+   rastreado **ou** arquivo não rastreado e não ignorado nos insumos do dbt (`dbt/`, o glossário) — o modelo
+   novo ainda fora do Git entra no *build* e não pode passar por limpo; os artefatos ignorados (`dbt/target`)
+   não sujam. O `tree_dirty_at_generation` do pacote não muda de significado.
+5. **Os papéis** (RVL5-1-04, RVL5-2-05): tabela e *view* declaradas como fontes de `governance` no gerador do
+   legado, cada uma com `meta.grants`: na tabela, `select` para `auditor` e `transformer`, `insert` e
+   `update` para `transformer`; na *view*, `select` para `auditor` e `transformer`. O `analyst` fica no
+   contrato de consumo. O dbt e o leitor do pacote conectam hoje como o superusuário; os *grants* são a
+   política, e `tests/test_acesso.py` a cobra por papel (`insert` com o padrão da identidade, `update`,
+   `select` da *view*), com retenção (`permanent`), descrição e classificação.
+6. **O pacote.** `provenance.warehouse` passa a ser o que a *view* diz **no momento da geração**, e só
    `verified` se a linha verificada é a da execução do *manifest* (`invocation_id` igual): é então que "o
    armazém é o do *manifest*", como a decisão da rodada 5 diz. Campos novos `built_from_commit`,
    `built_at`, `reason`; o formato continua o 1 (regra 3), e o esquema troca o `const not_verified` por
    `verified | not_verified`. A leitura usa a conexão do `.env`: o `catalog` e a 5ª etapa do `check`
-   passam a carregá-lo (RVL5-1-05); sem conexão, `not_verified` com motivo "sem conexão", e nunca texto
-   de erro do banco no pacote. O `check-offline` não chama o leitor. É a única leitura do banco que o
-   pacote faz, e o contrato a declara.
-6. **A comparação do `--check`** tira `built_by_invocation_id`, `built_from_commit` e `built_at` e compara
-   `status` e `reason`; o teste de duas montagens passa a usar um leitor substituto para as duas invocações
-   (RVL5-1-05).
+   passam a carregá-lo (RVL5-1-05); sem conexão, `not_verified` com motivo "sem conexão", e nunca texto de
+   erro do banco no pacote. O `check-offline` não chama o leitor. É a única leitura do banco que o pacote
+   faz, e o contrato a declara. A comparação do `--check` tira `built_by_invocation_id`,
+   `built_from_commit` e `built_at` e compara `status` e `reason`.
 7. **Os testes:** a migração do zero e sobre o armazém existente; a regra de leitura com linhas montadas
-   (cada motivo de `not_verified`, a sobreposição, a linha aberta, a ordem por `sequence`); a macro, em
-   integração, registrando um `make dbt-build` completo e um `--select`, e não um `dbt test`; o mapa de
-   estados dos `results`, com um `build` que reprova teste e pula dependentes; o gerador com leitor
-   substituto e sem conexão; o esquema aceitando `verified` só com os campos. Aviso em Consumidores §5.
-   O ADR (0054) registra a garantia estreita, para o Owner ver o que ela promete e o que não.
+   (cada motivo, a linha aberta, a abandonada, a sobreposição, a ordem por `sequence`); a macro em
+   integração — um `make dbt-build` completo (verificado), um `--select` e um `dbt retry` depois de uma falha
+   (parciais), um `dbt test` (sem linha), o *hook* de acesso falhando antes do fecho (linha aberta, por uma
+   variável só de teste) —; o mapa de estados com um `build` que reprova teste e pula dependentes; a sujeira
+   com modelo novo não rastreado, mudança rastreada e metadados ausentes; os papéis; o gerador com leitor
+   substituto e sem conexão; o esquema aceitando `verified` só com os campos. Aviso em Consumidores §5. O
+   ADR novo (o próximo número) registra a garantia estreita e a regra do abandono.
 
 **Q6, as colunas em português** de `trusted.legacy_order_totals_divergence`. A decisão enumerou três; a
 revisão do desenho achou a quarta (RVL5-1-06), e o Owner a incluiu em 15/11/2026. Passam a
