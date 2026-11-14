@@ -10,12 +10,12 @@
 
 with na_camada as (
 
+    -- O mês sai do instante, sem passar pela `dim_date`: uma entrega cuja data
+    -- não estivesse no calendário sumiria dos dois lados e o teste passaria.
     select
-        d.year_month,
+        {{ parte_da_data('year_month', data_em_sao_paulo('s.delivered_at')) }} as year_month,
         count(*)                                    as remessas_entregues
     from {{ ref('shipments') }} s
-    join {{ ref('dim_date') }} d
-      on d.full_date = {{ data_em_sao_paulo('s.delivered_at') }}
     where s.is_delivered
     group by 1
 
@@ -40,3 +40,12 @@ from na_camada c
 full outer join na_view v
   on v.year_month = c.year_month
 where c.remessas_entregues is distinct from v.remessas_entregues
+
+union all
+
+-- Remessa entregue sem data de chegada conformada: o `relationships` da coluna não
+-- acusa o nulo, e a view a perderia na junção com o calendário.
+select 'sem data de chegada', count(*), 0
+from {{ ref('fact_shipment') }}
+where is_delivered and delivered_date_key is null
+having count(*) > 0

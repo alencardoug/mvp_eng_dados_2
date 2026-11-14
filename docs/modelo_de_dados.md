@@ -579,6 +579,12 @@ classificação que impede somar saldo de estoque ao longo do tempo.
 | `fact_coupon_redemption` | 6.000 | Um uso de cupom em um pedido. | Transacional |
 | `fact_refund` | 1.400 | Um reembolso realizado. | Transacional |
 
+**`fact_shipment` e `fact_shipment_item` repetem os atributos de remessa e de pedido**, tirados dos
+mesmos modelos de `trusted` com as mesmas expressões ([ADR-0053](adr/0053-fato-no-grao-da-remessa.md)).
+Cada uma se reconcilia com a sua condutora — a de remessa com `shipments` (contagem e tentativas de
+entrega), a de item com `shipment_items` (contagem e unidades) —, e **nenhum teste compara as duas
+atributo a atributo**: uma expressão alterada numa e não na outra passaria. É risco aceito.
+
 `fact_inventory_movement` carrega **`cogs_amount`**, o custo do produto vendido, registrado no
 instante da saída ([ADR-0030](adr/0030-cmv-do-livro-de-estoque.md)). É por ela que a margem é
 calculada, e não pelo custo de compra: o custo do movimento não muda quando o preço de compra muda.

@@ -639,3 +639,15 @@ pela posição zero em todo o trimestre, e não pela correção-relâmpago em si
 trimestres de valor positivo (RVL1-3-02); a pendência das notas de replicação aponta para os *commits*
 feitos (RVL1-3-03). **A revisão do Bloco 1 está fechada.**
 
+### Rodada 12 — Codex conta 2, sobre o bloco da D66 em `f4ab54a` (14/11/2026)
+
+Relatório em `data/medicoes/base_consumidores/codex2_d66_r1.md`. Dois bloqueantes, um ajuste e uma
+observação:
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVD-1-01 | O teste de população da P13 passava pela `dim_date`, e uma entrega sem data conformada sumiria dos dois lados | bloqueante | Feito: o mês sai do instante, e a remessa entregue sem `delivered_date_key` é acusada à parte; contraprova acusa 1 mês |
+| RVD-1-02 | O texto copiado da fato de item prometia, em `is_cycle_closing_shipment` e `order_delivered_at`, o fechamento do ciclo que o SQL só garante com `is_order_cycle_closed`; o `description_reason` de `failed_attempt_count` falava de item | bloqueante | Feito nas duas fatos de remessa (a de item tinha o mesmo defeito) |
+| RVD-1-03 | O comentário prometia uma reconciliação entre as duas fatos que não existe | ajuste | Feito: o comentário diz o que cada uma reconcilia, e o limite foi para o Modelo de Dados §3; o ADR-0053 fica como foi aceito |
+| RVD-1-04 | A D66 consta como `feita` em Consumidores §5 antes do *push* | observação | Sem mudança: a linha só se lê no GitHub junto com os *commits* que ela cita |
+

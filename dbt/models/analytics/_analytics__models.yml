@@ -1937,7 +1937,7 @@ models:
         meta:
           sensitivity: internal
       - name: is_cycle_closing_shipment
-        description: "Verdadeiro na remessa que fecha o ciclo de entrega do pedido: a última entregue (ADR-0033)."
+        description: "Verdadeiro na última remessa entregue do pedido. Ela fecha o ciclo de entrega só quando `is_order_cycle_closed` também é verdadeiro (ADR-0033); com o ciclo aberto, marca a mais recente das já entregues."
         meta:
           sensitivity: internal
       - name: is_split_order
@@ -1945,7 +1945,7 @@ models:
         meta:
           sensitivity: internal
       - name: order_delivered_at
-        description: "Instante em que a última remessa do pedido foi entregue; nulo enquanto falta alguma."
+        description: "Instante da entrega mais recente entre as remessas já entregues do pedido; nulo sem nenhuma entregue. É o fim do ciclo só quando `is_order_cycle_closed` é verdadeiro."
         meta:
           sensitivity: internal
       - name: quantity_ordered
@@ -2166,7 +2166,7 @@ models:
         meta:
           sensitivity: internal
       - name: is_cycle_closing_shipment
-        description: "Verdadeiro na remessa que fecha o ciclo de entrega do pedido: a última entregue (ADR-0033)."
+        description: "Verdadeiro na última remessa entregue do pedido. Ela fecha o ciclo de entrega só quando `is_order_cycle_closed` também é verdadeiro (ADR-0033); com o ciclo aberto, marca a mais recente das já entregues."
         meta:
           sensitivity: internal
       - name: is_split_order
@@ -2174,14 +2174,14 @@ models:
         meta:
           sensitivity: internal
       - name: order_delivered_at
-        description: "Instante em que a última remessa do pedido foi entregue; nulo enquanto falta alguma."
+        description: "Instante da entrega mais recente entre as remessas já entregues do pedido; nulo sem nenhuma entregue. É o fim do ciclo só quando `is_order_cycle_closed` é verdadeiro."
         meta:
           sensitivity: internal
       - name: failed_attempt_count
         description: "Aditiva — tentativas de entrega da remessa que falharam."
         meta:
           sensitivity: public
-          description_reason: a fato está no grão do item e o valor é da remessa — o herdado diria aditiva por item (RVL3-03)
+          description_reason: o texto herdado de `shipments` não diz a aditividade, e na fato de item a mesma coluna não é aditiva
       - name: delivery_delay_days
         description: "Dias entre a entrega e o prazo prometido: positivo é atraso, negativo é adiantamento; nulo sem entrega."
         meta:

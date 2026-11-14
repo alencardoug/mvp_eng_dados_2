@@ -12,7 +12,9 @@
 -- A fato de item continua: é ela que diz **o que** foi enviado, e a P14 fecha o
 -- ciclo do pedido nela. Os atributos de remessa e de pedido saem dos mesmos
 -- modelos de `trusted` e com as mesmas expressões, para as duas fatos não
--- divergirem; a reconciliação entre elas é teste (`_analytics__models.yml`).
+-- divergirem. Nenhum teste compara as duas fatos atributo a atributo: esta se
+-- reconcilia com `shipments` (contagem e tentativas de entrega), a de item com
+-- `shipment_items` (contagem e unidades), e o limite está no Modelo de Dados §3.
 
 with remessas as {{ 'not materialized ' if target.type == 'postgres' else '' }}(
 
