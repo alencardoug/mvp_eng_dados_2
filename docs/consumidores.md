@@ -1,0 +1,119 @@
+# Consumidores
+
+> **O que vive aqui:** quem lê este repositório, como lê, como pede o banco, por onde fala com ele e o
+> que mudou para quem lê. É o canal de saída daqui para os consumidores, versionado para que cada um
+> fixe o *commit* que leu.
+>
+> **O que não vive aqui:** a decisão de onde os consumidores leem (ver
+> [D92](pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026));
+> o formato do pacote (ver [Pacote de Metadados](pacote_de_metadados.md)); o trabalho da fase que
+> corrige o que eles leem (ver o [plano da base dos consumidores](../PLANO_base_dos_consumidores.md));
+> os achados que o `nl_sql` devolve (ver [Achados do nl_sql](achados_nl_sql.md)).
+
+| Campo | Informação |
+|---|---|
+| Aberto em | 14/11/2026, no alinhamento central das pendências dos três consumidores |
+| Situação | Vigente |
+
+---
+
+## 1. Quem lê
+
+| Consumidor | O que é | O que lê daqui | Por onde fala com cá |
+|---|---|---|---|
+| `nl_sql` (`~/Projetos/data/nl_sql`, privado) | Bancada de testes NL→SQL | Nada no ambiente. A importação é única e congelada (dados de 11/11/2026; dbt e glossário de `mvp_eng_dados_1@cbc5271`). Daqui só lê arquivos, para citar evidência `arquivo:linha` | Escreve as entradas nos [Achados](achados_nl_sql.md), sem *commit*; o Owner revisa e *commita* |
+| `gdados` (`~/Projetos/gdados`) | Portal de leitura da governança, com estrutura, ambientes e conceitos | O pacote e os artefatos por *commit*. Não lê banco | `docs/alinhamento_entre_projetos.md`, no próprio repositório |
+| `bi-como-codigo` (`~/Projetos/bi-como-codigo`, público) | Vitrine de BI como código, com o portal da etapa 2.7 | As views de `consumption`, pelo login `consumption_reader`; o pacote; os artefatos por *commit* | `docs/upstream_questions.md`, no próprio repositório |
+
+O `gdados` e a etapa 2.7 do BI são **dois portais que leem o mesmo pacote** (decisão do Owner em
+14/11/2026). Nenhum dos dois lê o `dbt/target/` nem o *manifest* direto.
+
+---
+
+## 2. Regras de leitura
+
+1. **Por *commit* fixado.** O consumidor registra o *commit* daqui que leu. Os *commits* anteriores
+   a `a35a8cb`, o primeiro daqui, existem só no `mvp_eng_dados_1`, que fica como referência histórica.
+2. **Publicado antes de anunciado.** Um *commit* só entra na §6 ou num aviso depois de estar no
+   `origin/main` do GitHub. O *push* é sempre com a autorização do Owner.
+3. **Nenhum consumidor escreve aqui nem roda `make` aqui.** A única exceção é a sessão do `nl_sql`,
+   que escreve entradas nos Achados sem *commit*. Ler arquivos e usar `git show`/`git log` neste
+   *checkout* é livre. Comandos do projeto não são, nem os que parecem só ler: qualquer
+   `dbt … --select` reescreve o `dbt/target/manifest.json`. Para a linhagem e os metadados, a fonte é
+   o pacote ou, até ele existir, o esquema e o exemplo.
+4. **O que o consumidor exibe tem a data e o *commit* de onde veio.** Uma medição histórica não vira
+   número atual por existir.
+
+---
+
+## 3. O banco compartilhado
+
+Os três bancos (`mvp_ed1_source_db`, `mvp_ed1_legacy_db`, `mvp_ed1_warehouse_db`) são **um só
+conjunto**, herdado do `mvp_eng_dados_1` com os mesmos volumes e portas. Só este repositório os
+opera (`make`). Um consumidor que lê o armazém entra pelo próprio login, hoje só o BI.
+
+**Para ler o banco:**
+
+1. A sessão do consumidor pede ao Owner que os bancos estejam de pé. O Owner sobe com `make up`
+   neste repositório, ou pede a esta sessão.
+2. **Janela de leitura.** Quando a leitura precisa de um estado estável (exportação, oráculo), o
+   consumidor pede uma janela ao Owner. Enquanto ela está aberta, esta sessão não roda `dbt-build`,
+   regeneração, restauração nem ingestão. O Owner abre e fecha a janela, e é ele o trinco.
+3. **Dentro da janela**, a leitura é do consumidor: uma transação `REPEATABLE READ READ ONLY` dá o
+   corte consistente.
+4. **Qual *build* está no banco.** Cada *build* que muda o que um consumidor lê entra na §5, com o
+   *commit* e o `invocation_id`. Fora disso, a procedência do armazém é **não verificada** até o
+   desenho do Bloco 4 (L5), e o pacote a marca assim.
+
+---
+
+## 4. Os canais
+
+- **Entrada (puxada).** Cada consumidor escreve as perguntas e os achados no próprio repositório, nos
+  arquivos da §1, e esta sessão os lê no início de cada bloco do plano e quando o Owner avisa. Cada
+  item recebe uma resposta, aqui ou no plano, pela regra de entrada (plano, Bloco 0, item 3): achado
+  novo ganha ID de F14 em diante nos Achados e uma linha no plano, com o bloco de destino.
+- **Saída.** Este documento. Quando a mudança é urgente, sai também um aviso fora do Git
+  (`data/medicoes/base_consumidores/avisos/`) que aponta para cá. O aviso nunca é a única fonte.
+
+---
+
+## 5. O que mudou para quem consome
+
+As mudanças de **valor**, **esquema** ou **texto** de um objeto que um consumidor lê. Uma linha por
+mudança, com o caso de antes e de depois quando é número. O contrato das views pega mudança de
+esquema e não pega mudança de valor: por isso a coluna "Caso".
+
+| Data | *Commit* | Objeto | Muda | Caso: antes → depois | *Build* do armazém | Achado |
+|---|---|---|---|---|---|---|
+| — | — | — | Nada mudou desde a `v2.0.0` (`f86b9fb`) | — | — | — |
+
+**O que está previsto mudar, e quando,** está no plano (Blocos 1, 1b e a D66). A linha só entra aqui
+quando a mudança está feita e publicada.
+
+**O esquema das views.** O conjunto das 16 views não muda nesta fase, e os Blocos 5 e 6 não mexem em
+`consumption`. A `inventory_turnover_by_sku_and_warehouse` mantém o esquema, salvo se a Q8 decidir
+outra coisa. A `on_time_delivery_rate_by_carrier` depende da D66. Qualquer mudança de esquema entra
+aqui antes do *commit* que a faz.
+
+---
+
+## 6. *Commits* marcados para fixar
+
+| Marco | *Commit* | Para quem |
+|---|---|---|
+| `v2.0.0`, herdada | `f86b9fb`, só no `mvp_eng_dados_1` | Referência histórica |
+| Especificação do pacote, formato 1 | Anunciado no aviso que acompanha a publicação (o documento não cita o próprio *commit*) | `gdados` (E1), BI (2.7) |
+| Fim da auditoria das 16 views (Bloco 1b, com a P13 depois da D66) | A marcar | BI (N85: as etapas 2.4 a 2.10 fixam este) |
+| Primeira versão do pacote (Bloco 4) | A marcar | `gdados`, BI |
+
+---
+
+## 7. O GCP
+
+**Nenhum recurso novo no GCP**, em nenhum projeto (decisão do Owner em 14/11/2026). O ambiente da
+Etapa 13 foi destruído em 13/11/2026 e é evidência **datada e congelada**: as declarações
+(`terraform/`, o mapa de paridade) e o [Registro da fase GCP](registro_fase_gcp.md) estão aqui; as
+evidências coletadas antes do desmonte estão fora do Git, no `mvp_eng_dados_1` (L10, Bloco 4). O custo
+real da fase entra em 16/11/2026 no `mvp_eng_dados_1`, como a D92 prevê, e **também aqui**, no mesmo
+dia, para que os portais o leiam deste repositório.

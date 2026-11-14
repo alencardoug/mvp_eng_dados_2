@@ -1,0 +1,396 @@
+{
+  "crossings": [
+    {
+      "destination": "`raw`",
+      "frequency": "a cada execução da DAG `fluxo_batch` (sem agenda: disparo manual)",
+      "mechanism": "Airbyte, modo por tabela (`dedup_history` em 23, `full_refresh` em 8, `append` em 5) — [`airbyte/streams.yml`](../airbyte/streams.yml), ADR-0015",
+      "note": "réplica descartável; as colunas chegam com o nome da origem, mais `_airbyte_*`",
+      "origin": "`oltp` — 36 tabelas"
+    }
+  ],
+  "description_gaps": [
+    {
+      "column": null,
+      "relation": "trusted.carriers"
+    }
+  ],
+  "environments": [
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": null,
+      "id": "compose_bancos",
+      "note": null,
+      "path": "docker/docker-compose.yml",
+      "repository": "mvp_eng_dados_2",
+      "title": "Bancos e serviços locais"
+    },
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": null,
+      "id": "compose_airflow",
+      "note": null,
+      "path": "docker/docker-compose.airflow.yml",
+      "repository": "mvp_eng_dados_2",
+      "title": "Orquestração local"
+    },
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": null,
+      "id": "compose_streaming",
+      "note": null,
+      "path": "docker/docker-compose.streaming.yml",
+      "repository": "mvp_eng_dados_2",
+      "title": "Streaming local"
+    },
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": "2026-11-13",
+      "id": "terraform",
+      "note": "Declaração; os recursos foram destruídos em 13/11/2026.",
+      "path": "terraform/",
+      "repository": "mvp_eng_dados_2",
+      "title": "Infraestrutura GCP declarada"
+    },
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": null,
+      "id": "mapa_de_paridade",
+      "note": null,
+      "path": "docs/arquitetura.md#5-mapa-de-paridade-local--gcp",
+      "repository": "mvp_eng_dados_2",
+      "title": "Mapa de paridade local ↔ GCP"
+    },
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": null,
+      "id": "arquitetura",
+      "note": null,
+      "path": "docs/arquitetura.md",
+      "repository": "mvp_eng_dados_2",
+      "title": "Arquitetura"
+    },
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": null,
+      "id": "modelo_de_dados",
+      "note": null,
+      "path": "docs/modelo_de_dados.md",
+      "repository": "mvp_eng_dados_2",
+      "title": "Modelo de dados"
+    },
+    {
+      "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": "2026-11-13",
+      "id": "registro_fase_gcp",
+      "note": "Processo da Etapa 13; o custo real entra quando o faturamento fechar.",
+      "path": "docs/registro_fase_gcp.md",
+      "repository": "mvp_eng_dados_2",
+      "title": "Registro da fase GCP"
+    },
+    {
+      "commit": null,
+      "delivery": "not_available",
+      "frozen_at": "2026-11-13",
+      "id": "evidencias_gcp",
+      "note": "Fora do Git (L10); o que entra, e sanitizado como, se decide no Bloco 4.",
+      "path": "data/medicoes/etapa_13/evidencias/",
+      "repository": "mvp_eng_dados_1",
+      "title": "Evidências coletadas no GCP antes do desmonte"
+    }
+  ],
+  "format": 1,
+  "lineage": {
+    "format": 1,
+    "manifest_generated_at": "2026-11-13T22:21:52.217488Z",
+    "relations": {
+      "analytics.fact_sales_order_item": {
+        "columns": {
+          "net_revenue_amount": {
+            "leaves": [
+              "trusted.order_items.net_revenue_amount"
+            ],
+            "origins": [
+              {
+                "column": "raw.order_items.discount_amount",
+                "kind": "source"
+              },
+              {
+                "column": "raw.order_items.quantity",
+                "kind": "source"
+              },
+              {
+                "column": "raw.order_items.unit_price",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.order_items.discount_amount",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.order_items.quantity",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.order_items.unit_price",
+                "kind": "source"
+              }
+            ]
+          }
+        }
+      },
+      "consumption.average_order_value_by_channel_and_segment": {
+        "columns": {
+          "average_order_value": {
+            "leaves": [
+              "analytics.fact_sales_order_item.net_revenue_amount",
+              "analytics.fact_sales_order_item.order_id",
+              "analytics.fact_sales_order_item.source_system"
+            ],
+            "origins": [
+              {
+                "column": "raw.order_items.discount_amount",
+                "kind": "source"
+              },
+              {
+                "column": "raw.order_items.order_id",
+                "kind": "source"
+              },
+              {
+                "column": "raw.order_items.quantity",
+                "kind": "source"
+              },
+              {
+                "column": "raw.order_items.unit_price",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.order_items.discount_amount",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.order_items.order_id",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.order_items.quantity",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.order_items.unit_price",
+                "kind": "source"
+              },
+              {
+                "column": "trusted.order_items.source_system",
+                "kind": "generated"
+              }
+            ]
+          },
+          "sales_channel_name": {
+            "leaves": [
+              "analytics.dim_sales_channel.sales_channel_name"
+            ],
+            "origins": [
+              {
+                "column": "raw.sales_channels.name",
+                "kind": "source"
+              },
+              {
+                "column": "raw_legacy.sales_channels.name",
+                "kind": "source"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "provenance": {
+    "dbt": {
+      "adapter_type": "postgres",
+      "dbt_version": "1.12.3",
+      "manifest_generated_at": "2026-11-13T22:21:52.217488Z",
+      "manifest_invocation_id": "8eeff407-6cfc-4fe6-84b4-db55e8b12c92",
+      "run_results_generated_at": "2026-11-13T22:23:26.113188Z",
+      "run_results_invocation_id": "8eeff407-6cfc-4fe6-84b4-db55e8b12c92"
+    },
+    "inputs": [
+      "dbt/models/analytics/_analytics__models.yml",
+      "dbt/models/consumption/_consumption__models.yml",
+      "docs/glossario_de_negocio/perguntas_de_negocio.md"
+    ],
+    "inputs_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "link_base": "docs/",
+    "warehouse": {
+      "built_by_invocation_id": null,
+      "status": "not_verified"
+    }
+  },
+  "questions": {
+    "P02": {
+      "dimensions": [
+        "analytics.dim_date",
+        "analytics.dim_sales_channel",
+        "analytics.dim_customer"
+      ],
+      "facts": [
+        "analytics.fact_sales_order_item"
+      ],
+      "measures": [
+        {
+          "additivity": "additive",
+          "column": "net_revenue_amount",
+          "note": null
+        },
+        {
+          "additivity": "additive",
+          "column": "order_count",
+          "note": "contagem distinta de pedido"
+        },
+        {
+          "additivity": "non_additive",
+          "column": "average_order_value",
+          "note": "razão entre as duas"
+        }
+      ],
+      "title": "Qual o ticket médio por pedido, por canal e por segmento de cliente, mês a mês?",
+      "view": "consumption.average_order_value_by_channel_and_segment"
+    }
+  },
+  "relations": {
+    "analytics.fact_sales_order_item": {
+      "columns": {
+        "net_revenue_amount": {
+          "data_type": null,
+          "description": "**Receita líquida** é o que a venda do produto gerou, depois dos descontos e **antes** de frete e\nimposto: quantidade vendida × preço unitário praticado, menos o desconto concedido na linha.\n\n- **Cálculo:** `sum(quantity * unit_price) - sum(discount_amount)`, no grão do item de pedido. A\n  **receita bruta** é a mesma soma sem o desconto.\n- **Implementado em:** `fact_sales_order_item`, colunas `net_revenue_amount` e\n  `gross_revenue_amount`. Ambas são **aditivas**.\n- **Relacionado:** ticket médio, lucro bruto, desconto concedido.\n\n**Por que frete e imposto ficam de fora.** São duas razões independentes, e nenhuma é preferência\nde estilo. O imposto sobre venda é **dedução** na convenção contábil brasileira, não receita — e\nincluí-lo faria categorias de alíquotas diferentes se compararem por política tributária em vez de\ndesempenho comercial. O frete é valor de **pedido**, não de item: rateá-lo entre os itens exigiria\numa regra arbitrária, e o resultado por SKU passaria a depender de com quantos outros produtos ele\nfoi comprado.\n\nO valor efetivamente cobrado do cliente não se perde: `order_total_amount` viaja na fato como\ndimensão degenerada, e é ele que reconcilia com o financeiro.",
+          "meta": {
+            "sensitivity": "confidential"
+          },
+          "sensitivity": "confidential"
+        }
+      },
+      "description": "**Grão: uma linha de item de pedido.** Um SKU comprado em um pedido. Medidas todas aditivas; valores de nível de pedido não estão aqui, porque somá-los no grão de item multiplicaria o frete pelo número de itens.\n",
+      "materialization": "table",
+      "meta": {
+        "domain": "vendas",
+        "owner": "data_custodian",
+        "retention": "rebuildable",
+        "writers": [
+          "transformer"
+        ]
+      },
+      "name": "fact_sales_order_item",
+      "resource_type": "model",
+      "schema": "analytics"
+    },
+    "consumption.average_order_value_by_channel_and_segment": {
+      "columns": {
+        "average_order_value": {
+          "data_type": "numeric",
+          "description": "Não aditiva — razão entre as duas colunas anteriores.",
+          "meta": {
+            "sensitivity": "confidential"
+          },
+          "sensitivity": "confidential"
+        },
+        "sales_channel_name": {
+          "data_type": "text",
+          "description": "Nome do canal de venda.",
+          "meta": {
+            "description_inherited": true,
+            "sensitivity": "public"
+          },
+          "sensitivity": "public"
+        }
+      },
+      "description": "P02 — Ticket médio por canal e segmento. **Ticket médio** é a receita líquida dividida pelo número de pedidos distintos do mesmo recorte.\n\n- **Cálculo:** `net_revenue_amount / order_count`, **recalculado a cada recorte**.\n- **Implementado em:** view `average_order_value_by_channel_and_segment`.\n- **Relacionado:** receita líquida, recorrência de compra.\n\n**É medida não aditiva, e isso tem consequência prática.** A média das médias mensais não é a média\ndo ano: doze meses de tamanhos diferentes não se somam e dividem por doze. Por isso a view entrega\n`net_revenue_amount` e `order_count` **ao lado** do resultado — quem reagregar por trimestre soma os\ndois e divide de novo, em vez de somar ticket médio com ticket médio.\n\nO denominador é o **pedido**, não o item: um pedido de cinco itens conta uma vez.",
+      "materialization": "view",
+      "meta": {
+        "domain": "vendas",
+        "owner": "data_custodian",
+        "retention": "rebuildable",
+        "writers": [
+          "transformer"
+        ]
+      },
+      "name": "average_order_value_by_channel_and_segment",
+      "resource_type": "model",
+      "schema": "consumption"
+    },
+    "raw.order_items": {
+      "columns": {
+        "unit_price": {
+          "data_type": null,
+          "description": "Preço unitário praticado na venda.",
+          "meta": {
+            "sensitivity": "confidential"
+          },
+          "sensitivity": "confidential"
+        }
+      },
+      "description": null,
+      "materialization": null,
+      "meta": {
+        "grants": {
+          "select": [
+            "transformer"
+          ]
+        },
+        "retention": "permanent",
+        "writers": [
+          "ingestor"
+        ]
+      },
+      "name": "order_items",
+      "resource_type": "source",
+      "schema": "raw"
+    },
+    "trusted.carriers": {
+      "columns": {},
+      "description": null,
+      "materialization": "table",
+      "meta": {
+        "domain": "logistica",
+        "owner": "data_custodian",
+        "retention": "rebuildable",
+        "writers": [
+          "transformer"
+        ]
+      },
+      "name": "carriers",
+      "resource_type": "model",
+      "schema": "trusted"
+    }
+  },
+  "tests": {
+    "test.mvp_ed1.not_null_fact_sales_order_item_net_revenue_amount.744c563ed6": {
+      "column": "net_revenue_amount",
+      "declared_in": "dbt/models/analytics/_analytics__models.yml",
+      "kind": "data_test",
+      "relation": "analytics.fact_sales_order_item",
+      "result": {
+        "executed_at": "2026-11-13T22:23:20.783828Z",
+        "invocation_id": "8eeff407-6cfc-4fe6-84b4-db55e8b12c92",
+        "same_invocation_as_manifest": true,
+        "status": "pass"
+      },
+      "test": "not_null"
+    }
+  },
+  "view_audits": {
+    "consumption.average_order_value_by_channel_and_segment": {
+      "commit": null,
+      "criteria": [],
+      "findings": [],
+      "reference": null,
+      "status": "not_audited"
+    }
+  }
+}

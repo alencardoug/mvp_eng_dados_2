@@ -397,6 +397,11 @@ Levantada pela revisão da governança para o portal (V2, §1) e decidida pelas 
   artefato incompleto se fecham nela, com a E1 do `gdados` como consumidor.
 - Descartadas: o anexo de *release* com *hash* fixado no `gdados`, um alvo manual e um passo a mais a
   cada versão; o `gdados` lendo o `dbt/target/` direto, que é o problema da G09.
+- **O formato foi fixado antes da geração** (14/11/2026, Q13 do plano da base dos consumidores): o
+  nome, o caminho, a versão 1 e o tratamento de artefato incompleto estão no
+  [Pacote de Metadados](pacote_de_metadados.md). Os consumidores são o `gdados` e a etapa 2.7 do
+  `bi-como-codigo`, dois portais que leem o mesmo pacote (Q12). A geração e a guarda continuam no
+  Bloco 4.
 
 ### D88 a D90 — da revisão das correções de terça da Etapa 13 (decididas em 10/11/2026)
 

@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alencardoug/mvp_eng_dados_2/docs/pacote_de_metadados.schema.json",
+  "title": "Pacote de metadados do mvp_eng_dados_2, formato 1",
+  "description": "Contrato do pacote da D91. A especificação em prosa está em docs/pacote_de_metadados.md; vale o esquema do mesmo commit do pacote.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "provenance",
+    "relations",
+    "lineage",
+    "crossings",
+    "questions",
+    "description_gaps",
+    "tests",
+    "view_audits",
+    "environments"
+  ],
+  "properties": {
+    "format": {"const": 1},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "relations": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/relation_id"},
+      "additionalProperties": {"$ref": "#/$defs/relation"}
+    },
+    "lineage": {"$ref": "#/$defs/lineage"},
+    "crossings": {"type": "array", "items": {"$ref": "#/$defs/crossing"}},
+    "questions": {
+      "type": "object",
+      "propertyNames": {"pattern": "^P[0-9]{2}$"},
+      "additionalProperties": {"$ref": "#/$defs/question"}
+    },
+    "description_gaps": {"type": "array", "items": {"$ref": "#/$defs/description_gap"}},
+    "tests": {
+      "type": "object",
+      "propertyNames": {"pattern": "^(test|unit_test)\\.[a-z0-9_]+\\."},
+      "additionalProperties": {"$ref": "#/$defs/test"}
+    },
+    "view_audits": {
+      "type": "object",
+      "propertyNames": {"pattern": "^consumption\\.[a-z0-9_]+$"},
+      "additionalProperties": {"$ref": "#/$defs/view_audit"}
+    },
+    "environments": {"type": "array", "items": {"$ref": "#/$defs/environment_artifact"}}
+  },
+  "$defs": {
+    "relation_id": {"type": "string", "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"},
+    "column_id": {"type": "string", "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+\\.[a-z0-9_]+$"},
+    "text_or_null": {"type": ["string", "null"]},
+    "timestamp_or_null": {"type": ["string", "null"], "format": "date-time"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit_or_null": {"type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$"},
+    "meta": {
+      "description": "O meta: do dbt, repassado como está. As chaves são as do manifest; não segue a regra de chave sempre presente.",
+      "type": "object"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputs_sha256", "inputs", "dbt", "warehouse", "link_base"],
+      "properties": {
+        "inputs_sha256": {"$ref": "#/$defs/sha256"},
+        "inputs": {
+          "description": "Caminhos rastreados pelo Git cujo conteúdo entra no inputs_sha256, em ordem.",
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "dbt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dbt_version",
+            "adapter_type",
+            "manifest_generated_at",
+            "manifest_invocation_id",
+            "run_results_generated_at",
+            "run_results_invocation_id"
+          ],
+          "properties": {
+            "dbt_version": {"type": "string"},
+            "adapter_type": {"type": "string"},
+            "manifest_generated_at": {"type": "string", "format": "date-time"},
+            "manifest_invocation_id": {"type": "string"},
+            "run_results_generated_at": {"$ref": "#/$defs/timestamp_or_null"},
+            "run_results_invocation_id": {"$ref": "#/$defs/text_or_null"}
+          }
+        },
+        "warehouse": {
+          "description": "Qual execução construiu o armazém (L5). Até o desenho do Bloco 4, sempre not_verified.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "built_by_invocation_id"],
+          "properties": {
+            "status": {"enum": ["not_verified", "verified"]},
+            "built_by_invocation_id": {"$ref": "#/$defs/text_or_null"}
+          }
+        },
+        "link_base": {
+          "description": "Diretório do repositório contra o qual se resolvem os links relativos dos textos.",
+          "type": "string"
+        }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "name", "resource_type", "materialization", "description", "meta", "columns"],
+      "properties": {
+        "schema": {"type": "string"},
+        "name": {"type": "string"},
+        "resource_type": {"enum": ["source", "seed", "model", "snapshot"]},
+        "materialization": {
+          "description": "null para source.",
+          "type": ["string", "null"]
+        },
+        "description": {"$ref": "#/$defs/text_or_null"},
+        "meta": {"$ref": "#/$defs/meta"},
+        "columns": {
+          "type": "object",
+          "propertyNames": {"pattern": "^[a-z0-9_]+$"},
+          "additionalProperties": {"$ref": "#/$defs/column"}
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "data_type", "sensitivity", "meta"],
+      "properties": {
+        "description": {"$ref": "#/$defs/text_or_null"},
+        "data_type": {"$ref": "#/$defs/text_or_null"},
+        "sensitivity": {"enum": ["public", "internal", "confidential", "personal", null]},
+        "meta": {"$ref": "#/$defs/meta"}
+      }
+    },
+    "lineage": {
+      "description": "A saída de python -m mvp_ed1.models.lineage --json, formato 1, sem alteração.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "manifest_generated_at", "relations"],
+      "properties": {
+        "format": {"const": 1},
+        "manifest_generated_at": {"$ref": "#/$defs/timestamp_or_null"},
+        "relations": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/relation_id"},
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["columns"],
+            "properties": {
+              "columns": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["leaves", "origins"],
+                  "properties": {
+                    "leaves": {"type": "array", "items": {"$ref": "#/$defs/column_id"}},
+                    "origins": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["column", "kind"],
+                        "properties": {
+                          "column": {"$ref": "#/$defs/column_id"},
+                          "kind": {"enum": ["source", "seed", "generated"]}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "crossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "destination", "mechanism", "frequency", "note"],
+      "properties": {
+        "origin": {"type": "string"},
+        "destination": {"type": "string"},
+        "mechanism": {"type": "string"},
+        "frequency": {"type": "string"},
+        "note": {"type": "string"}
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "facts", "measures", "dimensions", "view"],
+      "properties": {
+        "title": {"type": "string"},
+        "facts": {"type": "array", "items": {"$ref": "#/$defs/relation_id"}},
+        "measures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["column", "additivity", "note"],
+            "properties": {
+              "column": {"type": "string"},
+              "additivity": {"enum": ["additive", "semi_additive", "non_additive"]},
+              "note": {"$ref": "#/$defs/text_or_null"}
+            }
+          }
+        },
+        "dimensions": {"type": "array", "items": {"$ref": "#/$defs/relation_id"}},
+        "view": {"$ref": "#/$defs/relation_id"}
+      }
+    },
+    "description_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation", "column"],
+      "properties": {
+        "relation": {"$ref": "#/$defs/relation_id"},
+        "column": {
+          "description": "null quando falta a descrição da própria relação.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "test", "relation", "column", "declared_in", "result"],
+      "properties": {
+        "kind": {"enum": ["data_test", "unit_test"]},
+        "test": {"type": "string"},
+        "relation": {"anyOf": [{"$ref": "#/$defs/relation_id"}, {"type": "null"}]},
+        "column": {"$ref": "#/$defs/text_or_null"},
+        "declared_in": {"type": "string"},
+        "result": {
+          "description": "null = sem resultado. Nunca se infere sucesso da declaração.",
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "executed_at", "invocation_id", "same_invocation_as_manifest"],
+              "properties": {
+                "status": {"enum": ["pass", "fail", "warn", "error", "skipped"]},
+                "executed_at": {"$ref": "#/$defs/timestamp_or_null"},
+                "invocation_id": {"type": "string"},
+                "same_invocation_as_manifest": {"type": "boolean"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "view_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "commit", "criteria", "reference", "findings"],
+      "properties": {
+        "status": {"enum": ["not_audited", "audited", "audit_pending_decision"]},
+        "commit": {"$ref": "#/$defs/commit_or_null"},
+        "criteria": {
+          "type": "array",
+          "items": {"enum": ["non_additivity", "time_dependent_balance", "truncated_population"]}
+        },
+        "reference": {
+          "description": "Caminho do teste versionado que calcula a referência independente.",
+          "type": ["string", "null"]
+        },
+        "findings": {
+          "description": "IDs dos achados (F1, F2, F14…) que a auditoria registrou para esta view.",
+          "type": "array",
+          "items": {"type": "string", "pattern": "^F[0-9]+$"}
+        }
+      }
+    },
+    "environment_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "repository", "path", "delivery", "commit", "frozen_at", "note"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+        "title": {"type": "string"},
+        "repository": {"enum": ["mvp_eng_dados_2", "mvp_eng_dados_1"]},
+        "path": {"type": "string"},
+        "delivery": {"enum": ["read_by_commit", "in_package", "not_available"]},
+        "commit": {
+          "description": "null = o commit fixado pelo consumidor neste repositório; preenchido quando o artefato vive em outro repositório.",
+          "$ref": "#/$defs/commit_or_null"
+        },
+        "frozen_at": {
+          "description": "Data em que o artefato deixou de mudar (infraestrutura destruída), ou null.",
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "note": {"$ref": "#/$defs/text_or_null"}
+      }
+    }
+  }
+}

@@ -1,0 +1,107 @@
+"""O contrato do pacote de metadados (D91): o esquema é válido e o exemplo o cumpre.
+
+O pacote ainda não é gerado (Bloco 4). Até lá, o que os consumidores leem é o
+esquema e o exemplo de `docs/`, e é isso que se guarda aqui, sem banco nem
+manifest: o esquema é JSON Schema 2020-12 válido, o exemplo passa nele, e cada
+regra que a especificação promete — chave sempre presente, formato fixo, valor
+fora da lista recusado, sem resultado distinto de sucesso — tem contraprova:
+o exemplo alterado é recusado.
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import pathlib
+
+import jsonschema
+import pytest
+
+from mvp_ed1.models import lineage
+
+RAIZ = pathlib.Path(__file__).resolve().parents[1]
+ESQUEMA = RAIZ / "docs/pacote_de_metadados.schema.json"
+EXEMPLO = RAIZ / "docs/pacote_de_metadados.exemplo.json"
+
+
+def _carregar(caminho: pathlib.Path) -> dict:
+    return json.loads(caminho.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def validador() -> jsonschema.Draft202012Validator:
+    esquema = _carregar(ESQUEMA)
+    jsonschema.Draft202012Validator.check_schema(esquema)
+    return jsonschema.Draft202012Validator(esquema)
+
+
+@pytest.fixture()
+def exemplo() -> dict:
+    return _carregar(EXEMPLO)
+
+
+def test_o_exemplo_cumpre_o_esquema(validador, exemplo) -> None:
+    erros = sorted(validador.iter_errors(exemplo), key=str)
+    assert not erros, [e.message for e in erros]
+
+
+def test_o_exemplo_esta_na_forma_deterministica(exemplo) -> None:
+    """A forma que a especificação promete ao pacote: chaves em ordem, dois espaços, quebra no fim."""
+    esperado = json.dumps(exemplo, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    assert EXEMPLO.read_text(encoding="utf-8") == esperado
+
+
+def test_a_linhagem_do_pacote_e_o_formato_do_exportador(validador) -> None:
+    """O pacote leva o `lineage --json` sem alteração: o formato dele é o do módulo."""
+    esquema = _carregar(ESQUEMA)
+    assert esquema["$defs"]["lineage"]["properties"]["format"]["const"] == lineage.JSON_FORMAT
+
+
+def test_toda_view_de_pergunta_tem_estado_de_auditoria(exemplo) -> None:
+    """A view de cada pergunta aparece em `view_audits`, mesmo quando ainda `not_audited`."""
+    views = {p["view"] for p in exemplo["questions"].values()}
+    assert views and views <= set(exemplo["view_audits"])
+
+
+# ── Contraprovas: cada regra recusa o que deve recusar ────────────────────────
+
+
+def _sem(dado: dict, *caminho: str) -> dict:
+    copia = copy.deepcopy(dado)
+    alvo = copia
+    for chave in caminho[:-1]:
+        alvo = alvo[chave]
+    del alvo[caminho[-1]]
+    return copia
+
+
+def _com(dado: dict, valor, *caminho: str) -> dict:
+    copia = copy.deepcopy(dado)
+    alvo = copia
+    for chave in caminho[:-1]:
+        alvo = alvo[chave]
+    alvo[caminho[-1]] = valor
+    return copia
+
+
+TESTE = "test.mvp_ed1.not_null_fact_sales_order_item_net_revenue_amount.744c563ed6"
+VIEW = "consumption.average_order_value_by_channel_and_segment"
+
+
+@pytest.mark.parametrize(
+    "alterar",
+    [
+        pytest.param(lambda e: _sem(e, "description_gaps"), id="secao-ausente"),
+        pytest.param(lambda e: _sem(e, "relations", VIEW, "columns", "sales_channel_name", "description"), id="chave-omitida-em-vez-de-null"),
+        pytest.param(lambda e: _com(e, 2, "format"), id="formato-desconhecido"),
+        pytest.param(lambda e: _com(e, "secret", "relations", VIEW, "columns", "sales_channel_name", "sensitivity"), id="sensibilidade-fora-da-lista"),
+        pytest.param(lambda e: _com(e, "success", "tests", TESTE, "result", "status"), id="estado-de-teste-fora-da-lista"),
+        pytest.param(lambda e: _com(e, {}, "tests", TESTE, "result"), id="resultado-vazio-em-vez-de-null"),
+        pytest.param(lambda e: _com(e, "verified_by_hand", "provenance", "warehouse", "status"), id="procedencia-fora-da-lista"),
+        pytest.param(lambda e: _com(e, "x", "lineage", "relations", VIEW, "columns", "sales_channel_name", "origins", 0, "kind"), id="tipo-de-origem-fora-da-lista"),
+        pytest.param(lambda e: _com(e, "abc", "provenance", "inputs_sha256"), id="hash-malformado"),
+        pytest.param(lambda e: _com(e, 1, "campo_inventado"), id="chave-desconhecida-no-topo"),
+    ],
+)
+def test_o_esquema_recusa_o_exemplo_alterado(validador, exemplo, alterar) -> None:
+    assert list(validador.iter_errors(alterar(exemplo)))
