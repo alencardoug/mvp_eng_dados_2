@@ -89,6 +89,7 @@ esquema e não pega mudança de valor: por isso a coluna "Caso".
 | `feita` | 14/11/2026 | `9aeea8d` | `consumption.support_tickets_per_hundred_orders` | **Valor:** o denominador soma as origens do canal pelo nome; 117 linhas no lugar de 118 (a chave mês × canal × categoria deixa de se repetir); 75 taxas mudam | Jan/2024, Conta, Aplicativo: 4,5455 → 4,3478 (22 → 23 pedidos) | `701cc3ea-d3dd-4ccf-8c29-b506c8f7458b` | F1 |
 | `feita` | 14/11/2026 | `d212c07` | `analytics.dim_customer` (`order_count`, `first_order_at`) | **Texto:** a descrição diz que a dimensão conta o pedido cujos itens foram todos para a quarentena, que a fato não tem. Nenhum valor muda | 15 clientes do legado, 15 pedidos a mais que a fato | `a1e034c2-5f43-4a08-90fe-9a823a7e1623` | F3 |
 | `feita` | 14/11/2026 | `69ea446` | `consumption.inventory_turnover_by_sku_and_warehouse` | **Esquema e valor:** `quantity_on_hand` e `inventory_value_amount` saem; entram `avg_quantity_on_hand` e `avg_inventory_value_amount`, médias do trimestre, ambas `numeric`; o giro passa a ser pelo estoque médio (ADR-0052). Aviso prévio em `3010ead` | 6.990 linhas e o mesmo CMV; 1.449 giros mudam mais de 10%; indefinidos 620 → 1.216 | `1bc2a738-c76b-4435-86e8-6b8e138adb6a` | F2 |
+| `feita` | 14/11/2026 | `745fe6a` | `consumption.on_time_delivery_rate_by_carrier` | **Valor:** a view lê `fact_shipment` (nova, uma linha por remessa) e conta também a remessa cujos itens foram todos rejeitados em cascata (ADR-0053, D66). O esquema não muda | Remessas entregues no total: 3.297 → 3.313; 1.175 → 1.180 linhas; 3 taxas mudam | `48462795-d80b-4ecd-837e-361358062d72` | D66 |
 
 **A sequência de uma linha.** Mudança de **valor** ou de **texto** entra uma vez só, como `feita`,
 depois de *commitada*, publicada e construída no armazém, já com o *commit* e o `invocation_id`.
@@ -100,7 +101,7 @@ com o *commit* e o `invocation_id`, num *commit* posterior. Nenhuma linha cita o
 
 **O esquema das views.** O conjunto das 16 views não muda nesta fase, e os Blocos 5 e 6 não mexem em
 `consumption`. A `inventory_turnover_by_sku_and_warehouse` mantém o esquema, salvo se a Q8 decidir
-outra coisa. A `on_time_delivery_rate_by_carrier` depende da D66. Qualquer mudança de esquema entra
+outra coisa. A `on_time_delivery_rate_by_carrier` manteve o esquema na D66. Qualquer mudança de esquema entra
 aqui como `prevista` antes do *commit* que a faz.
 
 ---

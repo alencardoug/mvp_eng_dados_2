@@ -295,6 +295,14 @@ pergunta, no armazém de `d212c07`: 147 remessas do legado entregues em `trusted
 3.166. Vira o **Bloco D66**, com ADR, logo depois do Bloco 1b e antes do Bloco 2, porque a P13 conclui a
 auditoria sobre ela e o BI fixa o commit dela (N85 de lá).
 
+**Bloco D66 entregue em 14/11/2026, antes do 1b** (a auditoria da P13 precisa dele, e o resto do 1b
+não depende dele), em `745fe6a`, pelo [ADR-0053](docs/adr/0053-fato-no-grao-da-remessa.md):
+`fact_shipment`, uma linha por remessa (3.772 no armazém local), reconciliada com `trusted.shipments`;
+a P13 lê dela e conta as 16 (3.297 → 3.313 remessas entregues no total); o teste
+`p13_conta_toda_remessa_entregue` compara a view com a população de `trusted`, e a contraprova sobre a
+view anterior acusa 16 remessas em 12 meses. A P14 continua na fato de item; se ela tem o mesmo recorte
+é pergunta da auditoria do 1b.
+
 A D66 é perguntada com as alternativas dela (Pendências) e com o que já foi medido: o M27 do BI e a
 medição posterior à regeneração que a própria D66 registra. As duas são históricas e são remedidas
 antes de perguntar. A auditoria da P13 no Bloco 1b só conclui depois da resposta (RVC-4-02). Se a
