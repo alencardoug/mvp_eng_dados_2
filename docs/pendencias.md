@@ -13,8 +13,8 @@
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
 | Verificações e trabalho adiados | 4 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026) |
-| Decisões pendentes | 4 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D66, levantada pela revisão do roteiro de regeneração da v1.1.0 e adiada para depois dela; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal e a D92 na separação do `mvp_eng_dados_2` (§2) |
-| Última revisão | 14/11/2026 — V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Decisões pendentes | 3 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2` e a D66 na fase da base dos consumidores (§2) |
+| Última revisão | 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -66,41 +66,6 @@ só documentar a limitação.
 
 *Efeito de não decidir:* nenhum no fluxo atual; qualquer uso futuro de Connections ou Variables
 falha.
-
-### D66 — a P13 não conta a remessa entregue cujos itens foram todos rejeitados
-
-**Pergunta:** a P13 passa a ler uma fato no grão da remessa, para contar toda remessa entregue como o
-[ADR-0033](adr/0033-entrega-medida-em-dois-graos.md) a define, ou a definição muda?
-
-**Medido em 23/10 e 03/11/2026,** em sessão somente leitura: 144 remessas legadas entregues em
-`trusted.shipments` e 132 em `analytics.fact_shipment_item`; do varejo, 3.166 nos dois. As 12 que
-faltam são legadas, aceitas como remessa e com o pedido em `trusted`, e nenhum item delas chegou lá:
-os 17 itens da captura selecionada foram rejeitados em cascata (`PARENT_REJECTED`) — 17 itens de
-pedido, 6 variantes e, na raiz, 4 produtos do legado rejeitados por defeito próprio. A view
-`on_time_delivery_rate_by_carrier` reduz a fato do item a remessa com `distinct`, e remessa sem item
-aceito não tem linha para reduzir; o ADR-0033 diz que o denominador são as remessas entregues. As
-consultas e as saídas estão no `bi-como-codigo` — M27, M32 e M38 do
-[plano](https://github.com/alencardoug/bi-como-codigo/blob/c7690fe/PLAN.md#2-what-was-measured),
-onde a questão nasceu como o O6 do
-[roteiro de regeneração](https://github.com/alencardoug/bi-como-codigo/blob/c7690fe/docs/regeneration_runbook.md#7-not-verified-and-observations).
-
-**Decisão de 03/11/2026: fora da v1.1.0.** Corrigir agora reabriria a conciliação da P13 no roteiro
-de regeneração e acrescentaria uma fato no meio da manutenção; a regeneração da v1.1.0 muda o número
-de qualquer forma. Até a decisão, a descrição da view diz qual população é contada.
-
-*Opções:* **(a)** uma fato no grão da remessa, com ADR, lida pela P13 — recomendada: a pontualidade
-é atributo da remessa, e estas passaram pelas regras; o que se rejeitou foi o conteúdo, três níveis
-acima; **(b)** emendar o ADR-0033 e o [glossário](glossario_de_negocio/entrega_no_prazo.md): a
-entrega no prazo conta só a remessa com algum item aceito.
-
-**Respondida em 14/11/2026: (a)**, no `PLANO_base_dos_consumidores.md` (seção D66), remedida antes no
-dado de agora: 16 das 147 remessas legadas entregues de fora. Sai daqui quando o ADR da fato no grão da
-remessa for escrito, no bloco próprio.
-
-*Efeito de não decidir:* nenhum teste falha; a taxa do ramo legado deixava de fora 12 de 144
-remessas entregues (8%) no dado da v1.0.0. No da v1.1.0 ficam de fora **16** remessas legadas
-entregues, todas com os itens rejeitados em cascata (`parent_rejected`), cada uma explicada pela
-reconciliação da P13 (04/11/2026, na regeneração); o total de remessas entregues não foi recontado.
 
 ### D43 — a guarda de identidade como função no armazém (adiada em 16/09/2026)
 
@@ -365,6 +330,41 @@ cada lote e estão no histórico em `28044c7^`, `20ea4f3^` e `4cf41ff^`.
 ---
 
 ## 2. Decisões já fechadas
+
+### D66 — a P13 passa a ler uma fato no grão da remessa (decidida em 14/11/2026)
+
+**Pergunta:** a P13 passa a ler uma fato no grão da remessa, para contar toda remessa entregue como o
+[ADR-0033](adr/0033-entrega-medida-em-dois-graos.md) a define, ou a definição muda?
+
+**Medido em 23/10 e 03/11/2026,** em sessão somente leitura: 144 remessas legadas entregues em
+`trusted.shipments` e 132 em `analytics.fact_shipment_item`; do varejo, 3.166 nos dois. As 12 que
+faltam são legadas, aceitas como remessa e com o pedido em `trusted`, e nenhum item delas chegou lá:
+os 17 itens da captura selecionada foram rejeitados em cascata (`PARENT_REJECTED`) — 17 itens de
+pedido, 6 variantes e, na raiz, 4 produtos do legado rejeitados por defeito próprio. A view
+`on_time_delivery_rate_by_carrier` reduz a fato do item a remessa com `distinct`, e remessa sem item
+aceito não tem linha para reduzir; o ADR-0033 diz que o denominador são as remessas entregues. As
+consultas e as saídas estão no `bi-como-codigo` — M27, M32 e M38 do
+[plano](https://github.com/alencardoug/bi-como-codigo/blob/c7690fe/PLAN.md#2-what-was-measured),
+onde a questão nasceu como o O6 do
+[roteiro de regeneração](https://github.com/alencardoug/bi-como-codigo/blob/c7690fe/docs/regeneration_runbook.md#7-not-verified-and-observations).
+
+**Decisão de 03/11/2026: fora da v1.1.0.** Corrigir agora reabriria a conciliação da P13 no roteiro
+de regeneração e acrescentaria uma fato no meio da manutenção; a regeneração da v1.1.0 muda o número
+de qualquer forma. Até a decisão, a descrição da view diz qual população é contada.
+
+*Opções:* **(a)** uma fato no grão da remessa, com ADR, lida pela P13 — recomendada: a pontualidade
+é atributo da remessa, e estas passaram pelas regras; o que se rejeitou foi o conteúdo, três níveis
+acima; **(b)** emendar o ADR-0033 e o [glossário](glossario_de_negocio/entrega_no_prazo.md): a
+entrega no prazo conta só a remessa com algum item aceito.
+
+**Respondida em 14/11/2026: (a)**, no `PLANO_base_dos_consumidores.md` (seção D66), remedida antes no
+dado de agora: 16 das 147 remessas legadas entregues de fora. Registrada no [ADR-0053](adr/0053-fato-no-grao-da-remessa.md):
+a P13 lê `fact_shipment` e conta as 16.
+
+*Efeito de não decidir:* nenhum teste falha; a taxa do ramo legado deixava de fora 12 de 144
+remessas entregues (8%) no dado da v1.0.0. No da v1.1.0 ficam de fora **16** remessas legadas
+entregues, todas com os itens rejeitados em cascata (`parent_rejected`), cada uma explicada pela
+reconciliação da P13 (04/11/2026, na regeneração); o total de remessas entregues não foi recontado.
 
 ### D92 — o projeto continua no `mvp_eng_dados_2`, e o `mvp_eng_dados_1` fica travado (decidida em 13/11/2026)
 

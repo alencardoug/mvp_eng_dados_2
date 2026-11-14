@@ -1,7 +1,7 @@
 # Modelo de Dados
 
 > **O que vive aqui:** o inventário do que é modelado — as 40 tabelas transacionais por domínio, o
-> modelo dimensional (10 fatos e 15 dimensões), as invariantes de negócio e o contrato do evento de
+> modelo dimensional (11 fatos e 15 dimensões), as invariantes de negócio e o contrato do evento de
 > estoque.
 >
 > **O que não vive aqui:** como os dados são gerados (ver [Geração de Dados](geracao_de_dados.md));
@@ -552,13 +552,13 @@ erDiagram
 
 ---
 
-## 3. Modelo dimensional — 25 tabelas em `analytics`
+## 3. Modelo dimensional — 26 tabelas em `analytics`
 
 Não há fatos do tipo *snapshot*: todo processo é representado por eventos transacionais. As
 métricas de estado ao longo do tempo são derivadas dos eventos, não de fotografias periódicas do
 banco.
 
-### 3.1 Tabelas fato — 10
+### 3.1 Tabelas fato — 11
 
 Os **atributos e as medidas** de cada fato não estão fixados aqui: são derivados das perguntas de
 negócio, conforme o [ADR-0018](adr/0018-fatos-e-views-a-partir-de-perguntas-de-negocio.md). Cada
@@ -571,6 +571,7 @@ classificação que impede somar saldo de estoque ao longo do tempo.
 | `fact_order_status_event` | 175.000 | Uma mudança de estado de um pedido. | Transacional |
 | `fact_inventory_movement` | 120.000 na carga inicial; cresce com o *streaming* | Uma movimentação de SKU em um armazém. | Transacional |
 | `fact_shipment_item` | 78.000 | Um item de pedido em uma remessa. | Transacional |
+| `fact_shipment` | Uma por remessa de `shipments` (3.772 no armazém local, em 14/11/2026) | Uma remessa, inclusive a que não tem item aceito ([ADR-0053](adr/0053-fato-no-grao-da-remessa.md)). | Transacional |
 | `fact_sales_order_item` | 75.000 | Uma linha de item de pedido. | Transacional |
 | `fact_payment_transaction` | 71.500 | Uma tentativa ou operação financeira. | Transacional |
 | `fact_support_ticket_event` | 18.000 | Uma interação ou mudança de estado de chamado. | Transacional |

@@ -5,7 +5,7 @@
 >
 > **O que não vive aqui:** a definição dos conceitos que as perguntas usam (ver os arquivos de
 > conceito neste mesmo diretório); o grão e a contagem de cada fato (ver
-> [Modelo de Dados](../modelo_de_dados.md#3-modelo-dimensional--25-tabelas-em-analytics)); a
+> [Modelo de Dados](../modelo_de_dados.md#3-modelo-dimensional--26-tabelas-em-analytics)); a
 > materialização das views (ver [ADR-0016](../adr/0016-materializacao-por-camada.md)).
 
 | Campo | Informação |
@@ -228,7 +228,7 @@ remessa ([ADR-0034](../adr/0034-entrega-do-livro-de-eventos.md)).
 
 | | |
 |---|---|
-| **Fatos** | `fact_shipment_item` · `fact_order_status_event` |
+| **Fatos** | `fact_shipment` — toda remessa entregue, inclusive a de itens rejeitados em cascata ([ADR-0053](../adr/0053-fato-no-grao-da-remessa.md)) |
 | **Medidas** | `delivered_count` (aditiva) · `on_time_count` (aditiva) · `on_time_rate` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_carrier` · `dim_warehouse` |
 | **View** | `on_time_delivery_rate_by_carrier` |

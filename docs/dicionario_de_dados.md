@@ -818,11 +818,11 @@ quando ao menos uma das suas origens é fonte; *só de seed* quando nenhuma é f
 |---|---:|---:|---:|---:|
 | `staging` | 1114 | 1026 | 0 | 88 |
 | `trusted` | 1069 | 972 | 15 | 82 |
-| `analytics` | 477 | 387 | 10 | 80 |
+| `analytics` | 513 | 418 | 10 | 85 |
 | `consumption` | 188 | 117 | 9 | 62 |
 | `quarantine` | 26 | 16 | 0 | 10 |
 | `snapshots` | 109 | 86 | 0 | 23 |
-| **total** | **2983** | **2604** | **34** | **345** |
+| **total** | **3019** | **2635** | **34** | **350** |
 
 ### 3.3 Origem de cada coluna de `consumption`
 
@@ -958,7 +958,7 @@ de fora do repositório, com as folhas imediatas de cada coluna.
 | `delivered_count` | `consumption.on_time_delivery_rate_by_carrier.delivered_count` (gerada) |
 | `on_time_count` | `raw.delivery_events.{event_type, occurred_at}` · `raw.shipments.estimated_delivery_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.shipments.estimated_delivery_at` |
 | `late_count` | `raw.delivery_events.{event_type, occurred_at}` · `raw.shipments.estimated_delivery_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.shipments.estimated_delivery_at` |
-| `split_order_shipment_count` | `analytics.fact_shipment_item.is_split_order` (gerada) |
+| `split_order_shipment_count` | `analytics.fact_shipment.is_split_order` (gerada) |
 | `on_time_rate` | `raw.delivery_events.{event_type, occurred_at}` · `raw.shipments.estimated_delivery_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.shipments.estimated_delivery_at` |
 | `avg_delay_days_when_late` | `raw.delivery_events.{event_type, occurred_at}` · `raw.shipments.estimated_delivery_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.shipments.estimated_delivery_at` |
 | `avg_transit_days` | `raw.delivery_events.{event_type, occurred_at}` · `raw.shipments.shipped_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.shipments.shipped_at` |

@@ -89,6 +89,7 @@ decisão.
 | [0050](0050-guardar-a-memoria-do-legado-num-livro-retido.md) | Guardar a memória do legado num livro retido, com recuperação registrada | Aceita | — (N29 a N35 do plano do `bi-como-codigo`) |
 | [0051](0051-cdc-da-fase-gcp-pelo-debezium-server.md) | Levar o CDC da fase GCP ao Pub/Sub pelo Debezium Server | Aceita | D69 |
 | [0052](0052-giro-pelo-estoque-medio-do-trimestre.md) | Calcular o giro pelo estoque médio do trimestre, a custo médio móvel | Aceita | — (Q2 e Q8 do `PLANO_base_dos_consumidores.md`) |
+| [0053](0053-fato-no-grao-da-remessa.md) | Medir a pontualidade numa fato no grão da remessa | Aceita | D66 |
 
 ---
 
@@ -97,7 +98,6 @@ decisão.
 | # | Decisão | Levantada em | Efeito de não decidir |
 |---|---|---|---|
 | D43 | A guarda de identidade da macro `chave_canonica` como função `safe_cast` no armazém, em vez da gramática reproduzida em SQL — **adiada de propósito** para a Etapa 13 ([Pendências](../pendencias.md#d43--a-guarda-de-identidade-como-função-no-armazém-adiada-em-16092026)) | 16/09/2026 | Nenhum na fase local; a paridade com `SAFE_CAST` fica suposta até lá |
-| D66 | Uma fato no grão da remessa para a P13 contar toda remessa entregue, como o ADR-0033 define, ou a definição emendada — **adiada** para depois da v1.1.0 ([Pendências](../pendencias.md#d66--a-p13-não-conta-a-remessa-entregue-cujos-itens-foram-todos-rejeitados)) | 03/11/2026 | A taxa do ramo legado deixa de fora 12 de 144 remessas entregues, sem teste que acuse |
 
 Decisões nascidas da **revisão por outro agente**, e não da construção, já são maioria nesta etapa —
 quatro delas, todas de alguém olhando o que estava pronto, e nenhuma era implementação: as quatro

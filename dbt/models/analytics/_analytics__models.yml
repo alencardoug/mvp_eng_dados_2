@@ -1974,6 +1974,225 @@ models:
           description_inherited: true
           sensitivity: internal
 
+  - name: fact_shipment
+    meta:
+      domain: logistica
+    description: >
+      **Grão: uma remessa.** Toda remessa de `trusted.shipments`, inclusive a
+      que não tem item aceito (os itens rejeitados em cascata ficam na
+      quarentena, a remessa não; ADR-0053, D66). Duas datas em papéis
+      diferentes — `date_key` é o despacho, `delivered_date_key` é a chegada
+      (ADR-0033). As colunas de grão de pedido (`order_to_delivery_days` e as
+      vizinhas) são atributos repetidos em cada remessa do pedido: reduza ao
+      pedido antes de agregar. O que foi enviado está em `fact_shipment_item`.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, shipment_id]
+      - fato_reconcilia_com_a_condutora:
+          config:
+            tags: [fronteira]
+          arguments:
+            condutora: ref('shipments')
+            medidas:
+              failed_attempt_count: failed_attempt_count
+    columns:
+      - name: shipment_key
+        meta:
+          sensitivity: internal
+        description: Prova do grão — uma linha por remessa.
+        data_tests: [unique, not_null]
+      - name: date_key
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: "Data de **despacho** da remessa."
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: delivered_date_key
+        meta:
+          sensitivity: internal
+          description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+        description: "Data de **chegada**. Nula enquanto a remessa não chega, e o nulo significa *ainda não chegou* — o motivo está no cabeçalho do modelo. Sem `not_null` por isso; o `relationships` continua valendo para as linhas preenchidas."
+        data_tests:
+          - relationships: {to: ref('dim_date'), field: date_key}
+      - name: carrier_key
+        description: "Chave substituta da transportadora: hash de `source_system` e `carrier_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_carrier'), field: carrier_key}
+      - name: warehouse_key
+        description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_warehouse'), field: warehouse_key}
+      - name: customer_key
+        description: "Chave substituta da **versão** do cliente (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_customer'), field: customer_key}
+      - name: sales_channel_key
+        description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
+      - name: geography_key
+        description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_geography'), field: geography_key}
+      - name: is_on_time
+        meta:
+          sensitivity: internal
+        description: '{{ doc("on_time_delivery") }}'
+      - name: order_to_delivery_days
+        meta:
+          sensitivity: internal
+        description: '{{ doc("order_to_delivery_cycle") }}'
+      - name: shipment_status
+        description: "Estado da remessa; transições válidas em Modelo de Dados §4."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [created, picking, dispatched, in_transit, delivered, returned, lost]
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: shipment_id
+        description: "Identificador da remessa na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_id
+        description: "Pedido que a remessa atende."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: shipment_code
+        description: "Chave natural da remessa."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_number
+        description: "Número do pedido; chave natural."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: tracking_code
+        description: "Código de rastreio junto à transportadora."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_status
+        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: placed_at
+        description: "Momento de negócio em que o pedido foi feito."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: shipped_at
+        description: "Momento do despacho."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: estimated_delivery_at
+        description: "Prazo de entrega prometido ao cliente."
+        meta:
+          description_inherited: true
+          sensitivity: public
+      - name: delivered_at
+        description: "Instante da entrega, o do último evento de entrega da remessa; nulo enquanto ela não foi entregue."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: returned_at
+        description: "Instante da devolução, o do último evento de devolução; nulo sem devolução."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_dispatched
+        description: "Verdadeiro quando a remessa saiu do armazém."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_delivered
+        description: "Verdadeiro quando a remessa foi entregue."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_returned
+        description: "Verdadeiro quando a remessa voltou ao remetente."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: is_lost
+        description: "Verdadeiro quando a remessa está extraviada."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: order_shipment_count
+        description: "Não aditiva entre remessas — número de remessas do pedido, repetido em cada remessa dele."
+        meta:
+          sensitivity: internal
+      - name: delivered_shipment_count
+        description: "Não aditiva entre remessas — remessas entregues do pedido, repetidas em cada remessa dele."
+        meta:
+          sensitivity: internal
+      - name: is_order_cycle_closed
+        description: "Verdadeiro quando todas as remessas do pedido foram entregues e o ciclo de entrega está fechado (ADR-0033)."
+        meta:
+          sensitivity: internal
+      - name: is_cycle_closing_shipment
+        description: "Verdadeiro na remessa que fecha o ciclo de entrega do pedido: a última entregue (ADR-0033)."
+        meta:
+          sensitivity: internal
+      - name: is_split_order
+        description: "Verdadeiro quando o pedido foi dividido em mais de uma remessa."
+        meta:
+          sensitivity: internal
+      - name: order_delivered_at
+        description: "Instante em que a última remessa do pedido foi entregue; nulo enquanto falta alguma."
+        meta:
+          sensitivity: internal
+      - name: failed_attempt_count
+        description: "Aditiva — tentativas de entrega da remessa que falharam."
+        meta:
+          sensitivity: public
+          description_reason: a fato está no grão do item e o valor é da remessa — o herdado diria aditiva por item (RVL3-03)
+      - name: delivery_delay_days
+        description: "Dias entre a entrega e o prazo prometido: positivo é atraso, negativo é adiantamento; nulo sem entrega."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: transit_days
+        description: "Dias entre o despacho e a entrega; nulo enquanto falta um dos dois."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+
   - name: fact_order_status_event
     meta:
       domain: vendas

@@ -9,7 +9,8 @@ o pedido.
 - **Cálculo:** `on_time_count / delivered_count`, por transportadora, modalidade
   e mês de chegada.
 - **Implementado em:** view `on_time_delivery_rate_by_carrier`, coluna
-  `on_time_rate`; sinalizador `is_on_time` em `trusted.shipments` e em
+  `on_time_rate`, lida de `fact_shipment` (uma linha por remessa, ADR-0053);
+  sinalizador `is_on_time` em `trusted.shipments`, `fact_shipment` e
   `fact_shipment_item`.
 - **Relacionado:** ciclo de entrega, prazo prometido.
 

@@ -888,9 +888,9 @@ models:
     description: >
       P13 — Fração de entregas dentro do prazo prometido, por transportadora e
       modalidade, mês a mês. **Grão da remessa**: pedido dividido conta duas
-      vezes, de propósito. Conta as remessas entregues que têm pelo menos um
-      item aceito na fato: uma remessa legada entregue cujos itens foram todos
-      rejeitados em cascata fica de fora (D66).
+      vezes, de propósito. Conta toda remessa entregue, lida de
+      `fact_shipment`, inclusive a que teve todos os itens rejeitados em
+      cascata (ADR-0053, D66).
     config:
       contract: {enforced: true}
     columns:

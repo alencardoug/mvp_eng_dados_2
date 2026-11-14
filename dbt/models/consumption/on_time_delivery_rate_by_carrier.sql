@@ -10,15 +10,15 @@
 -- realizadas, e uma remessa que saiu em janeiro e chegou em fevereiro é uma
 -- entrega de fevereiro.
 --
--- A fato está no grão do item; a redução a remessa — a origem com o número,
--- como em toda identidade (macro `empilhado`) — é o `distinct` abaixo. Sem
--- ele, uma caixa com seis itens pesaria seis vezes na taxa, e a transportadora
--- que leva pedidos maiores pareceria melhor ou pior sem que nada tivesse
--- mudado na pontualidade dela.
+-- A fato é a da remessa (ADR-0053, D66): uma linha por remessa, inclusive a
+-- que não tem item aceito. Até 14/11/2026 a view reduzia `fact_shipment_item`
+-- a remessa com `distinct`, e a remessa cujos itens foram todos rejeitados em
+-- cascata não tinha linha para reduzir: no legado, 16 das 147 remessas
+-- entregues ficavam de fora.
 
 with remessas as (
 
-    select distinct
+    select
         f.source_system,
         f.shipment_id,
         f.delivered_date_key,
@@ -29,7 +29,7 @@ with remessas as (
         f.delivery_delay_days,
         f.transit_days,
         f.failed_attempt_count
-    from {{ ref('fact_shipment_item') }} f
+    from {{ ref('fact_shipment') }} f
     where f.is_delivered
 
 )
