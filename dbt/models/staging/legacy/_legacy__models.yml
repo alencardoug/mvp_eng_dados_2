@@ -3601,7 +3601,8 @@ models:
     meta:
       sensitivity: internal
   - name: refunded_at
-    description: Momento em que o reembolso foi concluído.
+    description: 'Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado
+      e no recusado, e só marca a conclusão quando o estado é completed.'
     meta:
       sensitivity: internal
   - name: created_at

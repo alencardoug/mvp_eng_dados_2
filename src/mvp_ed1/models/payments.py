@@ -175,5 +175,5 @@ class Refund(Base, TimestampMixin, SoftDeleteMixin):
         info=meta(INTERNAL, "Estado do reembolso: requested, completed ou rejected."),
     )
     refunded_at: Mapped[dt.datetime | None] = mapped_column(
-        Timestamp, nullable=True, info=meta(INTERNAL, "Momento em que o reembolso foi concluído."),
+        Timestamp, nullable=True, info=meta(INTERNAL, "Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado e no recusado, e só marca a conclusão quando o estado é completed."),
     )

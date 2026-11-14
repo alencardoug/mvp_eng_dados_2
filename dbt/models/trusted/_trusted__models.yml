@@ -14,11 +14,11 @@ models:
       - name: is_finished
         meta:
           sensitivity: public
-        description: "Verdadeiro quando a vigência da campanha terminou antes de a data de referência do armazém (`as_of_date`, 01/09/2026)."
+        description: "Verdadeiro quando a vigência da campanha terminou antes de a data de referência dos dados (`as_of_date`, 01/09/2026)."
       - name: is_running
         meta:
           sensitivity: public
-        description: "Verdadeiro quando a data de referência do armazém (`as_of_date`, 01/09/2026) cai dentro da vigência da campanha."
+        description: "Verdadeiro quando a data de referência dos dados (`as_of_date`, 01/09/2026) cai dentro da vigência da campanha."
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
@@ -158,7 +158,7 @@ models:
       - name: occurred_at
         meta:
           sensitivity: internal
-        description: "Instante do evento: a criação do carrinho, no evento de criação; a conversão, no de conversão; e, no carrinho que não converteu, o que vier primeiro entre a expiração e a data de referência do armazém."
+        description: "Instante do evento: a criação do carrinho, no evento de criação; a conversão, no de conversão; e, no carrinho que não converteu, o que vier primeiro entre a expiração e a data de referência dos dados."
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
@@ -433,7 +433,7 @@ models:
       - name: is_redeemable_now
         meta:
           sensitivity: public
-        description: "Verdadeiro quando a data de referência do armazém (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
+        description: "Verdadeiro quando a data de referência dos dados (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
       - name: redeemed_discount_amount
         meta:
           sensitivity: confidential
@@ -541,7 +541,7 @@ models:
       - name: days_since_last_order
         meta:
           sensitivity: internal
-        description: "Dias entre o último pedido realizado do cliente e a data de referência do armazém; nulo para quem nunca comprou."
+        description: "Dias entre o último pedido realizado do cliente e a data de referência dos dados; nulo para quem nunca comprou."
       - name: first_order_at
         meta:
           sensitivity: internal
@@ -549,7 +549,7 @@ models:
       - name: is_churned
         meta:
           sensitivity: internal
-        description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência do armazém (`active_customer_window_days`)."
+        description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência dos dados (`active_customer_window_days`)."
       - name: last_order_at
         meta:
           sensitivity: internal
@@ -964,7 +964,7 @@ models:
       - name: has_post_order_repeat
         meta:
           sensitivity: internal
-        description: "Verdadeiro quando o cliente fez outro pedido realizado em até 90 dias depois deste (`repeat_purchase_window_days`); nulo enquanto a janela não fechou na data de referência do armazém (ADR-0036)."
+        description: "Verdadeiro quando o cliente fez outro pedido realizado em até 90 dias depois deste (`repeat_purchase_window_days`); nulo enquanto a janela não fechou na data de referência dos dados (ADR-0036)."
       - name: is_cancelled
         meta:
           sensitivity: internal
@@ -980,7 +980,7 @@ models:
       - name: is_repeat_window_closed
         meta:
           sensitivity: internal
-        description: "Verdadeiro quando já se passaram 90 dias do pedido na data de referência do armazém: a janela da recompra pós-pedido está fechada."
+        description: "Verdadeiro quando já se passaram 90 dias do pedido na data de referência dos dados: a janela da recompra pós-pedido está fechada."
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
@@ -1702,7 +1702,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: refunded_at
-        description: "Momento em que o reembolso foi concluído."
+        description: "Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado e no recusado, e só marca a conclusão quando o estado é completed."
         meta:
           description_inherited: true
           sensitivity: internal

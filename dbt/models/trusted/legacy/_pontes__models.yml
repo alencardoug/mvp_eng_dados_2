@@ -3338,7 +3338,7 @@ models:
           lineage: [raw_legacy.refunds.status]
           description_from: stg_retail__refunds.refund_status
       - name: refunded_at
-        description: "Momento em que o reembolso foi concluído."
+        description: "Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado e no recusado, e só marca a conclusão quando o estado é completed."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"

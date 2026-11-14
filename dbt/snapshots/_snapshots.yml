@@ -103,7 +103,7 @@ snapshots:
           description_inherited: true
           sensitivity: internal
       - name: is_redeemable_now
-        description: "Verdadeiro quando a data de referência do armazém (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
+        description: "Verdadeiro quando a data de referência dos dados (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
         meta:
           description_inherited: true
           sensitivity: public
@@ -256,12 +256,12 @@ snapshots:
         meta:
           sensitivity: internal
       - name: is_churned
-        description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência do armazém (`active_customer_window_days`)."
+        description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência dos dados (`active_customer_window_days`)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: days_since_last_order
-        description: "Dias entre o último pedido realizado do cliente e a data de referência do armazém; nulo para quem nunca comprou."
+        description: "Dias entre o último pedido realizado do cliente e a data de referência dos dados; nulo para quem nunca comprou."
         meta:
           description_inherited: true
           sensitivity: internal

@@ -23,7 +23,9 @@ models:
   - name: dim_date
     meta:
       domain: transversal
-    description: Calendário do período simulado. Dimensão estática, gerada da série de datas.
+    description: >
+      **Grão: um dia** (`full_date`). Calendário do período simulado. Dimensão estática, gerada da
+      série de datas.
     columns:
       - name: date_key
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
@@ -91,7 +93,10 @@ models:
   - name: dim_customer
     meta:
       domain: clientes
-    description: '{{ doc("active_customer") }}'
+    description: >
+      **Grão: uma versão do cliente** — `(source_system, customer_natural_key, valid_from)`, SCD tipo
+      2. O código do cliente (`customer_code`) se repete entre as origens para **pessoas diferentes**:
+      identifique pela origem com a chave natural, nunca pelo código. {{ doc("active_customer") }}
     data_tests:
       - vigencias_sem_sobreposicao:
           chave_natural: customer_natural_key
@@ -182,12 +187,12 @@ models:
           sensitivity: confidential
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
       - name: is_churned
-        description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência do armazém (`active_customer_window_days`)."
+        description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência dos dados (`active_customer_window_days`)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: days_since_last_order
-        description: "Dias entre o último pedido realizado do cliente e a data de referência do armazém; nulo para quem nunca comprou."
+        description: "Dias entre o último pedido realizado do cliente e a data de referência dos dados; nulo para quem nunca comprou."
         meta:
           description_inherited: true
           sensitivity: internal
@@ -242,7 +247,10 @@ models:
   - name: dim_product
     meta:
       domain: catalogo
-    description: SKU com produto, categoria e marca. SCD tipo 2.
+    description: >
+      **Grão: uma versão do SKU** — `(source_system, product_natural_key, valid_from)`, SCD tipo 2,
+      com produto, categoria e marca. O código (`sku`) se repete entre as origens para **itens
+      diferentes**: identifique pela origem com a chave natural, nunca pelo código.
     data_tests:
       - vigencias_sem_sobreposicao:
           chave_natural: product_natural_key
@@ -394,6 +402,11 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [source_system, category_natural_key]
+    description: >
+      **Grão: uma categoria de produto por origem** — `(source_system, category_natural_key)`, com a
+      categoria raiz ao lado. Para recortar as duas origens juntas, agrupe pelo nome
+      (`category_name`): o mesmo membro tem uma chave em cada origem, e agrupar pela chave o parte em
+      dois.
     columns:
       - name: category_key
         description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
@@ -434,6 +447,9 @@ models:
   - name: dim_brand
     meta:
       domain: catalogo
+    description: >
+      **Grão: uma marca por origem** — `(source_system, brand_natural_key)`. Os nomes de marca não se
+      repetem entre as origens no dado de hoje.
     columns:
       - name: brand_key
         description: "Chave substituta da marca: hash de `source_system` e `brand_id` (ADR-0017)."
@@ -465,9 +481,12 @@ models:
     meta:
       domain: vendas
     description: >
-      Canal de venda. Carrega um membro "Sem canal" desde a Etapa 9: chamado que
-      não nasce de pedido não tem canal, e a alternativa seria chave nula na
-      fato — que some de todo recorte em vez de aparecer agrupada.
+      **Grão: um canal de venda por origem** — `(source_system, sales_channel_natural_key)`, mais o
+      membro "Sem canal". Para recortar as duas origens juntas, agrupe pelo nome
+      (`sales_channel_name`): o mesmo membro tem uma chave em cada origem, e agrupar pela chave o
+      parte em dois. Carrega o membro "Sem canal" desde a Etapa 9: chamado que não nasce de pedido não
+      tem canal, e a alternativa seria chave nula na fato — que some de todo recorte em vez de
+      aparecer agrupada.
     columns:
       - name: sales_channel_key
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
@@ -517,8 +536,8 @@ models:
     meta:
       domain: transversal
     description: >
-      Geografia conformada — atende a venda aqui e a remessa na Etapa 8. Carrega
-      um membro "Desconhecido" para que a fato nunca fique com chave nula.
+      **Grão: um lugar** — `(country, state_code, city)`, conformado entre as origens, mais o membro
+      "Desconhecido". Atende a venda e a remessa, e o membro desconhecido evita chave nula na fato.
     columns:
       - name: geography_key
         description: "Chave substituta do lugar: hash de país, unidade federativa e cidade; o membro desconhecido tem chave própria (ADR-0017)."
@@ -666,9 +685,9 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: order_status
-        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        description: "Estado atual do pedido; o histórico das mudanças está em `fact_order_status_event`."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
       - name: order_date
         description: "Data do pedido, no fuso de São Paulo."
@@ -695,12 +714,12 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: has_post_order_repeat
-        description: "Verdadeiro quando o cliente fez outro pedido realizado em até 90 dias depois deste (`repeat_purchase_window_days`); nulo enquanto a janela não fechou na data de referência do armazém (ADR-0036)."
+        description: "Verdadeiro quando o cliente fez outro pedido realizado em até 90 dias depois deste (`repeat_purchase_window_days`); nulo enquanto a janela não fechou na data de referência dos dados (ADR-0036)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_repeat_window_closed
-        description: "Verdadeiro quando já se passaram 90 dias do pedido na data de referência do armazém: a janela da recompra pós-pedido está fechada."
+        description: "Verdadeiro quando já se passaram 90 dias do pedido na data de referência dos dados: a janela da recompra pós-pedido está fechada."
         meta:
           description_inherited: true
           sensitivity: internal
@@ -811,7 +830,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: occurred_at
-        description: "Instante do evento: a criação do carrinho, no evento de criação; a conversão, no de conversão; e, no carrinho que não converteu, o que vier primeiro entre a expiração e a data de referência do armazém."
+        description: "Instante do evento: a criação do carrinho, no evento de criação; a conversão, no de conversão; e, no carrinho que não converteu, o que vier primeiro entre a expiração e a data de referência dos dados."
         meta:
           description_inherited: true
           sensitivity: internal
@@ -870,6 +889,10 @@ models:
   - name: dim_payment_method
     meta:
       domain: pagamentos
+    description: >
+      **Grão: um meio de pagamento por origem** — `(source_system, payment_method_natural_key)`, com o
+      tipo do meio. Para recortar as duas origens juntas, agrupe pelo nome (`payment_method_name`): o
+      mesmo membro tem uma chave em cada origem, e agrupar pela chave o parte em dois.
     columns:
       - name: payment_method_key
         description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
@@ -928,7 +951,11 @@ models:
   - name: dim_supplier
     meta:
       domain: compras
-    description: Fornecedor. SCD tipo 1 nesta etapa — a divergência do §3.2 está declarada no modelo.
+    description: >
+      **Grão: um fornecedor por origem** — `(source_system, supplier_natural_key)`, SCD tipo 1; a
+      divergência do §3.2 está declarada no modelo. Para recortar as duas origens juntas, agrupe pelo
+      nome (`supplier_name`): o mesmo membro tem uma chave em cada origem, e agrupar pela chave o
+      parte em dois.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -988,7 +1015,11 @@ models:
   - name: dim_warehouse
     meta:
       domain: estoque
-    description: Armazém, com a **mesma** `dim_geography` do endereço de entrega.
+    description: >
+      **Grão: um armazém por origem** — `(source_system, warehouse_natural_key)`, com a **mesma**
+      `dim_geography` do endereço de entrega. Para recortar as duas origens juntas, agrupe pelo nome
+      (`warehouse_name`): o mesmo membro tem uma chave em cada origem, e agrupar pela chave o parte em
+      dois.
     columns:
       - name: warehouse_key
         description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
@@ -1067,9 +1098,9 @@ models:
     meta:
       domain: pagamentos
     description: >
-      **Grão: uma tentativa ou operação financeira.** A operação recusada fica —
-      "quantas tentativas foram precisas para receber" é a pergunta P09, e ela só
-      existe se a recusa estiver aqui.
+      **Grão: uma tentativa ou operação financeira.** A operação recusada fica: é
+      ela que mede quantas tentativas foram precisas para receber, e a taxa de
+      aprovação conta as autorizações aprovadas sobre todas as tentativas.
     data_tests:
       - fato_reconcilia_com_a_condutora:
           config:
@@ -1325,7 +1356,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: refunded_at
-        description: "Momento em que o reembolso foi concluído."
+        description: "Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado e no recusado, e só marca a conclusão quando o estado é completed."
         meta:
           description_inherited: true
           sensitivity: internal
@@ -1344,9 +1375,9 @@ models:
         meta:
           sensitivity: internal
       - name: originally_captured_amount
-        description: "Valor movimentado nesta operação."
+        description: "Valor capturado na transação de captura que este reembolso reverte; não é o capturado do período."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado é o da transação genérica e não diz que é a captura revertida (F14)"
           sensitivity: confidential
       - name: completed_refund_amount
         description: "Aditiva — valor do reembolso quando ele foi concluído; 0 nos demais."
@@ -1430,9 +1461,9 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: purchase_order_status
-        description: "Estado da ordem; transições válidas em Modelo de Dados §4."
+        description: "Estado da ordem de compra: draft, placed, partially_received, received ou cancelled."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
       - name: ordered_at
         description: "Momento de emissão da ordem."
@@ -1673,9 +1704,11 @@ models:
     meta:
       domain: logistica
     description: >
-      Transportadora e a modalidade que ela presta. SCD tipo 1: a modalidade
-      classifica o fato, mas não muda para uma transportadora contratada — o
-      gatilho que a tornaria tipo 2 está escrito no próprio modelo.
+      **Grão: uma transportadora por origem** — `(source_system, carrier_natural_key)`, com a
+      modalidade que ela presta. SCD tipo 1: a modalidade classifica o fato, mas não muda para uma
+      transportadora contratada — o gatilho que a tornaria tipo 2 está escrito no próprio modelo. Para
+      recortar as duas origens juntas, agrupe pelo nome (`carrier_name`): o mesmo membro tem uma chave
+      em cada origem, e agrupar pela chave o parte em dois.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1772,7 +1805,7 @@ models:
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
-        description: "Data de **despacho** da remessa."
+        description: "Data de **despacho** da remessa; na remessa ainda não despachada (`is_dispatched` falso), a data de criação dela."
         data_tests:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
@@ -1845,9 +1878,9 @@ models:
         description: '**Aditiva** — unidades que viajaram nesta caixa.'
         data_tests: [not_null]
       - name: shipment_status
-        description: "Estado da remessa; transições válidas em Modelo de Dados §4."
+        description: "Estado da remessa: created, picking, dispatched, in_transit, delivered, returned ou lost."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
         data_tests:
           - not_null
@@ -1889,9 +1922,9 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: order_status
-        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        description: "Estado atual do pedido; o histórico das mudanças está em `fact_order_status_event`."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
       - name: placed_at
         description: "Momento de negócio em que o pedido foi feito."
@@ -2020,7 +2053,7 @@ models:
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
-        description: "Data de **despacho** da remessa."
+        description: "Data de **despacho** da remessa; na remessa ainda não despachada (`is_dispatched` falso), a data de criação dela."
         data_tests:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
@@ -2079,9 +2112,9 @@ models:
           sensitivity: internal
         description: '{{ doc("order_to_delivery_cycle") }}'
       - name: shipment_status
-        description: "Estado da remessa; transições válidas em Modelo de Dados §4."
+        description: "Estado da remessa: created, picking, dispatched, in_transit, delivered, returned ou lost."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
         data_tests:
           - not_null
@@ -2118,9 +2151,9 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: order_status
-        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        description: "Estado atual do pedido; o histórico das mudanças está em `fact_order_status_event`."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
       - name: placed_at
         description: "Momento de negócio em que o pedido foi feito."
@@ -2335,9 +2368,9 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: current_order_status
-        description: "Estado atual do pedido; o histórico vive em `order_status_history`."
+        description: "Estado atual do pedido, repetido em cada transição dele; as transições são as linhas desta fato."
         meta:
-          description_inherited: true
+          description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
       - name: is_order_creation
         description: "Verdadeiro na primeira transição do pedido, que não vem de estado nenhum."
@@ -2374,7 +2407,11 @@ models:
   - name: dim_campaign
     meta:
       domain: marketing
-    description: Campanha e objetivo. SCD tipo 1 — o objetivo é fixado na criação e não muda.
+    description: >
+      **Grão: uma campanha por origem** — `(source_system, campaign_natural_key)`, com o objetivo. SCD
+      tipo 1 — o objetivo é fixado na criação e não muda. Para recortar as duas origens juntas, agrupe
+      pelo nome (`campaign_name`): o mesmo membro tem uma chave em cada origem, e agrupar pela chave o
+      parte em dois.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -2436,12 +2473,12 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: is_running
-        description: "Verdadeiro quando a data de referência do armazém (`as_of_date`, 01/09/2026) cai dentro da vigência da campanha."
+        description: "Verdadeiro quando a data de referência dos dados (`as_of_date`, 01/09/2026) cai dentro da vigência da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_finished
-        description: "Verdadeiro quando a vigência da campanha terminou antes de a data de referência do armazém (`as_of_date`, 01/09/2026)."
+        description: "Verdadeiro quando a vigência da campanha terminou antes de a data de referência dos dados (`as_of_date`, 01/09/2026)."
         meta:
           description_inherited: true
           sensitivity: public
@@ -2455,9 +2492,9 @@ models:
     meta:
       domain: atendimento
     description: >
-      Categoria de chamado — **derivada** de uma *seed*, porque a origem só tem
-      a lista dentro de um `CHECK` e uma dimensão precisa de nome legível e de
-      agrupamento.
+      **Grão: uma categoria de chamado** (`support_category_natural_key`), sem origem: é **derivada**
+      de uma *seed*, porque a origem só tem a lista dentro de um `CHECK` e uma dimensão precisa de
+      nome legível e de agrupamento.
     columns:
       - name: support_category_key
         description: "Chave substituta da categoria de chamado: hash de `category_code` (ADR-0017)."
@@ -2491,10 +2528,10 @@ models:
     meta:
       domain: marketing
     description: >
-      Cupom. SCD tipo 2 no padrão misto: campanha e regra de desconto
-      historizadas, uso acumulado corrente. `redemption_count` **não** entra nas
-      `check_cols` do *snapshot* — cada resgate criaria uma versão, e a dimensão
-      teria mais linhas que a fato que ela recorta.
+      **Grão: uma versão do cupom** — `(source_system, coupon_natural_key, valid_from)`, SCD tipo 2 no
+      padrão misto: campanha e regra de desconto historizadas, uso acumulado corrente.
+      `redemption_count` **não** entra nas `check_cols` do *snapshot* — cada resgate criaria uma
+      versão, e a dimensão teria mais linhas que a fato que ela recorta.
     data_tests:
       - vigencias_sem_sobreposicao:
           chave_natural: coupon_natural_key
@@ -2565,7 +2602,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: is_redeemable_now
-        description: "Verdadeiro quando a data de referência do armazém (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
+        description: "Verdadeiro quando a data de referência dos dados (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
         meta:
           description_inherited: true
           sensitivity: public
@@ -2622,9 +2659,9 @@ models:
     meta:
       domain: atendimento
     description: >
-      Agente. SCD tipo 2 pela **equipe**, que classifica o chamado. Carrega o
-      membro desconhecido: `ticket_events.agent_id` é nulo quando o autor é o
-      cliente.
+      **Grão: uma versão do agente** — `(source_system, support_agent_natural_key, valid_from)`, SCD
+      tipo 2 pela **equipe**, que classifica o chamado. Carrega o membro desconhecido:
+      `ticket_events.agent_id` é nulo quando o autor é o cliente.
     data_tests:
       - vigencias_sem_sobreposicao:
           chave_natural: support_agent_natural_key
@@ -2808,7 +2845,7 @@ models:
       - name: is_eligible
         meta:
           sensitivity: confidential
-        description: As três condições da invariante 12 juntas — vigência, piso e teto.
+        description: "Verdadeiro quando o resgate atende ao mesmo tempo à vigência do cupom, ao valor mínimo do pedido e ao limite de usos."
         data_tests: [not_null]
       - name: coupon_discount_amount
         meta:
