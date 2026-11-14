@@ -769,3 +769,37 @@ def test_o_dominio_e_escrito_e_conferido_no_meta_que_a_entrada_declara() -> None
                      "  - name: a\n    config:\n      meta: {domain: marketing}\n"):
         with pytest.raises(ValueError, match="escrito em linha"):
             dm.patch_domains("version: 2\nmodels:\n" + em_linha, {"a": "vendas"})
+
+
+# ── Qual `.yml` é de gerador (RVB3-1-01) ────────────────────────────────────────
+
+def test_so_o_comeco_da_primeira_linha_faz_o_yml_ser_de_gerador(tmp_path) -> None:
+    """Arquivo à mão que *menciona* o gerado ao lado no cabeçalho continua à mão."""
+    casos = {
+        "# Gerado por `make legacy-models`. Não edite.\nversion: 2\n": True,
+        "# Gerado\nversion: 2\n": True,
+        "# Escrito à mão: o modelo que não vem do catálogo (o\n# `_legacy__models.yml` ao lado é gerado por `make legacy-models`).\n": False,
+        "version: 2\n# Gerado por engano na segunda linha\n": False,
+        "# gerado, em minúscula, não é a marca dos escritores\n": False,
+    }
+    for i, (texto, esperado) in enumerate(casos.items()):
+        caminho = tmp_path / f"_{i}.yml"
+        caminho.write_text(texto, encoding="utf-8")
+        assert s._is_generated(caminho) is esperado, texto
+
+
+def test_os_escritores_gravam_a_marca_de_gerado_na_primeira_linha() -> None:
+    """A marca é o contrato: todo `.yml` que um gerador escreve começa com ela."""
+    for caminho in sorted((s.DBT / "models").rglob("*.yml")) + sorted((s.DBT / "snapshots").rglob("*.yml")):
+        primeira = caminho.read_text(encoding="utf-8").partition("\n")[0]
+        if "gerado por" in primeira.lower():
+            assert primeira.startswith(s.GENERATED_MARK), caminho
+
+
+def test_os_yml_a_mao_que_citam_o_gerado_ao_lado_sao_a_mao() -> None:
+    """Os dois arquivos do Bloco 3: à mão, com herança — não `generator`, que suspende a herança."""
+    entradas = d.disk_entries()
+    for modelo, arquivo in (("rejected_shipment_deliveries", "_entregas__models.yml"),
+                            ("legacy_selected_capture", "_captura__models.yml")):
+        assert entradas[modelo].path.name == arquivo
+        assert entradas[modelo].kind == "hand", modelo

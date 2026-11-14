@@ -140,3 +140,18 @@ def test_contraprovas_no_manifest_real(manifest) -> None:
     assert ("trusted", "sales_channels", "sales_channel_name") not in sem_declaracao.texts
     assert sem_declaracao.undescribed[("trusted", "sales_channels", "sales_channel_name")] == "upstream_blank"
     assert any("sem `description_from`" in p for p in sem_declaracao.problems)
+
+
+def test_texto_novo_a_montante_chega_a_quarentena_das_entregas(manifest) -> None:
+    """RVB3-1-01: a sonda do revisor. Mudar, **só em memória**, o texto de
+    `trusted.shipments.delivery_event_count` agenda o *patch* do `.yml` à mão da
+    quarentena — antes o arquivo era tido por gerado e guardava o texto antigo."""
+    _, derivacao = sensitivity.load(MANIFEST)
+    disco = descriptions.disk_entries()
+    fontes = descriptions.disk_sources()
+    coluna = disco["shipments"].columns["delivery_event_count"]
+    disco["shipments"].columns["delivery_event_count"] = {**coluna, "description": "Texto novo, só para a sonda."}
+    textos = descriptions.derive_texts(manifest, derivacao, disco=disco, fontes=fontes)
+    destino = disco["rejected_shipment_deliveries"].path
+    assert textos.origin[("quarantine", "rejected_shipment_deliveries", "delivery_event_count")] == "inherited"
+    assert textos.patches[destino]["rejected_shipment_deliveries"]["delivery_event_count"] == "Texto novo, só para a sonda."

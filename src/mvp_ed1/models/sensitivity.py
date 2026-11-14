@@ -704,10 +704,18 @@ def _leaves_by_output(query: exp.Expression, node_id: str, propria: tuple[str, s
 
 # ── Onde cada coluna está declarada hoje ────────────────────────────────────────
 
+GENERATED_MARK = "# Gerado"   # o começo da 1ª linha que todo escritor de `.yml` grava
+
+
 def _is_generated(path: pathlib.Path) -> bool:
+    """O `.yml` é de um gerador quando a **primeira linha começa** com `GENERATED_MARK`.
+
+    Só o começo conta: um arquivo à mão que *menciona* o gerado ao lado no
+    cabeçalho continua à mão — antes a palavra em qualquer das três primeiras
+    linhas bastava, e dois arquivos à mão saíram da herança (RVB3-1-01).
+    """
     with path.open(encoding="utf-8") as arquivo:
-        cabecalho = "".join(arquivo.readline() for _ in range(3))
-    return "gerado" in cabecalho.lower()
+        return arquivo.readline().startswith(GENERATED_MARK)
 
 
 @dataclass
