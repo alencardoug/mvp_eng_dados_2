@@ -496,6 +496,17 @@ explícito do custodiante.
      singular confere, de outra conexão e durante a execução, que a linha `started` desta invocação está
      visível e aberta.
    Comando que não escreve o armazém (`test`, `docs generate`, `compile`, `parse`) não registra nada.
+   **Mutação do armazém fora do dbt** (RVL5-3-01): o que o `Makefile` faz no armazém sem o dbt — o
+   descarte dos *snapshots* de `dbt-build RESET=1` e de `dbt-drop-snapshots` — registra-se do mesmo jeito,
+   em duas fases, com `command = drop_snapshots`: a linha abre e confirma **antes** do descarte, e fecha
+   depois. Interrompida no meio, fica aberta e bloqueia; concluída, é uma execução parcial mais nova que o
+   *build* anterior, e também tira dele o `verified`. Toda escrita nova fora do dbt entra pela mesma função
+   (`governance.registrar_mutacao`).
+   **Os insumos estáveis** (RVL5-3-02): a coluna `inputs_confirmed` nasce falsa. O `CARIMBO_DEPOIS`, depois
+   do dbt, refaz o *commit*, a sujeira e o digest dos insumos do dbt e, **só se os três são os de antes**,
+   a marca verdadeira; se o passo não roda, ou se algo mudou, ela fica falsa e a execução não é verificada.
+   O limite que sobra, declarado no ADR como precondição operacional: um arquivo editado e desfeito
+   **dentro** do *build* não é visto — o *checkout* fica parado enquanto o dbt roda.
 2. **O que fica sem fecho é visível** (RVL5-1-02): falha do *hook* de acesso (o dbt pula os *hooks*
    seguintes, e o fecho é o último), do próprio registro, ou interrupção deixam a linha `started` sem
    `finished_at`. **E ela bloqueia** (RVL5-2-03): enquanto houver linha aberta, nada é verificado — uma
@@ -505,7 +516,8 @@ explícito do custodiante.
    nova, e vai ao ADR para o Owner.
 3. **A regra de leitura** — uma só, numa *view* do próprio schema, `governance.warehouse_provenance`, que o BI
    e o pacote leem (RVL5-1-01): a candidata é a linha de maior `sequence`. É **verificada** se é
-   `full_build`, `success`, de `git_commit` conhecido e `git_tree_dirty = false`, se não há linha aberta, e
+   `full_build`, `success`, de `git_commit` conhecido, `git_tree_dirty = false` e `inputs_confirmed`, se não
+   há linha aberta, e
    se toda linha anterior terminou (ou foi abandonada) **antes** de ela começar — os dois instantes do
    relógio do banco. Senão, `not_verified`, com o motivo (execução parcial, sem fecho, *commit*
    desconhecido, árvore suja, reprovada, sobreposta). A DAG, que roda por camada, nunca sustenta procedência
@@ -534,7 +546,9 @@ explícito do custodiante.
    (cada motivo, a linha aberta, a abandonada, a sobreposição, a ordem por `sequence`); a macro em
    integração — um `make dbt-build` completo (verificado), um `--select` e um `dbt retry` depois de uma falha
    (parciais), um `dbt test` (sem linha), o *hook* de acesso falhando antes do fecho (linha aberta, por uma
-   variável só de teste) —; o mapa de estados com um `build` que reprova teste e pula dependentes; a sujeira
+   variável só de teste), o descarte dos *snapshots* concluído sem o dbt chegar à abertura (não verificado) e
+   o `RESET=1` bem-sucedido (verificado), um insumo alterado entre a coleta e o fim (`inputs_confirmed`
+   falso) —; o mapa de estados com um `build` que reprova teste e pula dependentes; a sujeira
    com modelo novo não rastreado, mudança rastreada e metadados ausentes; os papéis; o gerador com leitor
    substituto e sem conexão; o esquema aceitando `verified` só com os campos. Aviso em Consumidores §5. O
    ADR novo (o próximo número) registra a garantia estreita e a regra do abandono.
