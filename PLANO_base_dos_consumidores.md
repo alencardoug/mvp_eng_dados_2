@@ -801,3 +801,26 @@ curto da pontualidade passa a dizer que a chegada é o `delivered` **mais recent
 Relatório em `codex1_bloco3_r3.md`. RVB3-2-01 e RVB3-1-03 resolvidos, nenhum achado novo. **A revisão do
 Bloco 3 está fechada.** Seguem com o Owner a revisão integral dos textos e a confirmação da dispensa de ADR
 do RVG-1-01. O `0ecf270` (o `::` na revisão de segredos) e o `68b1535` (Bloco 4) vão à revisão juntos.
+
+### Rodadas 21 a 28 — Codex conta 1, sobre o Bloco 4 (14/11/2026)
+
+Relatórios em `codex1_bloco4_r1.md` a `r8.md`; objeto inicial `68b1535` (o gerador) e `0ecf270` (o `::` na
+revisão de segredos). Antes de enviar, achado meu: o pacote de `68b1535` carregava um JUnit antigo com 1
+falha (regenerado em `7ef9f20`). As rodadas, com o que cada uma deixou:
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 1 | `3d704c0` | 4 bloqueantes, 3 ajustes (RVB4-1-01 a 07) | Carimbo do *build*; 5ª etapa do `make check`; leitores que recusam; JUnit pelo arquivo real; caminho de máquina recusado; calendário; árvore suja inteira |
+| 2 | `415d6b1` | 4 bloqueantes, 2 ajustes | Normalização por caminho (a 5ª etapa acusaria todo *build*); `dbt/**/*` no digest; completude do JUnit pela coleta; carimbo pela invocação |
+| 3 | `9526117` | 2 bloqueantes | `checks: {}` nunca publicável (`--conferir-pytest` no `check-offline`) |
+| 4 | `3fa601d` | 1 bloqueante, 1 ajuste | Leitor de blocos do Markdown (depois removido) |
+| 5 | `b0bcdd0` | 4 bloqueantes | A cobertura passa a se conferir contra o **declarado** (P01–P16; o cabeçalho das Pendências com o Registro), e não relendo o Markdown |
+| 6 | `81b1b9a` | 2 bloqueantes | Regra de autoria da seção 1; toda linha da tabela do Registro conta |
+| 7 | `acb26d0` | 1 bloqueante, 1 observação | Tabela do Registro por bloco; alcance lexical declarado no contrato |
+| 8 | — | nenhum | **A revisão do Bloco 4 está fechada.** |
+
+Da rodada 7 em diante, o pedido ao revisor calibrou a gravidade: bloqueante só para caminho concreto de
+perda ou invenção de item com documento escrito de boa-fé; forma exótica, observação com o limite no
+contrato. A primeira versão do pacote, que os consumidores fixam, é a de `acb26d0` (Consumidores §6).
+Seguem com o Owner a L5 (procedência do armazém, tabela nova em `governance`) e a L10 (evidências do GCP).
+
