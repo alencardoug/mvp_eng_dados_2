@@ -465,40 +465,65 @@ já declarou em `governance` o conjunto *log de execução* ("cada execução de
 resultado, versão do código"); esta entrega o materializa para o dbt, como a ADR-0044 materializou
 `legacy_captures`, e a ADR nova registra a materialização.
 
-1. **A tabela** `governance.dbt_invocations`, pela migração `0003_dbt_invocations` de `governance.py`
-   (nunca editar as anteriores): `invocation_id` (chave), `command` (`build`, `run`, `seed`, `snapshot`),
-   `git_commit` (40 hexadecimais, **nulo** quando a execução não o informa), `git_tree_dirty` (nulo idem),
-   `dbt_version`, `target`, `started_at` e `finished_at` (`timestamptz`), `node_count`, `error_count` e
-   `status` (`success` quando nenhum nó terminou em erro, `error` senão). Escrita pelo `transformer`, lida
-   pelo `auditor`, como o resto de `governance`; o `analyst` não a lê (o contrato de consumo é a view).
-2. **A escrita**, no `on-run-end`, depois de `aplicar_acesso_por_camada`: uma macro registra a linha só nos
-   comandos que escrevem o armazém (`build`, `run`, `seed`, `snapshot`; o `test` e o `docs generate` não).
-   O *commit* e a árvore suja chegam por ambiente (`MVP_GIT_COMMIT`, `MVP_GIT_TREE_DIRTY`), que o
-   `CARIMBO_ANTES` do `Makefile` exporta; a DAG do Airflow, que roda o dbt sem eles, registra a execução
-   com o *commit* nulo — o que é verdade: ela não sabe.
-3. **Quem lê.** O BI captura como custodiante, numa transação de leitura (o `PLAN.md` dele, §3.5): na mesma
-   transação lê a última linha da tabela e tem "este armazém foi construído por esta execução, deste
-   *commit*, com ou sem mudança local". É a resposta que a L5 pedia, e não depende do pacote.
-4. **O pacote.** `provenance.warehouse` passa a dizer o que a tabela registra **da execução que produziu o
-   *manifest***: `status: verified` quando há a linha com o mesmo `invocation_id` e *commit* informado,
-   com `built_by_invocation_id`, `built_from_commit`, `built_tree_dirty` e `built_at` (campos novos; o
-   formato continua o 1, regra 3, e o esquema troca o `const not_verified` por `verified | not_verified`).
-   Sem a linha, sem *commit* ou sem o banco de pé, `not_verified`, com aviso, e nada de recusa. **O
-   significado é estreito, e o contrato o diz:** a execução que produziu os artefatos do pacote está
-   registrada no armazém, deste *commit*; não que o armazém continue igual depois. O pacote passa a **ler
-   uma tabela do banco** — a regra "o pacote não lê o banco" muda para essa exceção.
-5. **A comparação do `--check`** tira os campos de execução de `warehouse` (já tira o `built_by_invocation_id`)
-   e compara o `status`.
-6. **Os testes:** a migração aplicada do zero e sobre o armazém existente; a macro registra a linha de um
-   `make dbt-build` e não a de um `dbt test` (integração, com o `invocation_id` do *manifest*); o gerador com
-   um leitor substituto (linha igual, linha de outra execução, *commit* nulo, banco fora); o esquema aceita
-   `verified` só com os campos preenchidos. Aviso em Consumidores §5 (campo novo e valor novo do pacote).
+**Revisto depois da rodada 1 da revisão do desenho** (`codex1_l5_desenho_r1.md`, RVL5-1-01 a 06). A garantia
+é **estreita e conservadora**: o log registra toda execução do dbt que escreve o armazém, e só uma delas —
+o `build` completo, limpo, de *commit* conhecido, sem nada depois — sustenta "este armazém foi construído
+por este *commit*". Qualquer outra coisa deixa a procedência **não verificada**, e diz por quê.
 
-**Q6, as três colunas em português** de `trusted.legacy_order_totals_divergence` (`itens_empilhados`,
-`itens_rejeitados`, `motivos_da_rejeicao`): passam a `accepted_item_count` (o `.yml` a descreve como os itens aceitos), `rejected_item_count` e
-`rejection_reasons`. Só o modelo e o `.yml` dele as leem (conferido), nenhuma view; o pacote as publica em
-`relations`. A linha `prevista` em Consumidores §5 sai num *commit* antes do que renomeia, e vira `feita`
-com o *build*.
+1. **A tabela** `governance.dbt_invocations`, pela migração `0003_dbt_invocations` de `governance.py`
+   (nunca editar as anteriores), **escrita em duas fases**, como `legacy_captures` (ADR-0044):
+   - no `on-run-start`, a linha `started`: `sequence` (`bigserial`, a ordem de início, que o banco dá),
+     `invocation_id` (único), `command`, `full_build` (`build` sem `--select`, `--exclude`, `--selector`,
+     `--resource-type` nem `--empty`, lido de `invocation_args_dict`), `git_commit` e `git_tree_dirty` (do
+     ambiente; nulos quando a execução não os informa, como na DAG), `dbt_version`, `target`, `started_at`;
+   - no `on-run-end`, **por último**, depois do *hook* de acesso, o fecho da mesma linha: `finished_at`, as contagens
+     por estado dos `results` (`success`, `pass`, `warn`, `error`, `fail`, `runtime error`, `skipped`,
+     `partial success`) e `status`: `success` só sem nenhum de `error`, `fail`, `runtime error`, `skipped`
+     e `partial success`; `failed` senão (RVL5-1-03). `warn` não reprova, e fica contado.
+   Comando que não escreve o armazém (`test`, `docs generate`, `compile`, `parse`) não registra nada.
+2. **O que fica sem fecho é visível** (RVL5-1-02): falha do *hook* de acesso (o dbt pula os *hooks*
+   seguintes, e o fecho é o último), do próprio registro, ou interrupção deixam a linha `started` sem
+   `finished_at`, e ela impede a procedência de dali em
+   diante. Linha `started` antiga não se "conserta": só um `build` completo novo, fechado, a supera.
+3. **A regra de leitura** — uma só, escrita numa função (`procedencia()` em `governance.py`) e numa *view*
+   do próprio schema, `governance.warehouse_provenance`, para o BI e o pacote lerem a mesma coisa
+   (RVL5-1-01): pega a linha de maior `sequence`. Ela é **verificada** se é `full_build`, `success`,
+   `git_commit` conhecido e `git_tree_dirty = false`, e nenhuma outra linha terminou depois de ela
+   começar ou está aberta (sobreposição). Senão, `not_verified`, com o motivo: execução parcial depois,
+   execução sem fecho, *commit* desconhecido, árvore suja, execução reprovada, sobreposição. A DAG, que roda
+   por camada, nunca sustenta procedência sozinha: o custodiante, antes de abrir a janela de leitura,
+   roda `make dbt-build` de um *commit* limpo.
+4. **Os papéis** (RVL5-1-04): a tabela é declarada como fonte de `governance` no gerador do legado, com
+   `meta.grants` próprio — `select` para `auditor` e `transformer`, `insert` e `update` para `transformer` —,
+   e a macro de acesso a mantém (ela revoga e repõe o declarado por tabela). O dbt hoje conecta como o
+   superusuário, então o registro não depende do grant; o grant é a política, e `tests/test_acesso.py`
+   passa a cobrá-la, com retenção (`permanent`) e descrição.
+5. **O pacote.** `provenance.warehouse` passa a ser o que a *view* diz **no momento da geração**, e só
+   `verified` se a linha verificada é a da execução do *manifest* (`invocation_id` igual): é então que "o
+   armazém é o do *manifest*", como a decisão da rodada 5 diz. Campos novos `built_from_commit`,
+   `built_at`, `reason`; o formato continua o 1 (regra 3), e o esquema troca o `const not_verified` por
+   `verified | not_verified`. A leitura usa a conexão do `.env`: o `catalog` e a 5ª etapa do `check`
+   passam a carregá-lo (RVL5-1-05); sem conexão, `not_verified` com motivo "sem conexão", e nunca texto
+   de erro do banco no pacote. O `check-offline` não chama o leitor. É a única leitura do banco que o
+   pacote faz, e o contrato a declara.
+6. **A comparação do `--check`** tira `built_by_invocation_id`, `built_from_commit` e `built_at` e compara
+   `status` e `reason`; o teste de duas montagens passa a usar um leitor substituto para as duas invocações
+   (RVL5-1-05).
+7. **Os testes:** a migração do zero e sobre o armazém existente; a regra de leitura com linhas montadas
+   (cada motivo de `not_verified`, a sobreposição, a linha aberta, a ordem por `sequence`); a macro, em
+   integração, registrando um `make dbt-build` completo e um `--select`, e não um `dbt test`; o mapa de
+   estados dos `results`, com um `build` que reprova teste e pula dependentes; o gerador com leitor
+   substituto e sem conexão; o esquema aceitando `verified` só com os campos. Aviso em Consumidores §5.
+   O ADR (0054) registra a garantia estreita, para o Owner ver o que ela promete e o que não.
+
+**Q6, as colunas em português** de `trusted.legacy_order_totals_divergence`. A decisão enumerou três; a
+revisão do desenho achou a quarta (RVL5-1-06), e o Owner a incluiu em 15/11/2026. Passam a
+`accepted_item_count` (`itens_empilhados`: o `.yml` a descreve como os itens aceitos), `rejected_item_count`
+(`itens_rejeitados`), `rejection_reasons` (`motivos_da_rejeicao`) e `explained_by_quarantine`
+(`explicada_pela_quarentena`, com o teste `not_null` que a acompanha). Só o modelo e o `.yml` dele as leem
+(conferido), nenhuma view; os derivados — o pacote (`relations`, `lineage`, o identificador do teste),
+o dicionário e a linhagem — saem da regeneração. A linha `prevista` em Consumidores §5 sai num *commit*
+antes do que renomeia, e vira `feita` com o *build*.
 
 ### Bloco 5 — domínios e métricas (F7, F9)
 
@@ -627,7 +652,7 @@ recomendadas. As opções, como foram apresentadas:
 | **L5** | A procedência do armazém: o banco não guarda qual execução nem qual *commit* o construiu, e o pacote diz `not_verified` | **Tabela em `governance`**: ao fim de cada *build*, o `invocation_id` e o *commit*; o pacote passa a dizer `verified` quando o armazém é o do *manifest*. Objeto novo no armazém, por isso com ADR, e mudança do esquema do pacote (o `verified` entra no formato, com aviso em Consumidores §5). Era a recomendada | Manter `not_verified`; adiar como verificação (Vn) |
 | **L10** | As evidências do GCP, fora do Git no `mvp_eng_dados_1` (arquivado), entram no pacote? | **Ficam `not_available`**; o Registro da fase GCP, versionado aqui, conta o processo. Era a recomendada | Trazer um recorte saneado para este repositório |
 | **RVG-1-01** | O texto próprio das 39 colunas da ponte (`TEXTOS_DA_PONTE`, `61e0543`) pede ADR? | **Dispensa ADR**: forma de declarar texto, dentro da N41. Era a recomendada | Um ADR curto |
-| **Q6** | A O1: as três colunas em português de `trusted.legacy_order_totals_divergence` | **Renomear para inglês**, em entrega própria, com o que as lê, e o aviso de mudança de esquema em Consumidores §5 (`prevista` antes, `feita` depois). Era a recomendada | Registrar como exceção |
+| **Q6** | A O1: as três colunas em português de `trusted.legacy_order_totals_divergence` (e a quarta, `explicada_pela_quarentena`, achada na revisão do desenho e incluída pelo Owner em 15/11/2026) | **Renomear para inglês**, em entrega própria, com o que as lê, e o aviso de mudança de esquema em Consumidores §5 (`prevista` antes, `feita` depois). Era a recomendada | Registrar como exceção |
 | **Q5** | A primeira *tag* deste repositório | **`v2.1.0`, no fim da fase**, depois dos Blocos 5 e 6: continua a numeração do `v2.0.0`, porque nada quebra para quem lê. Era a recomendada | `v3.0.0` no fim da fase; `v2.1.0` já, em `7d9548f` |
 
 **Os textos do Bloco 3: aprovados pelo Owner em 15/11/2026**, sem a revisão integral, que ele declarou não poder fazer; a aprovação se apoia nas três rodadas de revisão do Bloco 3 (§9, rodadas 18 a 20).
