@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); **alinhamento central** das pendências dos três consumidores em 14/11/2026 (§2.2), com a rodada 4 de perguntas respondida (Q12 a Q14, §6) e o **Bloco 0b entregue** (§3); próximo: o Bloco 1 |
+| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); **alinhamento central** das pendências dos três consumidores em 14/11/2026 (§2.2), com a rodada 4 de perguntas respondida (Q12 a Q14, §6) e o **Bloco 0b entregue** (§3); **Bloco 1 entregue** em 14/11/2026, com a Q8 respondida e o ADR-0052 (§3); próximo: a revisão do Bloco 1 e o Bloco 1b |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -219,6 +219,30 @@ O que cada consumidor fará com o aviso é da sessão dele, e esta fase não o a
      par legado incompleto. A regra aprovada vive no dono dela — o glossário (`giro_de_estoque.md`) e o
      ADR, se houver —, e o plano só aponta para lá.
 
+**Entregue em 14/11/2026** (medições em `data/medicoes/base_consumidores/bloco1/`, fora do Git; cada
+mudança em [Consumidores §5](docs/consumidores.md#5-o-que-mudou-para-quem-consome)):
+
+- **F1** em `9aeea8d`: o denominador soma as origens do canal pelo nome. Jan/2024, Conta, Aplicativo:
+  4,5455 → 4,3478. Teste de unidade e reconciliação `p15_…` com as fatos (*tag* `fronteira`), os dois
+  com contraprova sobre o SQL anterior (a reconciliação acusa 23 pares mês × canal nele).
+- **F3** em `d212c07`: a causa medida é regra vigente, não defeito. Os 15 pedidos realizados do legado
+  que a dimensão conta e a fato não tem estão todos sem item aceito, com os itens na quarentena (D35,
+  ADR-0038). Com eles, a dimensão e a fato batem nos 1.574 clientes. O teste
+  `cliente_reconcilia_com_a_fato_de_vendas` guarda a regra com a exceção declarada (sem ela, acusa os 15
+  clientes), e as descrições dizem o recorte. Se a regra deve mudar é a **Q7**, que tem o mesmo padrão
+  da D66 (pai aceito, filhos todos rejeitados) e vai com ela. Na DAG, a tarefa de quarentena passou a
+  deixar os testes `fronteira` para o fim.
+- **F2**: diagnóstico e proposta em `bloco1/f2_diagnostico_e_proposta.md`; a **Q8** foi respondida pelas
+  recomendações e registrada no [ADR-0052](docs/adr/0052-giro-pelo-estoque-medio-do-trimestre.md)
+  (`3010ead`, com o aviso `prevista` ao BI); a view em `69ea446`. Antes e depois: 6.990 linhas e o mesmo
+  CMV, 1.449 giros mudam mais de 10%, e os indefinidos vão de 620 a 1.216 pela correção-relâmpago do
+  gerador, registrada como [V4](docs/pendencias.md#v4--a-correção-relâmpago-do-gerador-de-estoque-registrada-em-14112026).
+  A primeira versão levava mais de 2 minutos por leitura. A final lê em 6 s: a grade só dos trimestres
+  com venda, montada por `union all`.
+- **Não replicado ainda nos Achados**: a nota "replicado aqui em `<commit>`" do F1, F2 e F3 espera a
+  revisão do Owner das entradas F14 a F16, que a sessão do `nl_sql` escreveu no mesmo arquivo, fora do
+  Git.
+
 ### Bloco 1b — a auditoria das 16 views (Q9-a)
 
 Depois do F1 e do F2, as 16 views de `consumption` passam pelos três critérios da etapa 2.11 do BI:
@@ -422,7 +446,7 @@ As opções como foram apresentadas:
 | **Q5** | A primeira *tag* deste repositório: o nome (`v2.1.0`, `v3.0.0`) e o que ela fecha |
 | **Q6** | A O1 do `PLANO_revisao_governanca.md`: renomear para inglês as três colunas de `trusted.legacy_order_totals_divergence`, ou registrar como exceção |
 | **Q7** | O F3, se a causa medida for regra |
-| **Q8** | O F2, sobre a proposta do passo 2: a média no tempo, a valorização do estoque médio, os cortes do trimestre e o fuso, o evento atrasado, o par cujo histórico não reconstrói o saldo (legado com movimento rejeitado) — e se a regra pede ADR. Perguntada **no Bloco 1**, logo depois do diagnóstico, e não com as outras (RVC-1-02) |
+| **Q8** | **Respondida em 14/11/2026 pelas recomendações** (ADR-0052). O F2, sobre a proposta do passo 2: a média no tempo, a valorização do estoque médio, os cortes do trimestre e o fuso, o evento atrasado, o par cujo histórico não reconstrói o saldo (legado com movimento rejeitado) — e se a regra pede ADR. Perguntada **no Bloco 1**, logo depois do diagnóstico, e não com as outras (RVC-1-02) |
 
 ### Rodada 3 — Q9 a Q11, da emenda (§2.1): respondida em 13/11/2026
 
