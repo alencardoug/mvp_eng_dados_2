@@ -15,14 +15,14 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 13/11/2026 (`nl_sql@f3b96fb`) |
+| Última atualização | 14/11/2026 (`nl_sql@ce09526`) |
 
 ---
 
 ## 1. Falhas deste projeto reveladas pelo teste
 
 Cada item traz a evidência, o efeito, o que o `nl_sql` fez e **como replicar aqui**. Os achados
-F1 a F4 vieram da revisão independente do Codex (`nl_sql/revisao_codex/REVISAO.md`); F5 a F13, da
+F1 a F4 vieram da revisão independente do Codex (`nl_sql/revisao_codex/REVISAO.md`); F5 a F16, da
 construção da governança no `nl_sql`.
 
 ### F1 — `support_tickets_per_hundred_orders` perde parte do denominador · **Gravidade: alta**
@@ -217,6 +217,55 @@ construção da governança no `nl_sql`.
 - **Replicar aqui:** corrigir a descrição ("despacho; na remessa ainda não despachada, a criação") ou
   separar as duas datas.
 
+### F14 — Duas descrições de `fact_refund` não dizem o que a coluna guarda · **Gravidade: média**
+
+- **Evidência (`mvp_eng_dados_2@32397cc`):**
+  - `dbt/models/analytics/_analytics__models.yml:1318`: `refunded_at` = "Momento em que o reembolso foi
+    concluído". Nos dados de 11/11/2026, a coluna está preenchida nos 120 reembolsos, inclusive nos 8 solicitados
+    e nos 2 recusados. O `date_key` sai dela (`dbt/models/analytics/fact_refund.sql:40`,
+    `coalesce(r.refunded_at, r.source_created_at)`).
+  - `_analytics__models.yml:1337`: `originally_captured_amount` = "Valor movimentado nesta operação". Na verdade
+    é o `captured_amount` da transação de captura revertida (`fact_refund.sql:32`; 120/120 batem com
+    `fact_payment_transaction.captured_amount`, e todas as transações revertidas são `capture`).
+- **Efeito:**
+  - "reembolsos concluídos por mês" pela data conta também os solicitados e os recusados;
+  - a ferramenta não tem como saber que `originally_captured_amount` não é o capturado do período.
+- **No `nl_sql`:** `governanca/canonico/colunas.yaml` corrige as duas (`nl_sql@ce09526`). O `verificar.py` passou a
+  exigir correção para toda C0 sabidamente errada (F4 e F14).
+- **Replicar aqui:**
+  - `refunded_at`: "instante registrado do reembolso; preenchido também nos solicitados e recusados" (ou anular
+    fora do concluído);
+  - `originally_captured_amount`: "valor capturado na transação que este reembolso reverte".
+
+### F15 — Descrições apontam para o que não existe na camada `analytics` · **Gravidade: baixa**
+
+- **Evidência (`mvp_eng_dados_2@32397cc`, `dbt/models/analytics/_analytics__models.yml`):**
+  - `:667`, `:1878`, `:2105`: "o histórico vive em `order_status_history`", uma tabela da origem. Na
+    `analytics`, o histórico é `fact_order_status_event`;
+  - `:1419`, `:1834`: "transições válidas em Modelo de Dados §4";
+  - `:2578`: "as três condições da invariante 12";
+  - 76 citações de ADR, e referências a *macro*, *snapshot*, *seed* e Beam;
+  - descrições de coluna que trazem o conceito inteiro do glossário, com a view `consumption` que o implementa
+    (ex.: `dim_customer.is_repeat_buyer`).
+- **Efeito:** quem lê só o catálogo (uma ferramenta NL→SQL, um analista no BigQuery) recebe uma referência que não
+  consegue seguir. Ou recebe o caminho da view pronta, em vez da regra.
+- **No `nl_sql`:** as colunas afetadas ganharam texto próprio (estão entre as 67 com texto próprio), e o `verificar.py` reprova jargão do MVP no texto
+  resolvido de qualquer coluna.
+- **Replicar aqui:** trocar a referência pela regra que ela abrevia ("o histórico está em
+  `fact_order_status_event`"; "vigência, mínimo e limite").
+- **Desvio:** os ADR continuam úteis no catálogo do dbt *docs*, que é para quem mantém o projeto. Tirá-los só da
+  descrição que vai ao BigQuery já resolve.
+
+### F16 — "Data de referência do **armazém**" é ambígua · **Gravidade: baixa**
+
+- **Evidência (`mvp_eng_dados_2@32397cc`):** `dbt/models/analytics/_analytics__models.yml:185`, `:190`, `:696`,
+  `:701`, `:812`, `:2206`, `:2211`, `:2335` falam em "data de referência do armazém (`as_of_date`, 01/09/2026)",
+  no sentido de *data warehouse*. Na mesma camada, `dim_warehouse` é o "Armazém" físico (centro de distribuição).
+- **Efeito:** em português, "armazém" lê-se como `dim_warehouse`. Uma ferramenta pode procurar a data num
+  armazém.
+- **No `nl_sql`:** "data de referência dos dados (01/09/2026)" nas 9 colunas.
+- **Replicar aqui:** "data de referência dos dados" (ou "do *data warehouse*").
+
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
 | Melhoria | No `nl_sql` | Equivalente aqui | Desvio |
@@ -227,6 +276,7 @@ construção da governança no `nl_sql`.
 | Verificação automática "o dado tem valor fora da lista?" | `governanca/verificar.py` | `accepted_values` já faz parte disso | — |
 | Ondas de criação por FK | `governanca/montar.py` | — (o dbt ordena por `ref`) | Só faz sentido com *constraints* declaradas |
 | Descrição dentro do limite do BigQuery | renderizador (em construção) | Reescrever as descrições longas em vez de cortar | — |
+| Descrição de coluna por precedência (própria > padrão por família > original), com verificação de limite, jargão e correção obrigatória da original errada | `canonico/colunas.yaml` + `verificar.py` | Um `{% docs %}` por família (chave substituta, vigência, exclusão lógica) e um teste que lê o `manifest.json` | — |
 | Ficha de tabela verificada nos dados (grão único, significado de cada data, versões, rótulo, membro desconhecido) | `canonico/tabelas.yaml` + `verificar.py` | Descrição de tabela do dbt + testes `unique_combination_of_columns` e um teste de data local por fato | Lá a verificação lê o Parquet congelado; aqui seria teste dbt |
 
 ---
@@ -254,3 +304,4 @@ construção da governança no `nl_sql`.
 | 12/11/2026 | `e3ad98e` | `nl_sql` com ambiente próprio, sem depender deste projeto; origem do clone registrada | — |
 | 12/11/2026 | (este documento) | Limite de 1.024 caracteres por descrição como causa das descrições cortadas; grão das dimensões | F4, F8 |
 | 13/11/2026 | `f3b96fb` | `tabelas.yaml`: grão, uso e datas das 25 tabelas, conferidos nos dados; canal de volta passa a ser este repositório (D92) | F8, F11, F12, F13 |
+| 14/11/2026 | `ce09526` | `colunas.yaml`: texto das 477 colunas com as correções da original; decisões da resposta central (Q14) | F14, F15, F16 |
