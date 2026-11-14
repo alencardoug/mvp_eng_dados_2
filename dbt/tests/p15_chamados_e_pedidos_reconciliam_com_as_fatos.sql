@@ -9,8 +9,8 @@
 -- o de todas as origens (F1 dos Achados do nl_sql).
 --
 -- Dois lados, cada um calculado das fatos sem passar pela view: os chamados
--- abertos por mês e canal pelo nome, e os pedidos realizados distintos por mês
--- e canal pelo nome. A view tem de dar o mesmo total de chamados em cada mês e
+-- abertos por mês e canal pelo nome, e os pedidos realizados por mês e canal
+-- pelo nome, do grão do pedido (inclusive o de itens rejeitados em cascata). A view tem de dar o mesmo total de chamados em cada mês e
 -- canal, e o mesmo denominador em toda linha do canal. A linha devolvida diz
 -- onde e quanto. A versão anterior da view, que ligava o denominador pela chave
 -- de cada origem, falha aqui nos meses em que o legado vendeu e não teve chamado.
@@ -35,10 +35,11 @@ pedidos_na_fato as (
         d.year_month,
         ch.sales_channel_name,
         cast({{ contar_distintos(['f.source_system', 'f.order_id']) }} as numeric) as channel_order_count
-    from {{ ref('fact_sales_order_item') }} f
+    from {{ ref('fact_order_status_event') }} f
     join {{ ref('dim_sales_channel') }} ch on ch.sales_channel_key = f.sales_channel_key
     join {{ ref('dim_date') }} d on d.date_key = f.date_key
-    where f.is_realised
+    where f.is_order_creation
+      and f.is_realised
     group by 1, 2
 
 ),

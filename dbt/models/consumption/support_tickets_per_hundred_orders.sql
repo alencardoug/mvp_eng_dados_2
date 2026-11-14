@@ -25,6 +25,11 @@
 -- é 100/23 (Achados do nl_sql, F1). Por isso os dois lados são reduzidos ao
 -- grão da resposta — mês × canal **pelo nome** — cada um por si, e só então se
 -- encontram. A categoria de chamado também vai pelo nome e pelo grupo.
+--
+-- **O pedido vem do grão do pedido** (`fact_order_status_event`, o evento de
+-- criação): o pedido realizado cujos itens foram todos rejeitados em cascata
+-- não está na fato de item e saía do denominador — 15 pedidos do legado em
+-- 14/11/2026, achado na revisão da auditoria das views, o padrão da D66.
 
 -- ── Duas ausências previstas, e o que cada uma significa ────────────────────
 -- **Linha com `channel_order_count` nulo.** São os chamados do canal *Sem
@@ -71,9 +76,10 @@ pedidos as (
         f.date_key,
         ch.sales_channel_name,
         {{ contar_distintos(['f.source_system', 'f.order_id']) }}   as channel_order_count
-    from {{ ref('fact_sales_order_item') }} f
+    from {{ ref('fact_order_status_event') }} f
     join {{ ref('dim_sales_channel') }} ch on ch.sales_channel_key = f.sales_channel_key
-    where f.is_realised
+    where f.is_order_creation
+      and f.is_realised
     group by f.date_key, ch.sales_channel_name
 
 ),

@@ -515,7 +515,7 @@ Reembolsos totais ou parciais de transações capturadas.
 | `amount` | `numeric(14,2)` | sim | — | `confidential` | Valor reembolsado. |
 | `reason` | `text` | não | — | `internal` | Motivo comercial do reembolso. |
 | `status` | `varchar(16)` | sim | — | `internal` | Estado do reembolso: requested, completed ou rejected. |
-| `refunded_at` | `timestampwithtimezone` | não | — | `internal` | Momento em que o reembolso foi concluído. |
+| `refunded_at` | `timestampwithtimezone` | não | — | `internal` | Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado e no recusado, e só marca a conclusão quando o estado é completed. |
 | `created_at` | `timestampwithtimezone` | sim | — | `internal` | Momento de criação do registro na origem. |
 | `updated_at` | `timestampwithtimezone` | sim | — | `internal` | Momento da última alteração; cursor da carga incremental (ADR-0015). |
 | `deleted_at` | `timestampwithtimezone` | não | — | `internal` | Exclusão lógica; nulo enquanto o registro está ativo (ADR-0015). |
@@ -1081,8 +1081,8 @@ de fora do repositório, com as folhas imediatas de cada coluna.
 | `high_priority_ticket_count` | `raw.support_tickets.priority` · `raw_legacy.support_tickets.priority` |
 | `reopened_ticket_count` | `raw.ticket_events.event_type` · `raw_legacy.ticket_events.event_type` |
 | `solved_first_time_count` | `raw.ticket_events.{event_type, occurred_at}` · `raw_legacy.ticket_events.{event_type, occurred_at}` |
-| `channel_order_count` | `raw.order_items.order_id` · `raw_legacy.order_items.order_id` · `trusted.order_items.source_system` (gerada) |
-| `tickets_per_hundred_orders` | `raw.order_items.order_id` · `raw_legacy.order_items.order_id` · `trusted.order_items.source_system` (gerada) |
+| `channel_order_count` | `raw.order_status_history.order_id` · `raw_legacy.order_status_history.order_id` · `trusted.order_status_events.source_system` (gerada) |
+| `tickets_per_hundred_orders` | `raw.order_status_history.order_id` · `raw_legacy.order_status_history.order_id` · `trusted.order_status_events.source_system` (gerada) |
 | `avg_hours_to_resolution` | `raw.support_tickets.opened_at` · `raw.ticket_events.{event_type, occurred_at}` · `raw_legacy.support_tickets.opened_at` · `raw_legacy.ticket_events.{event_type, occurred_at}` |
 
 #### `top_skus_by_revenue`

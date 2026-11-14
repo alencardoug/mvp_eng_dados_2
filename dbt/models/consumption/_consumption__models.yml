@@ -1073,7 +1073,9 @@ models:
       P15 — Chamados por 100 pedidos, por categoria e canal, mês a mês. O mês é
       o da **abertura** do chamado. O canal e a categoria vão pelo **nome**,
       somando as origens: `channel_order_count` são os pedidos realizados do
-      mês e do canal em todas as origens, tenham elas chamado ou não. Ele se
+      mês e do canal em todas as origens, tenham elas chamado ou não, lidos do grão do pedido
+      (`fact_order_status_event`), inclusive o pedido de itens rejeitados em
+      cascata. Ele se
       repete em cada categoria — o nome diz o grão, e somá-lo entre categorias
       multiplica os pedidos. Há linha só onde houve chamado, e a taxa é nula no
       canal "Sem canal", que não tem pedidos para servir de denominador.
@@ -1239,35 +1241,35 @@ unit_tests:
       "Sem canal" não tem pedido e fica com a taxa nula.
     model: support_tickets_per_hundred_orders
     given:
-      - input: ref('fact_sales_order_item')
+      - input: ref('fact_order_status_event')
         format: csv
         rows: |
-          date_key,sales_channel_key,source_system,order_id,is_realised
-          d1,ch_app_r,retail,1,true
-          d1,ch_app_r,retail,2,true
-          d1,ch_app_r,retail,3,true
-          d1,ch_app_r,retail,4,true
-          d1,ch_app_r,retail,5,true
-          d1,ch_app_r,retail,6,true
-          d1,ch_app_r,retail,7,true
-          d1,ch_app_r,retail,8,true
-          d1,ch_app_r,retail,9,true
-          d1,ch_app_r,retail,10,true
-          d1,ch_app_r,retail,11,true
-          d1,ch_app_r,retail,12,true
-          d1,ch_app_r,retail,13,true
-          d1,ch_app_r,retail,14,true
-          d1,ch_app_r,retail,15,true
-          d1,ch_app_r,retail,16,true
-          d1,ch_app_r,retail,17,true
-          d1,ch_app_r,retail,18,true
-          d1,ch_app_r,retail,19,true
-          d1,ch_app_r,retail,20,true
-          d1,ch_app_r,retail,21,true
-          d1,ch_app_r,retail,22,true
-          d1,ch_app_r,retail,1,true
-          d1,ch_app_r,retail,99,false
-          d1,ch_app_l,legacy,1,true
+          date_key,sales_channel_key,source_system,order_id,is_realised,is_order_creation
+          d1,ch_app_r,retail,1,true,true
+          d1,ch_app_r,retail,2,true,true
+          d1,ch_app_r,retail,3,true,true
+          d1,ch_app_r,retail,4,true,true
+          d1,ch_app_r,retail,5,true,true
+          d1,ch_app_r,retail,6,true,true
+          d1,ch_app_r,retail,7,true,true
+          d1,ch_app_r,retail,8,true,true
+          d1,ch_app_r,retail,9,true,true
+          d1,ch_app_r,retail,10,true,true
+          d1,ch_app_r,retail,11,true,true
+          d1,ch_app_r,retail,12,true,true
+          d1,ch_app_r,retail,13,true,true
+          d1,ch_app_r,retail,14,true,true
+          d1,ch_app_r,retail,15,true,true
+          d1,ch_app_r,retail,16,true,true
+          d1,ch_app_r,retail,17,true,true
+          d1,ch_app_r,retail,18,true,true
+          d1,ch_app_r,retail,19,true,true
+          d1,ch_app_r,retail,20,true,true
+          d1,ch_app_r,retail,21,true,true
+          d1,ch_app_r,retail,22,true,true
+          d1,ch_app_r,retail,1,true,false
+          d1,ch_app_r,retail,99,false,true
+          d1,ch_app_l,legacy,1,true,true
       - input: ref('fact_support_ticket_event')
         format: csv
         rows: |
