@@ -891,6 +891,11 @@ check-offline: require-env require-venv ## O que se confere sem nada de pé: seg
 	@# e Registro: antes só a skill `adr` os conferia, e o README divergiu sem
 	@# ninguém ver até 10/11/2026 (Q5 do plano da revisão da governança).
 	@.venv/bin/python .claude/skills/adr/verificar.py
+	@# O pacote de metadados versionado traz a suíte inteira do pytest de agora, pela coleta: o
+	@# `checks: {}` do primeiro `make catalog` da sequência de publicação, ou um JUnit recortado,
+	@# não chega a um commit (RVB4-3-01). Fora da suíte de propósito: o pacote publica o resultado
+	@# dela, e um teste que conferisse isto reabriria o ciclo que a sequência fecha.
+	@.venv/bin/python -m mvp_ed1.models.pacote --conferir-pytest
 	@echo "── 2/3 pytest sem os testes de integração ──"
 	@set -a; . ./.env; set +a; MVP_TESTE_FATO=0 .venv/bin/pytest -q -rs -m "not integracao"
 	@echo "── 3/3 o que ficou de fora: os de integração, que rodam no make check ──"

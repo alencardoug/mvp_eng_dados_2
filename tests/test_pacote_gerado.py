@@ -237,7 +237,8 @@ def test_os_itens_em_aberto_aceitam_espaco_e_recusam_o_titulo_estranho() -> None
     assert [i["id"] for i in pacote._abertos(PENDENCIAS.replace("### D63 —", "   ### D63 —"))] == ["D63", "D43", "V1"]
     assert [i["id"] for i in pacote._abertos(PENDENCIAS.replace("### V1 —", "###\nD65 é um parágrafo\n\n### V1 —"))] == \
         ["D63", "D43", "V1"]
-    for estranho in ("### **D63** —", "#### D63 —", "D63 — sublinhado\n---\n"):
+    for estranho in ("### **D63** —", "#### D63 —", "D63 — sublinhado\n---\n", "**D63** — sublinhado\n---\n",
+                     "`D63` — sublinhado\n===\n"):
         with pytest.raises(SystemExit, match="itens em aberto"):
             pacote._abertos(PENDENCIAS.replace("### D63 —", estranho, 1))
     assert [i["state"] for i in pacote._abertos(PENDENCIAS)] == ["pending", "deferred", "deferred"]
@@ -396,3 +397,19 @@ def test_um_build_equivalente_nao_atrasa_o_pacote_e_um_grafo_novo_atrasa() -> No
     relacao = next(iter(outro_manifest["nodes"].values()))
     relacao["description"] = "Descrição de outra declaração."
     assert pacote.diferencas(antes, pacote.montar(outro_manifest, derivacao, outro_run)) != []
+
+
+def test_o_pacote_vazio_ou_recortado_nao_e_publicavel() -> None:
+    """RVB4-3-01: `checks: {}` é só o estado intermediário; o `check-offline` e a 5ª etapa o recusam."""
+    casos = ["tests/test_a.py::test_x", "tests/test_a.py::test_y"]
+    cheio = {"checks": dict.fromkeys(casos, {})}
+    assert pacote.faltas_no_pytest(cheio, casos) is None
+    assert "vazio" in pacote.faltas_no_pytest({"checks": {}}, casos)
+    assert "faltam" in pacote.faltas_no_pytest({"checks": {casos[0]: {}}}, casos)
+
+
+def test_lista_citacao_e_tabela_antes_do_sublinhado_nao_sao_titulo() -> None:
+    """O marcador de lista exige espaço depois: `- D65` é lista, `**D65**` é parágrafo (título se sublinhado)."""
+    for texto in ("- D65 item\n---\n", "* D65 item\n---\n", "1. D65 item\n---\n", "> D65\n---\n", "| D65 |\n---\n"):
+        assert pacote._ids_nos_titulos(texto, r"(?:D|V)\d+") == [], texto
+    assert pacote._ids_nos_titulos("**D65** título\n---\n", r"(?:D|V)\d+") == ["D65"]

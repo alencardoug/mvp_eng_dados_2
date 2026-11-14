@@ -810,10 +810,11 @@ def test_check_offline_nao_sobe_nem_consulta_nada(tmp_path):
     r, chamadas = _make(tmp_path, "check-offline")
 
     assert r.returncode == 0, r.stdout + r.stderr
-    assert chamadas[:4] == [
+    assert chamadas[:5] == [
         "python -m mvp_ed1.secrets_review",
         "python -m mvp_ed1.docs_check",
         "python .claude/skills/adr/verificar.py",
+        "python -m mvp_ed1.models.pacote --conferir-pytest",
         "pytest -q -rs -m not integracao",
     ], chamadas
     assert "pytest -q --co -m integracao" in chamadas, chamadas
@@ -828,6 +829,16 @@ def test_check_offline_falha_quando_os_contadores_de_decisoes_divergem(tmp_path)
 
     assert r.returncode != 0, r.stdout + r.stderr
     assert "python .claude/skills/adr/verificar.py" in chamadas, chamadas
+    assert not any(c.startswith("pytest") for c in chamadas), chamadas
+
+
+def test_check_offline_falha_com_o_pacote_sem_a_suite_inteira(tmp_path):
+    """RVB4-3-01: o `checks` vazio ou recortado para o alvo antes da suíte, e o commit não sai."""
+    pacote_sem_suite = REGISTRADOR + 'case " $* " in *--conferir-pytest*) echo "sem a suíte" >&2; exit 1;; esac\n'
+    r, chamadas = _make(tmp_path, "check-offline", simulados={".venv/bin/python": pacote_sem_suite})
+
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert "python -m mvp_ed1.models.pacote --conferir-pytest" in chamadas, chamadas
     assert not any(c.startswith("pytest") for c in chamadas), chamadas
 
 

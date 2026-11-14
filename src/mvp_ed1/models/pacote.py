@@ -21,7 +21,8 @@ O que o digest não alcança, porque está fora do Git, tem duas guardas (RVB4-1
 * **a conferência do `make check`** (`--check`), depois do `pytest`: monta o pacote sem escrever e
   o compara com o versionado, sem os instantes e as execuções. Resultado de teste ou de `pytest`
   que mudou, teste novo ou sumido, descrição nova: o pacote está atrasado. O JUnit só entra se é o
-  da suíte inteira de agora, pela coleta do pytest; senão, `checks` sai vazio, sem resultado.
+  da suíte inteira de agora, pela coleta do pytest; senão, `checks` sai vazio — estado intermediário,
+  que o `check-offline` (`--conferir-pytest`) e a 5ª etapa recusam publicar.
 
 E nada parcial nem sensível sai: os leitores de Markdown recusam o que não reconhecem e conferem a
 cobertura; o JUnit recusa módulo que não existe e identificador repetido; o pacote inteiro, chaves
@@ -246,6 +247,9 @@ CABECA_ABERTO = re.compile(r"^ {0,3}#{3}[ \t]+(((?:D|V)\d+)[ \t]+—[ \t]+(.+?))
 #: sublinhada por `===` ou `---`). Só espaço e tabulação, nunca a quebra de linha (RVB4-2-03).
 TITULO_ATX = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t]*$")
 SUBLINHADO = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
+#: O que não é parágrafo e por isso não vira título *setext*: item de lista (o marcador exige espaço
+#: depois — `**D64**` não é lista, RVB4-3-02), citação, tabela.
+NAO_PARAGRAFO = re.compile(r"^ {0,3}(?:[-*+][ \t]|\d{1,9}[.)][ \t]|>|\|)")
 
 
 def _titulos(texto: str) -> list[str]:
@@ -255,7 +259,7 @@ def _titulos(texto: str) -> list[str]:
         if (m := TITULO_ATX.match(linha)):
             saida.append((m.group(1) or "").strip())
         elif (i + 1 < len(linhas) and SUBLINHADO.match(linhas[i + 1]) and linha.strip()
-              and not linha.lstrip().startswith(("|", "#", ">", "-", "*", "+")) and not TITULO_ATX.match(linha)):
+              and not NAO_PARAGRAFO.match(linha) and not SUBLINHADO.match(linha)):
             saida.append(linha.strip())
     return saida
 
@@ -598,11 +602,39 @@ def _montar_conferido() -> dict | int:
     return pacote
 
 
+def faltas_no_pytest(pacote: dict, casos: list[str]) -> str | None:
+    """`None` se o `checks` do pacote é a suíte inteira de agora; senão, o que falta (RVB4-3-01).
+
+    O `checks: {}` é o estado intermediário do primeiro `make catalog` da sequência de publicação, e
+    nunca se publica: vazio ou parcial, o pacote não passa no `check-offline` nem na 5ª etapa do `check`.
+    """
+    if not pacote.get("checks"):
+        return "o pacote não tem nenhum resultado do pytest (`checks` vazio)"
+    return completo(pacote["checks"], casos)
+
+
+def conferir_pytest() -> int:
+    """`--conferir-pytest`, no `check-offline`: o pacote versionado traz a suíte inteira de agora."""
+    if not PACOTE.exists():
+        print("docs/pacote_de_metadados.json não existe; rode `make catalog`", file=sys.stderr)
+        return 1
+    if (motivo := faltas_no_pytest(json.loads(PACOTE.read_text(encoding="utf-8")), coletados())):
+        print(f"pacote de metadados sem a suíte inteira do pytest: {motivo}; rode `make test` e `make catalog` "
+              "e versione o resultado", file=sys.stderr)
+        return 1
+    print("pacote de metadados com a suíte inteira do pytest")
+    return 0
+
+
 def conferir() -> int:
     """`--check`: o versionado é o que os artefatos de agora dão, salvo instantes e execuções (RVB4-1-01)."""
     pacote = _montar_conferido()
     if isinstance(pacote, int):
         return pacote
+    if not pacote["checks"]:
+        print("o JUnit desta execução não é o da suíte inteira (ver o aviso acima): o pacote não se confere "
+              "contra um pytest parcial — rode `make test` sem recorte", file=sys.stderr)
+        return 1
     if not PACOTE.exists():
         print("docs/pacote_de_metadados.json não existe; rode `make catalog`", file=sys.stderr)
         return 1
@@ -627,8 +659,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if argv[:1] == ["--check"]:
         return conferir()
+    if argv[:1] == ["--conferir-pytest"]:
+        return conferir_pytest()
     if argv:
-        print(f"uso: python -m mvp_ed1.models.pacote [--check | --digest-do-dbt | --invocacao-do-manifest | --carimbar DIGEST INVOCACAO_ANTES]; recebido {argv}",
+        print(f"uso: python -m mvp_ed1.models.pacote [--check | --conferir-pytest | --digest-do-dbt | --invocacao-do-manifest | --carimbar DIGEST INVOCACAO_ANTES]; recebido {argv}",
               file=sys.stderr)
         return 2
     pacote = _montar_conferido()
