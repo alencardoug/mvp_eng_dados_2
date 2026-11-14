@@ -312,6 +312,17 @@ def test_env_no_historico_e_aviso_mesmo_sem_achado(repositorio):
     assert any(".env já foi adicionado ao histórico" in a for a in avisos), avisos
 
 
+def test_identificador_de_teste_do_pytest_nao_e_atribuicao():
+    """O `::` de escopo não separa chave de valor: o pacote de metadados publica estes nomes."""
+    chave = "test_" + "secrets" + "_review.py"
+    assert secrets_review.detectar(f'"tests/{chave}::test_a_mesma_senha_e_achada": {{') == []
+    assert secrets_review.detectar(f"tests/{chave}::test_x\n") == []
+    # Contraprova: separador de verdade, com o valor começando por `::` ou sem espaço, continua achado.
+    senha = "pass" + "word"
+    for texto in (f"{senha}: ::Ab9Z7q1x", f"{senha}=Ab9Z7q1x", f'"{senha}":"Ab9Z7q1x"', f"{senha}:Ab9Z7q1x"):
+        assert [a.chave for a in secrets_review.detectar(texto)] == [senha], texto
+
+
 # ── Os moldes não excusam literal (revisão final da Etapa 12) ───────────────
 
 

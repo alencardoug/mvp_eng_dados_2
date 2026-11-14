@@ -73,12 +73,17 @@ BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".ico", ".woff", ".w
 #: A aspa que **abre** o valor é capturada: valor entre aspas é literal de
 #: texto, e expressão não existe ali (`placeholder`). O comprimento mínimo fica
 #: em `detectar`, não aqui, porque a senha igual ao usuário não o respeita.
+#: O `::` não é separador em nenhuma das três sintaxes: é o de escopo, como no
+#: identificador de teste do pytest (`tests/test_secrets_review.py::test_x`),
+#: que o pacote de metadados publica e que, lido como `chave: valor`, dava 49
+#: achados falsos (Bloco 4 da base dos consumidores). Valor que **começa** por
+#: `::` depois de um separador de verdade continua achado.
 ASSIGNMENT_PATTERN = re.compile(
     r"""(?ix)
     ["']?(?P<chave>[a-z0-9_.-]*
         (?:password|passwd|secret|token|api[_-]?key|private[_-]?key|credential)
         [a-z0-9_.-]*)["']?
-    \s*[=:]\s*
+    \s*(?:=|:(?!:))\s*
     (?P<aspa>["']?)(?P<valor>[^\s"',]+)
     """
 )
