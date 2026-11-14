@@ -40,6 +40,8 @@ construção da governança no `nl_sql`.
   só então juntar, sem partir dos chamados. Regerar e conferir contra
   `nl_sql/governanca/canonico/metricas.yaml` (`chamados_por_100_pedidos`).
 - **Desvio:** nenhum; a correção é a mesma.
+- **Replicado aqui em `9aeea8d`** (14/11/2026): os dois lados reduzidos a mês × canal pelo nome antes de
+  dividir. Jan/2024, Conta, Aplicativo: 4,5455 → 4,3478. Teste de unidade e reconciliação com as fatos.
 
 ### F2 — `inventory_turnover_by_sku_and_warehouse` mede outra grandeza · **Gravidade: alta**
 
@@ -56,6 +58,10 @@ construção da governança no `nl_sql`.
   de *snapshots*), ou renomear a métrica para o que ela é ("CMV do trimestre ÷ saldo corrente
   valorizado"). Exige decisão sobre a regra de valorização.
 - **Desvio:** o `nl_sql` não corrige, apenas exclui.
+- **Replicado aqui em `69ea446` e `9d50cca`** (14/11/2026), pelo ADR-0052: o estoque médio do trimestre
+  (média diária da posição de fim de dia, a custo médio móvel, sem nada posterior), lido do livro em
+  `analytics`. As colunas viraram `avg_quantity_on_hand` e `avg_inventory_value_amount`. O giro fica
+  indefinido onde o gerador cria a correção-relâmpago (V4 das Pendências).
 
 ### F3 — `dim_customer` e `fact_sales_order_item` discordam sobre a população · **Gravidade: média**
 
@@ -70,6 +76,9 @@ construção da governança no `nl_sql`.
 - **Replicar aqui:** achar a causa (quarentena, itens ausentes ou alguma transformação anterior) e
   reconciliar, ou documentar o recorte de cada fonte. Vale um teste de reconciliação dimensão × fato.
 - **Desvio:** o `nl_sql` não reconcilia; ele aceita as duas leituras.
+- **Diagnosticado aqui em `d212c07`** (14/11/2026): a causa é a regra do pai que sobrevive (D35). Os 15
+  pedidos a mais da dimensão estão sem item aceito, com todos os itens na quarentena. A regra fica
+  (Q7, decidida em 14/11/2026), com teste de reconciliação e a exceção declarada nas descrições.
 
 ### F4 — Descrições de coluna erradas ou cortadas · **Gravidade: média**
 
