@@ -376,6 +376,36 @@ consulta somente leitura, o teste compilado acusa as 7.738 linhas.
   aplicável — 6 a 9 — sai com um resultado escrito: exercitado, limite preservado ou continua aberto.
   Não promete fechar a V1 inteira.
 
+**Em andamento em 14/11/2026.** Feitos: F8 e F11 a F16 (`b326c66`); F4, a versão curta no BigQuery por
+marcador no glossário e as três descrições erradas (`4e163c9`); G06, 102 das 141 colunas (`ff3bdfe`), com
+a catraca baixada no mesmo *commit*. Os itens 6 a 9 da V1, que o RVC-1-06 manda revisitar antes do F4 e da
+G06: o **6** (o escritor só edita `.yml` em bloco) ficou como limite preservado, porque os dois `.yml` à mão
+novos e as promoções são em bloco; o **9** (macro nova e `dbt_project.yml` fora da conferência de *manifest*
+atrasado) ficou como limite preservado, porque todo `make catalog` desta parte veio depois de um `make
+dbt-build` completo; o **7** (formas de literal de instante) e o **8** (fonte de pacote) não se aplicam a
+estes textos e continuam abertos.
+
+**O desenho do RVG-1-01, para as 39 colunas que sobram da G06 (B1 e B3).** São colunas que a ponte do
+legado calcula e que não têm par no `stg_retail__*`: as 36 `ingested_at` (no legado, o instante da
+captura, `snapshot_at`, e não o carimbo do Airbyte), e, em `legado__inventory_movements`,
+`event_sequence` (o desempate técnico da D40), `arrived_by_stream` (sempre falso) e `arrived_by_batch`
+(sempre verdadeiro). Hoje o contrato (`descriptions.py`, o ramo `BRIDGES_FILE`) recusa texto na ponte
+sem `description_from`, pela N41: a ponte só significa o que o par significa, por declaração. A proposta
+mantém a regra e acrescenta uma segunda forma de declaração:
+
+1. `legacy/ponte.py` ganha a tabela `TEXTOS_DA_PONTE` (`{apelido: texto}`), só para as colunas de
+   `FORA_DA_ORIGEM` e a `event_sequence`, que é o que a ponte calcula e não copia.
+2. O gerador escreve esses textos no `_pontes__models.yml` com `description_reason` fixo ("a ponte
+   calcula a coluna; o texto é o de `TEXTOS_DA_PONTE`").
+3. O contrato aceita texto sem `description_from` na ponte **só** se ele vier com esse motivo e for
+   igual ao da tabela para aquele apelido. Qualquer outro continua recusado.
+4. Contraprovas: texto na ponte sem motivo (recusa); com motivo e texto diferente do da tabela (recusa);
+   apelido fora da tabela com motivo (recusa); a tabela com um apelido que tem par (recusa no gerador).
+5. A catraca de `trusted` baixa de 39 para 0 no mesmo *commit*.
+
+Não muda modelo, camada nem dado; é forma de declaração de texto. Se a revisão achar que ela contraria a
+N41, volta ao Owner antes de implementar.
+
 ### Bloco 4 — o pacote do portal (D91)
 
 A implementação da D91, **no formato fixado pelo Bloco 0b** ([Pacote de Metadados](docs/pacote_de_metadados.md)), com o contrato da guarda do RVG-1-04 e as contraprovas que ele pede (clone
