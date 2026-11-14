@@ -86,7 +86,7 @@ esquema e não pega mudança de valor: por isso a coluna "Caso".
 
 | Estado | Data | *Commit* | Objeto | Muda | Caso: antes → depois | *Build* do armazém | Achado |
 |---|---|---|---|---|---|---|---|
-| — | — | — | — | Nada mudou desde a `v2.0.0` (`f86b9fb`) | — | — | — |
+| `prevista` | 14/11/2026 | — | `consumption.inventory_turnover_by_sku_and_warehouse` | **Esquema e valor:** `quantity_on_hand` e `inventory_value_amount` saem; entram `avg_quantity_on_hand` e `avg_inventory_value_amount`, médias do trimestre, ambas `numeric`; o giro passa a ser pelo estoque médio (ADR-0052) | — | — | F2 |
 
 **A sequência de uma linha.** Mudança de **valor** ou de **texto** entra uma vez só, como `feita`,
 depois de *commitada*, publicada e construída no armazém, já com o *commit* e o `invocation_id`.

@@ -12,9 +12,9 @@
 |---|---|
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
-| Verificações e trabalho adiados | 3 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026) |
+| Verificações e trabalho adiados | 4 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026) |
 | Decisões pendentes | 4 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D66, levantada pela revisão do roteiro de regeneração da v1.1.0 e adiada para depois dela; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal e a D92 na separação do `mvp_eng_dados_2` (§2) |
-| Última revisão | 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Última revisão | 14/11/2026 — V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -281,6 +281,23 @@ do item 9.
 
 *Efeito de não decidir:* nenhum no projeto local. Os itens 1, 2, 6 e 7 voltam se a fase GCP for
 reaberta; o 9 fecha o critério de custo do M6.
+
+### V4 — a correção-relâmpago do gerador de estoque (registrada em 14/11/2026)
+
+**Pergunta:** quando corrigir? Quando uma saída não tem lastro, o gerador cria um `adjustment_in` um
+minuto antes dela, com o motivo "Divergência de conferência" (`src/mvp_ed1/generator/domains/estoque.py`,
+em `AJU-CONFERENCIA`). Em 14/11/2026 eram 1.514 ajustes, 1.465 no retail e 49 no legado, cerca de um
+terço dos ajustes de entrada. O livro fica íntegro, mas o estoque aparece do nada um minuto antes de
+sair: a posição de fim de dia é zero, e o giro do [ADR-0052](adr/0052-giro-pelo-estoque-medio-do-trimestre.md)
+fica indefinido nesses pares (1.216 de 6.990 linhas, contra 620 antes dele). É o caso do dado
+sintético sem realismo: uma operação real repõe antes, por recebimento, e não um minuto antes da
+venda.
+
+Corrigir é mudar o gerador (repor por recebimento com antecedência, ou dimensionar o estoque inicial
+pela demanda) e **regenerar as duas origens**, que é destrutivo e refaz todos os números conferidos.
+Decidido em 14/11/2026 (Q8): fica para depois da fase da base dos consumidores.
+
+*Efeito de não decidir:* o giro indefinido nesses pares, declarado na view e no glossário.
 
 ## 1.1 Decididas e implementadas
 
