@@ -246,10 +246,37 @@ def test_os_itens_em_aberto_sao_os_que_o_cabecalho_nomeia() -> None:
     assert [i["state"] for i in pacote._abertos(PENDENCIAS, REGISTRO)] == ["pending", "deferred", "deferred"]
     assert _lidos(PENDENCIAS.replace("### D63 —", "###  D63  —")) == ["D63", "D43", "V1"]
     assert _lidos(PENDENCIAS.replace("### D63 —", "   ### D63 —")) == ["D63", "D43", "V1"]
-    # Exemplo, código e parágrafo que não estão na forma canônica não viram item, e não recusam.
-    for inocente in ("###\nD65 é um parágrafo\n\n", "    **D65** é código\n---\n\n", "> ## 2. Exemplo\n\n",
-                     "```exemplo```\n\n", "> ```text\n> exemplo\n\n", "- ## 1.1 Exemplo\n\n"):
+    # Exemplo, código e citação que não começam linha por um identificador não viram item, e não recusam.
+    for inocente in ("> ## 2. Exemplo\n\n", "```exemplo```\n\n", "> ```text\n> exemplo\n\n", "- ## 1.1 Exemplo\n\n",
+                     "Parágrafo que cita a D65 no meio.\n\n", "D63 começa a linha, mas está declarada.\n\n"):
         assert _lidos(PENDENCIAS.replace("### V1 —", inocente + "### V1 —", 1)) == ["D63", "D43", "V1"], inocente
+
+
+@pytest.mark.parametrize("novo", [
+    # RVB4-6-01: item novo fora da forma canônica, com o cabeçalho sem ele — a regra de autoria o pega.
+    pytest.param("#### D93 — nova decisão operacional\n\n", id="nivel-4"),
+    pytest.param("D93 — nova decisão\n---\n\n", id="setext"),
+    pytest.param("#### V5 — nova verificação adiada\n\n", id="verificacao"),
+    pytest.param("### [D93](#d93) — nova\n\n", id="link"),
+    # A regra é de autoria, e de propósito: parágrafo ou código que começa por um ID não declarado recusa.
+    pytest.param("D93 é um parágrafo\n\n", id="paragrafo"), pytest.param("    **D93** é código\n\n", id="codigo"),
+])
+def test_linha_que_comeca_por_id_nao_declarado_recusa(novo) -> None:
+    with pytest.raises(SystemExit, match="D93|V5"):
+        pacote._abertos(PENDENCIAS.replace("### V1 —", novo + "### V1 —", 1), REGISTRO)
+
+
+@pytest.mark.parametrize(("linha", "motivo"), [
+    # RVB4-6-02: nenhuma linha da tabela do Registro some por estar em código ou link.
+    pytest.param("| `D93` | nova |", "Registro tem", id="codigo"),
+    pytest.param("| [D93](#3-decisões-pendentes) | nova |", "Registro tem", id="link"),
+    pytest.param("| **D93** | nova |", "Registro tem", id="negrito"),
+    pytest.param("| — | sem identificador |", "não tem um `Dnn`", id="sem-id"),
+    pytest.param("| D93 e D94 | duas |", "não tem um `Dnn`", id="dois-ids"),
+])
+def test_toda_linha_da_tabela_do_registro_conta(linha, motivo) -> None:
+    with pytest.raises(SystemExit, match=motivo):
+        pacote._abertos(PENDENCIAS, REGISTRO.replace("| D43 |", linha + "\n| D43 |"))
 
 
 @pytest.mark.parametrize("estranho", [

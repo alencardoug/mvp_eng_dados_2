@@ -50,6 +50,10 @@
    são os que o cabeçalho das Pendências nomeia e conta (*Decisões pendentes*, *Verificações e trabalho
    adiados*), com as pendentes do Registro entre eles. Cada item se escreve na forma canônica,
    `### ID — título`; em outra forma, ou copiado num exemplo, ele diverge da declaração e a geração recusa.
+   Duas regras guardam a própria declaração: na seção 1 das Pendências, **linha que começa por um
+   identificador** (depois de qualquer marcação) tem de ser de um item que o cabeçalho nomeia — o item
+   novo não escapa junto com o cabeçalho que esqueceu dele, e o parágrafo que comece assim é reescrito;
+   e toda linha da tabela de pendentes do Registro dá exatamente um `Dnn` na primeira célula.
 5. **Texto como dado.** As descrições são Markdown em português, como estão no dbt. O consumidor as
    exibe como texto ou como Markdown saneado, sem executar HTML. Links relativos resolvem contra
    `provenance.link_base` (`docs/`), no commit fixado.

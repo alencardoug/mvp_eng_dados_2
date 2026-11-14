@@ -255,6 +255,31 @@ CABECA_ABERTO = re.compile(r"^ {0,3}###[ \t]+(((?:D|V)\d+)[ \t]+—[ \t]+(.+?))[
 CELULA_DO_CABECALHO = r"^\|[ \t]*{rotulo}[ \t]*\|[ \t]*(\d+)[ \t]*(?:\(([^)]*)\))?"
 
 
+def _pendentes_do_registro(registro: str) -> set[str]:
+    """As decisões da tabela do Registro §3: **toda** linha de dados dá exatamente um `Dnn` na primeira
+    célula, em qualquer marcação (`D93`, `**D93**`, código, link); a que não dá recusa — nenhuma linha
+    some por não casar com uma expressão (RVB4-6-02)."""
+    secao = registro.partition("## 3. Decisões pendentes")[2].partition("\n## ")[0]
+    saida, tabela = set(), []
+    for linha in secao.split("\n") + [""]:
+        if linha.lstrip().startswith("|"):
+            tabela.append(linha)
+            continue
+        for dado in tabela[2:]:                      # o cabeçalho e o separador da tabela ficam de fora
+            primeira = dado.strip().strip("|").split("|")[0]
+            ids = re.findall(r"(?<![\w])(D\d+)(?![\w])", primeira)
+            if len(ids) != 1:
+                raise SystemExit(f"Registro §3: a linha {dado.strip()[:60]!r} não tem um `Dnn` só na primeira célula "
+                                 "— nenhum pacote é escrito")
+            saida.add(ids[0])
+        tabela = []
+    return saida
+
+
+#: Linha da seção 1 das Pendências que **começa** por um identificador, depois de qualquer marcação.
+LINHA_COM_ID = re.compile(r"^[ \t>*_`#+\-\[]*((?:D|V)\d+)(?![\w])", re.M)
+
+
 def _declarados_nas_pendencias(texto: str, registro: str) -> list[str]:
     """Os itens em aberto que o cabeçalho das Pendências **nomeia** — e conta —, e o Registro confirma."""
     saida = []
@@ -267,8 +292,7 @@ def _declarados_nas_pendencias(texto: str, registro: str) -> list[str]:
             raise SystemExit(f"pendências: o cabeçalho conta {m.group(1)} em `{rotulo}` e nomeia {nomeados} — "
                              "nenhum pacote é escrito")
         saida += nomeados
-    secao = registro.partition("## 3. Decisões pendentes")[2].partition("\n## ")[0]
-    no_registro = set(re.findall(r"^\|[ \t]*\*{0,2}(D\d+)\*{0,2}[ \t]*\|", secao, re.M))
+    no_registro = _pendentes_do_registro(registro)
     if not no_registro <= set(saida):
         raise SystemExit(f"pendências: o Registro tem {sorted(no_registro - set(saida))} pendente(s) que o cabeçalho "
                          "não nomeia — nenhum pacote é escrito")
@@ -452,7 +476,14 @@ def _abertos(texto: str, registro: str | None = None) -> list[dict]:
     secao = re.split(r"^##[ \t]+1\.1\b", partes[1], maxsplit=1, flags=re.M)[0]
     cabecas = CABECA_ABERTO.findall(secao)
     registro = REGISTRO.read_text(encoding="utf-8") if registro is None else registro
-    _sem_perda("itens em aberto", [c[1] for c in cabecas], _declarados_nas_pendencias(texto, registro))
+    declarados = _declarados_nas_pendencias(texto, registro)
+    # A regra de autoria da seção 1 (RVB4-6-01): linha que começa por um identificador é um item, e o item
+    # está declarado no cabeçalho. Sem ela, um item novo fora da forma canônica e um cabeçalho que não o
+    # nomeia escapariam juntos. Parágrafo ou exemplo que comece por um identificador não declarado recusa.
+    if (novos := sorted(set(LINHA_COM_ID.findall(secao)) - set(declarados))):
+        raise SystemExit(f"itens em aberto: {novos} começa(m) uma linha da seção 1 das Pendências e o cabeçalho não "
+                         "o(s) nomeia — declare no cabeçalho, ou reescreva a linha — nenhum pacote é escrito")
+    _sem_perda("itens em aberto", [c[1] for c in cabecas], declarados)
     saida = []
     for titulo, ident, nome in cabecas:
         adiada = "adiada" in nome or ident.startswith("V")
