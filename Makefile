@@ -52,12 +52,13 @@ TERRAFORM := .tools/terraform -chdir=airbyte
 DBT := set -a; . ./.env; set +a; cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt
 
 # O carimbo do *build* para o pacote de metadados (RVB4-1-02), em volta de todo comando do dbt
-# que escreve o manifest: o digest dos insumos do dbt lido **antes** e o `invocation_id` do
-# manifest escrito **depois** do início. O pacote recusa o manifest de outra execução ou de
-# outros insumos. Se o dbt não escreveu o manifest, o carimbo antigo sai. O código de saída
-# é sempre o do dbt; o `cd` volta porque o `$(DBT)` entra em `dbt/`.
-CARIMBO_ANTES := ini=$$(date -u +%Y-%m-%dT%H:%M:%SZ); dig=$$(.venv/bin/python -m mvp_ed1.models.pacote --digest-do-dbt) || exit 1
-CARIMBO_DEPOIS := st=$$?; cd "$(CURDIR)" && .venv/bin/python -m mvp_ed1.models.pacote --carimbar "$$dig" "$$ini"; exit $$st
+# que escreve o manifest: o digest dos insumos do dbt e a invocação do manifest que havia, lidos
+# **antes**; depois, o carimbo liga esse digest ao manifest **desta** execução — o que tem outra
+# invocação que a de antes (pelo relógio não se sabe, RVB4-2-05). O pacote recusa o manifest de
+# outra execução ou de outros insumos. Se o dbt não reescreveu o manifest, o carimbo antigo sai.
+# O código de saída é sempre o do dbt; o `cd` volta porque o `$(DBT)` entra em `dbt/`.
+CARIMBO_ANTES := dig=$$(.venv/bin/python -m mvp_ed1.models.pacote --digest-do-dbt) || exit 1; ant=$$(.venv/bin/python -m mvp_ed1.models.pacote --invocacao-do-manifest) || exit 1
+CARIMBO_DEPOIS := st=$$?; cd "$(CURDIR)" && .venv/bin/python -m mvp_ed1.models.pacote --carimbar "$$dig" "$$ant"; exit $$st
 
 # Credenciais do Airbyte no momento da execução; nunca gravadas em arquivo.
 CREDENCIAIS = eval "$$($(ABCTL) local credentials 2>/dev/null \

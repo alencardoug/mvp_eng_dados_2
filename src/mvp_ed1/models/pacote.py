@@ -13,13 +13,15 @@ pacote atrasado (`tests/test_pacote_gerado.py`). O pacote não cita o *commit* q
 
 O que o digest não alcança, porque está fora do Git, tem duas guardas (RVB4-1-01, RVB4-1-02):
 
-* **o carimbo do *build*** — `make dbt-build` grava em `dbt/target/pacote_carimbo.json` o digest
-  dos insumos do dbt lido **antes** do *build* e o `invocation_id` do *manifest* que ele produziu.
+* **o carimbo do *build*** — todo alvo do `Makefile` que roda o dbt e escreve o *manifest* grava em
+  `dbt/target/pacote_carimbo.json` o digest dos insumos do dbt lido **antes** e o `invocation_id`
+  do *manifest* que **ele** escreveu (o que tem outra invocação que a de antes).
   O gerador recusa o *manifest* de outra execução ou de outros insumos: regerar sobre um
   *manifest* atrasado daria o digest novo a conteúdo velho;
 * **a conferência do `make check`** (`--check`), depois do `pytest`: monta o pacote sem escrever e
   o compara com o versionado, sem os instantes e as execuções. Resultado de teste ou de `pytest`
-  que mudou, teste novo ou sumido, descrição nova: o pacote está atrasado.
+  que mudou, teste novo ou sumido, descrição nova: o pacote está atrasado. O JUnit só entra se é o
+  da suíte inteira de agora, pela coleta do pytest; senão, `checks` sai vazio, sem resultado.
 
 E nada parcial nem sensível sai: os leitores de Markdown recusam o que não reconhecem e conferem a
 cobertura; o JUnit recusa módulo que não existe e identificador repetido; o pacote inteiro, chaves
@@ -33,6 +35,7 @@ import copy
 import datetime as dt
 import hashlib
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -58,13 +61,9 @@ FORMATO = 1
 
 #: O que alimenta o pacote, rastreado pelo Git. Mudar um destes muda o `inputs_sha256`.
 INSUMOS = (
-    "dbt/dbt_project.yml",
-    "dbt/models/**/*.yml",
-    "dbt/models/**/*.sql",
-    "dbt/snapshots/*",
-    "dbt/seeds/*",
-    "dbt/macros/*.sql",
-    "dbt/tests/*.sql",
+    # Todo arquivo rastreado do projeto dbt, de qualquer tipo: o `.md` de `docs-paths` dentro de
+    # `models/` (`_convencoes.md`) também é texto publicado (RVB4-2-02).
+    "dbt/**/*",
     "docs/glossario_de_negocio/*.md",
     "docs/pendencias.md",
     "docs/adr/README.md",
@@ -75,7 +74,6 @@ INSUMOS = (
     "src/mvp_ed1/models/*.py",
     "src/mvp_ed1/legacy/ponte.py",
     "src/mvp_ed1/docs_check.py",        # o `slug` das âncoras de `open_items`
-    "dbt/profiles.yml",                 # o `dbt_target` de `provenance.environment`
     "tests/**/test_*.py",               # o `summary` de `checks`: só a 1ª linha da docstring conta
 )
 
@@ -139,17 +137,24 @@ def digest_do_dbt(raiz: pathlib.Path = ROOT) -> str:
     return digest([c for c in insumos(raiz) if c.startswith(INSUMOS_DO_DBT)], raiz)
 
 
-def carimbar(digest_antes: str, inicio: str, manifest: pathlib.Path = MANIFEST, carimbo: pathlib.Path = CARIMBO) -> bool:
-    """Depois do *build*: o *manifest* desta execução foi produzido destes insumos (lidos antes dela).
+def invocacao_do_manifest(manifest: pathlib.Path = MANIFEST) -> str:
+    """O `invocation_id` do *manifest* em `dbt/target`, ou `-` sem ele: o que havia **antes** do comando."""
+    if not manifest.exists():
+        return "-"
+    return json.loads(manifest.read_text(encoding="utf-8"))["metadata"]["invocation_id"]
 
-    Só carimba o *manifest* escrito **depois** de `inicio` (UTC, o instante em que o *build* começou):
-    se o dbt falhou antes de escrevê-lo, o que está em `dbt/target` é o de outra execução, e carimbá-lo
-    daria a ele os insumos de agora. Nesse caso o carimbo antigo sai, e o pacote recusa até o próximo
-    *build* que escreva o *manifest*.
+
+def carimbar(digest_antes: str, invocacao_antes: str, manifest: pathlib.Path = MANIFEST,
+             carimbo: pathlib.Path = CARIMBO) -> bool:
+    """Depois do comando do dbt: o *manifest* desta execução foi produzido destes insumos (lidos antes dela).
+
+    Só carimba o *manifest* que esta execução **escreveu**, o que se sabe pela invocação: é outra que a
+    do *manifest* que havia antes do comando. Pelo relógio não se sabe — o início em segundos e o
+    `generated_at` em microssegundos deixavam passar o *manifest* do mesmo segundo (RVB4-2-05). Se o
+    dbt não o reescreveu, o carimbo antigo sai, e o pacote recusa até o próximo *build* que o escreva.
     """
-    comeco = dt.datetime.fromisoformat(inicio)
     dado = json.loads(manifest.read_text(encoding="utf-8")) if manifest.exists() else None
-    if dado is None or dt.datetime.fromisoformat(dado["metadata"]["generated_at"]) < comeco:
+    if dado is None or dado["metadata"]["invocation_id"] == invocacao_antes:
         carimbo.unlink(missing_ok=True)
         print(f"aviso: o dbt não escreveu {manifest.name} nesta execução; sem carimbo, o pacote de metadados recusa "
               "até o próximo `make dbt-build`", file=sys.stderr)
@@ -235,8 +240,30 @@ def _faltas(relacoes: dict) -> list[dict]:
 
 
 #: O cabeçalho de uma pergunta e o de um item em aberto, com qualquer espaço que o Markdown aceita.
-CABECA_PERGUNTA = re.compile(r"^#{3}[ \t]+(P\d{2})[ \t]+—[ \t]+(.+?)[ \t]*$", re.M)
-CABECA_ABERTO = re.compile(r"^#{3}[ \t]+(((?:D|V)\d+)[ \t]+—[ \t]+(.+?))[ \t]*$", re.M)
+CABECA_PERGUNTA = re.compile(r"^ {0,3}#{3}[ \t]+(P\d{2})[ \t]+—[ \t]+(.+?)[ \t]*$", re.M)
+CABECA_ABERTO = re.compile(r"^ {0,3}#{3}[ \t]+(((?:D|V)\d+)[ \t]+—[ \t]+(.+?))[ \t]*$", re.M)
+#: Um título Markdown: ATX (até três espaços de recuo, de `#` a `######`) ou *setext* (a linha de texto
+#: sublinhada por `===` ou `---`). Só espaço e tabulação, nunca a quebra de linha (RVB4-2-03).
+TITULO_ATX = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t]*$")
+SUBLINHADO = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
+
+
+def _titulos(texto: str) -> list[str]:
+    """O texto de cada título Markdown, na ordem."""
+    linhas, saida = texto.split("\n"), []
+    for i, linha in enumerate(linhas):
+        if (m := TITULO_ATX.match(linha)):
+            saida.append((m.group(1) or "").strip())
+        elif (i + 1 < len(linhas) and SUBLINHADO.match(linhas[i + 1]) and linha.strip()
+              and not linha.lstrip().startswith(("|", "#", ">", "-", "*", "+")) and not TITULO_ATX.match(linha)):
+            saida.append(linha.strip())
+    return saida
+
+
+def _ids_nos_titulos(texto: str, ident: str) -> list[str]:
+    """O universo: o identificador com que cada título começa, mesmo em negrito ou código."""
+    return [m.group(1) for titulo in _titulos(texto)
+            if (m := re.match(rf"[*_`]*({ident})\b", titulo))]
 CELULA = re.compile(r"^\|[ \t]*\*\*(Fatos?|Medidas|Dimensões|View)\*\*[ \t]*\|[ \t]*(.+?)[ \t]*\|[ \t]*$", re.M)
 
 
@@ -263,9 +290,8 @@ def _medidas(celula: str, pergunta: str) -> list[dict]:
 def _perguntas(texto: str) -> dict:
     saida = {}
     cabecas = list(CABECA_PERGUNTA.finditer(texto))
-    # O universo: toda linha de título que cita um `Pnn`, com qualquer nível ou espaço.
-    _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas],
-               re.findall(r"^#+\s*(P\d{2})\b", texto, re.M))
+    # O universo: todo título Markdown que começa por um `Pnn`, de qualquer nível ou forma.
+    _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas], _ids_nos_titulos(texto, r"P\d{2}"))
     _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas], [f"P{i:02d}" for i in range(1, 17)])
     for cabeca, seguinte in zip(cabecas, cabecas[1:] + [None]):
         bloco = texto[cabeca.end():seguinte.start() if seguinte else len(texto)]
@@ -372,6 +398,31 @@ def _verificacoes(junit: pathlib.Path, raiz: pathlib.Path = ROOT) -> dict:
     return dict(sorted(saida.items()))
 
 
+def coletados(raiz: pathlib.Path = ROOT) -> list[str]:
+    """Os casos que a suíte **inteira** tem, pela coleta do pytest, sem o que o ambiente acrescenta.
+
+    É o oráculo da completude do JUnit (RVB4-2-04): o comando do `make test` é conferido em
+    `test_makefile`, mas o `PYTEST_ADDOPTS` do ambiente chega ao pytest sem aparecer nele, e um
+    `-k` ali produziria um JUnit parcial que passaria por inteiro.
+    """
+    ambiente = {k: v for k, v in os.environ.items() if k not in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS")}
+    r = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"],
+                       cwd=raiz, env=ambiente, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit(f"a coleta do pytest falhou (código {r.returncode}): {r.stdout[-300:]}{r.stderr[-300:]} "
+                         "— nenhum pacote é escrito")
+    return [linha for linha in r.stdout.splitlines() if linha.startswith("tests/") and "::" in linha]
+
+
+def completo(checks: dict, casos: list[str]) -> str | None:
+    """`None` se o JUnit é o da suíte inteira de agora; senão, o motivo (parcial ou de outra coleção)."""
+    if set(checks) == set(casos):
+        return None
+    faltam, sobram = sorted(set(casos) - set(checks)), sorted(set(checks) - set(casos))
+    return (f"{len(faltam)} caso(s) da coleta faltam no JUnit (p.ex. {faltam[:3]}) e {len(sobram)} "
+            f"sobram (p.ex. {sobram[:3]})")
+
+
 def _modulo_do_caso(classname: str, raiz: pathlib.Path = ROOT) -> tuple[str, list[str]]:
     """`tests.sub.test_x.Classe` → (`tests/sub/test_x.py`, [`Classe`]): o módulo é o arquivo que existe (RVB4-1-04)."""
     partes = (classname or "").split(".")
@@ -391,8 +442,8 @@ def _abertos(texto: str) -> list[dict]:
     secao = partes[1]
     secao = re.split(r"^##[ \t]+1\.1\b", secao, maxsplit=1, flags=re.M)[0]
     cabecas = CABECA_ABERTO.findall(secao)
-    # O universo: todo título da seção que cita um `Dnn` ou `Vn`, com qualquer nível ou espaço.
-    _sem_perda("itens em aberto", [c[1] for c in cabecas], re.findall(r"^#+\s*((?:D|V)\d+)\b", secao, re.M))
+    # O universo: todo título Markdown da seção que começa por um `Dnn` ou `Vn`, de qualquer nível ou forma.
+    _sem_perda("itens em aberto", [c[1] for c in cabecas], _ids_nos_titulos(secao, r"(?:D|V)\d+"))
     saida = []
     for titulo, ident, nome in cabecas:
         adiada = "adiada" in nome or ident.startswith("V")
@@ -409,6 +460,13 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT) ->
         raise SystemExit(f"linhagem incompleta ({len(linhagem.problems)} problema(s)): pacote não escrito")
     caminhos = insumos()
     relacoes = _relacoes(manifest)
+    checks = _verificacoes(junit)
+    # JUnit parcial ou de outra coleção não é publicado: é **sem resultado**, como o relatório ausente
+    # (regra 4). É também o primeiro `make catalog` da sequência de publicação, antes do `make test`.
+    if checks and (motivo := completo(checks, coletados())):
+        print(f"aviso: o JUnit não é o da suíte inteira de agora ({motivo}); `checks` sai vazio, sem resultado — "
+              "rode `make test` e `make catalog`", file=sys.stderr)
+        checks = {}
     perfil = yaml.safe_load((DBT / "profiles.yml").read_text(encoding="utf-8"))
     alvo = next(iter(perfil.values()))["target"]
     return {
@@ -433,7 +491,7 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT) ->
         "tests": _testes(manifest, run),
         "view_audits": _auditorias(yaml.safe_load(RESULTADO.read_text(encoding="utf-8"))),
         "environments": AMBIENTES,
-        "checks": _verificacoes(junit),
+        "checks": checks,
         "open_items": _abertos(PENDENCIAS.read_text(encoding="utf-8")),
     }
 
@@ -482,19 +540,29 @@ def validar(pacote: dict) -> list[str]:
     return sorted(erros)
 
 
-#: O que muda a cada execução sem mudar o que o pacote afirma: fora da comparação do `--check`.
-EXECUCAO = {"executed_at", "invocation_id", "same_invocation_as_manifest", "run_id"}
+#: O que muda a cada execução sem mudar o que o pacote afirma, **por caminho**: fora da comparação do
+#: `--check`. O `lineage.manifest_generated_at` faltava, e todo *build* novo acusava o pacote (RVB4-2-01).
+#: Por caminho, e não por nome de chave: uma coluna pode se chamar `invocation_id`.
+EXECUCAO_DO_PACOTE = (("provenance", "tree_dirty_at_generation"),
+                      ("provenance", "dbt", "manifest_generated_at"), ("provenance", "dbt", "manifest_invocation_id"),
+                      ("provenance", "dbt", "run_results_generated_at"), ("provenance", "dbt", "run_results_invocation_id"),
+                      ("lineage", "manifest_generated_at"),
+                      ("provenance", "warehouse", "built_by_invocation_id"))   # sempre nulo na versão 1 (L5)
+EXECUCAO_DO_RESULTADO = ("executed_at", "invocation_id", "same_invocation_as_manifest", "run_id")
 
 
 def normalizado(pacote: dict) -> dict:
     """O pacote sem os instantes e as execuções: o que tem de ser igual entre o versionado e o de agora."""
     p = copy.deepcopy(pacote)
-    p["provenance"].pop("tree_dirty_at_generation", None)
-    p["provenance"]["dbt"] = {k: v for k, v in p["provenance"]["dbt"].items() if not k.startswith(("manifest_", "run_results_"))}
+    for *caminho, chave in EXECUCAO_DO_PACOTE:
+        no = p
+        for parte in caminho:
+            no = no.get(parte) or {}
+        no.pop(chave, None)
     for secao in ("tests", "checks"):
-        for item in p[secao].values():
+        for item in p.get(secao, {}).values():
             if item.get("result"):
-                item["result"] = {k: v for k, v in item["result"].items() if k not in EXECUCAO}
+                item["result"] = {k: v for k, v in item["result"].items() if k not in EXECUCAO_DO_RESULTADO}
     return p
 
 
@@ -551,13 +619,16 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:1] == ["--digest-do-dbt"]:
         print(digest_do_dbt())
         return 0
+    if argv[:1] == ["--invocacao-do-manifest"]:
+        print(invocacao_do_manifest())
+        return 0
     if argv[:1] == ["--carimbar"] and len(argv) == 3:
         carimbar(argv[1], argv[2])
         return 0
     if argv[:1] == ["--check"]:
         return conferir()
     if argv:
-        print(f"uso: python -m mvp_ed1.models.pacote [--check | --digest-do-dbt | --carimbar DIGEST INICIO]; recebido {argv}",
+        print(f"uso: python -m mvp_ed1.models.pacote [--check | --digest-do-dbt | --invocacao-do-manifest | --carimbar DIGEST INVOCACAO_ANTES]; recebido {argv}",
               file=sys.stderr)
         return 2
     pacote = _montar_conferido()

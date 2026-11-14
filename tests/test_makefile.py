@@ -905,8 +905,9 @@ def test_dbt_docs_gera_e_serve(tmp_path):
 
 # ── O carimbo do build para o pacote de metadados (RVB4-1-02) ──────────────
 
-#: O `python` que responde o digest dos insumos do dbt, como o real faz com `--digest-do-dbt`.
-PYTHON_DO_DIGEST = (REGISTRADOR + 'case "$*" in *--digest-do-dbt*) echo "d1g357";; esac\n')
+#: O `python` que responde o digest dos insumos do dbt e a invocação do manifest anterior, como o real.
+PYTHON_DO_DIGEST = (REGISTRADOR + 'case "$*" in *--digest-do-dbt*) echo "d1g357";; '
+                    '*--invocacao-do-manifest*) echo "inv-0";; esac\n')
 #: O `dbt` que falha como um build com teste vermelho: o código tem de chegar ao `make`.
 DBT_QUE_FALHA = REGISTRADOR + "exit 1\n"
 
@@ -918,17 +919,16 @@ DBT_QUE_FALHA = REGISTRADOR + "exit 1\n"
     pytest.param(["docs-generate"], "dbt docs generate", id="docs-generate"),
 ])
 def test_todo_comando_do_dbt_que_escreve_o_manifest_e_carimbado(tmp_path, alvo, comando):
-    """O digest é lido **antes** do dbt, e o carimbo, gravado **depois**, com esse digest e o início."""
+    """O digest e a invocação anterior são lidos **antes** do dbt; o carimbo, gravado **depois**, com os dois."""
     r, chamadas = _make(tmp_path, *alvo, simulados={".venv/bin/python": PYTHON_DO_DIGEST})
 
     assert r.returncode == 0, r.stdout + r.stderr
     dbt = [c for c in chamadas if c.startswith("dbt ")]
     assert dbt == [comando], chamadas
     i = chamadas.index(comando)
-    assert chamadas[i - 1] == "python -m mvp_ed1.models.pacote --digest-do-dbt", chamadas
-    carimbo = chamadas[i + 1].split()
-    assert carimbo[:5] == ["python", "-m", "mvp_ed1.models.pacote", "--carimbar", "d1g357"], chamadas
-    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", carimbo[5]), chamadas
+    assert chamadas[i - 2:i] == ["python -m mvp_ed1.models.pacote --digest-do-dbt",
+                                 "python -m mvp_ed1.models.pacote --invocacao-do-manifest"], chamadas
+    assert chamadas[i + 1] == "python -m mvp_ed1.models.pacote --carimbar d1g357 inv-0", chamadas
 
 
 def test_o_carimbo_nao_esconde_a_falha_do_dbt(tmp_path):
@@ -937,7 +937,7 @@ def test_o_carimbo_nao_esconde_a_falha_do_dbt(tmp_path):
                         simulados={".venv/bin/python": PYTHON_DO_DIGEST, ".venv/bin/dbt": DBT_QUE_FALHA})
 
     assert r.returncode != 0, r.stdout + r.stderr
-    assert any(c.startswith("python -m mvp_ed1.models.pacote --carimbar d1g357 ") for c in chamadas), chamadas
+    assert "python -m mvp_ed1.models.pacote --carimbar d1g357 inv-0" in chamadas, chamadas
 
 
 def test_o_check_confere_o_pacote_depois_do_pytest(tmp_path):

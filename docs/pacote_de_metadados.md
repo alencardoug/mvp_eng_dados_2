@@ -81,7 +81,7 @@
 | `questions` | As 16 perguntas: título, fatos, medidas com a aditividade (`additive`, `semi_additive`, `non_additive`) e a nota, dimensões e view | [Perguntas de Negócio](glossario_de_negocio/perguntas_de_negocio.md) |
 | `description_gaps` | Cada relação ou coluna **declarada** sem descrição, explícita (`column: null` = falta a da relação). O universo é o declarado no *manifest* (modelos, *seeds*, *snapshots* e *sources*). Em 13/11/2026 eram 141 colunas, a G06 | *Manifest* |
 | `tests` | Cada teste de dados e teste de unidade do dbt: o que testa, o objeto e a coluna que guarda, onde está declarado e o resultado. `result: null` = **sem resultado**. O resultado traz o estado, a hora, a execução e se ela é a mesma do *manifest* (`same_invocation_as_manifest`) | *Manifest* e `run_results.json` |
-| `checks` | Cada teste do `pytest` (`módulo::teste`): o módulo, o que ele guarda (a primeira linha da *docstring* do módulo), a camada (`null` = não declarada: nenhum teste a declara hoje, e o pacote não a infere) e o resultado — estado, hora e execução, ou `null` = **sem resultado**. É onde estão a prova de acesso por execução, as invariantes, as reconciliações e a certificação da captura | O relatório JUnit do `pytest` do último `make test`, o que o `make check` roda (`data/pytest/junit.xml`, fora do Git) |
+| `checks` | Cada teste do `pytest` (`módulo::teste`): o módulo, o que ele guarda (a primeira linha da *docstring* do módulo), a camada (`null` = não declarada: nenhum teste a declara hoje, e o pacote não a infere) e o resultado — estado, hora e execução, ou `null` = **sem resultado**. É onde estão a prova de acesso por execução, as invariantes, as reconciliações e a certificação da captura | O relatório JUnit do `pytest` do último `make test`, o que o `make check` roda (`data/pytest/junit.xml`, fora do Git). Só entra o JUnit da suíte **inteira** de agora, conferido contra a coleta do `pytest` (sem o `PYTEST_ADDOPTS` do ambiente); o parcial ou o de outra coleção sai como `{}`, sem resultado |
 | `open_items` | As decisões e verificações em aberto que o portal não pode mostrar como resolvidas: identificador (`Dnn`, `Vn`), título, estado (`pending`, `deferred`), a âncora do texto e os objetos que tocam. `objects: null` = **não declarado** — hoje, todos —, e o portal não infere | [Registro de Decisões](adr/README.md) §3 e [Pendências](pendencias.md) §1 |
 | `view_audits` | Para cada uma das 16 views: o estado da auditoria do Bloco 1b (`not_audited`, `audited`, `audit_pending_decision`), o *commit* em que foi auditada, os critérios, o teste de referência e os achados | Declaração versionada do Bloco 1b. Até lá, todas `not_audited` |
 | `environments` | A fonte da página de estrutura e ambientes, artefato por artefato: repositório, caminho, se é lido por *commit* ou não está disponível, e a data em que congelou (L4, L10) | Lista declarada no gerador |
@@ -109,17 +109,21 @@ insumos não invalida o pacote. O que o `check-offline` não vê, porque está f
 guardas (revisão do Bloco 4, RVB4-1-01 e 02):
 
 - **o carimbo do *build*.** Todo comando do dbt que o `Makefile` roda e que escreve o *manifest*
-  grava em `dbt/target/pacote_carimbo.json` o digest dos insumos do dbt lido antes e o `invocation_id`
-  do *manifest* escrito depois. O gerador recusa o *manifest* de outra execução ou de outros insumos:
-  regerar sobre um *manifest* atrasado daria o digest de agora a um conteúdo antigo;
+  grava em `dbt/target/pacote_carimbo.json` o digest dos insumos do dbt (todo arquivo rastreado de
+  `dbt/` e o glossário de `docs-paths`) lido antes e o `invocation_id` do *manifest* que **esse**
+  comando escreveu — o que tem outra invocação que a de antes. O gerador recusa o *manifest* de outra
+  execução ou de outros insumos: regerar sobre um *manifest* atrasado daria o digest de agora a um
+  conteúdo antigo. O dbt rodado fora do `Makefile` não carimba, e o gerador recusa até o
+  `make dbt-build`;
 - **a 5ª etapa do `make check`**, depois do `pytest`: monta o pacote sem escrever e o compara com o
   versionado, fora os instantes, as execuções e o `tree_dirty_at_generation`. Resultado de teste ou de
   `pytest` que mudou, teste novo ou sumido, descrição nova: o pacote está atrasado, e o `check` falha
   até o `make catalog` e o *commit*.
 
 **A sequência de publicação.** O pacote publica o resultado dos testes que o conferem, e por isso, depois
-de mudar um insumo, ele se gera **duas** vezes: `make catalog` (insumos em dia), `make test` (o JUnit
-desses insumos), `make catalog` de novo (o `checks` desse JUnit) e o *commit*. Com o `make check` no
+de mudar um insumo, ele se gera **duas** vezes: `make catalog` (insumos em dia; se a suíte mudou, o
+JUnit anterior não é o dela, e `checks` sai vazio, com aviso), `make test` (o JUnit desses insumos),
+`make catalog` de novo (o `checks` desse JUnit) e o *commit*. Com o `make check` no
 lugar do `make test`, a 5ª etapa acusa o pacote da primeira geração, e o segundo `make catalog` é o que a
 resolve.
 
