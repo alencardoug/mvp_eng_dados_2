@@ -48,8 +48,8 @@ select
     coalesce(o.authorized_amount, 0)                as authorized_amount,
     coalesce(o.captured_amount, 0)                  as captured_amount,
     coalesce(o.refunded_amount, 0)                  as refunded_amount,
-    -- O que sobrou de fato: capturado menos devolvido. É este o número que
-    -- reconcilia com a receita, não o capturado bruto.
+    -- O saldo do pagamento: capturas aprovadas menos reembolsos aprovados. É
+    -- valor cobrado do pedido (com frete e imposto), não receita de produto.
     coalesce(o.captured_amount, 0) - coalesce(o.refunded_amount, 0) as net_captured_amount,
     o.first_authorized_at,
     o.first_captured_at,

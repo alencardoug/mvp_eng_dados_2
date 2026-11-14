@@ -1351,7 +1351,7 @@ models:
         meta:
           sensitivity: confidential
       - name: net_captured_amount
-        description: "Aditiva entre pagamentos — capturado menos devolvido: o que de fato ficou, e o que reconcilia com a receita."
+        description: "Aditiva entre pagamentos — capturas aprovadas menos reembolsos aprovados do pagamento: o saldo que ficou com a loja. Está no universo do valor cobrado do pedido, com frete e imposto; não é a receita de produto do glossário, e não se iguala a ela."
         meta:
           sensitivity: confidential
       - name: first_authorized_at
