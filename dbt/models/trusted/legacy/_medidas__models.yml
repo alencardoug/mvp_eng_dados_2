@@ -42,14 +42,20 @@ models:
           description_inherited: true
           sensitivity: confidential
       - name: items_gross_revenue_amount
+        description: "Aditiva entre pedidos — receita bruta dos itens aceitos do pedido, antes do desconto da linha."
         meta:
+          description_inherited: true
           sensitivity: confidential
       - name: itens_empilhados
+        description: "Aditiva entre pedidos — número de itens (linhas) aceitos do pedido; zero no pedido cujos itens foram todos rejeitados."
         meta:
+          description_inherited: true
           sensitivity: internal
       - name: itens_rejeitados
+        description: "Itens do pedido na quarentena do legado, na captura corrente; zero sem rejeição."
         meta:
           sensitivity: internal
       - name: motivos_da_rejeicao
+        description: "As origens da rejeição dos itens do pedido na quarentena (`own_invalid`, `parent_rejected`), separadas por vírgula; nulo sem rejeição."
         meta:
           sensitivity: internal

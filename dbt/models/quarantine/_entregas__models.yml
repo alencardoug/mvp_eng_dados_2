@@ -1,0 +1,76 @@
+# Escrito à mão: os modelos da quarentena que não vêm do catálogo do legado (o
+# `_legacy__models.yml` ao lado é gerado por `make legacy-models`).
+
+version: 2
+models:
+  - name: rejected_shipment_deliveries
+    meta:
+      domain: logistica
+    columns:
+      - name: shipment_id
+        description: "Identificador da remessa na origem, gerado pelo banco transacional."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: shipment_code
+        description: "Chave natural da remessa."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: order_id
+        description: "Pedido que a remessa atende."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: carrier_id
+        description: "Transportadora responsável."
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: warehouse_id
+        description: "Armazém de origem da remessa."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: shipment_status
+        description: "Estado da remessa; transições válidas em Modelo de Dados §4."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: shipped_at
+        description: "Momento do despacho."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: estimated_delivery_at
+        description: "Prazo de entrega prometido ao cliente."
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: delivered_at_projected
+        description: "Momento da entrega efetiva."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: delivery_event_count
+        description: "Número de eventos da remessa no livro `delivery_events`; zero sem evento."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: last_event_at
+        description: "Instante do último evento da remessa no livro; nulo sem evento."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+      - name: rejection_code
+        description: "Código da rejeição: `DELIVERY_WITHOUT_EVENT`, a entrega que a origem marcou e o livro `delivery_events` não registra."
+        meta:
+          sensitivity: internal
+      - name: rejection_reason
+        description: "O motivo da rejeição, por extenso: a entrega não é contada, e a data projetada não substitui a do livro (ADR-0034)."
+        meta:
+          sensitivity: internal
+      - name: rejected_from
+        description: "O modelo de onde a remessa foi rejeitada: `trusted.shipments`."
+        meta:
+          sensitivity: internal

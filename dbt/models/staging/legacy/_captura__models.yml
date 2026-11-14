@@ -1,0 +1,13 @@
+# Escrito à mão: o modelo de seleção da captura do legado, que não vem do catálogo (o
+# `_legacy__models.yml` ao lado é gerado por `make legacy-models`).
+
+version: 2
+models:
+  - name: legacy_selected_capture
+    meta:
+      domain: legado
+    columns:
+      - name: snapshot_id
+        description: "A captura do legado que o build usa: a fixada na variável `legacy_snapshot_id`, para reprocessar, ou a mais recente certificada nas 40 tabelas."
+        meta:
+          sensitivity: internal

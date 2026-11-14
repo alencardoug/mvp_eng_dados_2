@@ -185,13 +185,19 @@ models:
           description_inherited: true
           sensitivity: public
       - name: item_count
+        description: "Aditiva — número de itens (linhas) no carrinho; zero no carrinho sem item."
         meta:
+          description_inherited: true
           sensitivity: internal
       - name: unit_count
+        description: "Aditiva — soma das quantidades dos itens do carrinho; zero sem item."
         meta:
+          description_inherited: true
           sensitivity: internal
       - name: cart_value_amount
+        description: "Aditiva — valor do carrinho: soma de quantidade × preço unitário dos itens, arredondada a centavos; zero sem item."
         meta:
+          description_inherited: true
           sensitivity: confidential
       - name: is_anonymous
         description: "Verdadeiro quando o carrinho não tem cliente identificado — sessão anônima."
@@ -199,10 +205,14 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: is_converted
+        description: "Verdadeiro quando o carrinho virou pedido (estado `converted`)."
         meta:
+          description_inherited: true
           sensitivity: internal
       - name: is_abandoned
+        description: "Verdadeiro quando o carrinho com item foi abandonado ou expirou sem virar pedido; o carrinho vazio nunca é abandonado."
         meta:
+          description_inherited: true
           sensitivity: internal
       - name: is_deleted
         description: "{{ doc(\"is_deleted\") }}"
@@ -264,21 +274,27 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: item_count
+        description: "Aditiva — número de itens (linhas) no carrinho; zero no carrinho sem item."
         meta:
           sensitivity: internal
       - name: unit_count
+        description: "Aditiva — soma das quantidades dos itens do carrinho; zero sem item."
         meta:
           sensitivity: internal
       - name: cart_value_amount
+        description: "Aditiva — valor do carrinho: soma de quantidade × preço unitário dos itens, arredondada a centavos; zero sem item."
         meta:
           sensitivity: confidential
       - name: first_item_added_at
+        description: "Instante em que o primeiro item entrou no carrinho; nulo no carrinho sem item."
         meta:
           sensitivity: internal
       - name: is_converted
+        description: "Verdadeiro quando o carrinho virou pedido (estado `converted`)."
         meta:
           sensitivity: internal
       - name: is_abandoned
+        description: "Verdadeiro quando o carrinho com item foi abandonado ou expirou sem virar pedido; o carrinho vazio nunca é abandonado."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -513,9 +529,11 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: first_redeemed_at
+        description: "Instante do primeiro resgate do cupom; nulo no cupom nunca usado."
         meta:
           sensitivity: internal
       - name: last_redeemed_at
+        description: "Instante do último resgate do cupom; nulo no cupom nunca usado."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -643,12 +661,15 @@ models:
           description_inherited: true
           sensitivity: public
       - name: second_order_at
+        description: "Instante do segundo pedido realizado do cliente, o primeiro depois da estreia; nulo para quem comprou uma vez ou nunca."
         meta:
           sensitivity: internal
       - name: is_active
+        description: "Verdadeiro quando o último pedido realizado do cliente está dentro da janela de cliente ativo (`active_customer_window_days`, 180 dias) contada da data de referência dos dados."
         meta:
           sensitivity: internal
       - name: is_repeat_buyer
+        description: "Verdadeiro quando o segundo pedido realizado veio em até `repeat_purchase_window_days` (90) dias corridos da estreia."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -769,7 +790,9 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: schema_version
+        description: "Versão do esquema do evento de movimento, como a origem a carimbou, em inteiro."
         meta:
+          description_inherited: true
           sensitivity: internal
       - name: event_metadata
         description: "Contexto adicional do evento, opcional e limitado a 4 KB."
@@ -787,6 +810,7 @@ models:
           description_inherited: true
           sensitivity: confidential
       - name: cogs_amount
+        description: "Custo do produto vendido do movimento: |quantidade| × custo unitário, a centavos, só na saída por venda (`sale_dispatch`); zero nos outros tipos."
         meta:
           sensitivity: confidential
       - name: is_deleted
@@ -844,6 +868,7 @@ models:
           description_inherited: true
           sensitivity: confidential
       - name: net_revenue_amount
+        description: "Receita líquida da linha: quantidade × preço unitário, arredondada a centavos, menos o desconto da linha."
         meta:
           sensitivity: confidential
       - name: tax_amount
@@ -940,6 +965,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: hours_in_previous_status
+        description: "Horas que o pedido ficou no estado de origem antes desta transição; nulo na primeira, que não tem estado anterior."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -1052,18 +1078,23 @@ models:
           description_inherited: true
           sensitivity: confidential
       - name: item_count
+        description: "Aditiva entre pedidos — número de itens (linhas) aceitos do pedido; zero no pedido cujos itens foram todos rejeitados."
         meta:
           sensitivity: internal
       - name: unit_count
+        description: "Aditiva entre pedidos — soma das quantidades dos itens aceitos do pedido."
         meta:
           sensitivity: internal
       - name: items_gross_revenue_amount
+        description: "Aditiva entre pedidos — receita bruta dos itens aceitos do pedido, antes do desconto da linha."
         meta:
           sensitivity: confidential
       - name: items_net_revenue_amount
+        description: "Aditiva entre pedidos — receita líquida dos itens aceitos do pedido: quantidade × preço praticado menos o desconto da linha, sem frete nem imposto."
         meta:
           sensitivity: confidential
       - name: next_order_at
+        description: "Instante do próximo pedido realizado do mesmo cliente, na mesma origem; nulo no último dele e no pedido que não foi realizado."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -1202,18 +1233,23 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: is_approved
+        description: "Verdadeiro quando a transação teve sucesso (resultado `succeeded`)."
         meta:
           sensitivity: internal
       - name: is_authorization
+        description: "Verdadeiro na transação de autorização."
         meta:
           sensitivity: internal
       - name: is_capture
+        description: "Verdadeiro na transação de captura."
         meta:
           sensitivity: internal
       - name: is_refund
+        description: "Verdadeiro na transação de reembolso."
         meta:
           sensitivity: internal
       - name: is_void
+        description: "Verdadeiro na transação de cancelamento (`void`)."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -1291,36 +1327,47 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: transaction_count
+        description: "Aditiva entre pagamentos — número de transações do pagamento, de qualquer tipo e resultado."
         meta:
           sensitivity: internal
       - name: authorization_count
+        description: "Aditiva entre pagamentos — tentativas de autorização do pagamento, aprovadas ou não."
         meta:
           sensitivity: internal
       - name: approved_authorization_count
+        description: "Aditiva entre pagamentos — autorizações aprovadas do pagamento."
         meta:
           sensitivity: internal
       - name: authorized_amount
+        description: "Aditiva entre pagamentos — soma dos valores autorizados nas transações do pagamento."
         meta:
           sensitivity: confidential
       - name: captured_amount
+        description: "Aditiva entre pagamentos — soma dos valores capturados nas transações do pagamento."
         meta:
           sensitivity: confidential
       - name: refunded_amount
+        description: "Aditiva entre pagamentos — soma dos valores devolvidos nas transações de reembolso do pagamento."
         meta:
           sensitivity: confidential
       - name: net_captured_amount
+        description: "Aditiva entre pagamentos — capturado menos devolvido: o que de fato ficou, e o que reconcilia com a receita."
         meta:
           sensitivity: confidential
       - name: first_authorized_at
+        description: "Instante da primeira autorização aprovada; nulo sem autorização aprovada."
         meta:
           sensitivity: internal
       - name: first_captured_at
+        description: "Instante da primeira captura aprovada; nulo sem captura."
         meta:
           sensitivity: internal
       - name: is_captured
+        description: "Verdadeiro quando o pagamento está capturado ou reembolsado (o dinheiro chegou a entrar)."
         meta:
           sensitivity: internal
       - name: is_failed
+        description: "Verdadeiro quando o pagamento falhou (estado `failed`)."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -1471,6 +1518,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: source_updated_at
+        description: "O mais recente entre a última atualização da variante e a do produto na origem."
         meta:
           sensitivity: internal
 
@@ -1611,21 +1659,27 @@ models:
           description_inherited: true
           sensitivity: confidential
       - name: item_count
+        description: "Aditiva entre ordens — número de itens da ordem de compra; zero sem item."
         meta:
           sensitivity: internal
       - name: quantity_ordered
+        description: "Aditiva entre ordens — soma das quantidades pedidas nos itens da ordem."
         meta:
           sensitivity: internal
       - name: quantity_received
+        description: "Aditiva entre ordens — soma das quantidades recebidas nos itens da ordem."
         meta:
           sensitivity: internal
       - name: items_ordered_cost_amount
+        description: "Aditiva entre ordens — custo negociado dos itens pedidos."
         meta:
           sensitivity: confidential
       - name: items_received_cost_amount
+        description: "Aditiva entre ordens — custo dos itens recebidos."
         meta:
           sensitivity: confidential
       - name: is_fully_received
+        description: "Verdadeiro quando a ordem está recebida por inteiro (estado `received`)."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -1892,9 +1946,11 @@ models:
           description_inherited: true
           sensitivity: public
       - name: picked_up_at
+        description: "Instante do primeiro evento de coleta da remessa no livro `delivery_events`; nulo sem coleta."
         meta:
           sensitivity: internal
       - name: out_for_delivery_at
+        description: "Instante do primeiro evento de saída para entrega; nulo sem esse evento."
         meta:
           sensitivity: internal
       - name: delivered_at_projected
@@ -1903,18 +1959,23 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: delivery_event_count
+        description: "Número de eventos da remessa no livro `delivery_events`; zero sem evento."
         meta:
           sensitivity: internal
       - name: first_event_at
+        description: "Instante do primeiro evento da remessa no livro; nulo sem evento."
         meta:
           sensitivity: internal
       - name: last_event_at
+        description: "Instante do último evento da remessa no livro; nulo sem evento."
         meta:
           sensitivity: internal
       - name: is_on_time
+        description: "Verdadeiro quando a remessa chegou até o prazo prometido (`delivered_at <= estimated_delivery_at`); nulo enquanto não foi entregue."
         meta:
           sensitivity: internal
       - name: is_delivery_unbacked
+        description: "Verdadeiro quando a origem diz que a remessa foi entregue (`delivered_at_projected`) e o livro não tem o evento de entrega; ela vai à quarentena de entregas sem lastro."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -2109,30 +2170,39 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: first_event_at
+        description: "Instante do primeiro evento do chamado; nulo sem evento."
         meta:
           sensitivity: internal
       - name: last_event_at
+        description: "Instante do último evento do chamado; nulo sem evento."
         meta:
           sensitivity: internal
       - name: first_assigned_at
+        description: "Instante da primeira atribuição a um agente; nulo se nunca foi atribuído."
         meta:
           sensitivity: internal
       - name: first_resolved_at
+        description: "Instante da primeira resolução; nulo se nunca foi resolvido."
         meta:
           sensitivity: internal
       - name: last_resolved_at
+        description: "Instante da última resolução, que difere da primeira quando o chamado foi reaberto; nulo se nunca foi resolvido."
         meta:
           sensitivity: internal
       - name: ticket_event_count
+        description: "Número de eventos do chamado; zero sem evento."
         meta:
           sensitivity: internal
       - name: message_count
+        description: "Número de mensagens do chamado, de qualquer autor; zero sem mensagem."
         meta:
           sensitivity: internal
       - name: customer_message_count
+        description: "Número de mensagens escritas pelo cliente no chamado; zero sem mensagem dele."
         meta:
           sensitivity: internal
       - name: hours_open
+        description: "Horas entre a abertura e o fechamento do chamado; nulo enquanto ele está aberto."
         meta:
           sensitivity: internal
       - name: is_deleted
@@ -2232,3 +2302,163 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+  - name: delivery_events
+    meta:
+      domain: logistica
+    columns:
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: delivery_event_id
+        description: "Único depois da deduplicação de entrega ao menos uma vez."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: shipment_id
+        description: "Remessa à qual o evento se refere."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: delivery_event_type
+        description: "Natureza do evento de entrega."
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: occurred_at
+        description: "Momento de negócio do evento."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: event_location
+        description: "Localidade registrada pela transportadora."
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: event_description
+        description: "Descrição textual do evento."
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: is_delivery
+        description: "Verdadeiro no evento de entrega (`delivered`)."
+        meta:
+          sensitivity: public
+      - name: is_return
+        description: "Verdadeiro no evento de devolução ao remetente (`returned`)."
+        meta:
+          sensitivity: public
+      - name: is_failed_attempt
+        description: "Verdadeiro na tentativa de entrega que falhou (`delivery_attempt`)."
+        meta:
+          sensitivity: public
+      - name: is_pickup
+        description: "Verdadeiro na coleta pela transportadora (`picked_up`)."
+        meta:
+          sensitivity: public
+      - name: is_out_for_delivery
+        description: "Verdadeiro na saída para entrega (`out_for_delivery`)."
+        meta:
+          sensitivity: public
+      - name: event_sequence
+        description: "Ordem do evento dentro da remessa, de 1 em diante, pelo instante e, no empate, pelo identificador do evento."
+        meta:
+          sensitivity: internal
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted_append_only\") }}"
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_created_at
+        description: "Momento em que o evento foi registrado na origem."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+  - name: inventory_balances
+    meta:
+      domain: estoque
+    columns:
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: inventory_balance_id
+        description: "Identificador do saldo de estoque de uma variante num armazém na origem, gerado pelo banco transacional."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: warehouse_id
+        description: "Armazém do saldo."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: product_variant_id
+        description: "SKU do saldo."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: quantity_on_hand
+        description: "Quantidade fisicamente disponível."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: quantity_reserved
+        description: "Quantidade reservada para carrinhos e pedidos."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: quantity_available
+        description: "Quantidade livre para venda; derivada pelo banco."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: last_movement_at
+        description: "Momento do último movimento aplicado ao saldo."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: rebuilt_quantity_on_hand
+        description: "Saldo reconstruído do livro: a soma dos `quantity_delta` dos movimentos do par armazém × SKU registrados até a leitura da projeção (`recorded_at <= ingested_at`)."
+        meta:
+          sensitivity: internal
+      - name: quantity_in
+        description: "Soma das entradas do par no livro, no mesmo corte do saldo reconstruído."
+        meta:
+          sensitivity: internal
+      - name: quantity_out
+        description: "Soma das saídas do par no livro, no mesmo corte do saldo reconstruído."
+        meta:
+          sensitivity: internal
+      - name: movement_count
+        description: "Número de movimentos do par no livro, no mesmo corte."
+        meta:
+          sensitivity: internal
+      - name: balance_drift
+        description: "Saldo da projeção menos o reconstruído do livro; zero é o esperado, e o teste o exige salvo movimento na quarentena."
+        meta:
+          sensitivity: internal
+      - name: active_reserved_quantity
+        description: "Soma das reservas ativas do par; as liberadas, expiradas ou consumidas não entram (invariante 8)."
+        meta:
+          sensitivity: internal
+      - name: reserved_drift
+        description: "Reservado da projeção menos as reservas ativas; negativo é legítimo (reserva sem lastro), positivo é violação."
+        meta:
+          sensitivity: internal
+      - name: is_deleted
+        description: "{{ doc(\"is_deleted\") }}"
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_created_at
+        description: "Momento de criação do registro na origem."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_updated_at
+        description: "Momento da última alteração; cursor da carga incremental (ADR-0015)."
+        meta:
+          sensitivity: internal
+          description_inherited: true

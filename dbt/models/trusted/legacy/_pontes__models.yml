@@ -2020,6 +2020,7 @@ models:
           lineage: [raw_legacy.inventory_movements.recorded_at]
           description_from: stg_retail__inventory_movements.recorded_at
       - name: schema_version
+        description: "Versão do esquema do evento de movimento, como a origem a carimbou, em inteiro."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"

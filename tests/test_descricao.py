@@ -34,9 +34,12 @@ MANIFEST = sensitivity.MANIFEST
 #: etapa 1.7 (03/11/2026), já com a herança. Só baixa, e no mesmo commit da melhora.
 #: Baixado em 03/11/2026 (etapa 1.8): o texto escrito das colunas que calculam leva `analytics` e
 #: `consumption` a zero, como a etapa pede; as internas ficam no que sobra delas.
+#: Baixado em 14/11/2026 (G06, Bloco 3 do plano da base dos consumidores): o texto das colunas que
+#: calculam em `trusted`, `staging`, `quarantine` e nos *snapshots*; sobram as 39 da ponte do legado
+#: (B1 e B3), que esperam o desenho do RVG-1-01.
 TETO_SEM_DESCRICAO: dict[str, int] = {
-    "raw": 0, "raw_legacy": 0, "staging": 5, "trusted": 125, "analytics": 0,
-    "consumption": 0, "quarantine": 5, "snapshots": 6, "governance": 0,
+    "raw": 0, "raw_legacy": 0, "staging": 0, "trusted": 39, "analytics": 0,
+    "consumption": 0, "quarantine": 0, "snapshots": 0, "governance": 0,
 }
 
 #: Objetos materializados (modelo, snapshot, seed) sem `domain` ou sem `owner`, por camada.

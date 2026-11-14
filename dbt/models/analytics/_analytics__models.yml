@@ -114,10 +114,12 @@ models:
         data_tests: [not_null]
       - name: is_active
         meta:
+          description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("active_customer") }}'
       - name: is_repeat_buyer
         meta:
+          description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("repeat_purchase") }}'
       - name: is_deleted
@@ -647,6 +649,7 @@ models:
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: net_revenue_amount
         meta:
+          description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: confidential
         description: '{{ doc("net_revenue") }}'
         data_tests: [not_null]
@@ -1602,6 +1605,7 @@ models:
         data_tests: [not_null]
       - name: cogs_amount
         meta:
+          description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: confidential
         description: '{{ doc("cost_of_goods_sold") }}'
         data_tests: [not_null]
@@ -1865,6 +1869,7 @@ models:
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: is_on_time
         meta:
+          description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("on_time_delivery") }}'
       - name: order_to_delivery_days
@@ -2105,6 +2110,7 @@ models:
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: is_on_time
         meta:
+          description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("on_time_delivery") }}'
       - name: order_to_delivery_days
@@ -2320,6 +2326,7 @@ models:
               values: [pending, paid, picking, shipped, delivered, cancelled, returned]
       - name: hours_in_previous_status
         meta:
+          description_reason: "diz como somar no grão da transição, que o texto herdado não diz"
           sensitivity: internal
         description: '**Não aditiva** — tempo no estado de origem; soma dentro do pedido, nunca entre pedidos.'
       - name: transition_count

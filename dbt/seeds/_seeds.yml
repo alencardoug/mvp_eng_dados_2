@@ -18,6 +18,7 @@ seeds:
         state_code: "{{ 'varchar(2)' if target.type != 'bigquery' else 'string' }}"
     columns:
       - name: state_code
+        description: "Sigla da unidade federativa, com duas letras (SP, RJ…); chave da tabela."
         meta:
           sensitivity: public
         data_tests: [unique, not_null]
@@ -52,6 +53,7 @@ seeds:
         to_status: "{{ 'varchar(16)' if target.type != 'bigquery' else 'string' }}"
     columns:
       - name: to_status
+        description: "Estado de destino da transição: pending, paid, picking, shipped, delivered, cancelled ou returned."
         meta:
           sensitivity: public
         data_tests:
@@ -66,9 +68,11 @@ seeds:
           - accepted_values:
               values: [pending, paid, picking, shipped, delivered, '']
       - name: is_initial
+        description: "Verdadeiro na transição que cria o pedido (de nenhum estado para pending)."
         meta:
           sensitivity: public
       - name: description
+        description: "O que a transição significa, em português."
         meta:
           sensitivity: public
 
