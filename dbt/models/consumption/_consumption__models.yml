@@ -1067,8 +1067,10 @@ models:
       domain: atendimento
     description: >
       P15 — Chamados por 100 pedidos, por categoria e canal, mês a mês. O mês é
-      o da **abertura** do chamado. `channel_order_count` é do canal e se repete
-      em cada categoria — o nome diz o grão, e somá-lo entre categorias
+      o da **abertura** do chamado. O canal e a categoria vão pelo **nome**,
+      somando as origens: `channel_order_count` são os pedidos realizados do
+      mês e do canal em todas as origens, tenham elas chamado ou não. Ele se
+      repete em cada categoria — o nome diz o grão, e somá-lo entre categorias
       multiplica os pedidos. Há linha só onde houve chamado, e a taxa é nula no
       canal "Sem canal", que não tem pedidos para servir de denominador.
     config:
@@ -1220,3 +1222,72 @@ models:
           sensitivity: internal
         description: '**Não aditiva** — média entre os que voltaram.'
         data_type: numeric
+
+unit_tests:
+  - name: chamados_por_cem_pedidos_somam_as_origens_do_canal
+    description: >
+      F1 dos Achados do nl_sql. O denominador é do mês e do canal pelo nome,
+      somando as origens, e não depende de quais origens tiveram chamado: o
+      Aplicativo tem 22 pedidos realizados no retail e 1 no legacy, e o chamado
+      de Conta, só do retail, dá 100/23 = 4,3478 (a view antiga dava 100/22). Na
+      Entrega, os chamados das duas origens viram uma linha só, e a média de
+      horas é a dos chamados (30), não a média das médias por origem (37,5). O
+      "Sem canal" não tem pedido e fica com a taxa nula.
+    model: support_tickets_per_hundred_orders
+    given:
+      - input: ref('fact_sales_order_item')
+        format: csv
+        rows: |
+          date_key,sales_channel_key,source_system,order_id,is_realised
+          d1,ch_app_r,retail,1,true
+          d1,ch_app_r,retail,2,true
+          d1,ch_app_r,retail,3,true
+          d1,ch_app_r,retail,4,true
+          d1,ch_app_r,retail,5,true
+          d1,ch_app_r,retail,6,true
+          d1,ch_app_r,retail,7,true
+          d1,ch_app_r,retail,8,true
+          d1,ch_app_r,retail,9,true
+          d1,ch_app_r,retail,10,true
+          d1,ch_app_r,retail,11,true
+          d1,ch_app_r,retail,12,true
+          d1,ch_app_r,retail,13,true
+          d1,ch_app_r,retail,14,true
+          d1,ch_app_r,retail,15,true
+          d1,ch_app_r,retail,16,true
+          d1,ch_app_r,retail,17,true
+          d1,ch_app_r,retail,18,true
+          d1,ch_app_r,retail,19,true
+          d1,ch_app_r,retail,20,true
+          d1,ch_app_r,retail,21,true
+          d1,ch_app_r,retail,22,true
+          d1,ch_app_r,retail,1,true
+          d1,ch_app_r,retail,99,false
+          d1,ch_app_l,legacy,1,true
+      - input: ref('fact_support_ticket_event')
+        format: csv
+        rows: |
+          date_key,sales_channel_key,support_category_key,support_ticket_id,ticket_priority,was_reopened,is_solved_first_time,hours_to_resolution,is_ticket_creation
+          d1,ch_app_r,cat_conta,1,low,false,true,4,true
+          d1,ch_app_r,cat_entrega,2,high,false,true,10,true
+          d1,ch_app_r,cat_entrega,3,urgent,true,false,20,true
+          d1,ch_app_r,cat_entrega,3,urgent,true,false,20,false
+          d1,ch_app_l,cat_entrega,4,low,false,true,60,true
+          d1,ch_sem,cat_conta,5,low,false,true,8,true
+      - input: ref('dim_date')
+        rows:
+          - {date_key: d1, year_number: 2024, month_number: 1, year_month: "2024-01"}
+      - input: ref('dim_sales_channel')
+        rows:
+          - {sales_channel_key: ch_app_r, sales_channel_name: Aplicativo, channel_type: app}
+          - {sales_channel_key: ch_app_l, sales_channel_name: Aplicativo, channel_type: app}
+          - {sales_channel_key: ch_sem, sales_channel_name: Sem canal, channel_type: unknown}
+      - input: ref('dim_support_category')
+        rows:
+          - {support_category_key: cat_conta, support_category_name: Conta, support_category_group: Cadastro}
+          - {support_category_key: cat_entrega, support_category_name: Entrega, support_category_group: Logística}
+    expect:
+      rows:
+        - {year_month: "2024-01", sales_channel_name: Aplicativo, support_category_name: Conta, ticket_count: 1, channel_order_count: 23, tickets_per_hundred_orders: 4.3478, avg_hours_to_resolution: "4.00"}
+        - {year_month: "2024-01", sales_channel_name: Aplicativo, support_category_name: Entrega, ticket_count: 3, channel_order_count: 23, tickets_per_hundred_orders: 13.0435, avg_hours_to_resolution: "30.00"}
+        - {year_month: "2024-01", sales_channel_name: Sem canal, support_category_name: Conta, ticket_count: 1, channel_order_count: null, tickets_per_hundred_orders: null, avg_hours_to_resolution: "8.00"}

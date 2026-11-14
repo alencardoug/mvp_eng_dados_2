@@ -16,6 +16,16 @@
 -- categorias multiplica os pedidos pelo número de categorias — o nome existe
 -- para que quem for somar pare antes.
 --
+-- ── O canal é o do nome, somando as origens ─────────────────────────────────
+-- `dim_sales_channel` tem uma linha por canal **e por origem**: "Aplicativo"
+-- do `retail` e "Aplicativo" do `legacy` têm chaves diferentes. Agrupar pela
+-- chave partia o canal em dois e, pior, ligava o denominador aos chamados pela
+-- chave: a origem que não teve chamado naquele mês e categoria perdia os seus
+-- pedidos do denominador. Em jan/2024, Conta, Aplicativo, a taxa dava 100/22 e
+-- é 100/23 (Achados do nl_sql, F1). Por isso os dois lados são reduzidos ao
+-- grão da resposta — mês × canal **pelo nome** — cada um por si, e só então se
+-- encontram. A categoria de chamado também vai pelo nome e pelo grupo.
+
 -- ── Duas ausências previstas, e o que cada uma significa ────────────────────
 -- **Linha com `channel_order_count` nulo.** São os chamados do canal *Sem
 -- canal* — os que não nasceram de pedido. Sem pedido não há canal, e sem canal
@@ -39,14 +49,18 @@ with chamados as (
 
     select
         f.date_key,
-        f.sales_channel_key,
-        f.support_category_key,
+        ch.sales_channel_name,
+        ch.channel_type,
+        cat.support_category_name,
+        cat.support_category_group,
         f.support_ticket_id,
         f.ticket_priority,
         f.was_reopened,
         f.is_solved_first_time,
         f.hours_to_resolution
     from {{ ref('fact_support_ticket_event') }} f
+    join {{ ref('dim_sales_channel') }} ch on ch.sales_channel_key = f.sales_channel_key
+    join {{ ref('dim_support_category') }} cat on cat.support_category_key = f.support_category_key
     where f.is_ticket_creation
 
 ),
@@ -54,12 +68,13 @@ with chamados as (
 pedidos as (
 
     select
-        date_key,
-        sales_channel_key,
-        {{ contar_distintos(['source_system', 'order_id']) }}       as channel_order_count
-    from {{ ref('fact_sales_order_item') }}
-    where is_realised
-    group by date_key, sales_channel_key
+        f.date_key,
+        ch.sales_channel_name,
+        {{ contar_distintos(['f.source_system', 'f.order_id']) }}   as channel_order_count
+    from {{ ref('fact_sales_order_item') }} f
+    join {{ ref('dim_sales_channel') }} ch on ch.sales_channel_key = f.sales_channel_key
+    where f.is_realised
+    group by f.date_key, ch.sales_channel_name
 
 ),
 
@@ -67,12 +82,12 @@ pedidos_por_mes as (
 
     select
         d.year_month,
-        p.sales_channel_key,
+        p.sales_channel_name,
         -- `sum` de bigint é `numeric` no PostgreSQL e INT64 no BigQuery: o contrato diz numeric.
         cast(sum(p.channel_order_count) as numeric)     as channel_order_count
     from pedidos p
     join {{ ref('dim_date') }} d on d.date_key = p.date_key
-    group by d.year_month, p.sales_channel_key
+    group by d.year_month, p.sales_channel_name
 
 ),
 
@@ -82,17 +97,20 @@ chamados_por_mes as (
         d.year_number,
         d.month_number,
         d.year_month,
-        c.sales_channel_key,
-        c.support_category_key,
+        c.sales_channel_name,
+        c.channel_type,
+        c.support_category_name,
+        c.support_category_group,
         count(*)                                        as ticket_count,
         {{ contar_onde("c.ticket_priority in ('high', 'urgent')") }}
                                                         as high_priority_ticket_count,
         {{ contar_onde("c.was_reopened") }}          as reopened_ticket_count,
         {{ contar_onde("c.is_solved_first_time") }}  as solved_first_time_count,
+        -- A média sai dos chamados do recorte, nunca da média de médias por origem.
         round(avg(c.hours_to_resolution), 2)            as avg_hours_to_resolution
     from chamados c
     join {{ ref('dim_date') }} d on d.date_key = c.date_key
-    group by 1, 2, 3, 4, 5
+    group by 1, 2, 3, 4, 5, 6, 7
 
 )
 
@@ -100,10 +118,10 @@ select
     t.year_number,
     t.month_number,
     t.year_month,
-    ch.sales_channel_name,
-    ch.channel_type,
-    cat.support_category_name,
-    cat.support_category_group,
+    t.sales_channel_name,
+    t.channel_type,
+    t.support_category_name,
+    t.support_category_group,
 
     t.ticket_count,
     t.high_priority_ticket_count,
@@ -117,8 +135,6 @@ select
                                                         as tickets_per_hundred_orders,
     t.avg_hours_to_resolution
 from chamados_por_mes t
-join {{ ref('dim_sales_channel') }} ch on ch.sales_channel_key = t.sales_channel_key
-join {{ ref('dim_support_category') }} cat on cat.support_category_key = t.support_category_key
 left join pedidos_por_mes p
        on p.year_month = t.year_month
-      and p.sales_channel_key = t.sales_channel_key
+      and p.sales_channel_name = t.sales_channel_name
