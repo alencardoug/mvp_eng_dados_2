@@ -468,7 +468,11 @@ resultado, versão do código"); esta entrega o materializa para o dbt, como a A
 **Revisto depois da rodada 1 da revisão do desenho** (`codex1_l5_desenho_r1.md`, RVL5-1-01 a 06). A garantia
 é **estreita e conservadora**: o log registra toda execução do dbt que escreve o armazém, e só uma delas —
 o `build` completo, limpo, de *commit* conhecido, sem nada depois — sustenta "este armazém foi construído
-por este *commit*". Qualquer outra coisa deixa a procedência **não verificada**, e diz por quê.
+por este *commit*". Qualquer outra coisa deixa a procedência **não verificada**, e diz por quê. **O que "construído por este
+*commit*" quer dizer** (RVL5-6-02): o código e a invocação da **última execução integral elegível**, sob as
+materializações declaradas — não que essa invocação recriou cada linha. O `make dbt-build` não é
+`--full-refresh`: a fato incremental relê só a janela de atraso do ramo `retail`, e os *snapshots* guardam
+versões históricas por desenho. A procedência não certifica a origem de cada linha retida.
 
 **Revisto de novo depois da rodada 2** (`codex1_l5_desenho_r2.md`, RVL5-2-01 a 05): o "completo" passa a ser
 medido, e não lido dos argumentos; cada fase confirma a própria escrita; a linha aberta só sai por ato
@@ -516,7 +520,12 @@ explícito do custodiante.
      nunca os substitui — a linha `recovery_restore`, aberta antes do `pg_restore`, sobrevive a ele, e a
      ordem da `sequence` continua a do armazém. A conferência de contagens do passo 5
      (`_conferir_contra_o_banco`) deixa o log de fora, pela mesma razão. Numa máquina nova, o log nasce
-     vazio e o primeiro `build` completo depois da restauração é o que verifica;
+     vazio e o primeiro `build` completo depois da restauração é o que verifica. **Na restauração**
+     (RVL5-6-01): o `pg_restore --clean` da memória não pode descartar o schema `governance` nem a
+     identidade do log, que ficam no destino — as entradas desses objetos saem da lista de restauração
+     (`--use-list`), também ao ler um arquivo antigo que ainda traga o log dentro; em destino novo, a
+     migração cria o log **antes** de restaurar a memória. A prova é uma restauração que **conclui**,
+     preserva a linha corrente e a `sequence`, e é interrompida antes do *rebuild*;
    - **fora, com o motivo**: os testes do legado que escrevem em `trusted`, `quarantine` e `staging`
      (`test_legado_remocao`, `test_oraculo_da_memoria`) escrevem em **bancos efêmeros**; o DDL, os papéis
      e os *grants* de `governance garantir` não mudam o conteúdo das camadas construídas; o `psql`
