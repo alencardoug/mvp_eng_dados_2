@@ -42,6 +42,7 @@ import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 
 import yaml
 
@@ -241,33 +242,92 @@ def _faltas(relacoes: dict) -> list[dict]:
 
 
 #: O cabeçalho de uma pergunta e o de um item em aberto, com qualquer espaço que o Markdown aceita.
-CABECA_PERGUNTA = re.compile(r"^ {0,3}#{3}[ \t]+(P\d{2})[ \t]+—[ \t]+(.+?)[ \t]*$", re.M)
-CABECA_ABERTO = re.compile(r"^ {0,3}#{3}[ \t]+(((?:D|V)\d+)[ \t]+—[ \t]+(.+?))[ \t]*$", re.M)
-#: Um título Markdown: ATX (até três espaços de recuo, de `#` a `######`) ou *setext* (a linha de texto
-#: sublinhada por `===` ou `---`). Só espaço e tabulação, nunca a quebra de linha (RVB4-2-03).
-TITULO_ATX = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t]*$")
-SUBLINHADO = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
-#: O que não é parágrafo e por isso não vira título *setext*: item de lista (o marcador exige espaço
-#: depois — `**D64**` não é lista, RVB4-3-02), citação, tabela.
-NAO_PARAGRAFO = re.compile(r"^ {0,3}(?:[-*+][ \t]|\d{1,9}[.)][ \t]|>|\|)")
+#: Os blocos do Markdown, só o que decide o que é título (CommonMark, com a tabela do GFM): parágrafo,
+#: título ATX, título *setext* de uma ou mais linhas, código cercado e indentado, comentário HTML, quebra
+#: temática e contêiner (citação, lista). O universo e o leitor das Perguntas e das Pendências usam a
+#: **mesma** lista de títulos, e não podem divergir; o leitor só aceita a forma canônica, e o título de
+#: qualquer outra forma que comece por um identificador recusa a geração (RVB4-4-01, RVB4-4-02).
+CONTEINER = re.compile(r"^ {0,3}(>[ \t]?|[-*+][ \t]+|\d{1,9}[.)][ \t]+)")
+ATX = re.compile(r"^ {0,3}(#{1,6})(?=[ \t]|$)(.*)$")
+SUBLINHADO = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
+QUEBRA = re.compile(r"^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")
+CERCA = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
-def _titulos(texto: str) -> list[str]:
-    """O texto de cada título Markdown, na ordem."""
+@dataclass(frozen=True)
+class Titulo:
+    inicio: int          # a primeira linha do título (a do texto, no *setext*)
+    fim: int             # a última (a do sublinhado, no *setext*)
+    nivel: int
+    forma: str           # "atx" ou "setext"
+    conteiner: str       # "" no nível do documento; ">" por citação, "L" por item de lista
+    texto: str
+
+
+def _sem_conteiner(linha: str) -> tuple[str, str]:
+    marcas = ""
+    while (m := CONTEINER.match(linha)):
+        marcas += ">" if m.group(1).startswith(">") else "L"
+        linha = linha[m.end():]
+    return marcas, linha
+
+
+def _titulos(texto: str) -> list[Titulo]:
+    """Cada título do documento, na ordem — o que um leitor de Markdown mostraria como título."""
     linhas, saida = texto.split("\n"), []
-    for i, linha in enumerate(linhas):
-        if (m := TITULO_ATX.match(linha)):
-            saida.append((m.group(1) or "").strip())
-        elif (i + 1 < len(linhas) and SUBLINHADO.match(linhas[i + 1]) and linha.strip()
-              and not NAO_PARAGRAFO.match(linha) and not SUBLINHADO.match(linha)):
-            saida.append(linha.strip())
+    paragrafo: list[str] = []
+    inicio, conteiner_do_paragrafo, tabela, cerca, comentario = 0, "", False, None, False
+    for i, bruta in enumerate(linhas):
+        conteiner, linha = _sem_conteiner(bruta)
+        if cerca is not None:
+            if re.match(rf"^ {{0,3}}{re.escape(cerca[0])}{{{len(cerca)},}}[ \t]*$", linha):
+                cerca = None
+            continue
+        if comentario:
+            comentario = "-->" not in linha
+            continue
+        if not linha.strip():
+            paragrafo = []
+            continue
+        if paragrafo and not tabela and conteiner == conteiner_do_paragrafo and (m := SUBLINHADO.match(linha)):
+            saida.append(Titulo(inicio, i, 1 if m.group(1)[0] == "=" else 2, "setext", conteiner, " ".join(paragrafo)))
+            paragrafo = []
+            continue
+        if QUEBRA.match(bruta) or QUEBRA.match(linha):
+            paragrafo = []
+            continue
+        if (m := CERCA.match(linha)):
+            cerca, paragrafo = m.group(1), []
+            continue
+        if (m := ATX.match(linha)):
+            conteudo = re.sub(r"(?:^|[ \t]+)#+[ \t]*$", "", m.group(2).strip()).strip()
+            saida.append(Titulo(i, i, len(m.group(1)), "atx", conteiner, conteudo))
+            paragrafo = []
+            continue
+        if not paragrafo and re.match(r"^(?: {4}|\t)", linha):
+            continue                                   # código indentado: não interrompe parágrafo
+        if not paragrafo and linha.lstrip().startswith("<!--"):
+            comentario = "-->" not in linha
+            continue
+        if paragrafo:
+            paragrafo.append(linha.strip())            # continuação, também a preguiçosa
+            continue
+        paragrafo, inicio, conteiner_do_paragrafo = [linha.strip()], i, conteiner
+        tabela = linha.lstrip().startswith("|")        # a linha de tabela do GFM não vira *setext*
     return saida
 
 
-def _ids_nos_titulos(texto: str, ident: str) -> list[str]:
-    """O universo: o identificador com que cada título começa, mesmo em negrito ou código."""
-    return [m.group(1) for titulo in _titulos(texto)
-            if (m := re.match(rf"[*_`]*({ident})\b", titulo))]
+def _ids_nos_titulos(titulos: list[Titulo], ident: str) -> list[str]:
+    """O universo: o identificador com que cada título começa, de qualquer nível ou forma, mesmo em negrito."""
+    return [m.group(1) for t in titulos if (m := re.match(rf"[*_`]*({ident})(?![\w])", t.texto))]
+
+
+def _canonicos(titulos: list[Titulo], forma: str) -> list[tuple[Titulo, re.Match]]:
+    """Os títulos na forma que o leitor aceita: `### ID — título`, no nível do documento."""
+    return [(t, m) for t in titulos if t.forma == "atx" and t.nivel == 3 and t.conteiner == ""
+            and (m := re.fullmatch(forma, t.texto))]
+
+
 CELULA = re.compile(r"^\|[ \t]*\*\*(Fatos?|Medidas|Dimensões|View)\*\*[ \t]*\|[ \t]*(.+?)[ \t]*\|[ \t]*$", re.M)
 
 
@@ -293,12 +353,13 @@ def _medidas(celula: str, pergunta: str) -> list[dict]:
 
 def _perguntas(texto: str) -> dict:
     saida = {}
-    cabecas = list(CABECA_PERGUNTA.finditer(texto))
-    # O universo: todo título Markdown que começa por um `Pnn`, de qualquer nível ou forma.
-    _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas], _ids_nos_titulos(texto, r"P\d{2}"))
-    _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas], [f"P{i:02d}" for i in range(1, 17)])
-    for cabeca, seguinte in zip(cabecas, cabecas[1:] + [None]):
-        bloco = texto[cabeca.end():seguinte.start() if seguinte else len(texto)]
+    titulos = _titulos(texto)
+    cabecas = _canonicos(titulos, r"(P\d{2})[ \t]+—[ \t]+(.+)")
+    _sem_perda("perguntas de negócio", [m.group(1) for _, m in cabecas], _ids_nos_titulos(titulos, r"P\d{2}"))
+    _sem_perda("perguntas de negócio", [m.group(1) for _, m in cabecas], [f"P{i:02d}" for i in range(1, 17)])
+    linhas = texto.split("\n")
+    for (titulo, cabeca), seguinte in zip(cabecas, [c for c, _ in cabecas[1:]] + [None]):
+        bloco = "\n".join(linhas[titulo.fim + 1:seguinte.inicio if seguinte else len(linhas)])
         lidas = CELULA.findall(bloco)
         celulas = dict(lidas)
         if len(celulas) != len(lidas) or not {"Medidas", "Dimensões", "View"} <= celulas.keys() or not (
@@ -440,13 +501,17 @@ def _modulo_do_caso(classname: str, raiz: pathlib.Path = ROOT) -> tuple[str, lis
 def _abertos(texto: str) -> list[dict]:
     from mvp_ed1.docs_check import slug
 
-    partes = re.split(r"^##[ \t]+1\.[ \t]+Esperando você[ \t]*$", texto, maxsplit=1, flags=re.M)
-    if len(partes) != 2:
-        raise SystemExit("pendências: sem a seção `## 1. Esperando você` — nenhum pacote é escrito")
-    secao = partes[1]
-    secao = re.split(r"^##[ \t]+1\.1\b", secao, maxsplit=1, flags=re.M)[0]
-    cabecas = CABECA_ABERTO.findall(secao)
-    # O universo: todo título Markdown da seção que começa por um `Dnn` ou `Vn`, de qualquer nível ou forma.
+    titulos = _titulos(texto)
+    abre = [k for k, t in enumerate(titulos) if t.nivel == 2 and t.conteiner == "" and t.texto == "1. Esperando você"]
+    if len(abre) != 1:
+        raise SystemExit("pendências: sem uma seção `## 1. Esperando você` — nenhum pacote é escrito")
+    # A seção acaba na próxima seção **numerada** (`## 1.1 …`, `## 2. …`), e não no primeiro título de nível
+    # 2: o item sublinhado por `---` é um *setext* de nível 2, e acabar nele perderia o item e o resto.
+    fim = next((k for k in range(abre[0] + 1, len(titulos))
+                if titulos[k].nivel <= 2 and re.match(r"\d+(?:\.\d+)*\.?[ \t]", titulos[k].texto)), len(titulos))
+    secao = titulos[abre[0] + 1:fim]
+    cabecas = [(t.texto, m.group(1), m.group(2)) for t, m in _canonicos(secao, r"((?:D|V)\d+)[ \t]+—[ \t]+(.+)")]
+    # O universo: todo título da seção que começa por um `Dnn` ou `Vn`, de qualquer nível ou forma.
     _sem_perda("itens em aberto", [c[1] for c in cabecas], _ids_nos_titulos(secao, r"(?:D|V)\d+"))
     saida = []
     for titulo, ident, nome in cabecas:

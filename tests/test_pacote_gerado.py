@@ -408,8 +408,37 @@ def test_o_pacote_vazio_ou_recortado_nao_e_publicavel() -> None:
     assert "faltam" in pacote.faltas_no_pytest({"checks": {casos[0]: {}}}, casos)
 
 
+def _ids(texto: str) -> list[str]:
+    return pacote._ids_nos_titulos(pacote._titulos(texto), r"(?:D|V)\d+")
+
+
 def test_lista_citacao_e_tabela_antes_do_sublinhado_nao_sao_titulo() -> None:
     """O marcador de lista exige espaço depois: `- D65` é lista, `**D65**` é parágrafo (título se sublinhado)."""
     for texto in ("- D65 item\n---\n", "* D65 item\n---\n", "1. D65 item\n---\n", "> D65\n---\n", "| D65 |\n---\n"):
-        assert pacote._ids_nos_titulos(texto, r"(?:D|V)\d+") == [], texto
-    assert pacote._ids_nos_titulos("**D65** título\n---\n", r"(?:D|V)\d+") == ["D65"]
+        assert _ids(texto) == [], texto
+    assert _ids("**D65** título\n---\n") == ["D65"]
+
+
+@pytest.mark.parametrize(("texto", "esperado"), [
+    # RVB4-4-01: o *setext* de duas linhas é um título só, com o identificador na primeira.
+    pytest.param("D65 — título\ncontinuação do título\n---\n", ["D65"], id="setext-duas-linhas"),
+    pytest.param("D65 — título\n===\n", ["D65"], id="setext-nivel-1"),
+    # RVB4-4-02: código indentado (quatro espaços ou tabulação) não é parágrafo, nem vira título.
+    pytest.param("\n    **D65** é código\n---\n", [], id="codigo-quatro-espacos"),
+    pytest.param("\n\t**D65** é código\n---\n", [], id="codigo-tabulacao"),
+    pytest.param("parágrafo\n    **D65** continua o parágrafo\n---\n", [], id="recuo-dentro-do-paragrafo"),
+    pytest.param("```\n### D65 — dentro da cerca\n```\n", [], id="codigo-cercado"),
+    pytest.param("<!--\n### D65 — comentado\n-->\n", [], id="comentario-html"),
+    pytest.param("> ### D65 — citado\n", ["D65"], id="titulo-citado"),
+    pytest.param("### D65 — fechado ###\n", ["D65"], id="atx-fechado"),
+    pytest.param("***\n", [], id="quebra-tematica"),
+])
+def test_o_universo_e_o_dos_titulos_que_o_markdown_mostra(texto, esperado) -> None:
+    assert _ids(texto) == esperado
+
+
+def test_um_item_sublinhado_nao_encerra_a_secao_das_pendencias() -> None:
+    """O *setext* de `---` é nível 2: a seção acaba na próxima seção numerada, e o item fora da forma recusa."""
+    for estranho in ("D63 — o medidor\n---", "D63 — o medidor\nem duas linhas\n---", "**D63** — o medidor\n==="):
+        with pytest.raises(SystemExit, match="itens em aberto"):
+            pacote._abertos(PENDENCIAS.replace("### D63 — o medidor", estranho, 1))
