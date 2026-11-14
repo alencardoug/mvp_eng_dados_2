@@ -43,7 +43,9 @@
    que não conhece. Remover ou renomear um campo, ou mudar o significado dele, muda o número, e o
    aviso sai em [Consumidores §5](consumidores.md#5-o-que-mudou-para-quem-consome).
 4. **Nada parcial.** Se falta o *manifest* ou o `run_results.json`, a geração falha e nenhum pacote é
-   escrito. Não existe pacote "meio gerado".
+   escrito. Não existe pacote "meio gerado". O mesmo vale para o que os leitores não reconhecem: uma
+   pergunta, medida ou pendência fora da forma, ou um caso do JUnit cujo módulo não existe ou que se
+   repete, falha a geração em vez de sair do pacote em silêncio.
 5. **Texto como dado.** As descrições são Markdown em português, como estão no dbt. O consumidor as
    exibe como texto ou como Markdown saneado, sem executar HTML. Links relativos resolvem contra
    `provenance.link_base` (`docs/`), no commit fixado.
@@ -51,7 +53,9 @@
    forma; o calendário (o dia que o mês não tem) o gerador confere com `datetime.fromisoformat`, e o
    consumidor que validar só pelo esquema não o alcança.
 7. **Nada sensível.** Ficam de fora o SQL compilado, as mensagens de falha dos testes, os dados de
-   conexão e os caminhos fora do repositório. A sensibilidade de cada coluna está no pacote, e o
+   conexão e os caminhos fora do repositório. O gerador recusa o pacote em que qualquer chave ou valor
+   traga caminho de máquina (`/home/…`, `/opt/…`, `C:\…`) — inclusive o identificador de um teste
+   parametrizado, que por isso declara `ids` próprios. A sensibilidade de cada coluna está no pacote, e o
    **dado** de nenhuma delas está.
 8. **Identificadores.** Relação: `schema.nome`, como no `lineage --json`. Coluna:
    `schema.relação.coluna`. Pergunta: `P01` a `P16`. Teste: o `unique_id` do dbt.
@@ -63,7 +67,7 @@
 | Chave | O que traz | De onde vem |
 |---|---|---|
 | `format` | `1` | — |
-| `provenance.inputs` e `provenance.inputs_sha256` | A lista dos arquivos rastreados pelo Git que alimentam o pacote e o SHA-256 do conteúdo deles, em ordem | Os arquivos, no momento da geração |
+| `provenance.inputs` e `provenance.inputs_sha256` | A lista dos arquivos rastreados pelo Git que alimentam o pacote e o SHA-256 do conteúdo deles, em ordem. Do módulo de teste, o conteúdo é a primeira linha da *docstring*, o único trecho que o pacote lê dele (o `summary` de `checks`) | Os arquivos, no momento da geração |
 | `provenance.tree_dirty_at_generation` | Se algum arquivo rastreado diferia do `HEAD` quando o pacote foi gerado. No fluxo normal (mudar a declaração, `make catalog`, *commit*) é `true`, e por isso não prova nada sozinho: quem prova que o pacote versionado bate com os insumos versionados é o `inputs_sha256`, conferido no *commit* fixado. É a "árvore limpa ou suja" da D91, sem citar o próprio *commit* | `git`, no momento da geração |
 | `provenance.environment.dbt_target` | O *target* do *profile* do dbt com que os artefatos foram produzidos (hoje só `local`). É o "ambiente" da D91 | O *profile* lido pelo gerador |
 | `provenance.dbt` | Versão do dbt, adaptador, `generated_at` e `invocation_id` do *manifest* e do `run_results.json`, todos preenchidos (regra 4) | `dbt/target/` |
@@ -77,7 +81,7 @@
 | `questions` | As 16 perguntas: título, fatos, medidas com a aditividade (`additive`, `semi_additive`, `non_additive`) e a nota, dimensões e view | [Perguntas de Negócio](glossario_de_negocio/perguntas_de_negocio.md) |
 | `description_gaps` | Cada relação ou coluna **declarada** sem descrição, explícita (`column: null` = falta a da relação). O universo é o declarado no *manifest* (modelos, *seeds*, *snapshots* e *sources*). Em 13/11/2026 eram 141 colunas, a G06 | *Manifest* |
 | `tests` | Cada teste de dados e teste de unidade do dbt: o que testa, o objeto e a coluna que guarda, onde está declarado e o resultado. `result: null` = **sem resultado**. O resultado traz o estado, a hora, a execução e se ela é a mesma do *manifest* (`same_invocation_as_manifest`) | *Manifest* e `run_results.json` |
-| `checks` | Cada teste do `pytest` (`módulo::teste`): o módulo, o que ele guarda (a primeira linha da *docstring* do módulo), a camada (`null` = não declarada: nenhum teste a declara hoje, e o pacote não a infere) e o resultado — estado, hora e execução, ou `null` = **sem resultado**. É onde estão a prova de acesso por execução, as invariantes, as reconciliações e a certificação da captura | O relatório JUnit do `pytest` do `make check` (a gerar no Bloco 4) |
+| `checks` | Cada teste do `pytest` (`módulo::teste`): o módulo, o que ele guarda (a primeira linha da *docstring* do módulo), a camada (`null` = não declarada: nenhum teste a declara hoje, e o pacote não a infere) e o resultado — estado, hora e execução, ou `null` = **sem resultado**. É onde estão a prova de acesso por execução, as invariantes, as reconciliações e a certificação da captura | O relatório JUnit do `pytest` do último `make test`, o que o `make check` roda (`data/pytest/junit.xml`, fora do Git) |
 | `open_items` | As decisões e verificações em aberto que o portal não pode mostrar como resolvidas: identificador (`Dnn`, `Vn`), título, estado (`pending`, `deferred`), a âncora do texto e os objetos que tocam. `objects: null` = **não declarado** — hoje, todos —, e o portal não infere | [Registro de Decisões](adr/README.md) §3 e [Pendências](pendencias.md) §1 |
 | `view_audits` | Para cada uma das 16 views: o estado da auditoria do Bloco 1b (`not_audited`, `audited`, `audit_pending_decision`), o *commit* em que foi auditada, os critérios, o teste de referência e os achados | Declaração versionada do Bloco 1b. Até lá, todas `not_audited` |
 | `environments` | A fonte da página de estrutura e ambientes, artefato por artefato: repositório, caminho, se é lido por *commit* ou não está disponível, e a data em que congelou (L4, L10) | Lista declarada no gerador |
@@ -101,8 +105,23 @@ com sucesso numa data* (`result.status = pass`, com `executed_at`) e *problema e
 **A guarda** (RVG-1-04): o `check-offline` recalcula o `inputs_sha256` a partir dos arquivos e recusa
 o pacote atrasado. O pacote não cita o *commit* que o contém, porque esse *commit* ainda não existe
 quando ele é gerado. O *commit* é o que o consumidor fixa. Um *commit* posterior que não mexe nos
-insumos não invalida o pacote. O que o `check-offline` não vê, porque o *manifest* está fora do Git,
-o `check` completo confere.
+insumos não invalida o pacote. O que o `check-offline` não vê, porque está fora do Git, tem duas
+guardas (revisão do Bloco 4, RVB4-1-01 e 02):
+
+- **o carimbo do *build*.** Todo comando do dbt que o `Makefile` roda e que escreve o *manifest*
+  grava em `dbt/target/pacote_carimbo.json` o digest dos insumos do dbt lido antes e o `invocation_id`
+  do *manifest* escrito depois. O gerador recusa o *manifest* de outra execução ou de outros insumos:
+  regerar sobre um *manifest* atrasado daria o digest de agora a um conteúdo antigo;
+- **a 5ª etapa do `make check`**, depois do `pytest`: monta o pacote sem escrever e o compara com o
+  versionado, fora os instantes, as execuções e o `tree_dirty_at_generation`. Resultado de teste ou de
+  `pytest` que mudou, teste novo ou sumido, descrição nova: o pacote está atrasado, e o `check` falha
+  até o `make catalog` e o *commit*.
+
+**A sequência de publicação.** O pacote publica o resultado dos testes que o conferem, e por isso, depois
+de mudar um insumo, ele se gera **duas** vezes: `make catalog` (insumos em dia), `make test` (o JUnit
+desses insumos), `make catalog` de novo (o `checks` desse JUnit) e o *commit*. Com o `make check` no
+lugar do `make test`, a 5ª etapa acusa o pacote da primeira geração, e o segundo `make catalog` é o que a
+resolve.
 
 ---
 

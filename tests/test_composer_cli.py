@@ -244,7 +244,10 @@ def test_o_preambulo_de_log_do_composer_3_nao_impede_a_leitura():
 
 
 @pytest.mark.parametrize("texto", [PREAMBULO, PREAMBULO + "Traceback (most recent call last)\n",
-                                   PREAMBULO + "[1, 2]\n"])
+                                   PREAMBULO + "[1, 2]\n"],
+                         # O id é o que o JUnit e o pacote de metadados publicam: o texto bruto levaria
+                         # o caminho de máquina do preâmbulo (regra 7 do pacote, RVB4-1-05).
+                         ids=["so-preambulo", "traceback-depois", "lista-sem-objetos"])
 def test_so_preambulo_ou_resposta_invalida_depois_dele_e_erro(texto):
     with pytest.raises(composer_cli.RespostaInvalida):
         composer_cli.execucoes(texto)

@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import pathlib
 import subprocess
+import sys
 
 import jsonschema
 import pytest
@@ -71,10 +72,17 @@ def test_a_guarda_roda_num_clone_sem_artefatos(tmp_path) -> None:
     versionado = clone / "docs" / "pacote_de_metadados.json"
     if not versionado.exists():
         pytest.skip("o HEAD ainda não tem o pacote (o primeiro commit dele)")
+    # A guarda **do clone**, com o código e os arquivos dele: com o código do diretório de trabalho, uma
+    # mudança ainda não versionada em `INSUMOS` faria o HEAD parecer atrasado — e o pacote, que publica
+    # o resultado deste teste, carregaria essa falha (Bloco 4, rodada 1).
+    programa = ("import json, sys; sys.path.insert(0, 'src'); from mvp_ed1.models import pacote; "
+                "c = pacote.insumos(); print(json.dumps([pacote.__file__, c, pacote.digest(c)]))")
+    saida = subprocess.run([sys.executable, "-c", programa], cwd=clone, capture_output=True, text=True, check=True)
+    arquivo, caminhos, calculado = json.loads(saida.stdout)
+    assert pathlib.Path(arquivo).resolve().is_relative_to(clone.resolve()), arquivo
     dado = json.loads(versionado.read_text(encoding="utf-8"))
-    caminhos = pacote.insumos(clone)
     assert dado["provenance"]["inputs"] == caminhos
-    assert dado["provenance"]["inputs_sha256"] == pacote.digest(caminhos, raiz=clone)
+    assert dado["provenance"]["inputs_sha256"] == calculado
 
 
 @pytest.mark.integracao
@@ -87,3 +95,211 @@ def test_a_regeneracao_repetida_da_o_mesmo_texto() -> None:
     manifest, derivacao = sensitivity.load()
     run = json.loads(pacote.RUN_RESULTS.read_text(encoding="utf-8"))
     assert pacote.serializar(pacote.montar(manifest, derivacao, run)) == pacote.serializar(pacote.montar(manifest, derivacao, run))
+
+
+# ── A revisão do Bloco 4, rodada 1 (RVB4-1-01 a 07) ─────────────────────────────
+
+def test_o_resumo_de_um_modulo_de_teste_entra_no_digest_e_o_resto_do_codigo_nao(tmp_path) -> None:
+    """RVB4-1-01: o `summary` de `checks` é lido do módulo; mudar a docstring muda o digest."""
+    caminhos = pacote.insumos()
+    assert "tests/test_acesso.py" in caminhos and "dbt/profiles.yml" in caminhos
+    assert "src/mvp_ed1/docs_check.py" in caminhos
+    original = pacote.digest(caminhos)
+    docstring = pacote.digest(caminhos, conteudo=lambda c: b"outro resumo" if c == "tests/test_acesso.py"
+                              else pacote._conteudo(RAIZ, c))
+    assert docstring != original
+    modulo = tmp_path / "tests" / "test_x.py"
+    modulo.parent.mkdir()
+    modulo.write_text('"""O resumo.\n\nMais texto."""\nx = 1\n', encoding="utf-8")
+    antes = pacote._conteudo(tmp_path, "tests/test_x.py")
+    modulo.write_text('"""O resumo.\n\nOutro texto."""\nx = 2\n', encoding="utf-8")
+    assert pacote._conteudo(tmp_path, "tests/test_x.py") == antes == b"O resumo."   # só a 1ª linha conta
+    modulo.write_text('"""Outro resumo."""\n', encoding="utf-8")
+    assert pacote._conteudo(tmp_path, "tests/test_x.py") != antes
+
+
+def _manifest(invocacao: str, gerado: str = "2026-11-14T12:00:00.5Z") -> dict:
+    return {"metadata": {"invocation_id": invocacao, "generated_at": gerado}}
+
+
+def test_o_carimbo_recusa_manifest_de_outra_execucao_ou_de_outros_insumos(tmp_path) -> None:
+    """RVB4-1-02: a contraprova do revisor — declaração mudou, *manifest* ficou; o pacote não sai."""
+    manifest, carimbo = tmp_path / "manifest.json", tmp_path / "carimbo.json"
+    manifest.write_text(json.dumps(_manifest("inv-1")), encoding="utf-8")
+    with pytest.raises(SystemExit, match="sem carimbo|sem carimbo.json|não veio"):
+        pacote.conferir_carimbo(_manifest("inv-1"), "d1", carimbo)
+    assert pacote.carimbar("d1", "2026-11-14T11:59:59Z", manifest, carimbo)
+    pacote.conferir_carimbo(_manifest("inv-1"), "d1", carimbo)                       # o par certo passa
+    with pytest.raises(SystemExit, match="outra execução"):
+        pacote.conferir_carimbo(_manifest("inv-2"), "d1", carimbo)                   # `dbt parse` à mão
+    with pytest.raises(SystemExit, match="mudaram depois"):
+        pacote.conferir_carimbo(_manifest("inv-1"), "d2", carimbo)                   # descrição editada
+
+
+def test_o_carimbo_nao_vai_para_o_manifest_anterior_ao_build(tmp_path) -> None:
+    """O dbt falhou antes de escrever o *manifest*: o que está lá é de outra execução, e o carimbo sai."""
+    manifest, carimbo = tmp_path / "manifest.json", tmp_path / "carimbo.json"
+    manifest.write_text(json.dumps(_manifest("velho", "2026-11-14T10:00:00Z")), encoding="utf-8")
+    carimbo.write_text("{}", encoding="utf-8")
+    assert not pacote.carimbar("d1", "2026-11-14T11:00:00Z", manifest, carimbo)
+    assert not carimbo.exists()
+
+
+def test_o_digest_do_dbt_e_o_dos_insumos_que_o_dbt_le() -> None:
+    caminhos = [c for c in pacote.insumos() if c.startswith(pacote.INSUMOS_DO_DBT)]
+    assert "dbt/dbt_project.yml" in caminhos and "docs/glossario_de_negocio/receita_liquida.md" in caminhos
+    assert not any(c.startswith(("tests/", "src/", "docs/pendencias")) for c in caminhos)
+    assert pacote.digest_do_dbt() == pacote.digest(caminhos)
+
+
+PERGUNTA = """### P01 — Receita
+| Campo | Valor |
+|---|---|
+| **Fato** | `fact_sales_order_item` |
+| **Medidas** | `net_revenue_amount` (aditiva) · `order_count` (não aditiva, conta pedidos) |
+| **Dimensões** | `dim_date`, `dim_channel` |
+| **View** | `revenue_by_month` |
+"""
+
+
+def _dezesseis(bloco: str) -> str:
+    return "\n".join(bloco.replace("P01", f"P{i:02d}") for i in range(1, 17))
+
+
+@pytest.mark.parametrize("variante", [
+    pytest.param(lambda t: t, id="como-esta"),
+    pytest.param(lambda t: t.replace("### P01 —", "###  P01  —", 1), id="espaco-no-titulo"),
+    pytest.param(lambda t: t.replace(" · ", "·", 1), id="separador-sem-espaco"),
+    pytest.param(lambda t: t.replace("| **View** |", "|  **View**  |", 1), id="espaco-na-celula"),
+])
+def test_espaco_que_o_markdown_aceita_nao_perde_pergunta_nem_medida(variante) -> None:
+    """RVB4-1-03: as três contraprovas do revisor, e o espaço na célula."""
+    perguntas = pacote._perguntas(variante(_dezesseis(PERGUNTA)))
+    assert sorted(perguntas) == [f"P{i:02d}" for i in range(1, 17)]
+    assert [m["column"] for m in perguntas["P01"]["measures"]] == ["net_revenue_amount", "order_count"]
+    assert perguntas["P01"]["measures"][1] == {"column": "order_count", "additivity": "non_additive", "note": "conta pedidos"}
+
+
+@pytest.mark.parametrize(("variante", "motivo"), [
+    pytest.param(lambda t: t.replace("### P01 —", "### P01:", 1), "perguntas", id="titulo-nao-reconhecido"),
+    pytest.param(lambda t: t.replace("(aditiva)", "(aditivo)", 1), "medida fora da forma", id="aditividade-desconhecida"),
+    pytest.param(lambda t: t.replace("| **View** | `revenue_by_month` |\n", "", 1), "tabela", id="sem-view"),
+    pytest.param(lambda t: t.replace("### P16", "### P17"), "perguntas", id="fora-de-P01-a-P16"),
+])
+def test_o_que_o_leitor_nao_reconhece_recusa_o_pacote(variante, motivo) -> None:
+    with pytest.raises(SystemExit, match=motivo):
+        pacote._perguntas(variante(_dezesseis(PERGUNTA)))
+
+
+PENDENCIAS = """## 1. Esperando você
+
+### D63 — o medidor
+
+### D43 — a guarda (adiada em 16/09/2026)
+
+### V1 — verificações
+
+## 1.1 Decididas
+"""
+
+
+def test_os_itens_em_aberto_aceitam_espaco_e_recusam_o_titulo_estranho() -> None:
+    assert [i["id"] for i in pacote._abertos(PENDENCIAS.replace("### D63 —", "###  D63  —"))] == ["D63", "D43", "V1"]
+    assert [i["state"] for i in pacote._abertos(PENDENCIAS)] == ["pending", "deferred", "deferred"]
+    with pytest.raises(SystemExit, match="itens em aberto"):
+        pacote._abertos(PENDENCIAS.replace("### D63 —", "#### D63 —"))
+    with pytest.raises(SystemExit, match="Esperando você"):
+        pacote._abertos(PENDENCIAS.replace("## 1. Esperando você", "## 1. Outra coisa"))
+
+
+def _junit(tmp_path, *casos: str) -> pathlib.Path:
+    arquivo = tmp_path / "junit.xml"
+    arquivo.write_text('<testsuites><testsuite timestamp="2026-11-14T11:00:00-03:00">'
+                       + "".join(casos) + "</testsuite></testsuites>", encoding="utf-8")
+    return arquivo
+
+
+def test_o_junit_resolve_o_modulo_pelo_arquivo_e_guarda_a_classe(tmp_path) -> None:
+    """RVB4-1-04: subdiretório, classe e homônimos não colidem."""
+    for modulo in ("tests/test_a.py", "tests/sub/test_a.py", "tests/sub/test_b.py"):
+        (tmp_path / modulo).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / modulo).write_text(f'"""Resumo de {modulo}."""\n', encoding="utf-8")
+    junit = _junit(tmp_path, '<testcase classname="tests.sub.test_a" name="test_x"/>',
+                   '<testcase classname="tests.sub.test_b" name="test_x"><failure/></testcase>',
+                   '<testcase classname="tests.test_a.Classe" name="test_x"/>',
+                   '<testcase classname="tests.test_a" name="test_x"/>')
+    checks = pacote._verificacoes(junit, tmp_path)
+    assert sorted(checks) == ["tests/sub/test_a.py::test_x", "tests/sub/test_b.py::test_x",
+                              "tests/test_a.py::Classe::test_x", "tests/test_a.py::test_x"]
+    assert checks["tests/sub/test_b.py::test_x"]["result"]["status"] == "fail"
+    assert checks["tests/sub/test_a.py::test_x"]["summary"] == "Resumo de tests/sub/test_a.py."
+
+
+def test_o_junit_recusa_modulo_inexistente_e_caso_repetido(tmp_path) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("", encoding="utf-8")
+    with pytest.raises(SystemExit, match="não corresponde"):
+        pacote._verificacoes(_junit(tmp_path, '<testcase classname="tests.test_sumiu" name="t"/>'), tmp_path)
+    with pytest.raises(SystemExit, match="duas vezes"):
+        pacote._verificacoes(_junit(tmp_path, '<testcase classname="tests.test_a" name="t"/>',
+                                    '<testcase classname="tests.test_a" name="t"/>'), tmp_path)
+
+
+def _minimo(gerado: dict) -> dict:
+    """O pacote versionado como base das contraprovas de `validar`."""
+    return json.loads(json.dumps(gerado))
+
+
+def test_caminho_de_maquina_em_chave_ou_valor_e_recusado(gerado) -> None:
+    """RVB4-1-05: a regra 7 sobre o pacote inteiro, chaves inclusive."""
+    base = _minimo(gerado)
+    base["checks"] = {}
+    assert not [e for e in pacote.validar(base) if "caminho fora" in e]
+    chave = dict(base, checks={"tests/test_x.py::test_y[/opt/python3.11/lib/x.py:50]": {
+        "module": "tests/test_x.py", "summary": None, "layer": None, "result": None}})
+    assert any("caminho fora" in e for e in pacote.validar(chave))
+    valor = _minimo(base)
+    valor["environments"][0]["note"] = "ver /home/alguem/projeto"
+    assert any("caminho fora" in e for e in pacote.validar(valor))
+    assert not pacote.CAMINHO_DE_FORA.search("docs/arquitetura.md#5 e https://exemplo.org/home/x")
+
+
+def test_o_calendario_de_todo_instante_e_conferido(gerado) -> None:
+    """RVB4-1-06: 31/02 passa na expressão do esquema e não passa no gerador."""
+    base = _minimo(gerado)
+    base["provenance"]["dbt"]["manifest_generated_at"] = "2026-02-31T00:00:00Z"
+    assert any("instante-no-calendario" in e for e in pacote.validar(base))
+    assert pacote._instante("2026-11-14T14:05:25.720202Z") and not pacote._instante("2026-11-14T14:05:25")
+
+
+def test_a_arvore_suja_olha_todo_arquivo_rastreado(tmp_path) -> None:
+    """RVB4-1-07: mudança só no README, fora dos insumos, deixa a árvore suja."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "README.md").write_text("a\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+    assert not pacote._arvore_suja(tmp_path)
+    (tmp_path / "solto.txt").write_text("não rastreado\n", encoding="utf-8")
+    assert not pacote._arvore_suja(tmp_path)
+    (tmp_path / "README.md").write_text("b\n", encoding="utf-8")
+    assert pacote._arvore_suja(tmp_path)
+
+
+def test_a_conferencia_ignora_a_execucao_e_acusa_o_resultado(gerado) -> None:
+    """RVB4-1-01: outro instante e outra execução não atrasam o pacote; outro resultado, sim."""
+    base = _minimo(gerado)
+    if not base["tests"]:
+        pytest.skip("pacote sem testes do dbt")
+    outra = _minimo(base)
+    outra["provenance"]["tree_dirty_at_generation"] = not base["provenance"]["tree_dirty_at_generation"]
+    outra["provenance"]["dbt"]["manifest_invocation_id"] = "outra"
+    for item in outra["tests"].values():
+        if item["result"]:
+            item["result"]["executed_at"], item["result"]["invocation_id"] = "2030-01-01T00:00:00Z", "outra"
+    assert pacote.diferencas(base, outra) == []
+    teste = next(k for k, v in outra["tests"].items() if v["result"])
+    outra["tests"][teste]["result"]["status"] = "fail"
+    assert pacote.diferencas(base, outra) == [f"tests: 1 diferente(s), p.ex. {[teste]}"]
+    sumiu = _minimo(base)
+    sumiu["checks"].pop(next(iter(sumiu["checks"])))
+    assert pacote.diferencas(base, sumiu)[0].startswith("checks: 1 diferente(s)")

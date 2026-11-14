@@ -10,11 +10,26 @@ passa no esquema não escreve nada.
 A guarda (RVG-1-04) é o `inputs_sha256`: o SHA-256 do conteúdo dos arquivos rastreados que
 alimentam o pacote. O `check-offline` o recalcula sem nenhum artefato do dbt e recusa o
 pacote atrasado (`tests/test_pacote_gerado.py`). O pacote não cita o *commit* que o contém.
+
+O que o digest não alcança, porque está fora do Git, tem duas guardas (RVB4-1-01, RVB4-1-02):
+
+* **o carimbo do *build*** — `make dbt-build` grava em `dbt/target/pacote_carimbo.json` o digest
+  dos insumos do dbt lido **antes** do *build* e o `invocation_id` do *manifest* que ele produziu.
+  O gerador recusa o *manifest* de outra execução ou de outros insumos: regerar sobre um
+  *manifest* atrasado daria o digest novo a conteúdo velho;
+* **a conferência do `make check`** (`--check`), depois do `pytest`: monta o pacote sem escrever e
+  o compara com o versionado, sem os instantes e as execuções. Resultado de teste ou de `pytest`
+  que mudou, teste novo ou sumido, descrição nova: o pacote está atrasado.
+
+E nada parcial nem sensível sai: os leitores de Markdown recusam o que não reconhecem e conferem a
+cobertura; o JUnit recusa módulo que não existe e identificador repetido; o pacote inteiro, chaves
+inclusive, recusa caminho fora do repositório (regra 7); e cada instante passa pelo calendário.
 """
 
 from __future__ import annotations
 
 import ast
+import copy
 import datetime as dt
 import hashlib
 import json
@@ -32,6 +47,7 @@ ROOT = sensitivity.ROOT
 DBT = sensitivity.DBT
 MANIFEST = sensitivity.MANIFEST
 RUN_RESULTS = DBT / "target" / "run_results.json"
+CARIMBO = DBT / "target" / "pacote_carimbo.json"
 JUNIT = ROOT / "data" / "pytest" / "junit.xml"
 PACOTE = ROOT / "docs" / "pacote_de_metadados.json"
 ESQUEMA = ROOT / "docs" / "pacote_de_metadados.schema.json"
@@ -58,7 +74,13 @@ INSUMOS = (
     "airflow/dags/fluxo_batch.py",
     "src/mvp_ed1/models/*.py",
     "src/mvp_ed1/legacy/ponte.py",
+    "src/mvp_ed1/docs_check.py",        # o `slug` das âncoras de `open_items`
+    "dbt/profiles.yml",                 # o `dbt_target` de `provenance.environment`
+    "tests/**/test_*.py",               # o `summary` de `checks`: só a 1ª linha da docstring conta
 )
+
+#: Os insumos que o dbt lê para produzir o *manifest*: os que o carimbo do *build* fixa.
+INSUMOS_DO_DBT = ("dbt/", "docs/glossario_de_negocio/")
 
 #: A fonte da página de estrutura e ambientes, artefato por artefato (L4, L10).
 AMBIENTES = [
@@ -92,17 +114,68 @@ def _casa(caminho: str, padrao: str) -> bool:
     return caminho.startswith(prefixo + "/") and pathlib.PurePosixPath(caminho).match(sufixo)
 
 
+def _modulo_de_teste(caminho: str) -> bool:
+    return caminho.startswith("tests/") and pathlib.PurePosixPath(caminho).name.startswith("test_")
+
+
+def _conteudo(raiz: pathlib.Path, caminho: str) -> bytes:
+    """O que o pacote lê do insumo: o arquivo inteiro; do módulo de teste, só o `summary`."""
+    if _modulo_de_teste(caminho):
+        return (_resumo(raiz / caminho) or "").encode()
+    return (raiz / caminho).read_bytes()
+
+
 def digest(caminhos: list[str], raiz: pathlib.Path = ROOT, conteudo=None) -> str:
     """SHA-256 de `caminho\\0sha256(conteúdo)\\n` em ordem. `conteudo` troca a leitura (contraprovas)."""
     h = hashlib.sha256()
     for c in caminhos:
-        dados = conteudo(c) if conteudo else (raiz / c).read_bytes()
+        dados = conteudo(c) if conteudo else _conteudo(raiz, c)
         h.update(c.encode() + b"\0" + hashlib.sha256(dados).hexdigest().encode() + b"\n")
     return h.hexdigest()
 
 
-def _arvore_suja(caminhos: list[str]) -> bool:
-    saida = subprocess.run(["git", "status", "--porcelain", "--", *caminhos], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+def digest_do_dbt(raiz: pathlib.Path = ROOT) -> str:
+    """O digest dos insumos que o dbt lê — o que o carimbo do *build* fixa."""
+    return digest([c for c in insumos(raiz) if c.startswith(INSUMOS_DO_DBT)], raiz)
+
+
+def carimbar(digest_antes: str, inicio: str, manifest: pathlib.Path = MANIFEST, carimbo: pathlib.Path = CARIMBO) -> bool:
+    """Depois do *build*: o *manifest* desta execução foi produzido destes insumos (lidos antes dela).
+
+    Só carimba o *manifest* escrito **depois** de `inicio` (UTC, o instante em que o *build* começou):
+    se o dbt falhou antes de escrevê-lo, o que está em `dbt/target` é o de outra execução, e carimbá-lo
+    daria a ele os insumos de agora. Nesse caso o carimbo antigo sai, e o pacote recusa até o próximo
+    *build* que escreva o *manifest*.
+    """
+    comeco = dt.datetime.fromisoformat(inicio)
+    dado = json.loads(manifest.read_text(encoding="utf-8")) if manifest.exists() else None
+    if dado is None or dt.datetime.fromisoformat(dado["metadata"]["generated_at"]) < comeco:
+        carimbo.unlink(missing_ok=True)
+        print(f"aviso: o dbt não escreveu {manifest.name} nesta execução; sem carimbo, o pacote de metadados recusa "
+              "até o próximo `make dbt-build`", file=sys.stderr)
+        return False
+    carimbo.write_text(json.dumps({"inputs_sha256_dbt": digest_antes,
+                                   "manifest_invocation_id": dado["metadata"]["invocation_id"]}) + "\n", encoding="utf-8")
+    return True
+
+
+def conferir_carimbo(manifest: dict, atual: str, carimbo: pathlib.Path = CARIMBO) -> None:
+    """Recusa o *manifest* que não é o do último `make dbt-build` sobre os insumos de agora (RVB4-1-02)."""
+    if not carimbo.exists():
+        raise SystemExit(f"sem {carimbo.name}: o *manifest* não veio de `make dbt-build`; rode-o — nenhum pacote é escrito")
+    dado = json.loads(carimbo.read_text(encoding="utf-8"))
+    if dado.get("manifest_invocation_id") != manifest["metadata"]["invocation_id"]:
+        raise SystemExit("o *manifest* é de outra execução do dbt que não a do último `make dbt-build`; "
+                         "rode `make dbt-build` — nenhum pacote é escrito")
+    if dado.get("inputs_sha256_dbt") != atual:
+        raise SystemExit("os insumos do dbt mudaram depois do último `make dbt-build` (o *manifest* está atrasado); "
+                         "rode `make dbt-build` e `make catalog` — nenhum pacote é escrito")
+
+
+def _arvore_suja(raiz: pathlib.Path = ROOT) -> bool:
+    """Algum arquivo **rastreado**, de qualquer lugar da árvore, difere do `HEAD` (RVB4-1-07)."""
+    saida = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=raiz,
+                           capture_output=True, text=True, check=True).stdout
     return bool(saida.strip())
 
 
@@ -161,23 +234,49 @@ def _faltas(relacoes: dict) -> list[dict]:
     return saida
 
 
+#: O cabeçalho de uma pergunta e o de um item em aberto, com qualquer espaço que o Markdown aceita.
+CABECA_PERGUNTA = re.compile(r"^#{3}[ \t]+(P\d{2})[ \t]+—[ \t]+(.+?)[ \t]*$", re.M)
+CABECA_ABERTO = re.compile(r"^#{3}[ \t]+(((?:D|V)\d+)[ \t]+—[ \t]+(.+?))[ \t]*$", re.M)
+CELULA = re.compile(r"^\|[ \t]*\*\*(Fatos?|Medidas|Dimensões|View)\*\*[ \t]*\|[ \t]*(.+?)[ \t]*\|[ \t]*$", re.M)
+
+
+def _sem_perda(o_que: str, achados: list[str], universo: list[str]) -> None:
+    """Nada parcial (regra 4): o lido tem de ser o universo, sem repetição — senão, nada é escrito."""
+    if len(achados) != len(set(achados)) or sorted(achados) != sorted(universo):
+        raise SystemExit(f"{o_que}: lido {sorted(achados)}, esperado {sorted(universo)} — nenhum pacote é escrito")
+
+
+def _medidas(celula: str, pergunta: str) -> list[dict]:
+    medidas = []
+    for parte in re.split(r"[ \t]*·[ \t]*", celula.strip()):
+        m = re.fullmatch(r"`(\w+)`[ \t]*\(([^`]+)\)", parte.strip())
+        nota = m and m.group(2).replace("**", "")
+        tipo = nota and next((k for k in sorted(ADITIVIDADE, key=len, reverse=True) if nota.startswith(k)), None)
+        if not tipo:
+            raise SystemExit(f"{pergunta}: medida fora da forma `coluna` (aditividade, nota): {parte!r} — nenhum pacote é escrito")
+        resto = nota[len(tipo):].lstrip(" ,—").strip()
+        medidas.append({"column": m.group(1), "additivity": ADITIVIDADE[tipo], "note": resto or None})
+    _sem_perda(f"{pergunta}: medidas", [x["column"] for x in medidas], re.findall(r"`(\w+)`[ \t]*\(", celula))
+    return medidas
+
+
 def _perguntas(texto: str) -> dict:
     saida = {}
-    for bloco in re.split(r"\n(?=### P\d{2} — )", texto):
-        cabeca = re.match(r"### (P\d{2}) — (.+)", bloco)
-        if not cabeca:
-            continue
-        celulas = dict(re.findall(r"^\| \*\*(Fatos?|Medidas|Dimensões|View)\*\* \| (.+) \|$", bloco, re.M))
+    cabecas = list(CABECA_PERGUNTA.finditer(texto))
+    # O universo: toda linha de título que cita um `Pnn`, com qualquer nível ou espaço.
+    _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas],
+               re.findall(r"^#+\s*(P\d{2})\b", texto, re.M))
+    _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas], [f"P{i:02d}" for i in range(1, 17)])
+    for cabeca, seguinte in zip(cabecas, cabecas[1:] + [None]):
+        bloco = texto[cabeca.end():seguinte.start() if seguinte else len(texto)]
+        lidas = CELULA.findall(bloco)
+        celulas = dict(lidas)
+        if len(celulas) != len(lidas) or not {"Medidas", "Dimensões", "View"} <= celulas.keys() or not (
+                {"Fato", "Fatos"} & celulas.keys()):
+            raise SystemExit(f"{cabeca.group(1)}: a tabela não tem uma linha de cada (Fato, Medidas, Dimensões, View): "
+                             f"{[k for k, _ in lidas]} — nenhum pacote é escrito")
         fatos = celulas.get("Fato") or celulas.get("Fatos") or ""
-        medidas = []
-        for parte in (celulas.get("Medidas") or "").split(" · "):
-            m = re.match(r"`(\w+)`\s*\((.+)\)\s*$", parte.strip())
-            if not m:
-                continue
-            nota = m.group(2).replace("**", "")
-            tipo = next(k for k in sorted(ADITIVIDADE, key=len, reverse=True) if nota.startswith(k))
-            resto = nota[len(tipo):].lstrip(" ,—").strip()
-            medidas.append({"column": m.group(1), "additivity": ADITIVIDADE[tipo], "note": resto or None})
+        medidas = _medidas(celulas["Medidas"], cabeca.group(1))
         saida[cabeca.group(1)] = {
             "title": cabeca.group(2).strip(),
             "facts": [f"analytics.{f}" for f in re.findall(r"`(fact_\w+)`", fatos)],
@@ -250,33 +349,52 @@ def _resumo(modulo: pathlib.Path) -> str | None:
     return _texto(doc.splitlines()[0]) if doc else None
 
 
-def _verificacoes(junit: pathlib.Path) -> dict:
-    """O pytest do último `make check`; sem relatório, `{}` — e o pacote diz que não há resultado."""
+def _verificacoes(junit: pathlib.Path, raiz: pathlib.Path = ROOT) -> dict:
+    """O pytest do último `make test` (o do `make check`); sem relatório, `{}` — e o pacote diz que não há resultado."""
     if not junit.exists():
         return {}
-    raiz = ET.parse(junit).getroot()
-    suite = raiz if raiz.tag == "testsuite" else raiz.find("testsuite")
+    documento = ET.parse(junit).getroot()
+    suite = documento if documento.tag == "testsuite" else documento.find("testsuite")
     quando = dt.datetime.fromisoformat(suite.get("timestamp")).astimezone(dt.timezone.utc).isoformat().replace("+00:00", "Z")
     execucao = f"pytest@{quando}"
     saida = {}
     for caso in suite.iter("testcase"):
-        modulo = "tests/" + caso.get("classname").removeprefix("tests.").split(".")[0] + ".py"
+        modulo, classes = _modulo_do_caso(caso.get("classname"), raiz)
         estado = ("fail" if caso.find("failure") is not None else "error" if caso.find("error") is not None
                   else "skipped" if caso.find("skipped") is not None else "pass")
-        saida[f"{modulo}::{caso.get('name')}"] = {
-            "module": modulo, "summary": _resumo(ROOT / modulo), "layer": None,
+        chave = "::".join([modulo, *classes, caso.get("name")])
+        if chave in saida:
+            raise SystemExit(f"JUnit: `{chave}` aparece duas vezes — nenhum pacote é escrito")
+        saida[chave] = {
+            "module": modulo, "summary": _resumo(raiz / modulo), "layer": None,
             "result": {"status": estado, "executed_at": quando, "run_id": execucao},
         }
     return dict(sorted(saida.items()))
 
 
+def _modulo_do_caso(classname: str, raiz: pathlib.Path = ROOT) -> tuple[str, list[str]]:
+    """`tests.sub.test_x.Classe` → (`tests/sub/test_x.py`, [`Classe`]): o módulo é o arquivo que existe (RVB4-1-04)."""
+    partes = (classname or "").split(".")
+    for fim in range(len(partes), 0, -1):
+        modulo = "/".join(partes[:fim]) + ".py"
+        if modulo.startswith("tests/") and (raiz / modulo).is_file():
+            return modulo, partes[fim:]
+    raise SystemExit(f"JUnit: `{classname}` não corresponde a módulo nenhum em tests/ — nenhum pacote é escrito")
+
+
 def _abertos(texto: str) -> list[dict]:
     from mvp_ed1.docs_check import slug
 
-    secao = texto.split("\n## 1. Esperando você", 1)[1].split("\n## 1.1", 1)[0]
+    partes = re.split(r"^##[ \t]+1\.[ \t]+Esperando você[ \t]*$", texto, maxsplit=1, flags=re.M)
+    if len(partes) != 2:
+        raise SystemExit("pendências: sem a seção `## 1. Esperando você` — nenhum pacote é escrito")
+    secao = partes[1]
+    secao = re.split(r"^##[ \t]+1\.1\b", secao, maxsplit=1, flags=re.M)[0]
+    cabecas = CABECA_ABERTO.findall(secao)
+    # O universo: todo título da seção que cita um `Dnn` ou `Vn`, com qualquer nível ou espaço.
+    _sem_perda("itens em aberto", [c[1] for c in cabecas], re.findall(r"^#+\s*((?:D|V)\d+)\b", secao, re.M))
     saida = []
-    for titulo in re.findall(r"^### ((?:D|V)\d+ — .+)$", secao, re.M):
-        ident, nome = titulo.split(" — ", 1)
+    for titulo, ident, nome in cabecas:
         adiada = "adiada" in nome or ident.startswith("V")
         saida.append({"id": ident, "title": nome.strip(), "state": "deferred" if adiada else "pending",
                       "anchor": f"docs/pendencias.md#{slug(titulo)}", "objects": None})
@@ -297,7 +415,7 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT) ->
         "format": FORMATO,
         "provenance": {
             "inputs_sha256": digest(caminhos), "inputs": caminhos,
-            "tree_dirty_at_generation": _arvore_suja(caminhos),
+            "tree_dirty_at_generation": _arvore_suja(),
             "environment": {"dbt_target": alvo},
             "dbt": {"dbt_version": manifest["metadata"]["dbt_version"], "adapter_type": manifest["metadata"]["adapter_type"],
                     "manifest_generated_at": manifest["metadata"]["generated_at"],
@@ -324,25 +442,127 @@ def serializar(pacote: dict) -> str:
     return json.dumps(pacote, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
+#: Caminho absoluto de máquina (regra 7): o que o repositório não tem e não pode publicar.
+CAMINHO_DE_FORA = re.compile(r"(?<![\w.~/-])(?:/(?:home|opt|usr|tmp|var|etc|root|mnt|srv|Users|private)/|[A-Za-z]:\\)")
+
+
+def _instante(valor: object) -> bool:
+    """O calendário que a expressão do esquema não alcança (regra 6): 31/02 não passa (RVB4-1-06)."""
+    if not isinstance(valor, str):
+        return True
+    try:
+        return dt.datetime.fromisoformat(valor).tzinfo is not None
+    except ValueError:
+        return False
+
+
+def _cadeias(no, onde: str = ""):
+    """Toda cadeia do pacote, **chaves inclusive**, com onde está."""
+    if isinstance(no, dict):
+        for k, v in no.items():
+            yield f"{onde}{{chave}}", k
+            yield from _cadeias(v, f"{onde}.{k}")
+    elif isinstance(no, list):
+        for i, v in enumerate(no):
+            yield from _cadeias(v, f"{onde}[{i}]")
+    elif isinstance(no, str):
+        yield onde, no
+
+
 def validar(pacote: dict) -> list[str]:
     import jsonschema
 
     esquema = json.loads(ESQUEMA.read_text(encoding="utf-8"))
-    return sorted(e.message for e in jsonschema.Draft202012Validator(esquema).iter_errors(pacote))
+    esquema["$defs"]["instante"]["format"] = "instante-no-calendario"
+    formatos = copy.deepcopy(jsonschema.Draft202012Validator.FORMAT_CHECKER)
+    formatos.checks("instante-no-calendario")(_instante)
+    erros = [e.message for e in jsonschema.Draft202012Validator(esquema, format_checker=formatos).iter_errors(pacote)]
+    erros += [f"caminho fora do repositório em {onde}: …{texto[max(m.start() - 20, 0):m.end() + 40]!r}"
+              for onde, texto in _cadeias(pacote) if (m := CAMINHO_DE_FORA.search(texto))]
+    return sorted(erros)
 
 
-def main(argv: list[str] | None = None) -> int:
+#: O que muda a cada execução sem mudar o que o pacote afirma: fora da comparação do `--check`.
+EXECUCAO = {"executed_at", "invocation_id", "same_invocation_as_manifest", "run_id"}
+
+
+def normalizado(pacote: dict) -> dict:
+    """O pacote sem os instantes e as execuções: o que tem de ser igual entre o versionado e o de agora."""
+    p = copy.deepcopy(pacote)
+    p["provenance"].pop("tree_dirty_at_generation", None)
+    p["provenance"]["dbt"] = {k: v for k, v in p["provenance"]["dbt"].items() if not k.startswith(("manifest_", "run_results_"))}
+    for secao in ("tests", "checks"):
+        for item in p[secao].values():
+            if item.get("result"):
+                item["result"] = {k: v for k, v in item["result"].items() if k not in EXECUCAO}
+    return p
+
+
+def diferencas(versionado: dict, atual: dict, limite: int = 8) -> list[str]:
+    """Onde os dois pacotes normalizados divergem, seção a seção, com alguns exemplos de chave."""
+    a, b = normalizado(versionado), normalizado(atual)
+    saida = []
+    for secao in sorted(a.keys() | b.keys()):
+        x, y = a.get(secao), b.get(secao)
+        if x == y:
+            continue
+        if isinstance(x, dict) and isinstance(y, dict):
+            chaves = sorted(k for k in x.keys() | y.keys() if x.get(k) != y.get(k))
+            saida.append(f"{secao}: {len(chaves)} diferente(s), p.ex. {chaves[:limite]}")
+        else:
+            saida.append(f"{secao}: diferente")
+    return saida
+
+
+def _montar_conferido() -> dict | int:
     for artefato in (MANIFEST, RUN_RESULTS):
         if not artefato.exists():
             print(f"sem {artefato.relative_to(ROOT)}; rode `make dbt-build` antes — nenhum pacote é escrito", file=sys.stderr)
             return 2
     manifest, derivacao = sensitivity.load()
+    conferir_carimbo(manifest, digest_do_dbt())
     run = json.loads(RUN_RESULTS.read_text(encoding="utf-8"))
     pacote = montar(manifest, derivacao, run)
     erros = validar(pacote)
     if erros:
-        print(f"pacote fora do esquema ({len(erros)}): nada é escrito; p.ex. {erros[:3]}", file=sys.stderr)
+        print(f"pacote fora do esquema ou das regras ({len(erros)}): nada é escrito; p.ex. {erros[:3]}", file=sys.stderr)
         return 1
+    return pacote
+
+
+def conferir() -> int:
+    """`--check`: o versionado é o que os artefatos de agora dão, salvo instantes e execuções (RVB4-1-01)."""
+    pacote = _montar_conferido()
+    if isinstance(pacote, int):
+        return pacote
+    if not PACOTE.exists():
+        print("docs/pacote_de_metadados.json não existe; rode `make catalog`", file=sys.stderr)
+        return 1
+    if diferenca := diferencas(json.loads(PACOTE.read_text(encoding="utf-8")), pacote):
+        print("pacote de metadados atrasado em relação aos artefatos desta execução; rode `make catalog` e "
+              "versione o resultado:\n  " + "\n  ".join(diferenca), file=sys.stderr)
+        return 1
+    print(f"pacote de metadados em dia com os artefatos ({len(pacote['tests'])} testes, {len(pacote['checks'])} do pytest)")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--digest-do-dbt"]:
+        print(digest_do_dbt())
+        return 0
+    if argv[:1] == ["--carimbar"] and len(argv) == 3:
+        carimbar(argv[1], argv[2])
+        return 0
+    if argv[:1] == ["--check"]:
+        return conferir()
+    if argv:
+        print(f"uso: python -m mvp_ed1.models.pacote [--check | --digest-do-dbt | --carimbar DIGEST INICIO]; recebido {argv}",
+              file=sys.stderr)
+        return 2
+    pacote = _montar_conferido()
+    if isinstance(pacote, int):
+        return pacote
     texto = serializar(pacote)
     if PACOTE.exists() and PACOTE.read_text(encoding="utf-8") == texto:
         print(f"pacote de metadados já em dia ({len(pacote['relations'])} relações)")

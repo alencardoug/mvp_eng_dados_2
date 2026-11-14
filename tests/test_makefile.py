@@ -898,7 +898,55 @@ def test_dbt_docs_gera_e_serve(tmp_path):
     r, chamadas = _make(tmp_path, "dbt-docs")
 
     assert r.returncode == 0, r.stdout + r.stderr
-    assert chamadas == ["dbt docs generate", "dbt docs serve"], chamadas
+    # O `docs generate` escreve o manifest e por isso leva o carimbo do pacote (RVB4-1-02); o
+    # `serve` continua achando o `.env` e `dbt/`, porque o carimbo volta à raiz com `cd`.
+    assert [c for c in chamadas if not c.startswith("python")] == ["dbt docs generate", "dbt docs serve"], chamadas
+
+
+# ── O carimbo do build para o pacote de metadados (RVB4-1-02) ──────────────
+
+#: O `python` que responde o digest dos insumos do dbt, como o real faz com `--digest-do-dbt`.
+PYTHON_DO_DIGEST = (REGISTRADOR + 'case "$*" in *--digest-do-dbt*) echo "d1g357";; esac\n')
+#: O `dbt` que falha como um build com teste vermelho: o código tem de chegar ao `make`.
+DBT_QUE_FALHA = REGISTRADOR + "exit 1\n"
+
+
+@pytest.mark.parametrize(("alvo", "comando"), [
+    pytest.param(["dbt-build"], "dbt build", id="dbt-build"),
+    pytest.param(["dbt-rebuild"], "dbt build --full-refresh", id="dbt-rebuild"),
+    pytest.param(["dbt-test"], "dbt test", id="dbt-test"),
+    pytest.param(["docs-generate"], "dbt docs generate", id="docs-generate"),
+])
+def test_todo_comando_do_dbt_que_escreve_o_manifest_e_carimbado(tmp_path, alvo, comando):
+    """O digest é lido **antes** do dbt, e o carimbo, gravado **depois**, com esse digest e o início."""
+    r, chamadas = _make(tmp_path, *alvo, simulados={".venv/bin/python": PYTHON_DO_DIGEST})
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    dbt = [c for c in chamadas if c.startswith("dbt ")]
+    assert dbt == [comando], chamadas
+    i = chamadas.index(comando)
+    assert chamadas[i - 1] == "python -m mvp_ed1.models.pacote --digest-do-dbt", chamadas
+    carimbo = chamadas[i + 1].split()
+    assert carimbo[:5] == ["python", "-m", "mvp_ed1.models.pacote", "--carimbar", "d1g357"], chamadas
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", carimbo[5]), chamadas
+
+
+def test_o_carimbo_nao_esconde_a_falha_do_dbt(tmp_path):
+    """Build com teste vermelho: o carimbo é gravado (o manifest é desta execução) e o `make` falha."""
+    r, chamadas = _make(tmp_path, "dbt-build",
+                        simulados={".venv/bin/python": PYTHON_DO_DIGEST, ".venv/bin/dbt": DBT_QUE_FALHA})
+
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert any(c.startswith("python -m mvp_ed1.models.pacote --carimbar d1g357 ") for c in chamadas), chamadas
+
+
+def test_o_check_confere_o_pacote_depois_do_pytest(tmp_path):
+    """A 5ª etapa roda depois da suíte, que é quem escreve o JUnit (RVB4-1-01)."""
+    r, chamadas = _make(tmp_path, "check")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    pytest_ = next(i for i, c in enumerate(chamadas) if c.startswith("pytest"))
+    assert chamadas[pytest_ + 1:] == ["python -m mvp_ed1.models.pacote --check"], chamadas
 
 
 # ── B5, linha 2: o airbyte-config num Airbyte recém-instalado ───────────────

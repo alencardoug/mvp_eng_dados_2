@@ -51,6 +51,14 @@ TERRAFORM := .tools/terraform -chdir=airbyte
 # diretório do projeto, nunca de ~/.dbt.
 DBT := set -a; . ./.env; set +a; cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt
 
+# O carimbo do *build* para o pacote de metadados (RVB4-1-02), em volta de todo comando do dbt
+# que escreve o manifest: o digest dos insumos do dbt lido **antes** e o `invocation_id` do
+# manifest escrito **depois** do início. O pacote recusa o manifest de outra execução ou de
+# outros insumos. Se o dbt não escreveu o manifest, o carimbo antigo sai. O código de saída
+# é sempre o do dbt; o `cd` volta porque o `$(DBT)` entra em `dbt/`.
+CARIMBO_ANTES := ini=$$(date -u +%Y-%m-%dT%H:%M:%SZ); dig=$$(.venv/bin/python -m mvp_ed1.models.pacote --digest-do-dbt) || exit 1
+CARIMBO_DEPOIS := st=$$?; cd "$(CURDIR)" && .venv/bin/python -m mvp_ed1.models.pacote --carimbar "$$dig" "$$ini"; exit $$st
+
 # Credenciais do Airbyte no momento da execução; nunca gravadas em arquivo.
 CREDENCIAIS = eval "$$($(ABCTL) local credentials 2>/dev/null \
 	| sed 's/\x1b\[[0-9;]*m//g' \
@@ -292,7 +300,9 @@ catalog: require-venv ## Regenera dicionário, inventário, diagrama ER, a class
 	@.venv/bin/python -m mvp_ed1.models.lineage
 	@# O pacote de metadados da D91 (docs/pacote_de_metadados.md): compõe o que os passos acima
 	@# deixaram em dbt/target, mais o relatório do pytest do último `make test`. Sem os artefatos
-	@# do dbt, não escreve nada; o `check-offline` confere que ele está em dia com os insumos.
+	@# do dbt, ou com o manifest de outra execução que não a do carimbo sobre os insumos de agora,
+	@# não escreve nada; o `check-offline` confere que ele está em dia com os insumos, e o `check`
+	@# completo, com os resultados.
 	@.venv/bin/python -m mvp_ed1.models.pacote
 
 seed-data: require-env require-venv ## Gera e carrega os dados sintéticos; SCALE, SEED, AS_OF, FORCE=1
@@ -595,7 +605,7 @@ dbt-build: require-env require-venv ## Roda os modelos dbt e os testes; RESET=1 
 	@$(GARANTIR_LEITOR_NO_ENV)
 	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.governance garantir
 	@$(if $(filter 1,$(RESET)),$(MAKE) --no-print-directory dbt-drop-snapshots)
-	@$(DBT) build $(if $(filter 1,$(RESET)),--full-refresh) $(DBT_ARGS)
+	@$(CARIMBO_ANTES); $(DBT) build $(if $(filter 1,$(RESET)),--full-refresh) $(DBT_ARGS); $(CARIMBO_DEPOIS)
 
 airflow-up: require-env require-abctl ## Sobe o Airflow local (LocalExecutor, três contêineres)
 	$(call preflight,airflow)
@@ -795,7 +805,7 @@ dbt-rebuild: require-env require-venv ## Reconstrói TUDO sem derrubar os snapsh
 	@# a impressão vigente. É o mecanismo que acumulou as 63.802 linhas.
 	@$(GARANTIR_LEITOR_NO_ENV)
 	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.governance garantir
-	@$(DBT) build --full-refresh $(DBT_ARGS)
+	@$(CARIMBO_ANTES); $(DBT) build --full-refresh $(DBT_ARGS); $(CARIMBO_DEPOIS)
 
 dbt-drop-snapshots: require-env require-venv ## DESTRÓI o histórico SCD; use depois de regerar a origem
 	@echo "descartando o schema 'snapshots' — o histórico SCD será refeito do zero"
@@ -808,7 +818,7 @@ c = e.connect(); c.execute(sa.text('drop schema if exists snapshots cascade')); 
 print('  schema snapshots descartado')"
 
 dbt-test: require-env require-venv ## Somente os testes de dados
-	@$(DBT) test $(DBT_ARGS)
+	@$(CARIMBO_ANTES); $(DBT) test $(DBT_ARGS); $(CARIMBO_DEPOIS)
 
 docs-check: require-venv ## Confere links, âncoras e citações de ADR nos documentos rastreados
 	@.venv/bin/python -m mvp_ed1.docs_check
@@ -817,7 +827,7 @@ secrets-history: require-venv ## Varre TODO o histórico por forma de credencial
 	@.venv/bin/python -m mvp_ed1.secrets_review --historico
 
 docs-generate: require-env require-venv ## Só gera o catálogo — tem fim, e por isso é o que se mede
-	@$(DBT) docs generate
+	@$(CARIMBO_ANTES); $(DBT) docs generate; $(CARIMBO_DEPOIS)
 
 dbt-docs: require-env require-venv docs-generate ## Gera e serve o catálogo com dicionário, linhagem e glossário
 	@# O gerar é o `docs-generate`; aqui só se serve. `$(DBT)` entra em `dbt/`, e
@@ -837,8 +847,8 @@ test: require-venv ## Testes de código Python (pytest); CARGA=1 roda a carga em
 		MVP_TESTE_FATO=$(if $(filter 1,$(FATO)),1,0) .venv/bin/pytest -q -rs --junitxml=data/pytest/junit.xml
 	@$(if $(filter 1,$(CARGA)),$(MAKE) --no-print-directory test-carga,true)
 
-check: require-env require-venv ## Verificação completa, parando na primeira falha: segredos, dbt build + testes de dados, classificação e linhagem derivadas, pytest; FATO=1 inclui o teste que escreve na fato
-	@# Quatro etapas, nesta ordem e sem seguir depois de uma falha. Segredos
+check: require-env require-venv ## Verificação completa, parando na primeira falha: segredos, dbt build + testes de dados, classificação e linhagem derivadas, pytest, pacote de metadados; FATO=1 inclui o teste que escreve na fato
+	@# Cinco etapas, nesta ordem e sem seguir depois de uma falha. Segredos
 	@# primeiro porque custa um segundo e é a regra inviolável nº 1; o dbt antes
 	@# do pytest porque a suíte Python lê o armazém que o build acabou de
 	@# construir (captura selecionada, intervalo, memória); a classificação e a
@@ -847,17 +857,21 @@ check: require-env require-venv ## Verificação completa, parando na primeira f
 	@# A varredura do HISTÓRICO (`make secrets-history`) fica fora: o histórico
 	@# só cresce, e conferi-lo a cada `check` cobraria 25 s por nada. Ela entra
 	@# na definição de pronto e no dossiê.
-	@echo "── 1/4 revisão de segredos, .gitignore e coerência dos documentos ──"
+	@echo "── 1/5 revisão de segredos, .gitignore e coerência dos documentos ──"
 	@.venv/bin/python -m mvp_ed1.secrets_review
 	@.venv/bin/python -m mvp_ed1.docs_check
-	@echo "── 2/4 dbt build: modelos, testes de dados e reconciliações ──"
+	@echo "── 2/5 dbt build: modelos, testes de dados e reconciliações ──"
 	@$(MAKE) --no-print-directory dbt-build RESET=$(RESET)
-	@echo "── 3/4 classificação, descrição e linhagem derivadas em dia com os modelos ──"
+	@echo "── 3/5 classificação, descrição e linhagem derivadas em dia com os modelos ──"
 	@.venv/bin/python -m mvp_ed1.models.sensitivity --check
 	@.venv/bin/python -m mvp_ed1.models.lineage --check
-	@echo "── 4/4 pytest: código, contratos e integração ──"
+	@echo "── 4/5 pytest: código, contratos e integração ──"
 	@$(MAKE) --no-print-directory test FATO=$(FATO)
-	@echo "check: as quatro etapas passaram"
+	@# Depois do pytest, e não dentro dele: o JUnit só existe inteiro quando a suíte termina, e uma
+	@# asserção na mesma execução leria o relatório anterior (RVB4-1-01). Não escreve nada.
+	@echo "── 5/5 pacote de metadados em dia com os resultados desta execução ──"
+	@.venv/bin/python -m mvp_ed1.models.pacote --check
+	@echo "check: as cinco etapas passaram"
 
 check-offline: require-env require-venv ## O que se confere sem nada de pé: segredos, documentos e a suíte sem os testes de integração
 	@# O primeiro comando do clone de B5, antes de subir qualquer contêiner

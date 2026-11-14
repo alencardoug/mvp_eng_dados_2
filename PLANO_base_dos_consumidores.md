@@ -447,7 +447,9 @@ Três coisas entram no contrato, vindas da emenda e da rodada 4 de revisão:
   os mesmos bytes);
 - o `make test` grava o relatório JUnit em `data/pytest/junit.xml`, de onde sai o `checks`;
 - **volta ao item 9 da V1** (macro nova e `dbt_project.yml` fora da conferência de *manifest* atrasado):
-  a guarda do pacote não depende dessa conferência, porque os dois estão entre os insumos do digest;
+  pôr os dois entre os insumos do digest **não bastava** — regerar sobre o *manifest* atrasado dava o
+  digest novo ao conteúdo antigo (RVB4-1-02). A guarda é o carimbo do *build*, que liga o *manifest* aos
+  insumos do dbt lidos antes dele, e que o gerador confere;
 - **L5, a procedência do armazém:** o banco não guarda nada da execução que o construiu (conferido no
   `information_schema`). A proposta é gravar `invocation_id` e *commit* numa tabela de `governance` ao
   fim de cada *build*; é tabela nova, e por isso **volta ao Owner** antes de implementar. Até lá, o
