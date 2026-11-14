@@ -367,8 +367,9 @@ def fluxo_batch():
     # A quarentena sai de `trusted` e não alimenta ninguém — é destino, não
     # passagem (ADR-0008). Roda aqui porque o teste que a confere só tem o que
     # ler depois que ela existe, e porque uma rejeição descoberta tarde é uma
-    # rejeição que já contaminou o relatório.
-    quarentena = camada("quarantine", "--select quarantine tag:legado_reconciliacao")
+    # rejeição que já contaminou o relatório. O teste que lê a quarentena ao lado
+    # de `analytics` (a população de clientes, F3) é `fronteira` e sai daqui.
+    quarentena = camada("quarantine", f"--select quarantine tag:legado_reconciliacao {fronteira}")
     # `snapshot` no meio: lê `trusted`, é lido por `analytics`.
     snapshots = camada("snapshots", "", comando="snapshot")
     analytics = camada("analytics", f"--select analytics {fronteira}")

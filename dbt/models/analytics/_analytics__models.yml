@@ -162,7 +162,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: first_order_at
-        description: "Instante do primeiro pedido realizado do cliente; nulo para quem nunca comprou."
+        description: "Instante do primeiro pedido realizado do cliente; nulo para quem nunca comprou. Conta o pedido cujos itens foram todos rejeitados e estão na quarentena, que não chega a `fact_sales_order_item`: a primeira compra pode não estar na fato."
         meta:
           description_inherited: true
           sensitivity: internal
@@ -172,7 +172,7 @@ models:
           description_inherited: true
           sensitivity: internal
       - name: order_count
-        description: "**Aditiva entre clientes, só na versão vigente** (`is_current`) — pedidos realizados do cliente, com o valor atual repetido em cada versão dele; zero para quem nunca comprou."
+        description: "**Aditiva entre clientes, só na versão vigente** (`is_current`) — pedidos realizados do cliente, com o valor atual repetido em cada versão dele; zero para quem nunca comprou. Conta também o pedido cujos itens foram todos rejeitados e estão na quarentena, que não chega a `fact_sales_order_item`."
         meta:
           sensitivity: internal
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)

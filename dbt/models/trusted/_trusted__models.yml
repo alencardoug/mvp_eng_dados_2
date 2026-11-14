@@ -545,7 +545,7 @@ models:
       - name: first_order_at
         meta:
           sensitivity: internal
-        description: "Instante do primeiro pedido realizado do cliente; nulo para quem nunca comprou."
+        description: "Instante do primeiro pedido realizado do cliente; nulo para quem nunca comprou. Conta o pedido cujos itens foram todos rejeitados e estão na quarentena, que não chega a `fact_sales_order_item`: a primeira compra pode não estar na fato."
       - name: is_churned
         meta:
           sensitivity: internal
@@ -561,7 +561,7 @@ models:
       - name: order_count
         meta:
           sensitivity: internal
-        description: "Aditiva entre clientes — número de pedidos realizados do cliente; zero para quem nunca comprou."
+        description: "Aditiva entre clientes — número de pedidos realizados do cliente; zero para quem nunca comprou. Conta também o pedido cujos itens foram todos rejeitados e estão na quarentena, que não chega a `fact_sales_order_item`."
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
