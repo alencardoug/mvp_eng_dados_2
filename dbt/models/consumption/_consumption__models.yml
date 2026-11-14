@@ -557,9 +557,12 @@ models:
     meta:
       domain: estoque
     description: >
-      P11 — Giro por SKU e armazém. `quantity_on_hand` é **semiaditiva**:
-      soma por armazém e SKU, nunca ao longo do tempo — três meses somados
-      dariam um estoque que nunca existiu.
+      P11 — Giro por SKU e armazém no trimestre (ADR-0052): o custo do que
+      saiu em venda sobre o valor **médio** do estoque nos dias do trimestre,
+      pela posição de fim de dia e o custo médio das entradas até o dia. Nada
+      posterior ao trimestre muda o número. `avg_quantity_on_hand` é
+      **semiaditiva**: soma por armazém e SKU, nunca ao longo do tempo. O
+      estoque que entra e sai no mesmo dia não aparece na média.
     config:
       contract: {enforced: true}
     columns:
@@ -620,18 +623,18 @@ models:
         meta:
           sensitivity: confidential
         data_type: numeric
-      - name: quantity_on_hand
-        description: "Semiaditiva — saldo atual do SKU no armazém; zero sem saldo. Soma-se entre armazéns, nunca entre trimestres."
+      - name: avg_quantity_on_hand
+        description: "Semiaditiva — média, sobre os dias do trimestre, da posição de fim de dia do SKU no armazém, pelo livro de movimentos; zero sem posição. Soma-se entre armazéns, nunca entre trimestres."
         meta:
           sensitivity: internal
-        data_type: integer
-      - name: inventory_value_amount
-        description: "Semiaditiva — valor do estoque: o saldo atual vezes o custo unitário médio de todos os movimentos do SKU no armazém que têm custo, de qualquer tipo e de todo o período; soma-se entre SKUs e armazéns, nunca entre trimestres."
+        data_type: numeric
+      - name: avg_inventory_value_amount
+        description: "Semiaditiva — média, sobre os dias do trimestre, do valor do estoque: a posição de fim de dia vezes o custo médio ponderado das entradas até aquele dia. Soma-se entre SKUs e armazéns, nunca entre trimestres."
         meta:
           sensitivity: confidential
         data_type: numeric
       - name: inventory_turnover
-        description: "Não aditiva — giro: o custo das mercadorias vendidas sobre o valor do estoque, no trimestre; nulo sem estoque valorado."
+        description: "Não aditiva — giro: o custo das mercadorias vendidas no trimestre sobre o valor médio do estoque nele; nulo sem valor médio positivo."
         meta:
           sensitivity: confidential
         data_type: numeric
@@ -1291,3 +1294,46 @@ unit_tests:
         - {year_month: "2024-01", sales_channel_name: Aplicativo, support_category_name: Conta, ticket_count: 1, channel_order_count: 23, tickets_per_hundred_orders: 4.3478, avg_hours_to_resolution: "4.00"}
         - {year_month: "2024-01", sales_channel_name: Aplicativo, support_category_name: Entrega, ticket_count: 3, channel_order_count: 23, tickets_per_hundred_orders: 13.0435, avg_hours_to_resolution: "30.00"}
         - {year_month: "2024-01", sales_channel_name: Sem canal, support_category_name: Conta, ticket_count: 1, channel_order_count: null, tickets_per_hundred_orders: null, avg_hours_to_resolution: "8.00"}
+  - name: giro_pelo_estoque_medio_do_trimestre
+    description: >
+      ADR-0052, F2 dos Achados do nl_sql. O par A abre o trimestre com 10
+      unidades a custo 2, compradas no trimestre anterior; vende 4 no dia 2;
+      compra 10 a custo 5 no dia 3. Fim de dia: 10, 6, 16, 16 → média 12; valor
+      20, 12, 56, 56 (custo médio móvel 3,5 desde o dia 3) → média 36; giro
+      8 ÷ 36 = 0,22. A compra de 100 a custo 100 no trimestre seguinte não muda
+      nada. O par B tem a correção-relâmpago: entra e sai no mesmo dia, a
+      posição de fim de dia é zero, e o giro é nulo.
+    model: inventory_turnover_by_sku_and_warehouse
+    given:
+      - input: ref('fact_inventory_movement')
+        format: csv
+        rows: |
+          date_key,product_key,warehouse_key,source_system,quantity_delta,is_inbound,quantity_in,movement_cost_amount,is_sale,quantity_out,cogs_amount
+          d0,pa,w1,retail,10,true,10,20,false,0,0
+          d2,pa,w1,retail,-4,false,0,8,true,4,8
+          d3,pa,w1,retail,10,true,10,50,false,0,0
+          d5,pa,w1,retail,100,true,100,10000,false,0,0
+          d2,pb,w1,retail,3,true,3,3,false,0,0
+          d2,pb,w1,retail,-3,false,0,3,true,3,3
+      - input: ref('dim_date')
+        rows:
+          - {date_key: d0, full_date: "2023-12-31", year_number: 2023, quarter_number: 4}
+          - {date_key: d1, full_date: "2024-01-01", year_number: 2024, quarter_number: 1}
+          - {date_key: d2, full_date: "2024-01-02", year_number: 2024, quarter_number: 1}
+          - {date_key: d3, full_date: "2024-01-03", year_number: 2024, quarter_number: 1}
+          - {date_key: d4, full_date: "2024-01-04", year_number: 2024, quarter_number: 1}
+          - {date_key: d5, full_date: "2024-04-01", year_number: 2024, quarter_number: 2}
+      - input: ref('dim_product')
+        rows:
+          - {product_key: pa, source_system: retail, product_natural_key: 1, sku: SKU-A, product_name: Produto A, product_category_id: 7}
+          - {product_key: pb, source_system: retail, product_natural_key: 2, sku: SKU-B, product_name: Produto B, product_category_id: 7}
+      - input: ref('dim_warehouse')
+        rows:
+          - {warehouse_key: w1, source_system: retail, warehouse_natural_key: 1, warehouse_name: CD Teste, warehouse_region: Sudeste}
+      - input: ref('dim_category')
+        rows:
+          - {source_system: retail, category_natural_key: 7, category_name: Panelas}
+    expect:
+      rows:
+        - {year_quarter: "2024-T1", sku: SKU-A, quantity_out: 4, cost_of_goods_sold: 8, avg_quantity_on_hand: "12.00", avg_inventory_value_amount: "36.00", inventory_turnover: "0.22"}
+        - {year_quarter: "2024-T1", sku: SKU-B, quantity_out: 3, cost_of_goods_sold: 3, avg_quantity_on_hand: "0.00", avg_inventory_value_amount: "0.00", inventory_turnover: null}

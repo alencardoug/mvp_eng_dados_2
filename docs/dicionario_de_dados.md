@@ -910,9 +910,9 @@ de fora do repositório, com as folhas imediatas de cada coluna.
 | `warehouse_region` | `trusted.brazilian_states.region` (seed) |
 | `quantity_out` | `raw.inventory_movements.quantity_delta` · `raw.inventory_movements_stream.quantity_delta` · `raw_legacy.inventory_movements.quantity_delta` |
 | `cost_of_goods_sold` | `raw.inventory_movements.{quantity_delta, unit_cost}` · `raw.inventory_movements_stream.{quantity_delta, unit_cost}` · `raw_legacy.inventory_movements.{quantity_delta, unit_cost}` |
-| `quantity_on_hand` | `raw.inventory_balances.quantity_on_hand` · `raw_legacy.inventory_balances.quantity_on_hand` |
-| `inventory_value_amount` | `raw.inventory_balances.quantity_on_hand` · `raw.inventory_movements.unit_cost` · `raw.inventory_movements_stream.unit_cost` · `raw_legacy.inventory_balances.quantity_on_hand` · `raw_legacy.inventory_movements.unit_cost` |
-| `inventory_turnover` | `raw.inventory_balances.quantity_on_hand` · `raw.inventory_movements.{quantity_delta, unit_cost}` · `raw.inventory_movements_stream.{quantity_delta, unit_cost}` · `raw_legacy.inventory_balances.quantity_on_hand` · `raw_legacy.inventory_movements.{quantity_delta, unit_cost}` |
+| `avg_quantity_on_hand` | `raw.inventory_movements.quantity_delta` · `raw.inventory_movements_stream.quantity_delta` · `raw_legacy.inventory_movements.quantity_delta` |
+| `avg_inventory_value_amount` | `raw.inventory_movements.{quantity_delta, unit_cost}` · `raw.inventory_movements_stream.{quantity_delta, unit_cost}` · `raw_legacy.inventory_movements.{quantity_delta, unit_cost}` |
+| `inventory_turnover` | `raw.inventory_movements.{quantity_delta, unit_cost}` · `raw.inventory_movements_stream.{quantity_delta, unit_cost}` · `raw_legacy.inventory_movements.{quantity_delta, unit_cost}` |
 
 #### `monthly_revenue_by_channel_and_category`
 
