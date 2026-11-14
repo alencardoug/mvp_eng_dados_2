@@ -88,7 +88,7 @@ seja possível sem recalcular errado.
 
 | | |
 |---|---|
-| **Fato** | `fact_sales_order_item` |
+| **Fato** | `fact_order_status_event` (a estreia e a recompra, pelo evento de criação do pedido realizado; inclusive o pedido de itens rejeitados em cascata, F18) |
 | **Medidas** | `new_customer_count` (aditiva) · `returning_customer_count` (aditiva) · `repeat_purchase_rate_90d` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_customer` |
 | **View** | `new_and_repeat_customers_by_month` |
@@ -250,7 +250,7 @@ remessa ([ADR-0034](../adr/0034-entrega-do-livro-de-eventos.md)).
 
 | | |
 |---|---|
-| **Fatos** | `fact_shipment_item` · `fact_order_status_event` |
+| **Fatos** | `fact_shipment` (a remessa que fecha o ciclo do pedido; inclusive o pedido de itens rejeitados em cascata, F17) |
 | **Medidas** | `order_to_delivery_days` (**não aditiva** — média) · `delivered_count` (aditiva) |
 | **Dimensões** | `dim_date` · `dim_geography` · `dim_carrier` |
 | **View** | `order_to_delivery_time_by_region` |
@@ -275,7 +275,7 @@ clientes de uma coorte de estreia, esta conta pedidos.
 
 | | |
 |---|---|
-| **Fatos** | `fact_support_ticket_event` · `fact_sales_order_item` |
+| **Fatos** | `fact_support_ticket_event` · `fact_order_status_event` (o denominador, pelo grão do pedido, F21) |
 | **Medidas** | `ticket_count` (aditiva) · `order_count` (aditiva) · `tickets_per_hundred_orders` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_support_category` · `dim_sales_channel` |
 | **View** | `support_tickets_per_hundred_orders` |

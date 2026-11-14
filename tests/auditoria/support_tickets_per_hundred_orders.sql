@@ -1,5 +1,6 @@
 -- P15, referência (Perguntas de Negócio, "Como se conta"). Chamados abertos por mês, canal e
--- categoria pelo nome; pedidos realizados distintos por mês e canal pelo nome, somando as origens.
+-- categoria pelo nome; pedidos realizados por mês e canal pelo nome, somando as origens, do grão
+-- do pedido: todo pedido realizado, inclusive o de itens rejeitados em cascata.
 with chamados as (
     select d.year_number, d.month_number, d.year_month, ch.sales_channel_name, ch.channel_type,
            cat.support_category_name, cat.support_category_group,
@@ -17,11 +18,11 @@ with chamados as (
 ),
 pedidos as (
     select d.year_month, ch.sales_channel_name,
-           count(distinct f.source_system || ':' || f.order_id)::numeric as channel_order_count
-    from analytics.fact_sales_order_item f
+           count(*)::numeric as channel_order_count
+    from analytics.fact_order_status_event f
     join analytics.dim_date d on d.date_key = f.date_key
     join analytics.dim_sales_channel ch on ch.sales_channel_key = f.sales_channel_key
-    where f.is_realised
+    where f.is_order_creation and f.is_realised
     group by 1, 2
 )
 select c.year_number, c.month_number, c.year_month, c.sales_channel_name, c.channel_type,

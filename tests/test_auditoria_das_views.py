@@ -169,3 +169,38 @@ def test_a_referencia_acusa_a_versao_defeituosa(engine, defeituosa: str) -> None
         conexao.execute(text("rollback"))
         conexao.close()
     assert so_antiga + so_referencia > 0, f"a referência de {view} não acusa a versão defeituosa"
+
+
+def test_a_contraprova_do_f1_acusa_o_denominador(engine) -> None:
+    """A diferença do F1 é no denominador, não só no agrupamento (RVB1b-1-02).
+
+    A versão defeituosa agrupava pela chave do canal de cada origem, e por isso tinha linhas a mais.
+    Uma diferença de agrupamento não prova que a referência pegaria o denominador errado: aqui, os
+    denominadores da versão antiga, reduzidos a mês × canal pelo nome, têm de discordar dos da
+    referência em algum mês e canal com chamado.
+    """
+    antiga = _sql(AUDITORIA / "contraprova" / "f1_support_tickets_per_hundred_orders_32397cc.sql")
+    referencia = _sql(AUDITORIA / "support_tickets_per_hundred_orders.sql")
+    conexao = _corte(engine)
+    try:
+        divergentes = conexao.execute(
+            text(
+                f"""
+                with velho as (
+                    select year_month, sales_channel_name, max(channel_order_count) as d
+                    from ({antiga}) a group by 1, 2
+                ),
+                novo as (
+                    select year_month, sales_channel_name, max(channel_order_count) as d
+                    from ({referencia}) r group by 1, 2
+                )
+                select count(*) from velho join novo using (year_month, sales_channel_name)
+                where velho.d is distinct from novo.d
+                """
+            )
+        ).scalar_one()
+    finally:
+        conexao.execute(text("rollback"))
+        conexao.close()
+    assert divergentes > 0
+

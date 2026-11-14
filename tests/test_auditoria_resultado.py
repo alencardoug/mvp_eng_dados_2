@@ -26,12 +26,12 @@ def test_os_criterios_sao_os_tres_do_formato() -> None:
 
 
 def test_cada_referencia_e_populacao_existe() -> None:
-    faltam = [
-        caminho
-        for linha in RESULTADO["views"].values()
-        for chave in ("reference", "population")
-        if (caminho := linha.get(chave)) and not (RAIZ / caminho).exists()
-    ]
+    def caminhos(linha):
+        for chave in ("reference", "population"):
+            valor = linha.get(chave) or []
+            yield from ([valor] if isinstance(valor, str) else valor)
+
+    faltam = [c for linha in RESULTADO["views"].values() for c in caminhos(linha) if not (RAIZ / c).exists()]
     assert faltam == []
 
 

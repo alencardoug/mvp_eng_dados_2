@@ -5,14 +5,15 @@
 # achados. O teste que sustenta cada linha é tests/test_auditoria_das_views.py, que compara a view
 # com a referência e a população com a camada responsável.
 #
-# `commit` é o das views como foram auditadas (12677a3: o SQL das 16 não mudou depois dele). O
+# `commit` é o das views como foram auditadas. Era 12677a3; a revisão da auditoria mudou a P15 (F21), e
+# ele passa a ser 0471f6a, o commit dessa correção; o SQL das 16 não mudou depois dele. O
 # commit que contém este arquivo não pode ser citado aqui, porque ainda não existe quando ele é
 # escrito (a mesma regra do pacote).
 #
 # `findings` são os IDs dos Achados (docs/achados_nl_sql.md): os corrigidos antes ou durante a
 # auditoria e as observações dela.
 
-commit: 12677a3
+commit: 0471f6a
 criteria: [non_additivity, time_dependent_balance, truncated_population]
 
 views:
@@ -22,7 +23,8 @@ views:
     findings: [F5]
   average_order_value_by_channel_and_segment:
     reference: tests/auditoria/average_order_value_by_channel_and_segment.sql
-    findings: [F5]
+    population: tests/auditoria/populacao/p02_pedidos.sql
+    findings: [F5, F21]
   top_skus_by_revenue:
     reference: tests/auditoria/top_skus_by_revenue.sql
     findings: [F5, F20]
@@ -67,8 +69,8 @@ views:
     findings: [F9, F17]
   support_tickets_per_hundred_orders:
     reference: tests/auditoria/support_tickets_per_hundred_orders.sql
-    population: tests/auditoria/populacao/p15_chamados.sql
-    findings: [F1]
+    population: [tests/auditoria/populacao/p15_chamados.sql, tests/auditoria/populacao/p15_denominador.sql]
+    findings: [F1, F21]
   repeat_purchase_rate_after_support:
     reference: tests/auditoria/repeat_purchase_rate_after_support.sql
     population: tests/auditoria/populacao/p16_pedidos_sem_chamado.sql

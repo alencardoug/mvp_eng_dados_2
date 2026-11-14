@@ -1,17 +1,29 @@
--- P03, referência. Os 25 SKUs (por origem e chave natural) de maior receita líquida de
--- pedidos realizados, com empates no mesmo posto, e o peso de cada um na receita da categoria
--- pelo nome, somando as origens.
-with por_sku as (
+-- P03, referência. Os 25 SKUs de maior receita líquida de pedidos realizados, com empates no
+-- mesmo posto, e o peso de cada um na receita da categoria pelo nome, somando as origens. O SKU é
+-- a origem com a chave natural, **uma linha só**: se uma versão do produto mudar nome, categoria ou
+-- marca, a referência marca o atributo como 'VÁRIOS' em vez de partir a receita, e diverge da view
+-- (F20; RVB1b-1-05).
+with por_versao as (
     select p.source_system, p.product_natural_key, p.sku, p.product_name,
-           cat.category_name, cat.root_category_name, b.brand_name,
-           bool_or(p.is_deleted) as is_deleted,
-           sum(f.quantity) as unit_count, sum(f.net_revenue_amount) as net_revenue_amount
+           cat.category_name, cat.root_category_name, b.brand_name, p.is_deleted,
+           f.quantity, f.net_revenue_amount
     from analytics.fact_sales_order_item f
     join analytics.dim_product p on p.product_key = f.product_key
     join analytics.dim_category cat on cat.category_key = f.category_key
     left join analytics.dim_brand b on b.brand_key = f.brand_key
     where f.is_realised
-    group by 1, 2, 3, 4, 5, 6, 7
+),
+por_sku as (
+    select source_system, product_natural_key,
+           case when count(distinct sku) = 1 then min(sku) else 'VÁRIOS' end as sku,
+           case when count(distinct product_name) = 1 then min(product_name) else 'VÁRIOS' end as product_name,
+           case when count(distinct category_name) = 1 then min(category_name) else 'VÁRIOS' end as category_name,
+           case when count(distinct root_category_name) = 1 then min(root_category_name) else 'VÁRIOS' end as root_category_name,
+           case when count(distinct coalesce(brand_name, '')) = 1 then min(brand_name) else 'VÁRIOS' end as brand_name,
+           bool_or(is_deleted) as is_deleted,
+           sum(quantity) as unit_count, sum(net_revenue_amount) as net_revenue_amount
+    from por_versao
+    group by 1, 2
 ),
 categoria as (
     select category_name, sum(net_revenue_amount) as total from por_sku group by 1

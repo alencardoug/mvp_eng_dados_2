@@ -343,8 +343,9 @@ outras. Os órfãos são medidos aqui antes, no armazém local.
 **Entregue em 14/11/2026.** Medidos antes, no armazém local: 0 órfãos nas sete, todas preenchidas
 (`fact_sales_order_item.brand_key` 7.738 linhas; `fact_refund` 120 em cada uma das três;
 `fact_payment_transaction.sales_channel_key` 7.426; `fact_purchase_order_item` 1.630 nas duas). Os testes
-`relationships` da declaração de `analytics` passam de 54 para 61 (a contagem 44 → 51 era a do `nl_sql`,
-sobre as 25 tabelas; aqui entram também os da `fact_shipment`). Contraprova: com `dim_brand` vazia numa
+`relationships` da declaração de `analytics` passam de 51 para 58 (a contagem 44 → 51 era a do `nl_sql`,
+sobre as 25 tabelas; aqui entram também os da `fact_shipment`; a primeira contagem, 54 → 61, contava
+outras ocorrências da palavra e foi corrigida na revisão, RVB1b-1-04). Contraprova: com `dim_brand` vazia numa
 consulta somente leitura, o teste compilado acusa as 7.738 linhas.
 
 ### Bloco 3 — o texto (F5, F4, F8, G06)
@@ -694,4 +695,17 @@ cabeçalhos das duas fatos de remessa dizem que a P14 lê `fact_shipment` desde 
 Relatório em `codex2_d66_r3.md`. RVD-1-02, RVD-2-01 e RVD-2-02 resolvidos, nenhum achado novo. **A
 revisão do bloco da D66 está fechada.** O *push* espera o fechamento da revisão do 1b, porque os
 *commits* dos dois blocos se intercalam no `main`.
+
+### Rodada 15 — Codex conta 2, sobre o Bloco 1b e o Bloco 2 (14/11/2026)
+
+Relatório em `data/medicoes/base_consumidores/codex2_bloco1b_r1.md`. Um bloqueante, três ajustes e uma
+observação, todos aceitos:
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVB1b-1-01 | A população dos denominadores de pedidos da P02 e da P15 não era conferida | bloqueante | Feito: a P15 passa ao grão do pedido (`0471f6a`, F21) e ganha conferência contra `trusted.orders`; a P02 mantém o recorte, declarado (a receita do pedido de itens rejeitados não é conhecida), como o `order_count` das outras views de receita |
+| RVB1b-1-02 | A contraprova do F1 aceitava diferença de agrupamento | ajuste | Feito: um teste reduz os denominadores e exige divergência |
+| RVB1b-1-03 | As Perguntas de Negócio ainda citavam a fato de item na P04 e na P14 | ajuste | Feito, com a P15 |
+| RVB1b-1-04 | O plano dizia 54 → 61 `relationships`; são 51 → 58 | ajuste | Feito |
+| RVB1b-1-05 | Referências que reproduzem o cálculo; a da P03 conservava o grão do F20 | observação | Feito na P03 (chave natural, "VÁRIOS"); nas outras, limite declarado |
 

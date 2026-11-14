@@ -314,7 +314,21 @@ inventário.
 - **Evidência:** `top_skus_by_revenue` agrupa o SKU também por nome, categoria e marca da versão do
   produto. Um SKU que mudasse um desses atributos teria duas linhas e dividiria a receita no ranking.
   Hoje, 0 dos 595 SKUs vendidos têm mais de uma combinação.
-- **Efeito:** nenhum no dado atual; risco latente, registrado.
+- **Efeito:** nenhum no dado atual; risco latente, registrado. A referência da auditoria agrupa pela
+  origem com a chave natural e marca o atributo como "VÁRIOS" se ele variar: se o F20 acontecer, ela
+  diverge da view.
+
+### F21 — O denominador de pedidos perdia o pedido de itens rejeitados · **Gravidade: média**
+
+- **Evidência** (revisão da auditoria, RVB1b-1-01): a P15 contava os pedidos do denominador na fato de
+  item, e os 15 pedidos realizados do legado cujos itens foram todos para a quarentena saíam dele (15
+  combinações de mês e canal; 4 delas com chamado e linha na view).
+- **Corrigido aqui**, pela regra do pai que conta (D66, Q7): o denominador sai do grão do pedido,
+  `fact_order_status_event`, e a conferência de população o compara com `trusted.orders`.
+- **Recorte declarado, não corrigido:** o `order_count` das views de receita (P01, P02, P05, P06) conta
+  o pedido com item aceito, ao lado da receita do mesmo item. A receita do pedido de itens rejeitados
+  não é conhecida, e contá-lo com receita zero baixaria o ticket médio da P02. A conferência de
+  população da P02 declara a exceção.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
