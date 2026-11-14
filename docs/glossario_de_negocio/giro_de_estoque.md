@@ -30,6 +30,11 @@ sintético, toda saída sem lastro recebe uma correção de inventário um minut
 antes dela, e nesses SKUs a posição de fim de dia é zero: o giro fica
 indefinido.
 
+**Dia sem custo.** O dia em que o SKU tem posição no armazém e nenhuma entrada
+com custo até ele (um histórico que começa por uma saída) não tem valor. Com um
+dia assim no trimestre, o valor médio e o giro ficam indefinidos: a média dos
+outros dias passaria pela do trimestre inteiro.
+
 **Giro indefinido não é giro zero.** SKU sem estoque médio no período não girou
 zero vezes: não havia o que girar. A view devolve nulo, e escrever zero ali
 diria uma coisa diferente da que aconteceu.

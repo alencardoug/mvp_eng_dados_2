@@ -241,7 +241,12 @@ mudança em [Consumidores §5](docs/consumidores.md#5-o-que-mudou-para-quem-cons
   CMV, 1.449 giros mudam mais de 10%, e os indefinidos vão de 620 a 1.216, 1.212 deles com uma
   correção-relâmpago do gerador no trimestre (medido na revisão, RVL1-1-05), registrada como [V4](docs/pendencias.md#v4--a-correção-relâmpago-do-gerador-de-estoque-registrada-em-14112026).
   A primeira versão levava mais de 2 minutos por leitura. A final lê em 6 s: a grade só dos trimestres
-  com venda, montada por `union all`.
+  com venda, montada por `union all`. Da revisão (§9, rodadas 9 a 11): o dia com posição e sem custo
+  conhecido torna o valor médio e o giro indefinidos, em vez de média parcial (um par-trimestre hoje;
+  a regra está no glossário e na descrição da view, e o ADR-0052 fica como foi aceito). As correções-
+  relâmpago são 1.851 pelo `source_id` (1.792 no retail, 59 no legado), e não as 1.514 da primeira
+  contagem, que pedia uma saída da mesma quantidade em até 5 minutos. Saídas literais em
+  `bloco1/rvl1_saidas.md`.
 - **Não replicado ainda nos Achados**: a nota "replicado aqui em `<commit>`" do F1, F2 e F3 espera a
   revisão do Owner das entradas F14 a F16, que a sessão do `nl_sql` escreveu no mesmo arquivo, fora do
   Git.
@@ -596,3 +601,26 @@ preenchido.
 
 **Rodada 8** (codex2, sobre `9b1f246`, relatório `codex2_bloco0b_r3.md`): RVB-1-02 resolvido, nenhum
 achado novo. **A revisão do Bloco 0b está fechada.**
+
+### Rodada 9 — Codex conta 2, sobre o Bloco 1 em `c1db9ae` (14/11/2026)
+
+Relatório em `data/medicoes/base_consumidores/codex2_bloco1_r1.md`; dossiê em `REVISAO.md`. O revisor
+não alcançou o Docker e julgou o SQL e as *fixtures* estaticamente.
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVL1-1-01 | Dia com posição e sem entrada acumulada ficava sem valor e saía da média: média parcial publicada como do trimestre | bloqueante | Feito em `9d50cca`: valor médio e giro indefinidos com um dia assim; par E no teste de unidade, com contraprova |
+| RVL1-1-02 | A reconciliação da P15 não via denominador nulo (`min`/`max` ignoram nulo) | ajuste | Feito: contagem das linhas com e sem denominador; contraprova acusa 1 linha |
+| RVL1-1-03 | `<>` deixava passar a contagem nula da dimensão | ajuste | Feito: `is distinct from`; contraprova acusa 1 cliente |
+| RVL1-1-04 | A *fixture* do F2 não protegia o corte no primeiro movimento | ajuste | Feito: par C; contraprova 8,67→6,50 |
+| RVL1-1-05 | A causa dos 1.216 indefinidos estava atribuída sem medição | ajuste | Medido: 1.212 com correção-relâmpago no trimestre; saídas literais em `bloco1/rvl1_saidas.md` |
+
+### Rodada 10 — Codex conta 2, sobre `9d50cca` (14/11/2026)
+
+Relatório em `codex2_bloco1_r2.md`. RVL1-1-01 a 04 resolvidos; RVL1-1-05 parcial (os números sem
+saída literal); um achado novo:
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVL1-2-01 | O `9d50cca` reescreveu o ADR-0052 aceito (AGENTS.md, regra 3) | ajuste | Feito: o ADR volta ao texto aceito; a regra do dia sem custo foi para o glossário e para a descrição da view, e as medições para a V4 e este plano, com as saídas literais |
+
