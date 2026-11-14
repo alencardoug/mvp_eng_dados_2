@@ -93,6 +93,10 @@ de qualquer forma. Até a decisão, a descrição da view diz qual população �
 acima; **(b)** emendar o ADR-0033 e o [glossário](glossario_de_negocio/entrega_no_prazo.md): a
 entrega no prazo conta só a remessa com algum item aceito.
 
+**Respondida em 14/11/2026: (a)**, no `PLANO_base_dos_consumidores.md` (seção D66), remedida antes no
+dado de agora: 16 das 147 remessas legadas entregues de fora. Sai daqui quando o ADR da fato no grão da
+remessa for escrito, no bloco próprio.
+
 *Efeito de não decidir:* nenhum teste falha; a taxa do ramo legado deixava de fora 12 de 144
 remessas entregues (8%) no dado da v1.0.0. No da v1.1.0 ficam de fora **16** remessas legadas
 entregues, todas com os itens rejeitados em cascata (`parent_rejected`), cada uma explicada pela

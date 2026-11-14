@@ -127,6 +127,9 @@ daqui. Entraram no plano, pela regra de entrada (Bloco 0, item 3):
 | L10 | As evidências coletadas no GCP antes do desmonte estão só no `mvp_eng_dados_1`, fora do Git e fora da D91 | G | `gdados/docs/verificacao_de_viabilidade.md` §7.5; `mvp_eng_dados_1/data/medicoes/etapa_13/evidencias/` | Bloco 4, com a L4: o que entra e sanitizado como. Até lá, `not_available` no pacote |
 | L11 | Os consumidores não tinham canal de saída daqui, nem regra para pedir o banco ou uma janela de leitura, nem registro das mudanças de valor (UQ-03 a UQ-07 do BI, O7 do `gdados`) | G, B | Os arquivos de pendências dos dois | Bloco 0b: [Consumidores](docs/consumidores.md) |
 | L12 | O `gdados` (E1) e a 2.7 do BI precisam do formato do pacote para começar, e o Bloco 4 não tem data | G, B | `gdados/docs/decisoes.md`, D03 (A5); UQ-09 do BI | **Q13**: Bloco 0b, a especificação |
+| F14 | Duas descrições de `fact_refund` erradas: `refunded_at` está preenchido também nos 8 solicitados e nos 2 recusados (**conferido aqui**, 14/11/2026), e `originally_captured_amount` é o capturado da transação revertida | N, G, B | `_analytics__models.yml:1318` e `:1337`; `fact_refund.sql:32` e `:40` | Bloco 3. Anular `refunded_at` fora do concluído seria mudança de dado, e só vira pergunta se a auditoria do Bloco 1b achar uma view que conte reembolso concluído por essa data |
+| F15 | Descrições que apontam para o que não está na `analytics` (`order_status_history`, seções de documento, invariantes, ADRs) | N, G | `_analytics__models.yml:667`, `:1878`, `:2105` e outras | Bloco 3: a regra no lugar da referência, no texto que vai ao BigQuery (o curto do F4) |
+| F16 | "Data de referência do armazém" ambígua com `dim_warehouse` | N, G | `_analytics__models.yml:185` e outras sete | Bloco 3 |
 | L13 | O custo real da fase GCP entraria só no `mvp_eng_dados_1`, e os portais leem daqui (H2 do `gdados`) | G | `gdados/docs/alinhamento_entre_projetos.md` §4 | Em 16/11/2026, o custo entra também aqui, no mesmo dia ([Consumidores §7](docs/consumidores.md#7-o-gcp)) |
 
 ---
@@ -282,6 +285,12 @@ A conclusão da **P13** espera a D66 (seção seguinte). Se a D66 trouxer fato n
 
 ### D66 — antes do Bloco 4 (Q10-a)
 
+**Respondida em 14/11/2026: (a), uma fato no grão da remessa**, a recomendada. Remedida antes da
+pergunta, no armazém de `d212c07`: 147 remessas do legado entregues em `trusted.shipments`, 131 na fato,
+**16 de fora** (10,9%), todas com os itens na quarentena e nenhum item aceito; o retail fecha 3.166 de
+3.166. Vira o **Bloco D66**, com ADR, logo depois do Bloco 1b e antes do Bloco 2, porque a P13 conclui a
+auditoria sobre ela e o BI fixa o commit dela (N85 de lá).
+
 A D66 é perguntada com as alternativas dela (Pendências) e com o que já foi medido: o M27 do BI e a
 medição posterior à regeneração que a própria D66 registra. As duas são históricas e são remedidas
 antes de perguntar. A auditoria da P13 no Bloco 1b só conclui depois da resposta (RVC-4-02). Se a
@@ -310,6 +319,8 @@ outras. Os órfãos são medidos aqui antes, no armazém local.
   `dim_category` e `dim_payment_method` (F8+).
 - **F11, F12, F13** (§2.2): a citação da P09 trocada pela regra; a coluna pela qual se agrupa cada
   dimensão conformada, ao lado da regra de identidade; a descrição de `fact_shipment_item.date_key`.
+- **F14, F15, F16** (§2.2): as duas descrições de `fact_refund`; a regra no lugar da referência que o
+  leitor do catálogo não alcança; "data de referência dos dados" no lugar de "do armazém".
 - **G06:** o Bloco B do `PLANO_revisao_governanca.md`, na ordem que o RVG-1-02 corrigiu, com o
   desenho do RVG-1-01 revisado antes e os *snapshots* pelo RVG-1-03. A catraca baixa no mesmo
   *commit* de cada melhora.
@@ -445,7 +456,7 @@ As opções como foram apresentadas:
 |---|---|
 | **Q5** | A primeira *tag* deste repositório: o nome (`v2.1.0`, `v3.0.0`) e o que ela fecha |
 | **Q6** | A O1 do `PLANO_revisao_governanca.md`: renomear para inglês as três colunas de `trusted.legacy_order_totals_divergence`, ou registrar como exceção |
-| **Q7** | O F3, se a causa medida for regra |
+| **Q7** | O F3, se a causa medida for regra. **Respondida em 14/11/2026: manter a regra** (a D35: a dimensão conta o pedido realizado; a divergência fica declarada e testada), a recomendada, coerente com a D66 |
 | **Q8** | **Respondida em 14/11/2026 pelas recomendações** (ADR-0052). O F2, sobre a proposta do passo 2: a média no tempo, a valorização do estoque médio, os cortes do trimestre e o fuso, o evento atrasado, o par cujo histórico não reconstrói o saldo (legado com movimento rejeitado) — e se a regra pede ADR. Perguntada **no Bloco 1**, logo depois do diagnóstico, e não com as outras (RVC-1-02) |
 
 ### Rodada 3 — Q9 a Q11, da emenda (§2.1): respondida em 13/11/2026
