@@ -15,7 +15,9 @@
     "description_gaps",
     "tests",
     "view_audits",
-    "environments"
+    "environments",
+    "checks",
+    "open_items"
   ],
   "properties": {
     "format": {
@@ -79,6 +81,21 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/environment_artifact"
+      }
+    },
+    "checks": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^tests/[a-z0-9_/]+\\.py::"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "open_items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/open_item"
       }
     }
   },
@@ -229,7 +246,9 @@
         "materialization",
         "description",
         "meta",
-        "columns"
+        "columns",
+        "grain",
+        "grants_select"
       ],
       "properties": {
         "schema": {
@@ -267,6 +286,19 @@
           "additionalProperties": {
             "$ref": "#/$defs/column"
           }
+        },
+        "grain": {
+          "description": "O grão declarado: o texto entre '**Grão:' e '**' no início da descrição da relação (convenção das fatos e dimensões). null quando a relação não declara.",
+          "$ref": "#/$defs/text_or_null"
+        },
+        "grants_select": {
+          "description": "Os papéis que podem ler a relação, do config.grants.select do dbt, em ordem. Lista vazia quando não há concessão.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },
@@ -759,6 +791,106 @@
     "nonempty": {
       "type": "string",
       "minLength": 1
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "summary",
+        "result"
+      ],
+      "properties": {
+        "module": {
+          "type": "string",
+          "pattern": "^tests/[a-z0-9_/]+\\.py$"
+        },
+        "summary": {
+          "description": "A primeira linha da docstring do módulo: o que ele guarda.",
+          "$ref": "#/$defs/text_or_null"
+        },
+        "result": {
+          "description": "null = sem resultado. Nunca se infere sucesso da existência do teste.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "executed_at",
+                "run_id"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "error",
+                    "skipped"
+                  ]
+                },
+                "executed_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "open_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "state",
+        "anchor",
+        "objects"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(D|V)[0-9]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "deferred"
+          ]
+        },
+        "anchor": {
+          "description": "O caminho do texto no repositório, com a âncora, no commit fixado.",
+          "type": "string",
+          "pattern": "^docs/[a-z0-9_/]+\\.md#[^\\s]+$"
+        },
+        "objects": {
+          "description": "Os objetos que o item toca. null = não declarado (hoje, todos): o portal não infere.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/relation_id"
+              }
+            }
+          ]
+        }
+      }
     }
   }
 }

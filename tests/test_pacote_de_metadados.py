@@ -24,6 +24,7 @@ ESQUEMA = RAIZ / "docs/pacote_de_metadados.schema.json"
 EXEMPLO = RAIZ / "docs/pacote_de_metadados.exemplo.json"
 TESTE = "test.mvp_ed1.not_null_fact_sales_order_item_net_revenue_amount.744c563ed6"
 VIEW = "consumption.average_order_value_by_channel_and_segment"
+CHECK = "tests/test_acesso.py::test_o_declarado_e_a_politica_da_governanca"
 
 
 def _carregar(caminho: pathlib.Path) -> dict:
@@ -89,6 +90,17 @@ def test_o_resultado_dos_testes_aponta_para_a_execucao_declarada(exemplo) -> Non
             assert teste["result"]["same_invocation_as_manifest"] is mesma
 
 
+def test_o_grao_e_o_da_convencao_da_descricao(exemplo) -> None:
+    """`grain` é o texto entre `**Grão:` e `**` no início da descrição; sem a marca, `null`."""
+    for relacao in exemplo["relations"].values():
+        descricao = relacao["description"] or ""
+        if descricao.startswith("**Grão:"):
+            esperado = descricao[len("**Grão:"):].split("**", 1)[0].strip()
+            assert relacao["grain"] == esperado
+        else:
+            assert relacao["grain"] is None
+
+
 def test_toda_view_de_pergunta_tem_estado_de_auditoria(exemplo) -> None:
     """A view de cada pergunta aparece em `view_audits`, mesmo quando ainda `not_audited`."""
     views = {p["view"] for p in exemplo["questions"].values()}
@@ -141,6 +153,14 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
         pytest.param(lambda e: _com(e, "", "provenance", "dbt", "run_results_invocation_id"), id="run-results-com-invocation-vazia"),
         pytest.param(lambda e: _com(e, "", "tests", TESTE, "result", "invocation_id"), id="resultado-com-invocation-vazia"),
         pytest.param(lambda e: _com(e, "", "relations", VIEW, "columns", "sales_channel_name", "description"), id="descricao-vazia-em-vez-de-null"),
+        pytest.param(lambda e: _com(e, "", "relations", VIEW, "grain"), id="grao-vazio-em-vez-de-null"),
+        pytest.param(lambda e: _com(e, ["analyst", "analyst"], "relations", VIEW, "grants_select"), id="papel-repetido"),
+        pytest.param(lambda e: _sem(e, "checks"), id="sem-a-secao-do-pytest"),
+        pytest.param(lambda e: _com(e, {"status": "ok", "executed_at": "2026-11-14T00:00:00Z", "run_id": "x"}, "checks", CHECK, "result"), id="estado-do-pytest-fora-da-lista"),
+        pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": None, "run_id": "x"}, "checks", CHECK, "result"), id="pytest-pass-sem-data"),
+        pytest.param(lambda e: _com(e, "X1", "open_items", 0, "id"), id="item-aberto-com-id-invalido"),
+        pytest.param(lambda e: _com(e, "README.md#x", "open_items", 0, "anchor"), id="ancora-fora-de-docs"),
+        pytest.param(lambda e: _com(e, "closed", "open_items", 0, "state"), id="item-aberto-fechado"),
         pytest.param(
             lambda e: _com(
                 e,

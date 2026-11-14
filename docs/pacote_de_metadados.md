@@ -16,6 +16,7 @@
 | Consumidores | `gdados` (E1) e `bi-como-codigo` (etapa 2.7): dois portais, um pacote (Q12, 14/11/2026) |
 | Esquema | [`pacote_de_metadados.schema.json`](pacote_de_metadados.schema.json), JSON Schema 2020-12 |
 | Exemplo | [`pacote_de_metadados.exemplo.json`](pacote_de_metadados.exemplo.json), validado pelo esquema no `check-offline` |
+| Campos acrescentados | 14/11/2026, a pedido do `bi-como-codigo` (UQ-12 a UQ-15): `relations.*.grain`, `relations.*.grants_select`, `checks` e `open_items`. Campo novo, sem mudar o número (§2, regra 3) |
 
 ---
 
@@ -66,11 +67,15 @@
 | `provenance.warehouse` | Que execução construiu o armazém. Na versão 1, **sempre** `not_verified` e `null`, e o esquema só aceita isso (L5). O estado `verified` entra com o desenho do Bloco 4, como mudança do esquema | Desenho do Bloco 4 |
 | `provenance.link_base` | Contra onde resolvem os links relativos dos textos | — |
 | `relations` | Cada *source*, *seed*, modelo e *snapshot*: tipo, materialização, descrição, `meta` (domínio, dono, escritores, retenção…) e as colunas, com descrição, tipo declarado, sensibilidade e `meta` | *Manifest* |
+| `relations.*.grain` | O grão declarado: o texto entre `**Grão:` e `**` no início da descrição da relação, a convenção das fatos e das dimensões. `null` quando a relação não o declara | Descrição do *manifest* |
+| `relations.*.grants_select` | Os papéis que podem ler a relação, em ordem; lista vazia sem concessão. É a matriz de acesso por relação (papéis × camadas sai daí) | `config.grants.select` do *manifest* |
 | `lineage` | A saída do `python -m mvp_ed1.models.lineage --json`, formato 1, **sem alteração**: por coluna, as folhas imediatas e as origens terminais, com o tipo (`source`, `seed`, `generated`) | `models/lineage.py` |
 | `crossings` | As travessias que o dbt não vê (Airbyte, Debezium → Redpanda → Beam, captura do legado), com mecanismo e frequência, em Markdown | `lineage.crossings()` |
 | `questions` | As 16 perguntas: título, fatos, medidas com a aditividade (`additive`, `semi_additive`, `non_additive`) e a nota, dimensões e view | [Perguntas de Negócio](glossario_de_negocio/perguntas_de_negocio.md) |
 | `description_gaps` | Cada relação ou coluna **declarada** sem descrição, explícita (`column: null` = falta a da relação). O universo é o declarado no *manifest* (modelos, *seeds*, *snapshots* e *sources*). Em 13/11/2026 eram 141 colunas, a G06 | *Manifest* |
 | `tests` | Cada teste de dados e teste de unidade do dbt: o que testa, o objeto e a coluna que guarda, onde está declarado e o resultado. `result: null` = **sem resultado**. O resultado traz o estado, a hora, a execução e se ela é a mesma do *manifest* (`same_invocation_as_manifest`) | *Manifest* e `run_results.json` |
+| `checks` | Cada teste do `pytest` (`módulo::teste`): o módulo, o que ele guarda (a primeira linha da *docstring* do módulo) e o resultado — estado, hora e execução, ou `null` = **sem resultado**. É onde estão a prova de acesso por execução, as invariantes, as reconciliações e a certificação da captura | O relatório JUnit do `pytest` do `make check` (a gerar no Bloco 4) |
+| `open_items` | As decisões e verificações em aberto que o portal não pode mostrar como resolvidas: identificador (`Dnn`, `Vn`), título, estado (`pending`, `deferred`), a âncora do texto e os objetos que tocam. `objects: null` = **não declarado** — hoje, todos —, e o portal não infere | [Registro de Decisões](adr/README.md) §3 e [Pendências](pendencias.md) §1 |
 | `view_audits` | Para cada uma das 16 views: o estado da auditoria do Bloco 1b (`not_audited`, `audited`, `audit_pending_decision`), o *commit* em que foi auditada, os critérios, o teste de referência e os achados | Declaração versionada do Bloco 1b. Até lá, todas `not_audited` |
 | `environments` | A fonte da página de estrutura e ambientes, artefato por artefato: repositório, caminho, se é lido por *commit* ou não está disponível, e a data em que congelou (L4, L10) | Lista declarada no gerador |
 
@@ -102,12 +107,8 @@ o `check` completo confere.
 
 Fica para campo novo, se um consumidor pedir:
 
-- a matriz de acesso (papéis × camadas) e a prova por execução, que hoje vivem na
-  [Governança](governanca_de_dados.md) e no `tests/test_acesso.py`;
-- os resultados do `pytest` e das reconciliações;
-- as limitações e decisões em aberto, como a D66: o portal as lê nas
-  [Pendências](pendencias.md), por *commit*;
 - o texto dos documentos, dos ADRs e do glossário: o portal os lê por *commit*;
+- os objetos tocados por cada item em aberto (`open_items.*.objects`), que nenhuma declaração diz hoje;
 - as evidências do GCP, que estão fora do Git, no `mvp_eng_dados_1` (`environments`, `evidencias_gcp`).
 
 ---

@@ -1,4 +1,11 @@
 {
+  "checks": {
+    "tests/test_acesso.py::test_o_declarado_e_a_politica_da_governanca": {
+      "module": "tests/test_acesso.py",
+      "result": null,
+      "summary": "Acesso por papel: o que a Governança §7 declara é o que o armazém concede — e nada mais."
+    }
+  },
   "crossings": [
     {
       "destination": "`raw`",
@@ -212,6 +219,15 @@
       }
     }
   },
+  "open_items": [
+    {
+      "anchor": "docs/pendencias.md#d43--a-guarda-de-identidade-como-função-no-armazém-adiada-em-16092026",
+      "id": "D43",
+      "objects": null,
+      "state": "deferred",
+      "title": "A guarda de identidade como função no armazém"
+    }
+  ],
   "provenance": {
     "dbt": {
       "adapter_type": "postgres",
@@ -281,6 +297,10 @@
         }
       },
       "description": "**Grão: uma linha de item de pedido.** Um SKU comprado em um pedido. Medidas todas aditivas; valores de nível de pedido não estão aqui, porque somá-los no grão de item multiplicaria o frete pelo número de itens.\n",
+      "grain": "uma linha de item de pedido.",
+      "grants_select": [
+        "transformer"
+      ],
       "materialization": "table",
       "meta": {
         "domain": "vendas",
@@ -315,6 +335,11 @@
         }
       },
       "description": "P02 — Ticket médio por canal e segmento. **Ticket médio** é a receita líquida dividida pelo número de pedidos distintos do mesmo recorte.\n\n- **Cálculo:** `net_revenue_amount / order_count`, **recalculado a cada recorte**.\n- **Implementado em:** view `average_order_value_by_channel_and_segment`.\n- **Relacionado:** receita líquida, recorrência de compra.\n\n**É medida não aditiva, e isso tem consequência prática.** A média das médias mensais não é a média\ndo ano: doze meses de tamanhos diferentes não se somam e dividem por doze. Por isso a view entrega\n`net_revenue_amount` e `order_count` **ao lado** do resultado — quem reagregar por trimestre soma os\ndois e divide de novo, em vez de somar ticket médio com ticket médio.\n\nO denominador é o **pedido**, não o item: um pedido de cinco itens conta uma vez.",
+      "grain": null,
+      "grants_select": [
+        "analyst",
+        "transformer"
+      ],
       "materialization": "view",
       "meta": {
         "domain": "vendas",
@@ -340,6 +365,8 @@
         }
       },
       "description": null,
+      "grain": null,
+      "grants_select": [],
       "materialization": null,
       "meta": {
         "grants": {
@@ -359,6 +386,10 @@
     "trusted.carriers": {
       "columns": {},
       "description": null,
+      "grain": null,
+      "grants_select": [
+        "transformer"
+      ],
       "materialization": "table",
       "meta": {
         "domain": "logistica",
