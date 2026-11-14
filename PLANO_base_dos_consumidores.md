@@ -504,7 +504,19 @@ explícito do custodiante.
    - **registradas**: o descarte dos *snapshots* (`dbt-build RESET=1`, `dbt-drop-snapshots`;
      `drop_snapshots`); a adulteração da fato de trabalho por `make test FATO=1` (`test_fato_incremental`,
      aberta antes da adulteração e fechada depois do reparo; `test_fato`); a restauração da memória do
-     armazém (`recovery-restore`, o `pg_restore` do passo 4; `recovery_restore`);
+     armazém (`recovery-restore`, o `pg_restore` do passo 4; `recovery_restore`); **toda sincronização do
+     Airbyte** (`airbyte_sync`, RVL5-5-02): o destino `retail` usa `full_refresh_overwrite` com
+     `drop_cascade`, e a sincronização derruba as views de `staging` que dependem da tabela — não é só dado
+     de entrada. O registro fica no funil único dos disparos, `mvp_ed1.airbyte`, que o `Makefile` e a DAG
+     usam: a linha abre e confirma **antes** do disparo e só fecha quando o *job* chega a estado terminal
+     observado (`succeeded`, `failed`, `cancelled`); se quem espera morre, ela fica aberta, porque perder
+     o chamador não prova que o *job* parou;
+   - **o log não é memória** (RVL5-5-01): o `pg_dump` da memória do armazém exclui
+     `governance.dbt_invocations` e `governance.warehouse_provenance` (`--exclude-table`), e a restauração
+     nunca os substitui — a linha `recovery_restore`, aberta antes do `pg_restore`, sobrevive a ele, e a
+     ordem da `sequence` continua a do armazém. A conferência de contagens do passo 5
+     (`_conferir_contra_o_banco`) deixa o log de fora, pela mesma razão. Numa máquina nova, o log nasce
+     vazio e o primeiro `build` completo depois da restauração é o que verifica;
    - **fora, com o motivo**: os testes do legado que escrevem em `trusted`, `quarantine` e `staging`
      (`test_legado_remocao`, `test_oraculo_da_memoria`) escrevem em **bancos efêmeros**; o DDL, os papéis
      e os *grants* de `governance garantir` não mudam o conteúdo das camadas construídas; o `psql`
@@ -514,9 +526,12 @@ explícito do custodiante.
      sobre o dado de entrada estar parado; uma view de consumo, `skus_below_reorder_point`, lê o *stream*
      ao vivo. O ADR o declara.
    **Guarda do próximo escritor:** um teste estático varre `src/`, `tests/`, `Makefile`, `docker/` e
-   `airflow/` atrás de escrita SQL (`insert`, `update`, `delete`, `truncate`, `drop`, `alter`) nas camadas
-   construídas e de `pg_restore` no armazém, e exige que cada arquivo esteja numa lista declarada, com o
-   motivo (`registrar_mutacao` ou banco efêmero). O escritor novo não entra calado.
+   `airflow/` atrás de escrita SQL (`insert`, `update`, `delete`, `truncate`, `drop`, `alter` e `create` —
+   inclusive `create or replace view` e `create table … as`, RVL5-5-03) nas camadas construídas, de
+   `pg_restore` no armazém e de disparo do Airbyte fora do funil, e exige que cada arquivo esteja numa
+   lista declarada, com o motivo (`registrar_mutacao` ou banco efêmero). **O alcance é lexical e
+   declarado:** SQL montado dinamicamente não é visto, e uma escrita nova num arquivo **já** listado
+   depende da revisão da mudança, não da guarda.
    **Os insumos estáveis** (RVL5-3-02): a coluna `inputs_confirmed` nasce falsa. O `CARIMBO_DEPOIS`, depois
    do dbt, refaz o *commit*, a sujeira e o digest dos insumos do dbt e, **só se os três são os de antes**,
    a marca verdadeira; se o passo não roda, ou se algo mudou, ela fica falsa e a execução não é verificada.
@@ -563,8 +578,11 @@ explícito do custodiante.
    (parciais), um `dbt test` (sem linha), o *hook* de acesso falhando antes do fecho (linha aberta, por uma
    variável só de teste), o descarte dos *snapshots* concluído sem o dbt chegar à abertura (não verificado) e
    o `RESET=1` bem-sucedido (verificado), um insumo alterado entre a coleta e o fim (`inputs_confirmed`
-   falso), o teste da fato interrompido depois da adulteração e antes do dbt (não verificado) —; a guarda
-   estática com um escritor novo fora da lista (falha); o mapa de estados com um `build` que reprova teste e pula dependentes; a sujeira
+   falso), o teste da fato interrompido depois da adulteração e antes do dbt (não verificado), a
+   sincronização que derrubou dependentes sem o dbt abrir depois (não verificado), a restauração de um
+   pacote com o log dentro sobre um armazém com *build* posterior, interrompida antes do *rebuild* (não
+   verificado, e o log não substituído) —; a guarda estática com um escritor novo fora da lista, inclusive
+   um `create or replace view` (falha); o mapa de estados com um `build` que reprova teste e pula dependentes; a sujeira
    com modelo novo não rastreado, mudança rastreada e metadados ausentes; os papéis; o gerador com leitor
    substituto e sem conexão; o esquema aceitando `verified` só com os campos. Aviso em Consumidores §5. O
    ADR novo (o próximo número) registra a garantia estreita e a regra do abandono.
