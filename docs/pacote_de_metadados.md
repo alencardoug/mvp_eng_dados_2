@@ -47,10 +47,13 @@
 5. **Texto como dado.** As descrições são Markdown em português, como estão no dbt. O consumidor as
    exibe como texto ou como Markdown saneado, sem executar HTML. Links relativos resolvem contra
    `provenance.link_base` (`docs/`), no commit fixado.
-6. **Nada sensível.** Ficam de fora o SQL compilado, as mensagens de falha dos testes, os dados de
+6. **Instantes.** Todo instante é ISO 8601, com o fuso (UTC nos artefatos do dbt). O esquema confere a
+   forma; o calendário (o dia que o mês não tem) o gerador confere com `datetime.fromisoformat`, e o
+   consumidor que validar só pelo esquema não o alcança.
+7. **Nada sensível.** Ficam de fora o SQL compilado, as mensagens de falha dos testes, os dados de
    conexão e os caminhos fora do repositório. A sensibilidade de cada coluna está no pacote, e o
    **dado** de nenhuma delas está.
-7. **Identificadores.** Relação: `schema.nome`, como no `lineage --json`. Coluna:
+8. **Identificadores.** Relação: `schema.nome`, como no `lineage --json`. Coluna:
    `schema.relação.coluna`. Pergunta: `P01` a `P16`. Teste: o `unique_id` do dbt.
 
 ---

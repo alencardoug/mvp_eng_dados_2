@@ -90,6 +90,41 @@ def test_o_resultado_dos_testes_aponta_para_a_execucao_declarada(exemplo) -> Non
             assert teste["result"]["same_invocation_as_manifest"] is mesma
 
 
+def _instantes(dado, caminho=""):
+    """Todo valor do pacote que o esquema trata como instante, pela chave."""
+    chaves = {"executed_at", "manifest_generated_at", "run_results_generated_at"}
+    if isinstance(dado, dict):
+        for k, v in dado.items():
+            if k in chaves and isinstance(v, str):
+                yield f"{caminho}.{k}", v
+            else:
+                yield from _instantes(v, f"{caminho}.{k}")
+    elif isinstance(dado, list):
+        for i, v in enumerate(dado):
+            yield from _instantes(v, f"{caminho}[{i}]")
+
+
+def _calendario_valido(valor: str) -> bool:
+    import datetime as dt
+
+    try:
+        dt.datetime.fromisoformat(valor.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def test_todo_instante_do_exemplo_existe_no_calendario(exemplo) -> None:
+    """O que a expressão regular não alcança (RVF-2-01): o dia que o mês não tem."""
+    ruins = [c for c, v in _instantes(exemplo) if not _calendario_valido(v)]
+    assert ruins == []
+
+
+def test_o_calendario_recusa_o_dia_impossivel() -> None:
+    assert not _calendario_valido("2026-02-31T10:00:00Z")
+    assert _calendario_valido("2026-11-13T22:21:52.217488Z")
+
+
 def test_as_concessoes_da_source_vem_do_meta(exemplo) -> None:
     """Na *source*, quem lê é o `meta.grants.select`, que a macro de acesso concede (RVF-1-01)."""
     for relacao in exemplo["relations"].values():
@@ -168,6 +203,8 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
         pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": None, "run_id": "x"}, "checks", CHECK, "result"), id="pytest-pass-sem-data"),
         pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": "", "run_id": "x"}, "checks", CHECK, "result"), id="pytest-pass-com-data-vazia"),
         pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": "", "invocation_id": "x", "same_invocation_as_manifest": False}, "tests", TESTE, "result"), id="dbt-pass-com-data-vazia"),
+        pytest.param(lambda e: _com(e, "2026-11-13T22:21:52Zlixo", "provenance", "dbt", "manifest_generated_at"), id="instante-com-lixo-no-fim"),
+        pytest.param(lambda e: _com(e, "2026-13-01T00:00:00Z", "provenance", "dbt", "manifest_generated_at"), id="instante-mes-13"),
         pytest.param(lambda e: _com(e, "camada_inventada", "checks", CHECK, "layer"), id="camada-fora-da-lista"),
         pytest.param(lambda e: _sem(e, "checks", CHECK, "layer"), id="sem-camada"),
         pytest.param(lambda e: _com(e, "X1", "open_items", 0, "id"), id="item-aberto-com-id-invalido"),
