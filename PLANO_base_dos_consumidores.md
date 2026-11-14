@@ -578,6 +578,18 @@ recomendadas. As opções, como foram apresentadas:
 | **Q13** | Quando sai o formato do pacote (L12) | **A especificação já**, no Bloco 0b: documento, esquema e exemplo, revisados; o Bloco 4 gera depois. Era a recomendada | Manter a ordem (os consumidores esperam o Bloco 4); adiantar o Bloco 4 inteiro |
 | **Q14** | Quando o `nl_sql` sobe o projeto GCP dele | **Nenhum recurso novo no GCP**, em nenhum projeto. O `nl_sql` constrói a estrutura dele e sobe em outras nuvens, não agora no GCP. Resposta do Owner fora das opções | Subir agora só com a C0; subir no passo 4 do `nl_sql` |
 
+### Rodada 5 — depois do Bloco 4: respondida em 15/11/2026
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **L5** | A procedência do armazém: o banco não guarda qual execução nem qual *commit* o construiu, e o pacote diz `not_verified` | **Tabela em `governance`**: ao fim de cada *build*, o `invocation_id` e o *commit*; o pacote passa a dizer `verified` quando o armazém é o do *manifest*. Objeto novo no armazém, por isso com ADR, e mudança do esquema do pacote (o `verified` entra no formato, com aviso em Consumidores §5). Era a recomendada | Manter `not_verified`; adiar como verificação (Vn) |
+| **L10** | As evidências do GCP, fora do Git no `mvp_eng_dados_1` (arquivado), entram no pacote? | **Ficam `not_available`**; o Registro da fase GCP, versionado aqui, conta o processo. Era a recomendada | Trazer um recorte saneado para este repositório |
+| **RVG-1-01** | O texto próprio das 39 colunas da ponte (`TEXTOS_DA_PONTE`, `61e0543`) pede ADR? | **Dispensa ADR**: forma de declarar texto, dentro da N41. Era a recomendada | Um ADR curto |
+| **Q6** | A O1: as três colunas em português de `trusted.legacy_order_totals_divergence` | **Renomear para inglês**, em entrega própria, com o que as lê, e o aviso de mudança de esquema em Consumidores §5 (`prevista` antes, `feita` depois). Era a recomendada | Registrar como exceção |
+| **Q5** | A primeira *tag* deste repositório | **`v2.1.0`, no fim da fase**, depois dos Blocos 5 e 6: continua a numeração do `v2.0.0`, porque nada quebra para quem lê. Era a recomendada | `v3.0.0` no fim da fase; `v2.1.0` já, em `7d9548f` |
+
+A revisão integral dos textos do Bloco 3 continua com o Owner (CLAUDE.md §5).
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
