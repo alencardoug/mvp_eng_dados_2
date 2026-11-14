@@ -22,6 +22,8 @@ from mvp_ed1.models import lineage
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 ESQUEMA = RAIZ / "docs/pacote_de_metadados.schema.json"
 EXEMPLO = RAIZ / "docs/pacote_de_metadados.exemplo.json"
+TESTE = "test.mvp_ed1.not_null_fact_sales_order_item_net_revenue_amount.744c563ed6"
+VIEW = "consumption.average_order_value_by_channel_and_segment"
 
 
 def _carregar(caminho: pathlib.Path) -> dict:
@@ -57,6 +59,34 @@ def test_a_linhagem_do_pacote_e_o_formato_do_exportador(validador) -> None:
     assert esquema["$defs"]["lineage"]["properties"]["format"]["const"] == lineage.JSON_FORMAT
 
 
+def test_uma_auditoria_completa_passa(validador, exemplo) -> None:
+    """A condição do estado `audited` não recusa o caso legítimo: commit, os três critérios e a referência."""
+    auditada = _com(
+        exemplo,
+        {
+            "status": "audited",
+            "commit": "abc1234",
+            "criteria": ["non_additivity", "time_dependent_balance", "truncated_population"],
+            "reference": "tests/referencia.py",
+            "findings": [],
+        },
+        "view_audits",
+        VIEW,
+    )
+    assert not list(validador.iter_errors(auditada))
+
+
+def test_o_resultado_dos_testes_aponta_para_a_execucao_declarada(exemplo) -> None:
+    """O que o esquema não liga entre seções: cada resultado é da execução do `run_results`, e a marca
+    `same_invocation_as_manifest` diz a verdade. O gerador do Bloco 4 herda esta conferência."""
+    dbt = exemplo["provenance"]["dbt"]
+    mesma = dbt["run_results_invocation_id"] == dbt["manifest_invocation_id"]
+    for teste in exemplo["tests"].values():
+        if teste["result"] is not None:
+            assert teste["result"]["invocation_id"] == dbt["run_results_invocation_id"]
+            assert teste["result"]["same_invocation_as_manifest"] is mesma
+
+
 def test_toda_view_de_pergunta_tem_estado_de_auditoria(exemplo) -> None:
     """A view de cada pergunta aparece em `view_audits`, mesmo quando ainda `not_audited`."""
     views = {p["view"] for p in exemplo["questions"].values()}
@@ -84,8 +114,6 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
     return copia
 
 
-TESTE = "test.mvp_ed1.not_null_fact_sales_order_item_net_revenue_amount.744c563ed6"
-VIEW = "consumption.average_order_value_by_channel_and_segment"
 
 
 @pytest.mark.parametrize(
@@ -101,6 +129,13 @@ VIEW = "consumption.average_order_value_by_channel_and_segment"
         pytest.param(lambda e: _com(e, "x", "lineage", "relations", VIEW, "columns", "sales_channel_name", "origins", 0, "kind"), id="tipo-de-origem-fora-da-lista"),
         pytest.param(lambda e: _com(e, "abc", "provenance", "inputs_sha256"), id="hash-malformado"),
         pytest.param(lambda e: _com(e, 1, "campo_inventado"), id="chave-desconhecida-no-topo"),
+        pytest.param(lambda e: _com(e, None, "tests", TESTE, "result", "executed_at"), id="sucesso-sem-data"),
+        pytest.param(lambda e: _com(e, "audited", "view_audits", VIEW, "status"), id="auditada-sem-commit-criterios-referencia"),
+        pytest.param(lambda e: _com(e, "abc1234", "view_audits", VIEW, "commit"), id="nao-auditada-com-commit"),
+        pytest.param(lambda e: _com(e, "verified", "provenance", "warehouse", "status"), id="armazem-verificado-na-versao-1"),
+        pytest.param(lambda e: _com(e, None, "provenance", "dbt", "run_results_invocation_id"), id="run-results-sem-procedencia"),
+        pytest.param(lambda e: _sem(e, "provenance", "tree_dirty_at_generation"), id="sem-estado-da-arvore"),
+        pytest.param(lambda e: _sem(e, "provenance", "environment"), id="sem-ambiente"),
     ],
 )
 def test_o_esquema_recusa_o_exemplo_alterado(validador, exemplo, alterar) -> None:

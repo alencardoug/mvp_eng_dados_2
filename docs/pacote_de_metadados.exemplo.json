@@ -221,6 +221,9 @@
       "run_results_generated_at": "2026-11-13T22:23:26.113188Z",
       "run_results_invocation_id": "8eeff407-6cfc-4fe6-84b4-db55e8b12c92"
     },
+    "environment": {
+      "dbt_target": "local"
+    },
     "inputs": [
       "dbt/models/analytics/_analytics__models.yml",
       "dbt/models/consumption/_consumption__models.yml",
@@ -228,6 +231,7 @@
     ],
     "inputs_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "link_base": "docs/",
+    "tree_dirty_at_generation": true,
     "warehouse": {
       "built_by_invocation_id": null,
       "status": "not_verified"

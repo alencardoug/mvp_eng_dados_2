@@ -84,17 +84,22 @@ As mudanças de **valor**, **esquema** ou **texto** de um objeto que um consumid
 mudança, com o caso de antes e de depois quando é número. O contrato das views pega mudança de
 esquema e não pega mudança de valor: por isso a coluna "Caso".
 
-| Data | *Commit* | Objeto | Muda | Caso: antes → depois | *Build* do armazém | Achado |
-|---|---|---|---|---|---|---|
-| — | — | — | Nada mudou desde a `v2.0.0` (`f86b9fb`) | — | — | — |
+| Estado | Data | *Commit* | Objeto | Muda | Caso: antes → depois | *Build* do armazém | Achado |
+|---|---|---|---|---|---|---|---|
+| — | — | — | — | Nada mudou desde a `v2.0.0` (`f86b9fb`) | — | — | — |
 
-**O que está previsto mudar, e quando,** está no plano (Blocos 1, 1b e a D66). A linha só entra aqui
-quando a mudança está feita e publicada.
+**A sequência de uma linha.** Mudança de **valor** ou de **texto** entra uma vez só, como `feita`,
+depois de *commitada*, publicada e construída no armazém, já com o *commit* e o `invocation_id`.
+Mudança de **esquema** entra duas vezes: primeiro como `prevista`, sem *commit* nem *build*, num
+*commit* anterior ao que a faz, para o consumidor se preparar; depois, a mesma linha passa a `feita`,
+com o *commit* e o `invocation_id`, num *commit* posterior. Nenhuma linha cita o *commit* que a contém.
+
+**O que está previsto mudar de valor, e quando,** está no plano (Blocos 1, 1b e a D66).
 
 **O esquema das views.** O conjunto das 16 views não muda nesta fase, e os Blocos 5 e 6 não mexem em
 `consumption`. A `inventory_turnover_by_sku_and_warehouse` mantém o esquema, salvo se a Q8 decidir
 outra coisa. A `on_time_delivery_rate_by_carrier` depende da D66. Qualquer mudança de esquema entra
-aqui antes do *commit* que a faz.
+aqui como `prevista` antes do *commit* que a faz.
 
 ---
 

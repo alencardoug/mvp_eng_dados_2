@@ -176,7 +176,7 @@ O que cada consumidor fará com o aviso é da sessão dele, e esta fase não o a
   de leitura, os canais, o registro do que mudou para quem consome e os *commits* marcados para fixar;
 - [Pacote de Metadados](docs/pacote_de_metadados.md): o formato 1, com o esquema e um exemplo
   copiado do *manifest* real, guardados por `tests/test_pacote_de_metadados.py` (o exemplo passa no
-  esquema; dez alterações dele são recusadas). O Bloco 4 **gera** conforme este formato e não o
+  esquema; dezessete alterações dele são recusadas, e uma auditoria completa passa). O Bloco 4 **gera** conforme este formato e não o
   redesenha. O que fica para ele está na §5 do documento.
 
 ### Bloco 1 — os números (F1, F3, F2)
@@ -540,3 +540,16 @@ consumidores, e os RVC-1-01 a 09 ficam preservados. Relatório, pedido e *log* e
 bloqueante no escopo revisado**. RVC-4-01 a 04 estão **resolvidos**, não há achado novo, e os achados
 das rodadas 1 a 4 ficam preservados. Relatório em `data/medicoes/base_consumidores/codex2_plano_r5.md`.
 **A revisão da emenda está fechada.**
+
+### Rodada 6 — Codex conta 2, sobre o Bloco 0b em `0b99607` (14/11/2026)
+
+Relatório em `data/medicoes/base_consumidores/codex2_bloco0b_r1.md` (fora do Git). Dois bloqueantes e
+dois ajustes, todos reproduzidos e aceitos.
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVB-1-01 | A procedência do formato não comportava a árvore limpa ou suja nem o ambiente que a D91 pede | bloqueante | Feito: `provenance.tree_dirty_at_generation` e `provenance.environment.dbt_target`, com o significado escrito sem autorreferência (o que prova é o `inputs_sha256` no *commit* fixado); duas contraprovas |
+| RVB-1-02 | O esquema aceitava estado sem evidência: `pass` sem data, `audited` sem *commit*, critérios e referência, armazém `verified`, `run_results` sem procedência | bloqueante | Feito: condições `if/then` no esquema; armazém só `not_verified` na versão 1; procedência do `run_results` obrigatória; cinco contraprovas, um caso legítimo de auditoria que passa e a conferência do `invocation_id` entre seções, no teste e como dever do gerador |
+| RVB-1-03 | "Mesma regra da catraca" não definia o universo das faltas, e a catraca percorre o materializado | ajuste | Feito: `description_gaps` é o universo **declarado**; a especificação diz que o pacote não vê coluna materializada sem declaração, e que essa garantia é da catraca no `check` |
+| RVB-1-04 | O registro de mudança de esquema pedia a linha depois da publicação e antes do *commit* | ajuste | Feito: coluna Estado (`prevista`, `feita`) e a sequência escrita em Consumidores §5 |
+

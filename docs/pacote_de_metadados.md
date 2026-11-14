@@ -60,17 +60,31 @@
 |---|---|---|
 | `format` | `1` | — |
 | `provenance.inputs` e `provenance.inputs_sha256` | A lista dos arquivos rastreados pelo Git que alimentam o pacote e o SHA-256 do conteúdo deles, em ordem | Os arquivos, no momento da geração |
-| `provenance.dbt` | Versão do dbt, adaptador, `generated_at` e `invocation_id` do *manifest* e do `run_results.json` | `dbt/target/` |
-| `provenance.warehouse` | Que execução construiu o armazém. Na versão 1, sempre `not_verified` e `null` (L5) | Desenho do Bloco 4 |
+| `provenance.tree_dirty_at_generation` | Se algum arquivo rastreado diferia do `HEAD` quando o pacote foi gerado. No fluxo normal (mudar a declaração, `make catalog`, *commit*) é `true`, e por isso não prova nada sozinho: quem prova que o pacote versionado bate com os insumos versionados é o `inputs_sha256`, conferido no *commit* fixado. É a "árvore limpa ou suja" da D91, sem citar o próprio *commit* | `git`, no momento da geração |
+| `provenance.environment.dbt_target` | O *target* do *profile* do dbt com que os artefatos foram produzidos (hoje só `local`). É o "ambiente" da D91 | O *profile* lido pelo gerador |
+| `provenance.dbt` | Versão do dbt, adaptador, `generated_at` e `invocation_id` do *manifest* e do `run_results.json`, todos preenchidos (regra 4) | `dbt/target/` |
+| `provenance.warehouse` | Que execução construiu o armazém. Na versão 1, **sempre** `not_verified` e `null`, e o esquema só aceita isso (L5). O estado `verified` entra com o desenho do Bloco 4, como mudança do esquema | Desenho do Bloco 4 |
 | `provenance.link_base` | Contra onde resolvem os links relativos dos textos | — |
 | `relations` | Cada *source*, *seed*, modelo e *snapshot*: tipo, materialização, descrição, `meta` (domínio, dono, escritores, retenção…) e as colunas, com descrição, tipo declarado, sensibilidade e `meta` | *Manifest* |
 | `lineage` | A saída do `python -m mvp_ed1.models.lineage --json`, formato 1, **sem alteração**: por coluna, as folhas imediatas e as origens terminais, com o tipo (`source`, `seed`, `generated`) | `models/lineage.py` |
 | `crossings` | As travessias que o dbt não vê (Airbyte, Debezium → Redpanda → Beam, captura do legado), com mecanismo e frequência, em Markdown | `lineage.crossings()` |
 | `questions` | As 16 perguntas: título, fatos, medidas com a aditividade (`additive`, `semi_additive`, `non_additive`) e a nota, dimensões e view | [Perguntas de Negócio](glossario_de_negocio/perguntas_de_negocio.md) |
-| `description_gaps` | Cada relação ou coluna **sem descrição**, explícita (`column: null` = falta a da relação). Em 13/11/2026 eram 141 colunas, a G06 | *Manifest*, pela mesma regra da catraca |
+| `description_gaps` | Cada relação ou coluna **declarada** sem descrição, explícita (`column: null` = falta a da relação). O universo é o declarado no *manifest* (modelos, *seeds*, *snapshots* e *sources*). Em 13/11/2026 eram 141 colunas, a G06 | *Manifest* |
 | `tests` | Cada teste de dados e teste de unidade do dbt: o que testa, o objeto e a coluna que guarda, onde está declarado e o resultado. `result: null` = **sem resultado**. O resultado traz o estado, a hora, a execução e se ela é a mesma do *manifest* (`same_invocation_as_manifest`) | *Manifest* e `run_results.json` |
 | `view_audits` | Para cada uma das 16 views: o estado da auditoria do Bloco 1b (`not_audited`, `audited`, `audit_pending_decision`), o *commit* em que foi auditada, os critérios, o teste de referência e os achados | Declaração versionada do Bloco 1b. Até lá, todas `not_audited` |
 | `environments` | A fonte da página de estrutura e ambientes, artefato por artefato: repositório, caminho, se é lido por *commit* ou não está disponível, e a data em que congelou (L4, L10) | Lista declarada no gerador |
+
+**O universo das faltas.** A catraca do `make check` (`tests/test_descricao.py`) percorre as colunas
+**materializadas** no armazém e acusa também a coluna que existe no banco e não está declarada. O
+pacote não lê o banco, então não vê esse caso: `description_gaps` é a lista das faltas **declaradas**, e
+o portal não a apresenta como inventário físico. Quem garante que não há coluna materializada sem
+declaração é a catraca, no `check` completo.
+
+**Estado e evidência andam juntos.** O esquema recusa o estado sem a evidência que o sustenta: resultado
+`pass`, `fail`, `warn` ou `error` sem `executed_at`; view `audited` sem *commit*, sem os três critérios
+ou sem a referência; `not_audited` com qualquer um deles; `audit_pending_decision` sem achado. O que o
+esquema não liga entre seções, o gerador confere: o `invocation_id` de cada resultado é o do
+`run_results`, e `same_invocation_as_manifest` é verdadeiro só quando as duas execuções coincidem.
 
 **Os três estados de um teste**, como o catálogo do BI pede: *declarado* (está em `tests`), *executado
 com sucesso numa data* (`result.status = pass`, com `executed_at`) e *problema em aberto* (`fail`,
