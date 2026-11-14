@@ -15,14 +15,14 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 12/11/2026 (`nl_sql@e3ad98e`) |
+| Última atualização | 13/11/2026 (`nl_sql@f3b96fb`) |
 
 ---
 
 ## 1. Falhas deste projeto reveladas pelo teste
 
 Cada item traz a evidência, o efeito, o que o `nl_sql` fez e **como replicar aqui**. Os achados
-F1 a F4 vieram da revisão independente do Codex (`nl_sql/revisao_codex/REVISAO.md`); F5 a F10, da
+F1 a F4 vieram da revisão independente do Codex (`nl_sql/revisao_codex/REVISAO.md`); F5 a F13, da
 construção da governança no `nl_sql`.
 
 ### F1 — `support_tickets_per_hundred_orders` perde parte do denominador · **Gravidade: alta**
@@ -137,7 +137,12 @@ construção da governança no `nl_sql`.
 - **Evidência:** as 10 fatos têm "**Grão:**" na descrição; as 15 dimensões não.
 - **Replicar aqui:** declarar o grão de cada dimensão ("uma linha por versão do cliente", "uma linha
   por SKU-variante e versão"…).
-- **No `nl_sql`:** em andamento (`tabelas.yaml`).
+- **Também:** `dim_brand`, `dim_category` e `dim_payment_method` não têm descrição de tabela nenhuma
+  (`descricao_c0` vazia).
+- **No `nl_sql`:** feito em `governanca/canonico/tabelas.yaml` (`nl_sql@f3b96fb`): grão das 25 tabelas, com a
+  chave de negócio do grão conferida **única e sem nulo** nos dados (ex.: `dim_customer` =
+  `(source_system, customer_natural_key, valid_from)`; `fact_cart_event` = `(source_system, cart_id, event_type)`),
+  mais descrição, quando usar, quando não usar (com a tabela certa), versões e membros desconhecidos.
 
 ### F9 — Regras de negócio que só existem dentro das views · **Gravidade: alta**
 
@@ -173,6 +178,45 @@ construção da governança no `nl_sql`.
 
 ---
 
+### F11 — A descrição de uma fato cita uma pergunta do teste · **Gravidade: baixa**
+
+- **Evidência:** `dbt/models/analytics/_analytics__models.yml:1069` (`fact_payment_transaction`): "é a
+  pergunta P09".
+- **Efeito:** a governança aponta para uma pergunta de negócio pelo número; para uma ferramenta NL→SQL é
+  ruído (ela não conhece "P09") e, num teste, é vazamento de pergunta para o metadado.
+- **No `nl_sql`:** a descrição C1 da tabela não cita pergunta nenhuma; a regra (as recusas ficam na fato,
+  para medir aprovação e tentativas) fica no texto, sem o número.
+- **Replicar aqui:** trocar a citação pela regra que ela justifica.
+
+### F12 — Nada diz para agrupar pelo nome quando o mesmo membro existe nas duas origens · **Gravidade: média**
+
+- **Evidência (dados de 11/11/2026):** o mesmo canal, categoria, meio de pagamento, transportadora,
+  armazém, fornecedor e campanha aparecem nas duas origens com chaves diferentes (ex.: `Loja online`,
+  `Pix`, `Panelas`, `CD Recife` têm uma linha `retail` e uma `legacy`). Já o código de SKU e de cliente
+  repete-se entre origens para **entidades diferentes** (`SKU-0000029`, `CUS-0000024`).
+- **Efeito:** a regra de identidade `(source_system, id)` está documentada, mas não o seu par: para
+  recortar pelos atributos conformados, agrupa-se pelo **nome**. Agrupar pela chave parte "Loja online"
+  em duas linhas; agrupar SKU pelo código junta dois itens diferentes.
+- **No `nl_sql`:** `tabelas.yaml` declara o `rotulo` de agrupamento de cada dimensão conformada, e o
+  `verificar.py` confere que o nome de fato se repete entre origens (reprovou `dim_brand`, onde não se
+  repete).
+- **Replicar aqui:** dizer na descrição de cada dimensão conformada por qual coluna agrupar, ao lado da
+  regra de identidade.
+
+### F13 — `fact_shipment_item.date_key` não é só a data de despacho · **Gravidade: média**
+
+- **Evidência:** `dbt/models/analytics/fact_shipment_item.sql:131` calcula a data com
+  `coalesce(r.shipped_at, r.source_created_at)`; a descrição, em
+  `dbt/models/analytics/_analytics__models.yml:1761`, diz "Data de **despacho** da remessa". Nos dados, 346 das
+  7.556 linhas são de remessas não despachadas (`is_dispatched` falso), e nelas a data é a de criação.
+- **Efeito:** "remessas despachadas por mês" pela `date_key` conta também as que ainda não saíram.
+- **No `nl_sql`:** `tabelas.yaml` declara o significado de cada uma das 12 colunas-data das fatos e o
+  `verificar.py` confere, linha a linha, que cada uma é a data local de São Paulo do instante declarado
+  (só esta tem exceção, restrita a `is_dispatched`). A correção da descrição da coluna vai para
+  `colunas.yaml`.
+- **Replicar aqui:** corrigir a descrição ("despacho; na remessa ainda não despachada, a criação") ou
+  separar as duas datas.
+
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
 | Melhoria | No `nl_sql` | Equivalente aqui | Desvio |
@@ -183,6 +227,7 @@ construção da governança no `nl_sql`.
 | Verificação automática "o dado tem valor fora da lista?" | `governanca/verificar.py` | `accepted_values` já faz parte disso | — |
 | Ondas de criação por FK | `governanca/montar.py` | — (o dbt ordena por `ref`) | Só faz sentido com *constraints* declaradas |
 | Descrição dentro do limite do BigQuery | renderizador (em construção) | Reescrever as descrições longas em vez de cortar | — |
+| Ficha de tabela verificada nos dados (grão único, significado de cada data, versões, rótulo, membro desconhecido) | `canonico/tabelas.yaml` + `verificar.py` | Descrição de tabela do dbt + testes `unique_combination_of_columns` e um teste de data local por fato | Lá a verificação lê o Parquet congelado; aqui seria teste dbt |
 
 ---
 
@@ -208,3 +253,4 @@ construção da governança no `nl_sql`.
 | 12/11/2026 | `018265c` | Valores com significado, filtros, métricas verificadas contra o gabarito (23/23), 7 FKs novas | F5, F6, F7, F9 |
 | 12/11/2026 | `e3ad98e` | `nl_sql` com ambiente próprio, sem depender deste projeto; origem do clone registrada | — |
 | 12/11/2026 | (este documento) | Limite de 1.024 caracteres por descrição como causa das descrições cortadas; grão das dimensões | F4, F8 |
+| 13/11/2026 | `f3b96fb` | `tabelas.yaml`: grão, uso e datas das 25 tabelas, conferidos nos dados; canal de volta passa a ser este repositório (D92) | F8, F11, F12, F13 |
