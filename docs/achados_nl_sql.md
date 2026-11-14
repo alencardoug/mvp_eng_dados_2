@@ -100,6 +100,7 @@ construção da governança no `nl_sql`.
   - corrigir as três descrições;
   - para as cortadas, reescrever uma versão curta (≤ 1.024) que se sustente sozinha, em vez de
     cortar o texto longo.
+- **Replicado aqui em `4e163c9`** (14/11/2026): as três descrições corrigidas e, para as longas, a versão curta que o BigQuery recebe — o texto antes do marcador `<!-- bigquery: fim do texto curto -->` no glossário. `tests/test_descricao_no_bigquery.py` prova, sobre o *manifest*, que nenhuma coluna é cortada.
 
 ### F5 — O glossário de receita líquida omite que só conta pedido realizado · **Gravidade: alta**
 
@@ -111,6 +112,7 @@ construção da governança no `nl_sql`.
   valem para todas as métricas de venda.
 - **Replicar aqui:** acrescentar a regra ao glossário (receita líquida, ticket médio, lucro bruto) e à
   descrição de `net_revenue_amount`.
+- **Replicado aqui em `d3a9f9b`** (a regra no glossário, passo 1 do Bloco 1b) e conferido na versão curta em `4e163c9`.
 
 ### F6 — Sete FKs sem teste `relationships` no dbt · **Gravidade: média**
 
@@ -155,6 +157,7 @@ construção da governança no `nl_sql`.
   chave de negócio do grão conferida **única e sem nulo** nos dados (ex.: `dim_customer` =
   `(source_system, customer_natural_key, valid_from)`; `fact_cart_event` = `(source_system, cart_id, event_type)`),
   mais descrição, quando usar, quando não usar (com a tabela certa), versões e membros desconhecidos.
+- **Replicado aqui em `b326c66`** (14/11/2026): o grão das 15 dimensões, com a chave de grão conferida única no armazém, e a descrição das três que não tinham.
 
 ### F9 — Regras de negócio que só existem dentro das views · **Gravidade: alta**
 
@@ -199,6 +202,7 @@ construção da governança no `nl_sql`.
 - **No `nl_sql`:** a descrição C1 da tabela não cita pergunta nenhuma; a regra (as recusas ficam na fato,
   para medir aprovação e tentativas) fica no texto, sem o número.
 - **Replicar aqui:** trocar a citação pela regra que ela justifica.
+- **Replicado aqui em `b326c66`**: a descrição diz a regra, sem o número da pergunta.
 
 ### F12 — Nada diz para agrupar pelo nome quando o mesmo membro existe nas duas origens · **Gravidade: média**
 
@@ -214,6 +218,7 @@ construção da governança no `nl_sql`.
   repete).
 - **Replicar aqui:** dizer na descrição de cada dimensão conformada por qual coluna agrupar, ao lado da
   regra de identidade.
+- **Replicado aqui em `b326c66`**: cada dimensão conformada diz por qual nome agrupar; `dim_customer` e `dim_product` dizem que o código se repete entre origens para entidades diferentes (74 e 22 códigos, conferidos).
 
 ### F13 — `fact_shipment_item.date_key` não é só a data de despacho · **Gravidade: média**
 
@@ -228,6 +233,7 @@ construção da governança no `nl_sql`.
   `colunas.yaml`.
 - **Replicar aqui:** corrigir a descrição ("despacho; na remessa ainda não despachada, a criação") ou
   separar as duas datas.
+- **Replicado aqui em `b326c66`**: a descrição de `date_key` nas duas fatos de remessa diz a exceção da remessa não despachada.
 
 ### F14 — Duas descrições de `fact_refund` não dizem o que a coluna guarda · **Gravidade: média**
 
@@ -248,6 +254,7 @@ construção da governança no `nl_sql`.
   - `refunded_at`: "instante registrado do reembolso; preenchido também nos solicitados e recusados" (ou anular
     fora do concluído);
   - `originally_captured_amount`: "valor capturado na transação que este reembolso reverte".
+- **Replicado aqui em `b326c66`**: `refunded_at` corrigido na declaração de origem (`models/payments.py`), e `originally_captured_amount` com texto próprio em `fact_refund`.
 
 ### F15 — Descrições apontam para o que não existe na camada `analytics` · **Gravidade: baixa**
 
@@ -267,6 +274,7 @@ construção da governança no `nl_sql`.
   `fact_order_status_event`"; "vigência, mínimo e limite").
 - **Desvio:** os ADR continuam úteis no catálogo do dbt *docs*, que é para quem mantém o projeto. Tirá-los só da
   descrição que vai ao BigQuery já resolve.
+- **Replicado aqui em `b326c66`**: o estado do pedido aponta para `fact_order_status_event`, os estados de remessa e de compra listam os valores, e o cupom diz as três condições. As citações de ADR ficam no catálogo (o desvio declarado acima).
 
 ### F16 — "Data de referência do **armazém**" é ambígua · **Gravidade: baixa**
 
@@ -277,6 +285,7 @@ construção da governança no `nl_sql`.
   armazém.
 - **No `nl_sql`:** "data de referência dos dados (01/09/2026)" nas 9 colunas.
 - **Replicar aqui:** "data de referência dos dados" (ou "do *data warehouse*").
+- **Replicado aqui em `b326c66`**: "data de referência dos dados" em todas as declarações.
 
 ### F17 a F20 — o que a auditoria das 16 views daqui achou (Bloco 1b, 14/11/2026)
 

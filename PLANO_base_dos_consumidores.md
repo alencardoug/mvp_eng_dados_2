@@ -376,9 +376,11 @@ consulta somente leitura, o teste compilado acusa as 7.738 linhas.
   aplicável — 6 a 9 — sai com um resultado escrito: exercitado, limite preservado ou continua aberto.
   Não promete fechar a V1 inteira.
 
-**Em andamento em 14/11/2026.** Feitos: F8 e F11 a F16 (`b326c66`); F4, a versão curta no BigQuery por
-marcador no glossário e as três descrições erradas (`4e163c9`); G06, 102 das 141 colunas (`ff3bdfe`), com
-a catraca baixada no mesmo *commit*. Os itens 6 a 9 da V1, que o RVC-1-06 manda revisitar antes do F4 e da
+**Entregue em 14/11/2026.** F8 e F11 a F16 (`b326c66`); F4, a versão curta no BigQuery por
+marcador no glossário e as três descrições erradas (`4e163c9`); G06, 102 das 141 colunas (`ff3bdfe`) e as 39 da
+ponte pelo RVG-1-01 (`61e0543`, desenho revisado antes, sem ADR: o revisor não achou mudança de
+ferramenta, camada, modelagem nem tratamento, e a N41 fica; **a confirmar pelo Owner**), com a catraca
+baixada a zero em todas as camadas. **A revisão integral dos textos do Bloco 3 é do Owner** (CLAUDE.md §5). Os itens 6 a 9 da V1, que o RVC-1-06 manda revisitar antes do F4 e da
 G06: o **6** (o escritor só edita `.yml` em bloco) ficou como limite preservado, porque os dois `.yml` à mão
 novos e as promoções são em bloco; o **9** (macro nova e `dbt_project.yml` fora da conferência de *manifest*
 atrasado) ficou como limite preservado, porque todo `make catalog` desta parte veio depois de um `make
