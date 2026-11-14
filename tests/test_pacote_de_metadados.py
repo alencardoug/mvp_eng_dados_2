@@ -205,6 +205,7 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
         pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": "", "invocation_id": "x", "same_invocation_as_manifest": False}, "tests", TESTE, "result"), id="dbt-pass-com-data-vazia"),
         pytest.param(lambda e: _com(e, "2026-11-13T22:21:52Zlixo", "provenance", "dbt", "manifest_generated_at"), id="instante-com-lixo-no-fim"),
         pytest.param(lambda e: _com(e, "2026-13-01T00:00:00Z", "provenance", "dbt", "manifest_generated_at"), id="instante-mes-13"),
+        pytest.param(lambda e: _com(e, "2026-11-13T22:21:52Z\n", "provenance", "dbt", "manifest_generated_at"), id="instante-com-quebra-de-linha-no-fim"),
         pytest.param(lambda e: _com(e, "camada_inventada", "checks", CHECK, "layer"), id="camada-fora-da-lista"),
         pytest.param(lambda e: _sem(e, "checks", CHECK, "layer"), id="sem-camada"),
         pytest.param(lambda e: _com(e, "X1", "open_items", 0, "id"), id="item-aberto-com-id-invalido"),
