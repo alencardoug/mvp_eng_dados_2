@@ -1,6 +1,7 @@
 {
   "checks": {
     "tests/test_acesso.py::test_o_declarado_e_a_politica_da_governanca": {
+      "layer": null,
       "module": "tests/test_acesso.py",
       "result": null,
       "summary": "Acesso por papel: o que a Governança §7 declara é o que o armazém concede — e nada mais."
@@ -366,7 +367,9 @@
       },
       "description": null,
       "grain": null,
-      "grants_select": [],
+      "grants_select": [
+        "transformer"
+      ],
       "materialization": null,
       "meta": {
         "grants": {

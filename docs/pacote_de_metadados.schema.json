@@ -117,11 +117,14 @@
       "minLength": 1
     },
     "timestamp_or_null": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "format": "date-time"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/instante"
+        }
+      ]
     },
     "sha256": {
       "type": "string",
@@ -180,15 +183,13 @@
               "$ref": "#/$defs/nonempty"
             },
             "manifest_generated_at": {
-              "type": "string",
-              "format": "date-time"
+              "$ref": "#/$defs/instante"
             },
             "manifest_invocation_id": {
               "$ref": "#/$defs/nonempty"
             },
             "run_results_generated_at": {
-              "type": "string",
-              "format": "date-time"
+              "$ref": "#/$defs/instante"
             },
             "run_results_invocation_id": {
               "$ref": "#/$defs/nonempty"
@@ -292,7 +293,7 @@
           "$ref": "#/$defs/text_or_null"
         },
         "grants_select": {
-          "description": "Os papéis que podem ler a relação, do config.grants.select do dbt, em ordem. Lista vazia quando não há concessão.",
+          "description": "Os papéis que podem ler a relação, em ordem: do config.grants.select do modelo, snapshot ou seed; do meta.grants.select na source (o que a macro aplicar_acesso_por_camada concede). Lista vazia sem concessão.",
           "type": "array",
           "items": {
             "type": "string",
@@ -600,8 +601,7 @@
               "then": {
                 "properties": {
                   "executed_at": {
-                    "type": "string",
-                    "format": "date-time"
+                    "$ref": "#/$defs/instante"
                   }
                 }
               }
@@ -798,6 +798,7 @@
       "required": [
         "module",
         "summary",
+        "layer",
         "result"
       ],
       "properties": {
@@ -833,14 +834,34 @@
                   ]
                 },
                 "executed_at": {
-                  "type": "string",
-                  "format": "date-time"
+                  "$ref": "#/$defs/instante"
                 },
                 "run_id": {
                   "type": "string",
                   "minLength": 1
                 }
               }
+            }
+          ]
+        },
+        "layer": {
+          "description": "A camada que o teste guarda. null = não declarado: hoje nenhum teste do pytest declara camada, e o pacote não a infere do nome.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "raw",
+                "raw_legacy",
+                "staging",
+                "trusted",
+                "quarantine",
+                "snapshots",
+                "analytics",
+                "consumption",
+                "governance"
+              ]
             }
           ]
         }
@@ -891,6 +912,11 @@
           ]
         }
       }
+    },
+    "instante": {
+      "description": "Instante ISO 8601 com data e hora. O esquema não confia em `format`, que o validador pode não conferir.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
     }
   }
 }

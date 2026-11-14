@@ -90,6 +90,14 @@ def test_o_resultado_dos_testes_aponta_para_a_execucao_declarada(exemplo) -> Non
             assert teste["result"]["same_invocation_as_manifest"] is mesma
 
 
+def test_as_concessoes_da_source_vem_do_meta(exemplo) -> None:
+    """Na *source*, quem lê é o `meta.grants.select`, que a macro de acesso concede (RVF-1-01)."""
+    for relacao in exemplo["relations"].values():
+        if relacao["resource_type"] == "source":
+            esperado = sorted(((relacao["meta"].get("grants") or {}).get("select")) or [])
+            assert relacao["grants_select"] == esperado
+
+
 def test_o_grao_e_o_da_convencao_da_descricao(exemplo) -> None:
     """`grain` é o texto entre `**Grão:` e `**` no início da descrição; sem a marca, `null`."""
     for relacao in exemplo["relations"].values():
@@ -158,6 +166,10 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
         pytest.param(lambda e: _sem(e, "checks"), id="sem-a-secao-do-pytest"),
         pytest.param(lambda e: _com(e, {"status": "ok", "executed_at": "2026-11-14T00:00:00Z", "run_id": "x"}, "checks", CHECK, "result"), id="estado-do-pytest-fora-da-lista"),
         pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": None, "run_id": "x"}, "checks", CHECK, "result"), id="pytest-pass-sem-data"),
+        pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": "", "run_id": "x"}, "checks", CHECK, "result"), id="pytest-pass-com-data-vazia"),
+        pytest.param(lambda e: _com(e, {"status": "pass", "executed_at": "", "invocation_id": "x", "same_invocation_as_manifest": False}, "tests", TESTE, "result"), id="dbt-pass-com-data-vazia"),
+        pytest.param(lambda e: _com(e, "camada_inventada", "checks", CHECK, "layer"), id="camada-fora-da-lista"),
+        pytest.param(lambda e: _sem(e, "checks", CHECK, "layer"), id="sem-camada"),
         pytest.param(lambda e: _com(e, "X1", "open_items", 0, "id"), id="item-aberto-com-id-invalido"),
         pytest.param(lambda e: _com(e, "README.md#x", "open_items", 0, "anchor"), id="ancora-fora-de-docs"),
         pytest.param(lambda e: _com(e, "closed", "open_items", 0, "state"), id="item-aberto-fechado"),
