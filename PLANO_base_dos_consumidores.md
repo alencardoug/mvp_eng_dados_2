@@ -340,6 +340,13 @@ Bloco 3 ou num *commit* próprio.
 Os sete `relationships` em `_analytics__models.yml`, de 44 para 51. Sem decisão: é a mesma regra das
 outras. Os órfãos são medidos aqui antes, no armazém local.
 
+**Entregue em 14/11/2026.** Medidos antes, no armazém local: 0 órfãos nas sete, todas preenchidas
+(`fact_sales_order_item.brand_key` 7.738 linhas; `fact_refund` 120 em cada uma das três;
+`fact_payment_transaction.sales_channel_key` 7.426; `fact_purchase_order_item` 1.630 nas duas). Os testes
+`relationships` da declaração de `analytics` passam de 54 para 61 (a contagem 44 → 51 era a do `nl_sql`,
+sobre as 25 tabelas; aqui entram também os da `fact_shipment`). Contraprova: com `dim_brand` vazia numa
+consulta somente leitura, o teste compilado acusa as 7.738 linhas.
+
 ### Bloco 3 — o texto (F5, F4, F8, G06)
 
 - **F5:** a regra do pedido realizado no glossário (receita líquida, ticket médio, lucro bruto) e na

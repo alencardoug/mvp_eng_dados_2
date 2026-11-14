@@ -648,6 +648,8 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+        data_tests:
+          - relationships: {to: ref('dim_brand'), field: brand_key}
       - name: order_id
         description: "Pedido ao qual o item pertence."
         meta:
@@ -1133,6 +1135,8 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+        data_tests:
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: payment_transaction_id
         description: "Identificador da transação de pagamento na origem, gerado pelo banco transacional."
         meta:
@@ -1264,16 +1268,22 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+        data_tests:
+          - relationships: {to: ref('dim_payment_method'), field: payment_method_key}
       - name: customer_key
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
           sensitivity: internal
+        data_tests:
+          - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: sales_channel_key
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
           sensitivity: internal
+        data_tests:
+          - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: refund_id
         description: "Identificador do reembolso na origem, gerado pelo banco transacional."
         meta:
@@ -1395,11 +1405,15 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+        data_tests:
+          - relationships: {to: ref('dim_date'), field: date_key}
       - name: category_key
         description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
         meta:
           description_inherited: true
           sensitivity: internal
+        data_tests:
+          - relationships: {to: ref('dim_category'), field: category_key}
       - name: purchase_order_item_id
         description: "Identificador do item do pedido de compra na origem, gerado pelo banco transacional."
         meta:
