@@ -558,3 +558,6 @@ RVB-1-02 **parcial**, porque a string vazia ainda passava por referência e por 
 Respondido: `minLength` nos identificadores, na referência e em todo texto opcional (a ausência é
 `null`, nunca `""`); quatro contraprovas novas; a conferência entre seções exige identificador
 preenchido.
+
+**Rodada 8** (codex2, sobre `9b1f246`, relatório `codex2_bloco0b_r3.md`): RVB-1-02 resolvido, nenhum
+achado novo. **A revisão do Bloco 0b está fechada.**
