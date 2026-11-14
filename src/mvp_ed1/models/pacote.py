@@ -24,8 +24,9 @@ O que o digest não alcança, porque está fora do Git, tem duas guardas (RVB4-1
   da suíte inteira de agora, pela coleta do pytest; senão, `checks` sai vazio — estado intermediário,
   que o `check-offline` (`--conferir-pytest`) e a 5ª etapa recusam publicar.
 
-E nada parcial nem sensível sai: os leitores de Markdown recusam o que não reconhecem e conferem a
-cobertura; o JUnit recusa módulo que não existe e identificador repetido; o pacote inteiro, chaves
+E nada parcial nem sensível sai: os leitores de Markdown leem só a forma canônica e conferem a
+cobertura contra o que está declarado à parte (as 16 perguntas do contrato; os itens que o cabeçalho
+das Pendências nomeia, com o Registro) — o que diverge recusa; o JUnit recusa módulo que não existe e identificador repetido; o pacote inteiro, chaves
 inclusive, recusa caminho fora do repositório (regra 7); e cada instante passa pelo calendário.
 """
 
@@ -42,7 +43,6 @@ import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
 
 import yaml
 
@@ -59,6 +59,7 @@ ESQUEMA = ROOT / "docs" / "pacote_de_metadados.schema.json"
 PERGUNTAS = ROOT / "docs" / "glossario_de_negocio" / "perguntas_de_negocio.md"
 RESULTADO = ROOT / "tests" / "auditoria" / "resultado.yml"
 PENDENCIAS = ROOT / "docs" / "pendencias.md"
+REGISTRO = ROOT / "docs" / "adr" / "README.md"
 FORMATO = 1
 
 #: O que alimenta o pacote, rastreado pelo Git. Mudar um destes muda o `inputs_sha256`.
@@ -242,90 +243,36 @@ def _faltas(relacoes: dict) -> list[dict]:
 
 
 #: O cabeçalho de uma pergunta e o de um item em aberto, com qualquer espaço que o Markdown aceita.
-#: Os blocos do Markdown, só o que decide o que é título (CommonMark, com a tabela do GFM): parágrafo,
-#: título ATX, título *setext* de uma ou mais linhas, código cercado e indentado, comentário HTML, quebra
-#: temática e contêiner (citação, lista). O universo e o leitor das Perguntas e das Pendências usam a
-#: **mesma** lista de títulos, e não podem divergir; o leitor só aceita a forma canônica, e o título de
-#: qualquer outra forma que comece por um identificador recusa a geração (RVB4-4-01, RVB4-4-02).
-CONTEINER = re.compile(r"^ {0,3}(>[ \t]?|[-*+][ \t]+|\d{1,9}[.)][ \t]+)")
-ATX = re.compile(r"^ {0,3}(#{1,6})(?=[ \t]|$)(.*)$")
-SUBLINHADO = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
-QUEBRA = re.compile(r"^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")
-CERCA = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+#: A forma canônica de um item, uma linha só: `### P01 — título`, `### D63 — título` (recuo de até três).
+CABECA_PERGUNTA = re.compile(r"^ {0,3}###[ \t]+(P\d{2})[ \t]+—[ \t]+(.+?)[ \t]*$", re.M)
+CABECA_ABERTO = re.compile(r"^ {0,3}###[ \t]+(((?:D|V)\d+)[ \t]+—[ \t]+(.+?))[ \t]*$", re.M)
+
+#: A completude não se confere relendo o mesmo Markdown: cada forma de título (citação, cerca,
+#: comentário, link, *setext*…) pedia outra exceção num leitor que nunca fechava (RVB4-1-03 a 5-04).
+#: Ela se confere contra o que está **declarado à parte**: as 16 perguntas do contrato, e os itens que
+#: o cabeçalho das Pendências nomeia, conferidos com o Registro. Um item escrito fora da forma canônica,
+#: ou copiado num exemplo, diverge da declaração e recusa a geração — nunca sai em silêncio.
+CELULA_DO_CABECALHO = r"^\|[ \t]*{rotulo}[ \t]*\|[ \t]*(\d+)[ \t]*(?:\(([^)]*)\))?"
 
 
-@dataclass(frozen=True)
-class Titulo:
-    inicio: int          # a primeira linha do título (a do texto, no *setext*)
-    fim: int             # a última (a do sublinhado, no *setext*)
-    nivel: int
-    forma: str           # "atx" ou "setext"
-    conteiner: str       # "" no nível do documento; ">" por citação, "L" por item de lista
-    texto: str
-
-
-def _sem_conteiner(linha: str) -> tuple[str, str]:
-    marcas = ""
-    while (m := CONTEINER.match(linha)):
-        marcas += ">" if m.group(1).startswith(">") else "L"
-        linha = linha[m.end():]
-    return marcas, linha
-
-
-def _titulos(texto: str) -> list[Titulo]:
-    """Cada título do documento, na ordem — o que um leitor de Markdown mostraria como título."""
-    linhas, saida = texto.split("\n"), []
-    paragrafo: list[str] = []
-    inicio, conteiner_do_paragrafo, tabela, cerca, comentario = 0, "", False, None, False
-    for i, bruta in enumerate(linhas):
-        conteiner, linha = _sem_conteiner(bruta)
-        if cerca is not None:
-            if re.match(rf"^ {{0,3}}{re.escape(cerca[0])}{{{len(cerca)},}}[ \t]*$", linha):
-                cerca = None
-            continue
-        if comentario:
-            comentario = "-->" not in linha
-            continue
-        if not linha.strip():
-            paragrafo = []
-            continue
-        if paragrafo and not tabela and conteiner == conteiner_do_paragrafo and (m := SUBLINHADO.match(linha)):
-            saida.append(Titulo(inicio, i, 1 if m.group(1)[0] == "=" else 2, "setext", conteiner, " ".join(paragrafo)))
-            paragrafo = []
-            continue
-        if QUEBRA.match(bruta) or QUEBRA.match(linha):
-            paragrafo = []
-            continue
-        if (m := CERCA.match(linha)):
-            cerca, paragrafo = m.group(1), []
-            continue
-        if (m := ATX.match(linha)):
-            conteudo = re.sub(r"(?:^|[ \t]+)#+[ \t]*$", "", m.group(2).strip()).strip()
-            saida.append(Titulo(i, i, len(m.group(1)), "atx", conteiner, conteudo))
-            paragrafo = []
-            continue
-        if not paragrafo and re.match(r"^(?: {4}|\t)", linha):
-            continue                                   # código indentado: não interrompe parágrafo
-        if not paragrafo and linha.lstrip().startswith("<!--"):
-            comentario = "-->" not in linha
-            continue
-        if paragrafo:
-            paragrafo.append(linha.strip())            # continuação, também a preguiçosa
-            continue
-        paragrafo, inicio, conteiner_do_paragrafo = [linha.strip()], i, conteiner
-        tabela = linha.lstrip().startswith("|")        # a linha de tabela do GFM não vira *setext*
+def _declarados_nas_pendencias(texto: str, registro: str) -> list[str]:
+    """Os itens em aberto que o cabeçalho das Pendências **nomeia** — e conta —, e o Registro confirma."""
+    saida = []
+    for rotulo, ident in (("Decisões pendentes", r"D\d+"), ("Verificações e trabalho adiados", r"V\d+")):
+        m = re.search(CELULA_DO_CABECALHO.format(rotulo=rotulo), texto, re.M)
+        if not m:
+            raise SystemExit(f"pendências: o cabeçalho não tem a linha `{rotulo}` — nenhum pacote é escrito")
+        nomeados = list(dict.fromkeys(re.findall(rf"\b({ident})\b", m.group(2) or "")))
+        if len(nomeados) != int(m.group(1)):
+            raise SystemExit(f"pendências: o cabeçalho conta {m.group(1)} em `{rotulo}` e nomeia {nomeados} — "
+                             "nenhum pacote é escrito")
+        saida += nomeados
+    secao = registro.partition("## 3. Decisões pendentes")[2].partition("\n## ")[0]
+    no_registro = set(re.findall(r"^\|[ \t]*\*{0,2}(D\d+)\*{0,2}[ \t]*\|", secao, re.M))
+    if not no_registro <= set(saida):
+        raise SystemExit(f"pendências: o Registro tem {sorted(no_registro - set(saida))} pendente(s) que o cabeçalho "
+                         "não nomeia — nenhum pacote é escrito")
     return saida
-
-
-def _ids_nos_titulos(titulos: list[Titulo], ident: str) -> list[str]:
-    """O universo: o identificador com que cada título começa, de qualquer nível ou forma, mesmo em negrito."""
-    return [m.group(1) for t in titulos if (m := re.match(rf"[*_`]*({ident})(?![\w])", t.texto))]
-
-
-def _canonicos(titulos: list[Titulo], forma: str) -> list[tuple[Titulo, re.Match]]:
-    """Os títulos na forma que o leitor aceita: `### ID — título`, no nível do documento."""
-    return [(t, m) for t in titulos if t.forma == "atx" and t.nivel == 3 and t.conteiner == ""
-            and (m := re.fullmatch(forma, t.texto))]
 
 
 CELULA = re.compile(r"^\|[ \t]*\*\*(Fatos?|Medidas|Dimensões|View)\*\*[ \t]*\|[ \t]*(.+?)[ \t]*\|[ \t]*$", re.M)
@@ -353,13 +300,11 @@ def _medidas(celula: str, pergunta: str) -> list[dict]:
 
 def _perguntas(texto: str) -> dict:
     saida = {}
-    titulos = _titulos(texto)
-    cabecas = _canonicos(titulos, r"(P\d{2})[ \t]+—[ \t]+(.+)")
-    _sem_perda("perguntas de negócio", [m.group(1) for _, m in cabecas], _ids_nos_titulos(titulos, r"P\d{2}"))
-    _sem_perda("perguntas de negócio", [m.group(1) for _, m in cabecas], [f"P{i:02d}" for i in range(1, 17)])
-    linhas = texto.split("\n")
-    for (titulo, cabeca), seguinte in zip(cabecas, [c for c, _ in cabecas[1:]] + [None]):
-        bloco = "\n".join(linhas[titulo.fim + 1:seguinte.inicio if seguinte else len(linhas)])
+    cabecas = list(CABECA_PERGUNTA.finditer(texto))
+    # O universo é o do contrato, P01 a P16: pergunta escondida falta, e copiada se repete.
+    _sem_perda("perguntas de negócio", [c.group(1) for c in cabecas], [f"P{i:02d}" for i in range(1, 17)])
+    for cabeca, seguinte in zip(cabecas, cabecas[1:] + [None]):
+        bloco = texto[cabeca.end():seguinte.start() if seguinte else len(texto)]
         lidas = CELULA.findall(bloco)
         celulas = dict(lidas)
         if len(celulas) != len(lidas) or not {"Medidas", "Dimensões", "View"} <= celulas.keys() or not (
@@ -498,21 +443,16 @@ def _modulo_do_caso(classname: str, raiz: pathlib.Path = ROOT) -> tuple[str, lis
     raise SystemExit(f"JUnit: `{classname}` não corresponde a módulo nenhum em tests/ — nenhum pacote é escrito")
 
 
-def _abertos(texto: str) -> list[dict]:
+def _abertos(texto: str, registro: str | None = None) -> list[dict]:
     from mvp_ed1.docs_check import slug
 
-    titulos = _titulos(texto)
-    abre = [k for k, t in enumerate(titulos) if t.nivel == 2 and t.conteiner == "" and t.texto == "1. Esperando você"]
-    if len(abre) != 1:
-        raise SystemExit("pendências: sem uma seção `## 1. Esperando você` — nenhum pacote é escrito")
-    # A seção acaba na próxima seção **numerada** (`## 1.1 …`, `## 2. …`), e não no primeiro título de nível
-    # 2: o item sublinhado por `---` é um *setext* de nível 2, e acabar nele perderia o item e o resto.
-    fim = next((k for k in range(abre[0] + 1, len(titulos))
-                if titulos[k].nivel <= 2 and re.match(r"\d+(?:\.\d+)*\.?[ \t]", titulos[k].texto)), len(titulos))
-    secao = titulos[abre[0] + 1:fim]
-    cabecas = [(t.texto, m.group(1), m.group(2)) for t, m in _canonicos(secao, r"((?:D|V)\d+)[ \t]+—[ \t]+(.+)")]
-    # O universo: todo título da seção que começa por um `Dnn` ou `Vn`, de qualquer nível ou forma.
-    _sem_perda("itens em aberto", [c[1] for c in cabecas], _ids_nos_titulos(secao, r"(?:D|V)\d+"))
+    partes = re.split(r"^##[ \t]+1\.[ \t]+Esperando você[ \t]*$", texto, maxsplit=1, flags=re.M)
+    if len(partes) != 2:
+        raise SystemExit("pendências: sem a seção `## 1. Esperando você` — nenhum pacote é escrito")
+    secao = re.split(r"^##[ \t]+1\.1\b", partes[1], maxsplit=1, flags=re.M)[0]
+    cabecas = CABECA_ABERTO.findall(secao)
+    registro = REGISTRO.read_text(encoding="utf-8") if registro is None else registro
+    _sem_perda("itens em aberto", [c[1] for c in cabecas], _declarados_nas_pendencias(texto, registro))
     saida = []
     for titulo, ident, nome in cabecas:
         adiada = "adiada" in nome or ident.startswith("V")

@@ -45,7 +45,11 @@
 4. **Nada parcial.** Se falta o *manifest* ou o `run_results.json`, a geração falha e nenhum pacote é
    escrito. Não existe pacote "meio gerado". O mesmo vale para o que os leitores não reconhecem: uma
    pergunta, medida ou pendência fora da forma, ou um caso do JUnit cujo módulo não existe ou que se
-   repete, falha a geração em vez de sair do pacote em silêncio.
+   repete, falha a geração em vez de sair do pacote em silêncio. A cobertura se confere contra o que está
+   **declarado à parte**, e não relendo o mesmo Markdown: as perguntas são P01 a P16; os itens em aberto
+   são os que o cabeçalho das Pendências nomeia e conta (*Decisões pendentes*, *Verificações e trabalho
+   adiados*), com as pendentes do Registro entre eles. Cada item se escreve na forma canônica,
+   `### ID — título`; em outra forma, ou copiado num exemplo, ele diverge da declaração e a geração recusa.
 5. **Texto como dado.** As descrições são Markdown em português, como estão no dbt. O consumidor as
    exibe como texto ou como Markdown saneado, sem executar HTML. Links relativos resolvem contra
    `provenance.link_base` (`docs/`), no commit fixado.

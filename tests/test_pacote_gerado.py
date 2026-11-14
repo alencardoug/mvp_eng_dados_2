@@ -219,7 +219,12 @@ def test_o_que_o_leitor_nao_reconhece_recusa_o_pacote(variante, motivo) -> None:
         pacote._perguntas(variante(_dezesseis(PERGUNTA)))
 
 
-PENDENCIAS = """## 1. Esperando você
+PENDENCIAS = """| Campo | Informação |
+|---|---|
+| Verificações e trabalho adiados | 1 (V1, as verificações) |
+| Decisões pendentes | 2 (D63, o medidor; D43, adiada). A D65 foi fechada |
+
+## 1. Esperando você
 
 ### D63 — o medidor
 
@@ -229,21 +234,62 @@ PENDENCIAS = """## 1. Esperando você
 
 ## 1.1 Decididas
 """
+REGISTRO = "## 3. Decisões pendentes\n\n| # | Decisão |\n|---|---|\n| D43 | a guarda |\n\n## 4. Outra\n"
 
 
-def test_os_itens_em_aberto_aceitam_espaco_e_recusam_o_titulo_estranho() -> None:
-    assert [i["id"] for i in pacote._abertos(PENDENCIAS.replace("### D63 —", "###  D63  —"))] == ["D63", "D43", "V1"]
-    # RVB4-2-03: recuo de até três espaços é título; parágrafo depois de `###` vazio não é item.
-    assert [i["id"] for i in pacote._abertos(PENDENCIAS.replace("### D63 —", "   ### D63 —"))] == ["D63", "D43", "V1"]
-    assert [i["id"] for i in pacote._abertos(PENDENCIAS.replace("### V1 —", "###\nD65 é um parágrafo\n\n### V1 —"))] == \
-        ["D63", "D43", "V1"]
-    for estranho in ("### **D63** —", "#### D63 —", "D63 — sublinhado\n---\n", "**D63** — sublinhado\n---\n",
-                     "`D63` — sublinhado\n===\n"):
-        with pytest.raises(SystemExit, match="itens em aberto"):
-            pacote._abertos(PENDENCIAS.replace("### D63 —", estranho, 1))
-    assert [i["state"] for i in pacote._abertos(PENDENCIAS)] == ["pending", "deferred", "deferred"]
+def _lidos(texto: str) -> list[str]:
+    return [i["id"] for i in pacote._abertos(texto, REGISTRO)]
+
+
+def test_os_itens_em_aberto_sao_os_que_o_cabecalho_nomeia() -> None:
+    assert _lidos(PENDENCIAS) == ["D63", "D43", "V1"]
+    assert [i["state"] for i in pacote._abertos(PENDENCIAS, REGISTRO)] == ["pending", "deferred", "deferred"]
+    assert _lidos(PENDENCIAS.replace("### D63 —", "###  D63  —")) == ["D63", "D43", "V1"]
+    assert _lidos(PENDENCIAS.replace("### D63 —", "   ### D63 —")) == ["D63", "D43", "V1"]
+    # Exemplo, código e parágrafo que não estão na forma canônica não viram item, e não recusam.
+    for inocente in ("###\nD65 é um parágrafo\n\n", "    **D65** é código\n---\n\n", "> ## 2. Exemplo\n\n",
+                     "```exemplo```\n\n", "> ```text\n> exemplo\n\n", "- ## 1.1 Exemplo\n\n"):
+        assert _lidos(PENDENCIAS.replace("### V1 —", inocente + "### V1 —", 1)) == ["D63", "D43", "V1"], inocente
+
+
+@pytest.mark.parametrize("estranho", [
+    # As formas das rodadas 2 a 5 (RVB4-2-03, 3-02, 4-01, 5-03, 5-04): o item que o cabeçalho nomeia e o leitor
+    # não acha na forma canônica recusa a geração — nenhuma delas o perde em silêncio.
+    pytest.param("### **D63** —", id="negrito"), pytest.param("#### D63 —", id="nivel-4"),
+    pytest.param("D63 — sublinhado\n---\n", id="setext"), pytest.param("**D63** — sublinhado\n---\n", id="setext-negrito"),
+    pytest.param("D63 — em duas\nlinhas\n---\n", id="setext-duas-linhas"),
+    pytest.param("Nota.\n<!-- c -->\nD63 — sublinhado\n---\n", id="comentario-e-setext"),
+    pytest.param("### [D63](#d63) —", id="link"), pytest.param("> ### D63 —", id="citado"),
+])
+def test_o_item_fora_da_forma_canonica_recusa(estranho) -> None:
+    with pytest.raises(SystemExit, match="itens em aberto"):
+        pacote._abertos(PENDENCIAS.replace("### D63 —", estranho, 1), REGISTRO)
+
+
+def test_a_declaracao_tem_de_se_sustentar() -> None:
+    """Cópia do item, cabeçalho que conta e não nomeia, Registro com pendente fora do cabeçalho: recusa."""
+    with pytest.raises(SystemExit, match="itens em aberto"):                                   # cópia num exemplo
+        pacote._abertos(PENDENCIAS.replace("### V1 —", "```\n### D63 — exemplo\n```\n\n### V1 —", 1), REGISTRO)
+    with pytest.raises(SystemExit, match="conta 3"):
+        pacote._abertos(PENDENCIAS.replace("| 2 (D63", "| 3 (D63", 1), REGISTRO)
+    with pytest.raises(SystemExit, match="Registro tem"):
+        pacote._abertos(PENDENCIAS, REGISTRO.replace("| D43 |", "| D43 |\n| D99 | outra |"))
     with pytest.raises(SystemExit, match="Esperando você"):
-        pacote._abertos(PENDENCIAS.replace("## 1. Esperando você", "## 1. Outra coisa"))
+        pacote._abertos(PENDENCIAS.replace("## 1. Esperando você", "## 1. Outra coisa"), REGISTRO)
+    with pytest.raises(SystemExit, match="não tem a linha"):
+        pacote._abertos(PENDENCIAS.replace("| Decisões pendentes |", "| Decisões |"), REGISTRO)
+
+
+@pytest.mark.parametrize("variante", [
+    pytest.param(lambda t: t.replace("### P05 —", "### [P05](#p05) —", 1), id="link"),
+    pytest.param(lambda t: t.replace("### P05 —", "> ### P05 —", 1), id="citada"),
+    pytest.param(lambda t: t.replace("### P05 —", "P05 —", 1).replace("| Campo | Valor |", "---\n| Campo | Valor |", 5), id="setext"),
+    pytest.param(lambda t: t + "\n```\n### P05 — cópia\n```\n", id="copia-em-cerca"),
+])
+def test_a_pergunta_fora_da_forma_ou_copiada_recusa(variante) -> None:
+    """As 16 perguntas são as do contrato: escondida falta, copiada se repete."""
+    with pytest.raises(SystemExit, match="perguntas"):
+        pacote._perguntas(variante(_dezesseis(PERGUNTA)))
 
 
 def _junit(tmp_path, *casos: str) -> pathlib.Path:
@@ -406,39 +452,3 @@ def test_o_pacote_vazio_ou_recortado_nao_e_publicavel() -> None:
     assert pacote.faltas_no_pytest(cheio, casos) is None
     assert "vazio" in pacote.faltas_no_pytest({"checks": {}}, casos)
     assert "faltam" in pacote.faltas_no_pytest({"checks": {casos[0]: {}}}, casos)
-
-
-def _ids(texto: str) -> list[str]:
-    return pacote._ids_nos_titulos(pacote._titulos(texto), r"(?:D|V)\d+")
-
-
-def test_lista_citacao_e_tabela_antes_do_sublinhado_nao_sao_titulo() -> None:
-    """O marcador de lista exige espaço depois: `- D65` é lista, `**D65**` é parágrafo (título se sublinhado)."""
-    for texto in ("- D65 item\n---\n", "* D65 item\n---\n", "1. D65 item\n---\n", "> D65\n---\n", "| D65 |\n---\n"):
-        assert _ids(texto) == [], texto
-    assert _ids("**D65** título\n---\n") == ["D65"]
-
-
-@pytest.mark.parametrize(("texto", "esperado"), [
-    # RVB4-4-01: o *setext* de duas linhas é um título só, com o identificador na primeira.
-    pytest.param("D65 — título\ncontinuação do título\n---\n", ["D65"], id="setext-duas-linhas"),
-    pytest.param("D65 — título\n===\n", ["D65"], id="setext-nivel-1"),
-    # RVB4-4-02: código indentado (quatro espaços ou tabulação) não é parágrafo, nem vira título.
-    pytest.param("\n    **D65** é código\n---\n", [], id="codigo-quatro-espacos"),
-    pytest.param("\n\t**D65** é código\n---\n", [], id="codigo-tabulacao"),
-    pytest.param("parágrafo\n    **D65** continua o parágrafo\n---\n", [], id="recuo-dentro-do-paragrafo"),
-    pytest.param("```\n### D65 — dentro da cerca\n```\n", [], id="codigo-cercado"),
-    pytest.param("<!--\n### D65 — comentado\n-->\n", [], id="comentario-html"),
-    pytest.param("> ### D65 — citado\n", ["D65"], id="titulo-citado"),
-    pytest.param("### D65 — fechado ###\n", ["D65"], id="atx-fechado"),
-    pytest.param("***\n", [], id="quebra-tematica"),
-])
-def test_o_universo_e_o_dos_titulos_que_o_markdown_mostra(texto, esperado) -> None:
-    assert _ids(texto) == esperado
-
-
-def test_um_item_sublinhado_nao_encerra_a_secao_das_pendencias() -> None:
-    """O *setext* de `---` é nível 2: a seção acaba na próxima seção numerada, e o item fora da forma recusa."""
-    for estranho in ("D63 — o medidor\n---", "D63 — o medidor\nem duas linhas\n---", "**D63** — o medidor\n==="):
-        with pytest.raises(SystemExit, match="itens em aberto"):
-            pacote._abertos(PENDENCIAS.replace("### D63 — o medidor", estranho, 1))
