@@ -221,7 +221,7 @@ models:
   - name: new_and_repeat_customers_by_month
     meta:
       domain: clientes
-    description: 'P04 — Estreias por mês e recompra na janela. {{ doc("repeat_purchase") }}'
+    description: 'P04 — Estreias por mês e recompra na janela, pelo grão do pedido (`fact_order_status_event`): todo pedido realizado conta, inclusive o de itens rejeitados em cascata. {{ doc("repeat_purchase") }}'
     config:
       contract: {enforced: true}
     columns:
@@ -985,7 +985,8 @@ models:
     description: >
       P14 — Tempo médio entre pedido e entrega, por região e modalidade.
       **Grão do pedido**: fecha na última remessa a chegar, e pedido com remessa
-      em aberto ou extraviada fica de fora.
+      em aberto ou extraviada fica de fora. Lida de `fact_shipment`: conta
+      também o pedido cujos itens foram todos rejeitados em cascata.
     config:
       contract: {enforced: true}
     columns:

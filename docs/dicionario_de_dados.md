@@ -976,8 +976,8 @@ de fora do repositório, com as folhas imediatas de cada coluna.
 | `service_level` | `raw.carriers.service_level` · `raw_legacy.carriers.service_level` |
 | `carrier_name` | `raw.carriers.name` · `raw_legacy.carriers.name` |
 | `order_count` | `consumption.order_to_delivery_time_by_region.order_count` (gerada) |
-| `split_order_count` | `analytics.fact_shipment_item.is_split_order` (gerada) |
-| `shipment_count` | `analytics.fact_shipment_item.order_shipment_count` (gerada) |
+| `split_order_count` | `analytics.fact_shipment.is_split_order` (gerada) |
+| `shipment_count` | `analytics.fact_shipment.order_shipment_count` (gerada) |
 | `avg_order_to_delivery_days` | `raw.delivery_events.{event_type, occurred_at}` · `raw.orders.placed_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.orders.placed_at` |
 | `median_order_to_delivery_days` | `raw.delivery_events.{event_type, occurred_at}` · `raw.orders.placed_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.orders.placed_at` |
 | `max_order_to_delivery_days` | `raw.delivery_events.{event_type, occurred_at}` · `raw.orders.placed_at` · `raw_legacy.delivery_events.{event_type, occurred_at}` · `raw_legacy.orders.placed_at` |

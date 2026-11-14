@@ -9,8 +9,8 @@ o **pedido**.
 - **Cálculo:** média de `order_to_delivery_days` sobre pedidos com ciclo fechado,
   por região de entrega, modalidade e mês de chegada.
 - **Implementado em:** view `order_to_delivery_time_by_region`, coluna
-  `avg_order_to_delivery_days`; medida `order_to_delivery_days` em
-  `fact_shipment_item`.
+  `avg_order_to_delivery_days`, lida de `fact_shipment` (ADR-0053); medida
+  `order_to_delivery_days` em `fact_shipment` e `fact_shipment_item`.
 - **Relacionado:** entrega no prazo, prazo prometido.
 
 **O ciclo fecha na última remessa porque é quando o pedido chegou inteiro.** Um

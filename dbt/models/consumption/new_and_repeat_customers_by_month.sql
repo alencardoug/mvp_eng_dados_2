@@ -4,6 +4,13 @@
 -- em janeiro e voltou em março conta na coorte de **janeiro** — é assim que a
 -- taxa de um mês para de mudar depois de fechada a janela. Contar no mês da
 -- recompra faria toda coorte antiga variar para sempre.
+--
+-- **O pedido vem do grão do pedido**, `fact_order_status_event`, pelo evento de
+-- criação: lá está todo pedido, inclusive o que teve todos os itens rejeitados em
+-- cascata. A fato de item não o tem, e a estreia de um cliente cujo primeiro
+-- pedido foi assim caía no pedido seguinte (7 clientes) ou sumia (1), na
+-- auditoria das views de 14/11/2026 — o padrão da D66. A primeira compra passa a
+-- ser a da `dim_customer` (Q7).
 
 {#- A recompra dentro da janela, usada duas vezes abaixo. -#}
 {% set recompra_na_janela -%}
@@ -26,9 +33,10 @@ with estreia as (
         f.placed_at                                 as first_order_at,
         f.date_key                                  as first_order_date_key,
         f.sales_channel_key
-    from {{ ref('fact_sales_order_item') }} f
+    from {{ ref('fact_order_status_event') }} f
     join {{ ref('dim_customer') }} c using (customer_key)
-    where f.is_realised
+    where f.is_order_creation
+      and f.is_realised
     {{ distinct_on_order('c.source_system, c.customer_natural_key', 'c.source_system, c.customer_natural_key, f.placed_at') }}
 
 ),
@@ -44,8 +52,9 @@ recompra as (
     join {{ ref('dim_customer') }} c
       on  c.source_system = e.source_system
      and c.customer_natural_key = e.customer_natural_key
-    join {{ ref('fact_sales_order_item') }} f
+    join {{ ref('fact_order_status_event') }} f
       on f.customer_key = c.customer_key
+     and f.is_order_creation
      and f.is_realised
      and f.placed_at > e.first_order_at
     group by e.source_system, e.customer_natural_key

@@ -13,13 +13,18 @@
 -- o gerador dá uma transportadora por pedido e as duas leituras coincidem; a
 -- regra está escrita porque o dia em que deixarem de coincidir não avisa.
 --
+-- O pedido vem de `fact_shipment`, uma linha por remessa (ADR-0053): a remessa
+-- que fecha o ciclo tem os atributos do pedido. A fato de item perdia o pedido
+-- cujos itens foram todos rejeitados em cascata — 13 do legado em 14/11/2026, na
+-- auditoria das views, pelo mesmo padrão da D66.
+--
 -- Esta view e a de P13 **não se cruzam**: uma conta remessas, a outra conta
 -- pedidos, e um pedido com uma remessa entregue e outra extraviada aparece lá e
 -- não aparece aqui.
 
 with pedidos as (
 
-    select distinct
+    select
         f.source_system,
         f.order_id,
         f.delivered_date_key,
@@ -28,7 +33,7 @@ with pedidos as (
         f.is_split_order,
         f.order_shipment_count,
         f.order_to_delivery_days
-    from {{ ref('fact_shipment_item') }} f
+    from {{ ref('fact_shipment') }} f
     where f.is_order_cycle_closed
       and f.is_cycle_closing_shipment
 
