@@ -92,10 +92,12 @@
       "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+\\.[a-z0-9_]+$"
     },
     "text_or_null": {
+      "description": "Texto ou null. A string vazia é recusada: a ausência é sempre null.",
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "minLength": 1
     },
     "timestamp_or_null": {
       "type": [
@@ -155,24 +157,24 @@
           ],
           "properties": {
             "dbt_version": {
-              "type": "string"
+              "$ref": "#/$defs/nonempty"
             },
             "adapter_type": {
-              "type": "string"
+              "$ref": "#/$defs/nonempty"
             },
             "manifest_generated_at": {
               "type": "string",
               "format": "date-time"
             },
             "manifest_invocation_id": {
-              "type": "string"
+              "$ref": "#/$defs/nonempty"
             },
             "run_results_generated_at": {
               "type": "string",
               "format": "date-time"
             },
             "run_results_invocation_id": {
-              "type": "string"
+              "$ref": "#/$defs/nonempty"
             }
           }
         },
@@ -210,7 +212,8 @@
           "properties": {
             "dbt_target": {
               "description": "O target do profile do dbt com que os artefatos foram produzidos (hoje só local).",
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             }
           }
         }
@@ -544,7 +547,7 @@
                   "$ref": "#/$defs/timestamp_or_null"
                 },
                 "invocation_id": {
-                  "type": "string"
+                  "$ref": "#/$defs/nonempty"
                 },
                 "same_invocation_as_manifest": {
                   "type": "boolean"
@@ -611,7 +614,8 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "minLength": 1
         },
         "findings": {
           "description": "IDs dos achados (F1, F2, F14…) que a auditoria registrou para esta view.",
@@ -663,7 +667,8 @@
                 "uniqueItems": true
               },
               "reference": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               }
             }
           }
@@ -686,7 +691,8 @@
                 "uniqueItems": true
               },
               "reference": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "findings": {
                 "minItems": 1
@@ -749,6 +755,10 @@
           "$ref": "#/$defs/text_or_null"
         }
       }
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }

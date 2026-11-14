@@ -81,8 +81,10 @@ def test_o_resultado_dos_testes_aponta_para_a_execucao_declarada(exemplo) -> Non
     `same_invocation_as_manifest` diz a verdade. O gerador do Bloco 4 herda esta conferência."""
     dbt = exemplo["provenance"]["dbt"]
     mesma = dbt["run_results_invocation_id"] == dbt["manifest_invocation_id"]
+    assert dbt["run_results_invocation_id"] and dbt["manifest_invocation_id"]
     for teste in exemplo["tests"].values():
         if teste["result"] is not None:
+            assert teste["result"]["invocation_id"]
             assert teste["result"]["invocation_id"] == dbt["run_results_invocation_id"]
             assert teste["result"]["same_invocation_as_manifest"] is mesma
 
@@ -136,6 +138,18 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
         pytest.param(lambda e: _com(e, None, "provenance", "dbt", "run_results_invocation_id"), id="run-results-sem-procedencia"),
         pytest.param(lambda e: _sem(e, "provenance", "tree_dirty_at_generation"), id="sem-estado-da-arvore"),
         pytest.param(lambda e: _sem(e, "provenance", "environment"), id="sem-ambiente"),
+        pytest.param(lambda e: _com(e, "", "provenance", "dbt", "run_results_invocation_id"), id="run-results-com-invocation-vazia"),
+        pytest.param(lambda e: _com(e, "", "tests", TESTE, "result", "invocation_id"), id="resultado-com-invocation-vazia"),
+        pytest.param(lambda e: _com(e, "", "relations", VIEW, "columns", "sales_channel_name", "description"), id="descricao-vazia-em-vez-de-null"),
+        pytest.param(
+            lambda e: _com(
+                e,
+                {"status": "audited", "commit": "abc1234", "criteria": ["non_additivity", "time_dependent_balance", "truncated_population"], "reference": "", "findings": []},
+                "view_audits",
+                VIEW,
+            ),
+            id="auditada-com-referencia-vazia",
+        ),
     ],
 )
 def test_o_esquema_recusa_o_exemplo_alterado(validador, exemplo, alterar) -> None:

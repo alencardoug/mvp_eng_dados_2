@@ -176,7 +176,7 @@ O que cada consumidor fará com o aviso é da sessão dele, e esta fase não o a
   de leitura, os canais, o registro do que mudou para quem consome e os *commits* marcados para fixar;
 - [Pacote de Metadados](docs/pacote_de_metadados.md): o formato 1, com o esquema e um exemplo
   copiado do *manifest* real, guardados por `tests/test_pacote_de_metadados.py` (o exemplo passa no
-  esquema; dezessete alterações dele são recusadas, e uma auditoria completa passa). O Bloco 4 **gera** conforme este formato e não o
+  esquema; vinte e uma alterações dele são recusadas, e uma auditoria completa passa). O Bloco 4 **gera** conforme este formato e não o
   redesenha. O que fica para ele está na §5 do documento.
 
 ### Bloco 1 — os números (F1, F3, F2)
@@ -553,3 +553,8 @@ dois ajustes, todos reproduzidos e aceitos.
 | RVB-1-03 | "Mesma regra da catraca" não definia o universo das faltas, e a catraca percorre o materializado | ajuste | Feito: `description_gaps` é o universo **declarado**; a especificação diz que o pacote não vê coluna materializada sem declaração, e que essa garantia é da catraca no `check` |
 | RVB-1-04 | O registro de mudança de esquema pedia a linha depois da publicação e antes do *commit* | ajuste | Feito: coluna Estado (`prevista`, `feita`) e a sequência escrita em Consumidores §5 |
 
+**Rodada 7** (codex2, sobre `50d58b1`, relatório `codex2_bloco0b_r2.md`): RVB-1-01, 03 e 04 resolvidos;
+RVB-1-02 **parcial**, porque a string vazia ainda passava por referência e por `invocation_id`.
+Respondido: `minLength` nos identificadores, na referência e em todo texto opcional (a ausência é
+`null`, nunca `""`); quatro contraprovas novas; a conferência entre seções exige identificador
+preenchido.

@@ -35,7 +35,7 @@
    indentação de dois espaços e quebra de linha no fim. Nenhum carimbo de hora do próprio pacote:
    as datas são as dos artefatos de que ele nasce.
 2. **Chave sempre presente.** Toda chave que o esquema declara aparece. A ausência de valor é
-   `null`, e a lista vazia é `[]`. O portal mostra `null` como **ausente**, nunca como zero ou texto
+   `null`, nunca a string vazia, que o esquema recusa; a lista vazia é `[]`. O portal mostra `null` como **ausente**, nunca como zero ou texto
    vazio. A exceção são os objetos `meta`, repassados do dbt como estão: as chaves deles são as que a
    declaração tem.
 3. **Versão.** `format` é um inteiro. Campo novo não muda o número, e o consumidor ignora a chave
