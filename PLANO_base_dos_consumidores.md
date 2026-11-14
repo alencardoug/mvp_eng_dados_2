@@ -437,6 +437,25 @@ Três coisas entram no contrato, vindas da emenda e da rodada 4 de revisão:
   sem resultado aparece **sem resultado**: nunca se infere sucesso da declaração. As pendências
   documentadas (D62 a D64) ficam separadas.
 
+**Entregue em 14/11/2026** (a primeira versão do pacote):
+
+- o gerador `src/mvp_ed1/models/pacote.py`, chamado no fim do `make catalog`, no formato 1 já revisado;
+  recusa escrever sem `manifest.json` e `run_results.json`, e recusa o pacote fora do esquema;
+- a guarda no `check-offline` (`tests/test_pacote_gerado.py`): o `inputs_sha256` recalculado dos 314
+  arquivos rastreados que alimentam o pacote, sem `dbt/target`; as contraprovas do RVG-1-04 (insumo
+  alterado muda o digest; *commit* sem mudança de insumo não muda; clone limpo; regeneração repetida com
+  os mesmos bytes);
+- o `make test` grava o relatório JUnit em `data/pytest/junit.xml`, de onde sai o `checks`;
+- **volta ao item 9 da V1** (macro nova e `dbt_project.yml` fora da conferência de *manifest* atrasado):
+  a guarda do pacote não depende dessa conferência, porque os dois estão entre os insumos do digest;
+- **L5, a procedência do armazém:** o banco não guarda nada da execução que o construiu (conferido no
+  `information_schema`). A proposta é gravar `invocation_id` e *commit* numa tabela de `governance` ao
+  fim de cada *build*; é tabela nova, e por isso **volta ao Owner** antes de implementar. Até lá, o
+  pacote diz `not_verified`;
+- **L10, as evidências do GCP** fora do Git no `mvp_eng_dados_1`: ficam `not_available`; se entram, e
+  sanitizadas como, **é pergunta ao Owner**;
+- tamanho: 4,3 MB, versionado como a D91 decidiu.
+
 ### Bloco 5 — domínios e métricas (F7, F9)
 
 Pela Q3-a. O ADR do formato preserva as chaves de `meta` que já existem (`sensitivity`,

@@ -12,7 +12,7 @@
 | Campo | Informação |
 |---|---|
 | Formato | **1** |
-| Estado | **Especificação.** O pacote ainda não é gerado: a geração é o Bloco 4 do [plano da base dos consumidores](../PLANO_base_dos_consumidores.md). Esta especificação veio antes da geração por decisão do Owner, em 14/11/2026 (Q13), para que os consumidores construam contra ela |
+| Estado | **Gerado** desde 14/11/2026 (Bloco 4 do [plano da base dos consumidores](../PLANO_base_dos_consumidores.md)), por `make catalog` (`src/mvp_ed1/models/pacote.py`). A especificação veio antes da geração (Q13) |
 | Consumidores | `gdados` (E1) e `bi-como-codigo` (etapa 2.7): dois portais, um pacote (Q12, 14/11/2026) |
 | Esquema | [`pacote_de_metadados.schema.json`](pacote_de_metadados.schema.json), JSON Schema 2020-12 |
 | Exemplo | [`pacote_de_metadados.exemplo.json`](pacote_de_metadados.exemplo.json), validado pelo esquema no `check-offline` |
@@ -24,7 +24,7 @@
 
 | Arquivo | O que é | Desde |
 |---|---|---|
-| `docs/pacote_de_metadados.json` | O pacote. Gerado pelo `make catalog` e versionado | Bloco 4 (ainda não existe) |
+| `docs/pacote_de_metadados.json` | O pacote. Gerado pelo `make catalog` e versionado; `tests/test_pacote_gerado.py` o confere no `check-offline` | 14/11/2026 |
 | `docs/pacote_de_metadados.schema.json` | O esquema do formato. O pacote se valida contra o esquema **do mesmo commit** | 14/11/2026 |
 | `docs/pacote_de_metadados.exemplo.json` | Um recorte ilustrativo, com valores copiados do *manifest* local de 13/11/2026 (`generated_at` 22:21:52Z, *invocation* `8eeff407…`). Não é regenerado e não substitui o pacote: os valores dele envelhecem com as correções dos Blocos 1 a 3. O `inputs_sha256` dele é um marcador (64 zeros) | 14/11/2026 |
 

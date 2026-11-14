@@ -848,7 +848,8 @@ def test_o_pytest_do_check_lista_os_pulados_com_motivo(tmp_path):
     r, chamadas = _make(tmp_path, "test")
 
     assert r.returncode == 0, r.stdout + r.stderr
-    assert chamadas == ["pytest -q -rs"], chamadas
+    # O relatório JUnit alimenta o `checks` do pacote de metadados (Bloco 4 da base dos consumidores).
+    assert chamadas == ["pytest -q -rs --junitxml=data/pytest/junit.xml"], chamadas
 
 
 #: Os quatro que a sonda achou tocando o armazém ou o `dbt` (a do plano em 19/09 e a de 24/09, com a

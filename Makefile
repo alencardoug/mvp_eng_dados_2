@@ -290,6 +290,10 @@ catalog: require-venv ## Regenera dicionário, inventário, diagrama ER, a class
 	@# copia: `make legacy-models` e este alvo de novo (Governança §5.1).
 	@.venv/bin/python -m mvp_ed1.models.sensitivity
 	@.venv/bin/python -m mvp_ed1.models.lineage
+	@# O pacote de metadados da D91 (docs/pacote_de_metadados.md): compõe o que os passos acima
+	@# deixaram em dbt/target, mais o relatório do pytest do último `make test`. Sem os artefatos
+	@# do dbt, não escreve nada; o `check-offline` confere que ele está em dia com os insumos.
+	@.venv/bin/python -m mvp_ed1.models.pacote
 
 seed-data: require-env require-venv ## Gera e carrega os dados sintéticos; SCALE, SEED, AS_OF, FORCE=1
 	@$(GERADOR) seed \
@@ -830,7 +834,7 @@ test: require-venv ## Testes de código Python (pytest); CARGA=1 roda a carga em
 	@# `-rs` lista cada pulado com o motivo, e é por este alvo que o `check` os
 	@# lista: pulado não é verificado, e o Termo pede a lista (plano, §7.6).
 	@set -a; [ -f .env ] && . ./.env; set +a; \
-		MVP_TESTE_FATO=$(if $(filter 1,$(FATO)),1,0) .venv/bin/pytest -q -rs
+		MVP_TESTE_FATO=$(if $(filter 1,$(FATO)),1,0) .venv/bin/pytest -q -rs --junitxml=data/pytest/junit.xml
 	@$(if $(filter 1,$(CARGA)),$(MAKE) --no-print-directory test-carga,true)
 
 check: require-env require-venv ## Verificação completa, parando na primeira falha: segredos, dbt build + testes de dados, classificação e linhagem derivadas, pytest; FATO=1 inclui o teste que escreve na fato
