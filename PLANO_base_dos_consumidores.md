@@ -247,9 +247,8 @@ mudança em [Consumidores §5](docs/consumidores.md#5-o-que-mudou-para-quem-cons
   relâmpago são 1.851 pelo `source_id` (1.792 no retail, 59 no legado), e não as 1.514 da primeira
   contagem, que pedia uma saída da mesma quantidade em até 5 minutos. Saídas literais em
   `bloco1/rvl1_saidas.md`.
-- **Não replicado ainda nos Achados**: a nota "replicado aqui em `<commit>`" do F1, F2 e F3 espera a
-  revisão do Owner das entradas F14 a F16, que a sessão do `nl_sql` escreveu no mesmo arquivo, fora do
-  Git.
+- **Nos Achados:** a nota de replicação do F1, F2 e F3 entrou em `77e1182`, depois do *commit* das
+  entradas F14 a F16 do `nl_sql` (`0edfd1e`), que o Owner aprovou.
 
 ### Bloco 1b — a auditoria das 16 views (Q9-a)
 
@@ -623,4 +622,12 @@ saída literal); um achado novo:
 | # | Achado | Veredito | Situação |
 |---|---|---|---|
 | RVL1-2-01 | O `9d50cca` reescreveu o ADR-0052 aceito (AGENTS.md, regra 3) | ajuste | Feito: o ADR volta ao texto aceito; a regra do dia sem custo foi para o glossário e para a descrição da view, e as medições para a V4 e este plano, com as saídas literais |
+
+### Rodada 11 — Codex conta 2, sobre `1159059` (14/11/2026)
+
+Relatório em `codex2_bloco1_r3.md`. RVL1-2-01 e RVL1-1-05 resolvidos; três ajustes de texto, todos
+feitos: a nota do F1 nos Achados diz os dois grãos (RVL1-3-01); a do F2 diz que o giro fica indefinido
+pela posição zero em todo o trimestre, e não pela correção-relâmpago em si, que aparece também em 114
+trimestres de valor positivo (RVL1-3-02); a pendência das notas de replicação aponta para os *commits*
+feitos (RVL1-3-03). **A revisão do Bloco 1 está fechada.**
 

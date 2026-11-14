@@ -40,8 +40,9 @@ construção da governança no `nl_sql`.
   só então juntar, sem partir dos chamados. Regerar e conferir contra
   `nl_sql/governanca/canonico/metricas.yaml` (`chamados_por_100_pedidos`).
 - **Desvio:** nenhum; a correção é a mesma.
-- **Replicado aqui em `9aeea8d`** (14/11/2026): os dois lados reduzidos a mês × canal pelo nome antes de
-  dividir. Jan/2024, Conta, Aplicativo: 4,5455 → 4,3478. Teste de unidade e reconciliação com as fatos.
+- **Replicado aqui em `9aeea8d`** (14/11/2026): cada lado agregado no seu grão antes de dividir. Os
+  chamados por mês × canal pelo nome × categoria; os pedidos por mês × canal pelo nome, somando as
+  origens, repetidos em cada categoria. Jan/2024, Conta, Aplicativo: 4,5455 → 4,3478. Teste de unidade e reconciliação com as fatos.
 
 ### F2 — `inventory_turnover_by_sku_and_warehouse` mede outra grandeza · **Gravidade: alta**
 
@@ -61,7 +62,9 @@ construção da governança no `nl_sql`.
 - **Replicado aqui em `69ea446` e `9d50cca`** (14/11/2026), pelo ADR-0052: o estoque médio do trimestre
   (média diária da posição de fim de dia, a custo médio móvel, sem nada posterior), lido do livro em
   `analytics`. As colunas viraram `avg_quantity_on_hand` e `avg_inventory_value_amount`. O giro fica
-  indefinido onde o gerador cria a correção-relâmpago (V4 das Pendências).
+  indefinido quando a posição de fim de dia é zero em todo o trimestre: dos 1.216 casos, 1.212 têm uma
+  correção-relâmpago do gerador no trimestre (V4 das Pendências). A correção sozinha não anula o giro:
+  114 trimestres com ela têm valor médio positivo.
 
 ### F3 — `dim_customer` e `fact_sales_order_item` discordam sobre a população · **Gravidade: média**
 
