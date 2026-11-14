@@ -298,9 +298,13 @@ def derive_texts(manifest: dict, derivation: sensitivity.Derivation,
                     saida.problems.append(f"{no['name']}.{coluna}: a ponte não traz o texto de `{par}`; rode `make legacy-models`")
                 elif entrada.path.name == BRIDGES_FILE and escrito and como != "bridge":
                     # A ponte só significa o que o par significa por declaração (N41):
-                    # texto sem `description_from` não vale, nem para quem a empilha.
-                    saida.problems.append(f"{no['name']}.{coluna}: texto na ponte sem `description_from`; rode `make legacy-models`")
-                    final = None
+                    # texto sem `description_from` não vale, nem para quem a empilha — salvo o
+                    # que a própria ponte calcula e declara em `TEXTOS_DA_PONTE`, com o motivo
+                    # fixo, e exatamente aquele texto (RVG-1-01).
+                    from mvp_ed1.legacy.ponte import MOTIVO_DA_PONTE, TEXTOS_DA_PONTE
+                    if not (motivo == MOTIVO_DA_PONTE and escrito == TEXTOS_DA_PONTE.get(coluna)):
+                        saida.problems.append(f"{no['name']}.{coluna}: texto na ponte sem `description_from`; rode `make legacy-models`")
+                        final = None
             elif motivo and escrito:
                 final, origem = escrito, "written"
                 if marca:

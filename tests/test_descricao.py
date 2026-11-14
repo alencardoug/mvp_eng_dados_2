@@ -35,10 +35,10 @@ MANIFEST = sensitivity.MANIFEST
 #: Baixado em 03/11/2026 (etapa 1.8): o texto escrito das colunas que calculam leva `analytics` e
 #: `consumption` a zero, como a etapa pede; as internas ficam no que sobra delas.
 #: Baixado em 14/11/2026 (G06, Bloco 3 do plano da base dos consumidores): o texto das colunas que
-#: calculam em `trusted`, `staging`, `quarantine` e nos *snapshots*; sobram as 39 da ponte do legado
-#: (B1 e B3), que esperam o desenho do RVG-1-01.
+#: calculam em `trusted`, `staging`, `quarantine` e nos *snapshots*; e as 39 da ponte do legado
+#: (B1 e B3) pela declaração do RVG-1-01 (`TEXTOS_DA_PONTE`). Zero em todas as camadas.
 TETO_SEM_DESCRICAO: dict[str, int] = {
-    "raw": 0, "raw_legacy": 0, "staging": 0, "trusted": 39, "analytics": 0,
+    "raw": 0, "raw_legacy": 0, "staging": 0, "trusted": 0, "analytics": 0,
     "consumption": 0, "quarantine": 0, "snapshots": 0, "governance": 0,
 }
 

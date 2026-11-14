@@ -420,6 +420,29 @@ def test_ponte_so_herda_pela_declaracao_e_com_o_texto_do_par(tmp_path) -> None:
     assert atrasada.problems == ["legado__orders.a: a ponte não traz o texto de `stg_retail__orders.a`; rode `make legacy-models`"]
 
 
+
+def test_ponte_aceita_texto_proprio_so_o_da_tabela_e_com_o_motivo_fixo(tmp_path) -> None:
+    """RVG-1-01: a coluna que a ponte calcula tem texto próprio, e só esse (RVD01-1-01)."""
+    from mvp_ed1.legacy.ponte import MOTIVO_DA_PONTE, TEXTOS_DA_PONTE
+
+    pontes = tmp_path / d.BRIDGES_FILE
+    nos = {"legado__brands": ("trusted", [])}
+    transportes = {"legado__brands": {"ingested_at": tr.Computed("cast"), "outra": tr.Computed("cast")}}
+    texto = TEXTOS_DA_PONTE["ingested_at"]
+
+    def com(coluna_nome="ingested_at", **coluna) -> d.Texts:
+        return _textos(nos, transportes, {"legado__brands": _entrada(pontes, "generator", **{coluna_nome: coluna})})
+
+    certo = com(description=texto, meta={"description_reason": MOTIVO_DA_PONTE})
+    assert certo.problems == [] and certo.texts[("trusted", "legado__brands", "ingested_at")] == texto
+    recusa = "legado__brands.{}: texto na ponte sem `description_from`; rode `make legacy-models`"
+    assert com(description=texto).problems == [recusa.format("ingested_at")]                                   # sem motivo
+    assert com(description=texto, meta={"description_reason": "outro motivo"}).problems == [recusa.format("ingested_at")]
+    assert com(description="outro texto", meta={"description_reason": MOTIVO_DA_PONTE}).problems == [recusa.format("ingested_at")]
+    fora = com("outra", description=texto, meta={"description_reason": MOTIVO_DA_PONTE})                     # apelido fora da tabela
+    assert fora.problems == [recusa.format("outra")]
+
+
 # ── A escrita ───────────────────────────────────────────────────────────────────
 
 def test_a_escrita_da_descricao_insere_substitui_e_preserva_o_resto(tmp_path) -> None:

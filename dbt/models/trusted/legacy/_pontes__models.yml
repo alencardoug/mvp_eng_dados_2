@@ -76,10 +76,12 @@ models:
           lineage: [raw_legacy.brands.deleted_at]
           description_from: stg_retail__brands.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.brands._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__campaigns
     description: >
       Registros aptos de `legacy.campaigns` na forma de `stg_retail__campaigns`,
@@ -174,10 +176,12 @@ models:
           lineage: [raw_legacy.campaigns.deleted_at]
           description_from: stg_retail__campaigns.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.campaigns._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__carriers
     description: >
       Registros aptos de `legacy.carriers` na forma de `stg_retail__carriers`,
@@ -258,10 +262,12 @@ models:
           lineage: [raw_legacy.carriers.deleted_at]
           description_from: stg_retail__carriers.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.carriers._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__customer_segments
     description: >
       Registros aptos de `legacy.customer_segments` na forma de `stg_retail__customer_segments`,
@@ -335,10 +341,12 @@ models:
           lineage: [raw_legacy.customer_segments.deleted_at]
           description_from: stg_retail__customer_segments.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.customer_segments._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__payment_methods
     description: >
       Registros aptos de `legacy.payment_methods` na forma de `stg_retail__payment_methods`,
@@ -412,10 +420,12 @@ models:
           lineage: [raw_legacy.payment_methods.deleted_at]
           description_from: stg_retail__payment_methods.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.payment_methods._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__product_categories
     description: >
       Registros aptos de `legacy.product_categories` na forma de `stg_retail__product_categories`,
@@ -496,10 +506,12 @@ models:
           lineage: [raw_legacy.product_categories.deleted_at]
           description_from: stg_retail__product_categories.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.product_categories._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__sales_channels
     description: >
       Registros aptos de `legacy.sales_channels` na forma de `stg_retail__sales_channels`,
@@ -573,10 +585,12 @@ models:
           lineage: [raw_legacy.sales_channels.deleted_at]
           description_from: stg_retail__sales_channels.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.sales_channels._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__suppliers
     description: >
       Registros aptos de `legacy.suppliers` na forma de `stg_retail__suppliers`,
@@ -678,10 +692,12 @@ models:
           lineage: [raw_legacy.suppliers.deleted_at]
           description_from: stg_retail__suppliers.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.suppliers._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__support_agents
     description: >
       Registros aptos de `legacy.support_agents` na forma de `stg_retail__support_agents`,
@@ -783,10 +799,12 @@ models:
           lineage: [raw_legacy.support_agents.deleted_at]
           description_from: stg_retail__support_agents.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.support_agents._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__warehouses
     description: >
       Registros aptos de `legacy.warehouses` na forma de `stg_retail__warehouses`,
@@ -881,10 +899,12 @@ models:
           lineage: [raw_legacy.warehouses.deleted_at]
           description_from: stg_retail__warehouses.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.warehouses._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__coupons
     description: >
       Registros aptos de `legacy.coupons` na forma de `stg_retail__coupons`,
@@ -993,10 +1013,12 @@ models:
           lineage: [raw_legacy.coupons.deleted_at]
           description_from: stg_retail__coupons.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.coupons._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__customers
     description: >
       Registros aptos de `legacy.customers` na forma de `stg_retail__customers`,
@@ -1105,10 +1127,12 @@ models:
           lineage: [raw_legacy.customers.deleted_at]
           description_from: stg_retail__customers.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.customers._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__products
     description: >
       Registros aptos de `legacy.products` na forma de `stg_retail__products`,
@@ -1203,10 +1227,12 @@ models:
           lineage: [raw_legacy.products.deleted_at]
           description_from: stg_retail__products.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.products._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__purchase_orders
     description: >
       Registros aptos de `legacy.purchase_orders` na forma de `stg_retail__purchase_orders`,
@@ -1301,10 +1327,12 @@ models:
           lineage: [raw_legacy.purchase_orders.deleted_at]
           description_from: stg_retail__purchase_orders.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.purchase_orders._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__carts
     description: >
       Registros aptos de `legacy.carts` na forma de `stg_retail__carts`,
@@ -1399,10 +1427,12 @@ models:
           lineage: [raw_legacy.carts.deleted_at]
           description_from: stg_retail__carts.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.carts._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__customer_addresses
     description: >
       Registros aptos de `legacy.customer_addresses` na forma de `stg_retail__customer_addresses`,
@@ -1539,10 +1569,12 @@ models:
           lineage: [raw_legacy.customer_addresses.deleted_at]
           description_from: stg_retail__customer_addresses.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.customer_addresses._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__goods_receipts
     description: >
       Registros aptos de `legacy.goods_receipts` na forma de `stg_retail__goods_receipts`,
@@ -1623,10 +1655,12 @@ models:
           lineage: [raw_legacy.goods_receipts.deleted_at]
           description_from: stg_retail__goods_receipts.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.goods_receipts._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__product_variants
     description: >
       Registros aptos de `legacy.product_variants` na forma de `stg_retail__product_variants`,
@@ -1728,10 +1762,12 @@ models:
           lineage: [raw_legacy.product_variants.deleted_at]
           description_from: stg_retail__product_variants.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.product_variants._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__cart_items
     description: >
       Registros aptos de `legacy.cart_items` na forma de `stg_retail__cart_items`,
@@ -1812,10 +1848,12 @@ models:
           lineage: [raw_legacy.cart_items.deleted_at]
           description_from: stg_retail__cart_items.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.cart_items._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__inventory_balances
     description: >
       Registros aptos de `legacy.inventory_balances` na forma de `stg_retail__inventory_balances`,
@@ -1903,10 +1941,12 @@ models:
           lineage: [raw_legacy.inventory_balances.deleted_at]
           description_from: stg_retail__inventory_balances.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.inventory_balances._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__inventory_movements
     description: >
       Registros aptos de `legacy.inventory_movements` na forma de `stg_retail__inventory_movements`,
@@ -1924,10 +1964,12 @@ models:
           lineage: [raw_legacy.inventory_movements.movement_id]
           description_from: stg_retail__inventory_movements.movement_id
       - name: event_sequence
+        description: "Desempate técnico dentro da captura do legado (`legacy_row_id`), único por origem depois do empilhamento. Não é a ordem observada do evento nem estável entre recapturas (D40)."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.inventory_movements.legacy_row_id]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
       - name: idempotency_key
         description: "Chave que impede aplicação duplicada pelo consumidor (ADR-0019)."
         meta:
@@ -2034,15 +2076,19 @@ models:
           lineage: [raw_legacy.inventory_movements.metadata]
           description_from: stg_retail__inventory_movements.event_metadata
       - name: arrived_by_stream
+        description: "Sempre falso: o legado é capturado em lote e não tem caminho de *streaming*."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: []
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
       - name: arrived_by_batch
+        description: "Sempre verdadeiro: o legado chega só pela captura em lote."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: []
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
       - name: source_created_at
         description: "Momento em que a origem registrou o evento; base da leitura incremental."
         meta:
@@ -2058,10 +2104,12 @@ models:
           lineage: []
           description_from: stg_retail__inventory_movements.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.inventory_movements._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__orders
     description: >
       Registros aptos de `legacy.orders` na forma de `stg_retail__orders`,
@@ -2191,10 +2239,12 @@ models:
           lineage: [raw_legacy.orders.deleted_at]
           description_from: stg_retail__orders.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.orders._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__purchase_order_items
     description: >
       Registros aptos de `legacy.purchase_order_items` na forma de `stg_retail__purchase_order_items`,
@@ -2275,10 +2325,12 @@ models:
           lineage: [raw_legacy.purchase_order_items.deleted_at]
           description_from: stg_retail__purchase_order_items.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.purchase_order_items._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__coupon_redemptions
     description: >
       Registros aptos de `legacy.coupon_redemptions` na forma de `stg_retail__coupon_redemptions`,
@@ -2345,10 +2397,12 @@ models:
           lineage: []
           description_from: stg_retail__coupon_redemptions.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.coupon_redemptions._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__goods_receipt_items
     description: >
       Registros aptos de `legacy.goods_receipt_items` na forma de `stg_retail__goods_receipt_items`,
@@ -2422,10 +2476,12 @@ models:
           lineage: [raw_legacy.goods_receipt_items.deleted_at]
           description_from: stg_retail__goods_receipt_items.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.goods_receipt_items._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__order_items
     description: >
       Registros aptos de `legacy.order_items` na forma de `stg_retail__order_items`,
@@ -2520,10 +2576,12 @@ models:
           lineage: [raw_legacy.order_items.deleted_at]
           description_from: stg_retail__order_items.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.order_items._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__order_status_history
     description: >
       Registros aptos de `legacy.order_status_history` na forma de `stg_retail__order_status_history`,
@@ -2590,10 +2648,12 @@ models:
           lineage: []
           description_from: stg_retail__order_status_history.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.order_status_history._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__payments
     description: >
       Registros aptos de `legacy.payments` na forma de `stg_retail__payments`,
@@ -2702,10 +2762,12 @@ models:
           lineage: [raw_legacy.payments.deleted_at]
           description_from: stg_retail__payments.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.payments._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__shipments
     description: >
       Registros aptos de `legacy.shipments` na forma de `stg_retail__shipments`,
@@ -2821,10 +2883,12 @@ models:
           lineage: [raw_legacy.shipments.deleted_at]
           description_from: stg_retail__shipments.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.shipments._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__stock_reservations
     description: >
       Registros aptos de `legacy.stock_reservations` na forma de `stg_retail__stock_reservations`,
@@ -2933,10 +2997,12 @@ models:
           lineage: [raw_legacy.stock_reservations.deleted_at]
           description_from: stg_retail__stock_reservations.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.stock_reservations._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__delivery_events
     description: >
       Registros aptos de `legacy.delivery_events` na forma de `stg_retail__delivery_events`,
@@ -3003,10 +3069,12 @@ models:
           lineage: []
           description_from: stg_retail__delivery_events.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.delivery_events._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__payment_transactions
     description: >
       Registros aptos de `legacy.payment_transactions` na forma de `stg_retail__payment_transactions`,
@@ -3087,10 +3155,12 @@ models:
           lineage: []
           description_from: stg_retail__payment_transactions.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.payment_transactions._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__shipment_items
     description: >
       Registros aptos de `legacy.shipment_items` na forma de `stg_retail__shipment_items`,
@@ -3157,10 +3227,12 @@ models:
           lineage: [raw_legacy.shipment_items.deleted_at]
           description_from: stg_retail__shipment_items.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.shipment_items._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__support_tickets
     description: >
       Registros aptos de `legacy.support_tickets` na forma de `stg_retail__support_tickets`,
@@ -3283,10 +3355,12 @@ models:
           lineage: [raw_legacy.support_tickets.deleted_at]
           description_from: stg_retail__support_tickets.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.support_tickets._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__refunds
     description: >
       Registros aptos de `legacy.refunds` na forma de `stg_retail__refunds`,
@@ -3374,10 +3448,12 @@ models:
           lineage: [raw_legacy.refunds.deleted_at]
           description_from: stg_retail__refunds.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.refunds._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
   - name: legado__ticket_events
     description: >
       Registros aptos de `legacy.ticket_events` na forma de `stg_retail__ticket_events`,
@@ -3444,7 +3520,9 @@ models:
           lineage: []
           description_from: stg_retail__ticket_events.is_deleted
       - name: ingested_at
+        description: "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal."
         meta:
           sensitivity: internal
           sensitivity_reason: "extraída do payload JSON: nível da coluna de origem, declarado nos modelos SQLAlchemy (legacy/ponte.py)"
           lineage: [raw_legacy.ticket_events._airbyte_extracted_at]
+          description_reason: "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"

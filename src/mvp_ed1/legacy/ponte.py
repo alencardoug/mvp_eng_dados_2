@@ -76,6 +76,21 @@ FORA_DA_ORIGEM: dict[str, str] = {
     "event_sequence": "legacy_row_id",
 }
 
+#: O texto das colunas que a ponte **calcula** e não copia (RVG-1-01): as de `FORA_DA_ORIGEM`, pelo
+#: apelido que elas têm no `staging`. Não têm par no `stg_retail__*` — no legado, `ingested_at` é a
+#: captura, e não o carimbo do Airbyte —, e por isso não podem herdar pela declaração do par (N41). A
+#: ponte as declara aqui, com o motivo fixo, e `models/descriptions.py` só aceita texto sem
+#: `description_from` na ponte se ele for este, com este motivo. Apelido com par não entra.
+TEXTOS_DA_PONTE: dict[str, str] = {
+    "ingested_at": "Instante da captura do legado em que o registro foi lido (`snapshot_at`). No legado a carga é a captura; não é o carimbo do Airbyte da origem principal.",
+    "arrived_by_stream": "Sempre falso: o legado é capturado em lote e não tem caminho de *streaming*.",
+    "arrived_by_batch": "Sempre verdadeiro: o legado chega só pela captura em lote.",
+    "event_sequence": "Desempate técnico dentro da captura do legado (`legacy_row_id`), único por origem depois do empilhamento. Não é a ordem observada do evento nem estável entre recapturas (D40).",
+}
+
+#: O motivo que acompanha cada texto de `TEXTOS_DA_PONTE` no `.yml` gerado.
+MOTIVO_DA_PONTE = "a ponte calcula a coluna; o texto é o de TEXTOS_DA_PONTE (legacy/ponte.py, RVG-1-01)"
+
 #: De onde vem o que `FORA_DA_ORIGEM` põe no lugar: a coluna de `raw_legacy`
 #: por trás de cada substituto que é coluna (`snapshot_at` é o carimbo da
 #: captura, `legacy_row_id` a identidade da linha). Substituto que é literal
@@ -425,16 +440,26 @@ def models_yml() -> str:
         de, par = dict(origens(tabela)), dict(pares(tabela))
         modelo_par = f"stg_retail__{tabela}"
 
+        def proprio(apelido: str) -> str | None:
+            if apelido not in TEXTOS_DA_PONTE:
+                return None
+            if par[apelido]:
+                raise ValueError(f"legado__{tabela}.{apelido}: tem par no staging e não pode ter texto próprio na ponte")
+            return TEXTOS_DA_PONTE[apelido]
+
         def descricao(apelido: str) -> str:
-            texto = textos.get(modelo_par, {}).get(apelido) if par[apelido] else None
+            texto = textos.get(modelo_par, {}).get(apelido) if par[apelido] else proprio(apelido)
             return f"        description: {json.dumps(texto, ensure_ascii=False)}\n" if texto else ""
+
+        def motivo_proprio(apelido: str) -> str:
+            return f'\n          description_reason: "{MOTIVO_DA_PONTE}"' if proprio(apelido) else ""
 
         def heranca(apelido: str) -> str:
             return f"\n          description_from: {modelo_par}.{apelido}" if par[apelido] else ""
 
         return "\n".join(
             f'      - name: {apelido}\n{descricao(apelido)}        meta:\n          sensitivity: {nivel}\n'
-            f'          sensitivity_reason: "{motivo}"\n          lineage: [{", ".join(de[apelido])}]{heranca(apelido)}'
+            f'          sensitivity_reason: "{motivo}"\n          lineage: [{", ".join(de[apelido])}]{heranca(apelido)}{motivo_proprio(apelido)}'
             for apelido, nivel in sensibilidades(tabela)
         )
 
