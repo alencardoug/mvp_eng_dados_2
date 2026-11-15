@@ -1020,3 +1020,11 @@ enviar, achado meu: o pacote de `b56b2bc` estava atrasado (os insumos só viam o
 observação da 32 é de diagnóstico, com o conserto de uma linha provado pela contraprova do próprio revisor, e
 por isso foi respondida no *commit* de fecho, sem rodada 33. A calibração foi a do desenho: bloqueante só para
 caminho concreto, com operação suportada, que quebre promessa da ADR-0054 ou do contrato do pacote.
+
+**Rodada 33 — sobre `cdb51b4` (15/11/2026), `codex1_l5_leitor_r1.md`: nenhum achado.** Depois da publicação
+(`8e93bf1`), achado meu, medido: o login de leitura dos consumidores (membro de `analyst`) não lia
+`governance.warehouse_provenance` (*permission denied for schema governance*), embora a ADR-0054 e
+Consumidores §3 digam que o BI a lê na transação de captura. Nenhuma das dez rodadas de desenho e de
+implementação o pegou: as sondas de acesso conferiam a política, e a política não tinha a view. O Owner
+decidiu conceder ao `analyst` só a view, sem ADR; medido com o login real, a view lê e as tabelas de
+`governance` continuam negadas.
