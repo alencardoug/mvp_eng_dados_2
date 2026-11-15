@@ -687,7 +687,7 @@ views:
     reference:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/top_skus_by_revenue.sql
-      reason: O ranking e o corte — `rank()` sobre a receita dentro da categoria, e a participação na receita da categoria — não cabem no montador.
+      reason: O ranking e o corte — `rank()` sobre a receita líquida de todos os SKUs do período, sem partição, com o corte nos 25 primeiros — e a participação do SKU na receita da categoria dele não cabem no montador.
     facts: [analytics.fact_sales_order_item]
     dimensions: [analytics.dim_product, analytics.dim_category, analytics.dim_brand]
     columns:
@@ -709,7 +709,7 @@ views:
     reference:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/new_and_repeat_customers_by_month.sql
-      reason: A estreia e a recompra saem de uma janela sobre a ordem dos pedidos realizados de cada cliente (F18), que o montador não faz.
+      reason: A estreia é o primeiro pedido realizado de cada cliente pela chave natural (`distinct on`, F18), e a recompra é um pedido posterior dentro da janela contada da estreia, numa junção da fato com ela mesma; o montador não escolhe a primeira linha nem junta a fato a si mesma.
     facts: [analytics.fact_order_status_event]
     dimensions: [analytics.dim_date, analytics.dim_sales_channel, analytics.dim_customer]
     facts_note: "a estreia e a recompra, pelo evento de criação do pedido realizado; inclusive o pedido de itens rejeitados em cascata (F18)"
@@ -801,7 +801,7 @@ views:
     reference:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/repeat_purchase_rate_after_support.sql
-      reason: O pedido seguinte de cada cliente, dentro da janela, sai de uma janela sobre os pedidos realizados; o montador não ordena pedidos.
+      reason: Os dois grupos comparados não cabem no montador — a redução da fato a um pedido por linha, a ligação de cada pedido às categorias dos chamados dele (pela origem e pelo número) e a união com os pedidos sem chamado. A recompra e os dias até o pedido seguinte já vêm calculados na fato.
     facts: [analytics.fact_sales_order_item, analytics.fact_support_ticket_event]
     dimensions: [analytics.dim_date, analytics.dim_sales_channel, analytics.dim_support_category]
     columns:
@@ -811,7 +811,7 @@ views:
       sales_channel_name: grain
       has_support_ticket: grain
       support_category_name: grain
-      order_count: {reference: additive}
+      order_count: {reference: non_additive, note: "entre categorias: um pedido com chamados de duas categorias conta nas duas"}
       repeat_order_count: {reference: non_additive}
       repeat_purchase_rate: {reference: non_additive}
       avg_days_to_next_order: {reference: non_additive}

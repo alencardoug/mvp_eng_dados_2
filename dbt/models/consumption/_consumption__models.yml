@@ -167,7 +167,7 @@ models:
       contract: {enforced: true}
     columns:
       - name: revenue_rank
-        description: "Posição do SKU pela receita líquida no período, de 1 a 25; empates dividem a posição."
+        description: "Não aditiva — posição do SKU pela receita líquida no período, de 1 a 25; empates dividem a posição."
         meta:
           sensitivity: confidential
         data_type: bigint
@@ -521,12 +521,12 @@ models:
       - name: cart_count
         meta:
           sensitivity: internal
-        description: Carrinhos abertos — topo do funil.
+        description: "Aditiva — carrinhos abertos: topo do funil."
         data_type: bigint
       - name: closed_cart_count
         meta:
           sensitivity: internal
-        description: Denominador da conversão. Carrinho ainda aberto não entra.
+        description: "Aditiva — denominador da conversão. Carrinho ainda aberto não entra."
         data_type: bigint
       - name: converted_cart_count
         description: "Aditiva — carrinhos convertidos em pedido, por canal e mês."
@@ -986,12 +986,12 @@ models:
       - name: quantity_from_batch
         meta:
           sensitivity: internal
-        description: Parcela do saldo já absorvida pela fato — o caminho frio.
+        description: "Semiaditiva — parcela do saldo já absorvida pela fato: o caminho frio."
         data_type: integer
       - name: quantity_from_stream
         meta:
           sensitivity: internal
-        description: Parcela ainda só no caminho quente, que a próxima execução do dbt absorve.
+        description: "Semiaditiva — parcela ainda só no caminho quente, que a próxima execução do dbt absorve."
         data_type: integer
       - name: stream_movement_count
         description: "Aditiva — movimentos do SKU no armazém que chegaram pelo caminho quente (ADR-0031)."
@@ -999,7 +999,7 @@ models:
           sensitivity: internal
         data_type: bigint
       - name: reorder_point
-        description: "Ponto de reposição, em unidades: 25 para todo SKU (variável `reorder_point_units`)."
+        description: "Não aditiva — ponto de reposição, em unidades: 25 para todo SKU (variável `reorder_point_units`)."
         meta:
           sensitivity: internal
         data_type: integer
@@ -1011,7 +1011,7 @@ models:
       - name: daily_demand_units
         meta:
           sensitivity: internal
-        description: Demanda diária média na janela de cobertura; só venda entra.
+        description: "Não aditiva — demanda diária média na janela de cobertura; só venda entra."
         data_type: numeric
       - name: days_of_cover
         meta:
@@ -1019,7 +1019,7 @@ models:
         description: '{{ doc("days_of_cover") }}'
         data_type: numeric
       - name: last_movement_at
-        description: "Instante do último movimento do SKU no armazém."
+        description: "Não aditiva — instante do último movimento do SKU no armazém."
         meta:
           sensitivity: internal
         data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
@@ -1122,7 +1122,7 @@ models:
       - name: delivered_count
         meta:
           sensitivity: internal
-        description: Denominador — remessas **entregues**, não despachadas.
+        description: "Aditiva — denominador: remessas **entregues**, não despachadas."
         data_type: bigint
       - name: on_time_count
         description: "Aditiva — remessas entregues até o prazo prometido, por mês, transportadora, modalidade e armazém."
@@ -1275,7 +1275,7 @@ models:
       - name: median_order_to_delivery_days
         meta:
           sensitivity: internal
-        description: A mediana ao lado da média separa operação lenta de operação irregular.
+        description: "Não aditiva — a mediana ao lado da média separa operação lenta de operação irregular."
         data_type: numeric
       - name: max_order_to_delivery_days
         description: "Não aditiva — o maior ciclo de entrega do grupo, em dias, do pedido à entrega da última remessa."
@@ -1403,7 +1403,7 @@ models:
       - name: channel_order_count
         meta:
           sensitivity: internal
-        description: Denominador do **canal**, repetido em cada linha de categoria.
+        description: "Não aditiva — denominador do **canal**, repetido em cada linha de categoria."
         data_type: numeric
       - name: tickets_per_hundred_orders
         description: "Não aditiva — chamados por 100 pedidos realizados do canal no mês. Recalcula-se a cada recorte."
@@ -1464,9 +1464,9 @@ models:
         meta:
           sensitivity: internal
         description: >
-          Pedidos com janela fechada. Um pedido que gerou chamados de duas
-          categorias aparece nas duas linhas — somar entre categorias o conta
-          duas vezes.
+          Não aditiva entre categorias — pedidos com janela fechada. Um pedido
+          que gerou chamados de duas categorias aparece nas duas linhas: somar
+          entre categorias o conta duas vezes.
         data_type: bigint
       - name: repeat_order_count
         description: "**Não aditiva entre categorias** — pedidos com janela fechada que tiveram recompra em até 90 dias, por mês, canal, ter ou não chamado e categoria do chamado. Um pedido com chamados de duas categorias conta nas duas linhas: somar entre categorias o conta duas vezes."

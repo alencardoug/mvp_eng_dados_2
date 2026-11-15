@@ -366,7 +366,8 @@ def _perguntas(texto: str) -> dict:
                 {"Fato", "Fatos"} & celulas.keys()):
             raise SystemExit(f"{cabeca.group(1)}: a tabela não tem uma linha de cada (Fato, Medidas, Dimensões, View): "
                              f"{[k for k, _ in lidas]} — nenhum pacote é escrito")
-        fatos = celulas.get("Fato") or celulas.get("Fatos") or ""
+        # A nota depois do travessão (`facts_note`) pode citar uma fato de novo: ela não é lista (RVB5B-1-02).
+        fatos = (celulas.get("Fato") or celulas.get("Fatos") or "").split(" — ", 1)[0]
         medidas = _medidas(celulas["Medidas"], cabeca.group(1))
         saida[cabeca.group(1)] = {
             "title": cabeca.group(2).strip(),
@@ -601,6 +602,8 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT, le
         # As medidas, métricas e filtros das views, do `metricas.yml` (Bloco 5, item 10; ADR-0055).
         "metrics": metricas,
         "filters": filtros,
+        # A montagem de cada view (Q33; RVB5B-1-02): o grão, as fontes e a combinação, que mudam o número.
+        "view_rules": metrics.view_rules(),
         "description_gaps": _faltas(relacoes),
         "tests": _testes(manifest, run),
         "view_audits": _auditorias(yaml.safe_load(RESULTADO.read_text(encoding="utf-8"))),

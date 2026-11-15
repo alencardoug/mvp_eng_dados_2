@@ -360,6 +360,51 @@ def question_tables(doc: dict | None = None) -> list[str]:
             for n in (por_pergunta[f"P{i:02d}"] for i in range(1, 17))]
 
 
+def view_rules(doc: dict | None = None) -> dict:
+    """`view_rules` do pacote (Q33; RVB5B-1-02): a montagem de cada view, como a declaração a diz — o grão, as
+    fontes com o grão, as medidas, os filtros e as junções que a montagem usa, a combinação e o papel de cada
+    coluna; na view por referência, o teste, a consulta e o motivo. Toda chave presente; `null` onde não se aplica."""
+    doc = load_catalog() if doc is None else doc
+    saida = {}
+    for nome, view in doc["views"].items():
+        fatos, dims = relations(doc, nome)
+        fontes = []
+        for fonte in view.get("sources") or []:
+            declarada = doc["sources"][fonte["source"]]
+            sql, grao, medidas = _cte_da_fonte(doc, view, fonte)
+            filtros: list[str] = []
+            for m in medidas:
+                filtros += [f for f in doc["measures"][m].get("filters") or [] if f not in filtros]
+            fontes.append({
+                "relation": declarada["relation"], "alias": declarada["alias"],
+                "date": {"column": declarada["date"]["column"], "label": declarada["date"]["label"]},
+                "grain": list(grao), "measures": list(medidas), "filters": filtros,
+                "joins": [j["relation"] for j in declarada.get("joins") or []
+                          if f"join {j['relation']} {j['alias']} " in sql],
+            })
+        combina = view.get("combine")
+        colunas = {}
+        for coluna, papel in view["columns"].items():
+            papel_nome, alvo = role(coluna, papel)
+            colunas[coluna] = {
+                "role": papel_nome,
+                "name": alvo if papel_nome in ("measure", "metric") else None,
+                "additivity": additivity(doc, view, coluna) if papel_nome in ("measure", "metric", "reference") else None,
+                "note": note(doc, view, coluna),
+            }
+        ref = view.get("reference")
+        saida[f"consumption.{nome}"] = {
+            "question": view["question"], "facts": fatos, "dimensions": dims,
+            "grain": dict(view["grain"]) if view.get("grain") else None,
+            "sources": fontes,
+            "combine": {"type": combina["type"], "keys": list(combina["keys"]), "missing": combina.get("missing")}
+                       if combina else None,
+            "columns": colunas,
+            "reference": {"test": ref["test"], "query": ref["query"], "reason": ref["reason"]} if ref else None,
+        }
+    return saida
+
+
 # ── Os trechos de regra (entrega 4; Q30 a Q32) ────────────────────────────────────
 #
 # A regra sai da declaração como texto; nenhuma regra nova nasce aqui. O texto curto do BigQuery não

@@ -607,5 +607,105 @@
       "reference": null,
       "status": "not_audited"
     }
+  },
+  "view_rules": {
+    "consumption.average_order_value_by_channel_and_segment": {
+      "columns": {
+        "average_order_value": {
+          "additivity": "non_additive",
+          "name": "average_order_value",
+          "note": null,
+          "role": "metric"
+        },
+        "customer_segment_name": {
+          "additivity": null,
+          "name": null,
+          "note": null,
+          "role": "grain"
+        },
+        "month_number": {
+          "additivity": null,
+          "name": null,
+          "note": null,
+          "role": "grain"
+        },
+        "net_revenue_amount": {
+          "additivity": "additive",
+          "name": "net_revenue_amount",
+          "note": null,
+          "role": "measure"
+        },
+        "order_count": {
+          "additivity": "additive",
+          "name": "order_count",
+          "note": "contagem distinta de pedido",
+          "role": "measure"
+        },
+        "sales_channel_name": {
+          "additivity": null,
+          "name": null,
+          "note": null,
+          "role": "grain"
+        },
+        "year_month": {
+          "additivity": null,
+          "name": null,
+          "note": null,
+          "role": "grain"
+        },
+        "year_number": {
+          "additivity": null,
+          "name": null,
+          "note": null,
+          "role": "grain"
+        }
+      },
+      "combine": null,
+      "dimensions": [
+        "analytics.dim_date",
+        "analytics.dim_sales_channel",
+        "analytics.dim_customer"
+      ],
+      "facts": [
+        "analytics.fact_sales_order_item"
+      ],
+      "grain": {
+        "customer_segment_name": "c.customer_segment_name",
+        "month_number": "d.month_number",
+        "sales_channel_name": "ch.sales_channel_name",
+        "year_month": "d.year_month",
+        "year_number": "d.year_number"
+      },
+      "question": "P02",
+      "reference": null,
+      "sources": [
+        {
+          "alias": "f",
+          "date": {
+            "column": "date_key",
+            "label": "a data do pedido"
+          },
+          "filters": [
+            "realised_order"
+          ],
+          "grain": [
+            "year_month",
+            "year_number",
+            "month_number",
+            "sales_channel_name",
+            "customer_segment_name"
+          ],
+          "joins": [
+            "analytics.dim_sales_channel",
+            "analytics.dim_customer"
+          ],
+          "measures": [
+            "order_count",
+            "net_revenue_amount"
+          ],
+          "relation": "analytics.fact_sales_order_item"
+        }
+      ]
+    }
   }
 }

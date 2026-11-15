@@ -106,7 +106,7 @@ seja possível sem recalcular errado.
 | **Dimensões** | `dim_product` · `dim_category` · `dim_brand` |
 | **View** | `top_skus_by_revenue` |
 
-**Conferida por referência** (gerado de `docs/glossario_de_negocio/metricas.yml`): `tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia`, contra `tests/auditoria/top_skus_by_revenue.sql`. O ranking e o corte — `rank()` sobre a receita dentro da categoria, e a participação na receita da categoria — não cabem no montador.
+**Conferida por referência** (gerado de `docs/glossario_de_negocio/metricas.yml`): `tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia`, contra `tests/auditoria/top_skus_by_revenue.sql`. O ranking e o corte — `rank()` sobre a receita líquida de todos os SKUs do período, sem partição, com o corte nos 25 primeiros — e a participação do SKU na receita da categoria dele não cabem no montador.
 <!-- fim do trecho gerado -->
 
 ### P04 — Quantos clientes compraram pela primeira vez em cada mês, e quantos deles voltaram a comprar em 90 dias?
@@ -119,7 +119,7 @@ seja possível sem recalcular errado.
 | **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_customer` |
 | **View** | `new_and_repeat_customers_by_month` |
 
-**Conferida por referência** (gerado de `docs/glossario_de_negocio/metricas.yml`): `tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia`, contra `tests/auditoria/new_and_repeat_customers_by_month.sql`. A estreia e a recompra saem de uma janela sobre a ordem dos pedidos realizados de cada cliente (F18), que o montador não faz.
+**Conferida por referência** (gerado de `docs/glossario_de_negocio/metricas.yml`): `tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia`, contra `tests/auditoria/new_and_repeat_customers_by_month.sql`. A estreia é o primeiro pedido realizado de cada cliente pela chave natural (`distinct on`, F18), e a recompra é um pedido posterior dentro da janela contada da estreia, numa junção da fato com ela mesma; o montador não escolhe a primeira linha nem junta a fato a si mesma.
 <!-- fim do trecho gerado -->
 
 Depende dos conceitos de [cliente ativo](cliente_ativo.md) e
@@ -432,11 +432,11 @@ canal "Sem canal", sem denominador, e a taxa é nula ali.
 | | |
 |---|---|
 | **Fatos** | `fact_sales_order_item` · `fact_support_ticket_event` |
-| **Medidas** | `order_count` (aditiva) · `repeat_order_count` (**não aditiva**) · `repeat_purchase_rate` (**não aditiva**) · `avg_days_to_next_order` (**não aditiva**) |
+| **Medidas** | `order_count` (**não aditiva** — entre categorias: um pedido com chamados de duas categorias conta nas duas) · `repeat_order_count` (**não aditiva**) · `repeat_purchase_rate` (**não aditiva**) · `avg_days_to_next_order` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_support_category` |
 | **View** | `repeat_purchase_rate_after_support` |
 
-**Conferida por referência** (gerado de `docs/glossario_de_negocio/metricas.yml`): `tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia`, contra `tests/auditoria/repeat_purchase_rate_after_support.sql`. O pedido seguinte de cada cliente, dentro da janela, sai de uma janela sobre os pedidos realizados; o montador não ordena pedidos.
+**Conferida por referência** (gerado de `docs/glossario_de_negocio/metricas.yml`): `tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia`, contra `tests/auditoria/repeat_purchase_rate_after_support.sql`. Os dois grupos comparados não cabem no montador — a redução da fato a um pedido por linha, a ligação de cada pedido às categorias dos chamados dele (pela origem e pelo número) e a união com os pedidos sem chamado. A recompra e os dias até o pedido seguinte já vêm calculados na fato.
 <!-- fim do trecho gerado -->
 
 A unidade é o **pedido**, não o cliente: é o que permite comparar quem abriu chamado com quem não

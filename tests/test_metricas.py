@@ -83,22 +83,32 @@ def test_fatos_e_dimensoes_da_tabela_sao_os_que_a_view_le() -> None:
 
 
 def test_a_aditividade_declarada_e_a_do_comeco_da_descricao() -> None:
-    """A descrição da coluna de `consumption` que começa pela aditividade diz a mesma que a declaração (F28)."""
+    """Toda coluna de medida, métrica ou referência de `consumption` começa a descrição pela aditividade, e ela é
+    a da declaração (F28; RVB5B-1-01). A única dispensa é a descrição que é só o bloco do conceito
+    (`{{ doc(...) }}`), que o mecanismo de herança das descrições guarda; nenhuma outra passa calada."""
     import re
     import yaml
     rotulo = {"Aditiva": "additive", "Semiaditiva": "semi_additive", "Não aditiva": "non_additive"}
     texto = (metrics.sensitivity.ROOT / "dbt" / "models" / "consumption" / "_consumption__models.yml").read_text(encoding="utf-8")
-    divergentes, conferidas = [], 0
+    divergentes, sem_rotulo, conferidas, do_conceito = [], [], 0, 0
     for modelo in yaml.safe_load(texto)["models"]:
         view = DOC["views"][modelo["name"]]
         for coluna in modelo.get("columns") or []:
-            m = re.match(r"(Aditiva|Semiaditiva|Não aditiva)\b", (coluna.get("description") or "").strip())
-            if not m or metrics.role(coluna["name"], view["columns"][coluna["name"]])[0] not in ("measure", "metric", "reference"):
+            if metrics.role(coluna["name"], view["columns"][coluna["name"]])[0] not in ("measure", "metric", "reference"):
+                continue
+            descricao = (coluna.get("description") or "").strip()
+            if re.fullmatch(r"\{\{ doc\([\"']\w+[\"']\) \}\}", descricao):
+                do_conceito += 1
+                continue
+            m = re.match(r"(?:\*\*)?(Aditiva|Semiaditiva|Não aditiva)\b", descricao)
+            if not m:
+                sem_rotulo.append(f"{modelo['name']}.{coluna['name']}")
                 continue
             conferidas += 1
             if metrics.additivity(DOC, view, coluna["name"]) != rotulo[m.group(1)]:
                 divergentes.append(f"{modelo['name']}.{coluna['name']}")
-    assert divergentes == [] and conferidas > 60
+    assert sem_rotulo == [] and divergentes == []
+    assert conferidas > 75 and do_conceito < 10
 
 
 def test_a_tabela_gerada_e_lida_pelo_pacote_com_os_nomes_fisicos() -> None:
@@ -196,3 +206,28 @@ def test_a_regra_da_pergunta_cita_as_colunas_e_os_filtros_da_view() -> None:
             if papel_nome == "measure":
                 for f in DOC["measures"][alvo].get("filters") or []:
                     assert DOC["filters"][f]["label"] in regra, (nome, f)
+
+
+# ── A montagem no pacote (Q33; RVB5B-1-02) ───────────────────────────────────────
+
+def test_view_rules_cobre_as_16_views_e_casa_com_as_perguntas() -> None:
+    regras = metrics.view_rules(DOC)
+    assert set(regras) == {f"consumption.{n}" for n in DOC["views"]}
+    from mvp_ed1.models import pacote
+    lidas = pacote._perguntas(metrics.sensitivity.ROOT.joinpath(
+        "docs", "glossario_de_negocio", "perguntas_de_negocio.md").read_text(encoding="utf-8"))
+    for p, q in lidas.items():
+        r = regras[q["view"]]
+        assert r["question"] == p and r["facts"] == q["facts"] and r["dimensions"] == q["dimensions"], p
+
+
+@pytest.mark.parametrize("mudar", [
+    # As três mutações da revisão: cada uma muda o número da view, e tem de mudar o que o pacote publica.
+    pytest.param(lambda d: d["views"]["gross_margin_by_category"]["combine"].update(type="left"), id="P08-full-para-left"),
+    pytest.param(lambda d: d["views"]["refund_rate_by_reason"]["combine"].pop("missing"), id="P10-sem-o-zero"),
+    pytest.param(lambda d: d["views"]["refund_rate_by_reason"]["sources"][1].update(grain=["year_month"]), id="P10-capturas-so-por-mes"),
+])
+def test_regra_que_muda_o_numero_muda_o_pacote(mudar) -> None:
+    alterado = copy.deepcopy(DOC)
+    mudar(alterado)
+    assert metrics.view_rules(alterado) != metrics.view_rules(DOC)
