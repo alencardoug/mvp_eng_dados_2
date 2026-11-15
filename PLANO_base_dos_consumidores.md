@@ -1450,3 +1450,19 @@ no F27, respondidos no *commit* que contém esta entrada:
 
 **A revisão do plano do Bloco 5R está fechada.** O que falta dele é do fim da fase: o ramo, as escolhas da V4 e do
 F22 com o Owner, a adaptação do ciclo revisada, o ciclo.
+
+### Rodadas 39 a 42 — Codex conta 1, sobre a implementação da Parte A do Bloco 5 (15/11/2026)
+
+Relatórios em `codex1_bloco5_parteA_r1.md` a `r4.md`; objeto inicial `8968bac` e `df08dde` (o catálogo dos
+domínios e as ligações derivadas nas colunas). Os significados aceitos pelo Owner (Q19) não estavam em revisão,
+e sim a transcrição deles e das fontes: nenhum erro de transcrição, nenhum domínio errado nas 76 ligações.
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 39 | `1afc68f` | 1 bloqueante, 3 ajustes (RVB5A-1-01 a 04) | A remoção não deixa `data_tests:` nulo; o `not_null` derivado ganha a marca `config.meta.value_domain` (62 migrados) e sai sozinho com o `null_meaning`; sem `dominios.yml`, a ligação no disco recusa; a guarda dos membros lê as colunas pelo `information_schema` |
+| 40 | `6e55606` | 2 ajustes (RVB5A-2-01 e 02) | O derivado se reconhece pela estrutura carregada, não pelo texto; o `not_null` à mão com `enabled: false` não vale como garantia e é recusado |
+| 41 | `540a2f0` | 1 ajuste (RVB5A-3-01) | Os `data_tests` se leem no documento inteiro: a âncora YAML de outra coluna resolve |
+| 42 | — | nenhum | — |
+
+**A revisão da implementação da Parte A está fechada.** O que falta dela é do fim da fase (Q27): as guardas
+de relação do item 4, que esperam o ramo da regeneração. Isso não é o aceite do declarativo, que é do Owner.
