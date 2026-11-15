@@ -810,118 +810,169 @@ estáveis, nenhuma mudança) → `make test` → `make catalog` → `make check-
 - **O ADR:** [ADR-0055](docs/adr/0055-dominios-e-metricas-declarados-uma-vez.md). Depois, a revisão da implementação, a linha `feita` e os avisos. O
 aceite do declarativo — os dois catálogos — é do Owner (§5), separado da revisão técnica.
 
-### Bloco 5R — a fila da regeneração e o ciclo, no fim da fase (F24 a F26, V4, F22)
+### Bloco 5R — a fila da regeneração e o ciclo, no fim da fase (F24 a F27, V4, F22)
 
-Pela Q21 a Q26 (§6, rodada 7). Os significados aceitos na Q19, medidos contra o dado, são desmentidos em três
+Pela Q21 a Q29 (§6, rodada 7). Os significados aceitos na Q19, medidos contra o dado, são desmentidos em três
 pontos, e o Owner decidiu corrigir o gerador em vez de declarar a ressalva; depois, que a regeneração é **uma
-só, no fim da fase**, e leva junto a V4 e o F22. **Para revisão antes de executar.**
+só, no fim da fase**, que leva junto a V4, o F22 e o F27, e que o código das correções também espera o fim.
+Revisto pela rodada 1 da revisão (`codex1_bloco5r_r1.md`, RVB5R-1-01 a 07; §9). Sem ADR próprio (Q29): são
+correções de realismo dentro do desenho do ADR-0005, como as da v1.1.0.
 
-**Onde fica na ordem** (Q25). O ciclo roda **depois da Parte A, da Parte B e do Bloco 6, antes do
-fechamento**: as guardas da Parte A e as chaves do Bloco 6 ainda podem achar correções do gerador, e cada
-ciclo custa o roteiro inteiro (as fases A a G, o pacote de recuperação, a auditoria das 16 views, uma linha
-por view em Consumidores §5). As correções mudam a relação entre colunas, não quais valores cada coluna tem:
-as ligações da Parte A, medidas no dado de hoje, são medidas de novo no fim, e o que mudar se corrige na
-ligação. O catálogo se escreve agora, com os significados aceitos; até o ciclo, o dado ainda os contradiz
-nos pontos da fila, e por isso nenhum *commit* é marcado para os consumidores fixarem (Consumidores §6).
+**Onde fica na ordem** (Q25, Q27). Tudo o que depende do dado novo fica para o fim: o código das correções, as
+invariantes *offline* e as guardas do armazém que conferem as relações da fila são desenhados e medidos
+**juntos, num ramo** (`bloco-5r`), logo antes do ciclo, e entram no `main` com ele. O ciclo roda **depois da
+Parte A, da Parte B e do Bloco 6, antes do fechamento**: as guardas da Parte A e as chaves do Bloco 6 ainda
+podem achar correções, cada ciclo custa o roteiro inteiro, e as correções interagem — o F24 muda a demanda
+de estoque de que a V4 depende, e o `transaction_result` que o F22 segue. Até lá, o `main` e o `make check`
+ficam como estão (RVB5R-1-04): nenhuma guarda que falha no dado de hoje entra nele, e nenhuma verificação é
+rebaixada ou dispensada. A verificação das relações da Parte A (item 4) só se dá por concluída depois do
+ciclo; as relações que já valem no dado de hoje entram com a Parte A.
+
+O catálogo se escreve agora, com os significados aceitos; até o ciclo, o dado ainda os contradiz nos pontos da
+fila, e por isso nenhum *commit* é marcado para os consumidores fixarem (Consumidores §6). Depois do ciclo, as
+ligações da Parte A são **medidas de novo, uma a uma** — observados e `not_observed`, permitidos e
+`impossible`, inclusive os códigos que o mapa do F22 conservar: as correções mexem sobretudo na relação entre
+colunas, mas redistribuem os alvos da injeção do legado, e um modelo só do F25 já mudou os estados presentes
+entre as ocorrências aptas (revisão do Bloco 5R, rodada 1, §4).
 
 **A fila.** Cada correção do gerador entra aqui com o achado, a causa no código e a invariante; o achado novo
-segue a regra de entrada do F22 (a evidência medida, o efeito, o que fazer aqui) e entra na fila sem esperar
-o fim. Hoje: F24, F25, F26, V4 e F22. **O código de cada correção e a invariante *offline* se escrevem
-antes do ciclo**, para a revisão do declarativo acontecer uma vez; **a medir antes do primeiro *commit*
-deles no `main`**: se algum teste compara a geração em memória com a origem carregada (o legado guarda o
-manifesto do lote), as correções esperam num ramo até o ciclo. Os testes do armazém que conferem as mesmas
-relações (item 4 da Parte A) falham no dado de hoje: ficam declarados com o achado da fila que os resolve, e
-uma guarda confere que a lista deles é exatamente a fila — nenhum teste some em silêncio, e nenhum fica
-pendente sem achado.
+segue a regra de entrada do F22 (a evidência medida, o efeito, o que fazer aqui) e entra na fila sem esperar o
+fim. Hoje: F24, F25, F26, F27, V4 e F22. No ramo, cada guarda do armazém declara o achado da fila que ela
+confere — um achado pode ter várias —, e a entrada no `main` exige todas verdes sobre o dado novo.
 
 **As correções.** São do declarativo (`generator/geracao.yml`) quando forem parâmetro, e do código do domínio
-quando forem processo; cada uma ganha a invariante que a guarda no teste do gerador.
+quando forem processo; cada uma ganha a invariante que a guarda no teste do gerador. Mudança de piso ou de
+proporção em `geracao.yml` é declaração, e passa pela revisão do Owner (CLAUDE.md §5).
 
 1. **F24 — quem compra e o que se vende** (Q21, Q23):
    - o cliente `pending` ou `blocked` não tem pedido nem carrinho identificado: hoje o cliente sai de
      `fonte.escolha(clientes)` no carrinho e no pedido de venda direta (`generator/domains/vendas.py`);
    - o cliente `inactive` só tem pedido, e carrinho identificado, com data anterior aos 180 dias que
-     precedem o fim do período (`motor.fim`). A janela é a do glossário (`cliente_ativo.md`, `churn.md`),
-     mas o estado continua cadastral, e o `active` pode não ter comprado na janela;
-   - a variante de produto `draft` não entra em carrinho nem em pedido. O carrinho já usa só a variante
-     `is_active`, que nasce falsa no produto que não está `active` (`generator/domains/catalogo.py`); o
-     pedido usa todas (`vendas.py`) — é dali que sai a venda do `draft`;
-   - a variante de produto `discontinued` só vende antes dos 90 dias que precedem o fim do período;
-   - **a medir antes de aceitar:** quantos clientes e produtos ficam sem venda, e se a proporção de
-     referência dos pedidos (Geração §4) continua de pé. O que ela mudar volta ao Owner.
-2. **F25 — o extravio** (Q22): no laço de `remessas` (`generator/domains/logistica.py`), o extravio deixa
-   de sair da remessa sorteada como `delivered` e passa a valer para a remessa em trânsito de pedido
-   `shipped` — a regra que `_garantir_extravio` já declara. A taxa `extravio` continua a mesma, sobre a
-   nova base; o número de remessas `lost` é medido antes e depois. **A remessa do legado `returned` sem
-   evento de devolução** (`SHP-00000081`) é investigada antes de se corrigir: nas 107 do `retail` e nas
-   outras 3 do `legacy`, o evento existe. A causa pode ser o catálogo de falhas do legado; se for falha
-   declarada, não se corrige e o F25 o registra.
-3. **F26 — a reabertura e o encerramento** (Q22, Q24): em `_eventos` (`generator/domains/atendimento.py`),
-   o `reopened` vem sempre depois de um `resolved`, e o chamado reaberto termina `in_progress`; o
-   `closed_at` só é preenchido no `closed`, e o `resolved` fica com ele nulo — a resolução é o evento do
-   livro. O `is_closed` de `trusted.support_tickets` é regra do modelo (`resolved` ou `closed`) e não lê o
-   `closed_at`: ele não muda, e a descrição dele é conferida contra o significado aceito. O tempo até o
-   fechamento (`trusted.support_tickets`, a partir do `closed_at`) muda nos chamados `resolved`; o tempo
-   de resolução, que vem do evento, não.
-4. **V4 — a correção-relâmpago do estoque** (Q26): hoje, quando uma saída não tem lastro, o gerador cria
-   um `adjustment_in` um minuto antes dela (`generator/domains/estoque.py`, `AJU-CONFERENCIA`) — 1.851
-   ajustes em 14/11/2026, e 1.212 das 1.216 linhas de giro indefinido da P11. As duas formas que a V4
-   registra — repor por recebimento com antecedência, ou dimensionar o estoque inicial pela demanda — são
-   medidas em memória (quantos ajustes sobram, o giro indefinido, a proporção de referência dos
-   movimentos) e levadas ao Owner com a recomendação antes do código; a escolha é dele.
-5. **F22 — o código do adquirente** (Q26): o `gateway_response_code` deixa de ser sorteado na lista
-   (`generator/geracao.yml`, `payment_transactions`) e passa a seguir o `transaction_result`. O mapa
-   código → resultado e o significado de cada código, pela convenção do mercado, são proposta para o
-   aceite do Owner, como na Q19; até o ciclo, o catálogo declara o que a Q17 decidiu (sem significado de
-   negócio neste dado), e o ciclo troca a declaração junto com o dado.
+     precedem o fim do período (`motor.fim`), conferida no instante do carrinho **e** no da conversão
+     (`converted_at`, `placed_at`, até 48 h depois da abertura). A janela é a do glossário
+     (`cliente_ativo.md`, `churn.md`), mas o estado continua cadastral, e o `active` pode não ter comprado na
+     janela. O estado existe antes das vendas: a seleção dos candidatos é pelo instante do evento, sem
+     derivar o estado das compras;
+   - a variante de produto `draft` não entra em carrinho nem em pedido, e a de `discontinued` só vende antes
+     dos 90 dias que precedem o fim do período. O carrinho usa a variante `is_active`, mas com *fallback*
+     para todas (`_itens_de_carrinho`: `[…] or dados['product_variants']`) — no fator 0,001 a única variante
+     é de produto `draft` (RVB5R-1-01) —, e o pedido completa variantes de todas, inclusive no pedido que vem
+     de carrinho. A correção garante **candidatos elegíveis em todo fator**, sem tirar o `draft` do cadastro
+     nem baixar a cobertura do ADR-0014;
+   - o cupom herda o cliente e o instante do pedido (`marketing.resgates`): não há o que filtrar ali; o
+     chamado sem pedido continua podendo ser de qualquer cliente — a Q21 trata da compra, não do atendimento;
+   - **a medir antes de aceitar:** quantos clientes e produtos ficam sem venda, os pisos de cobertura e se a
+     proporção de referência dos pedidos (Geração §4) continua de pé. O que ela mudar volta ao Owner.
+2. **F25 — o extravio** (Q22): no laço de `remessas` (`generator/domains/logistica.py`), o extravio deixa de
+   sair da remessa sorteada como `delivered` e passa a valer para a remessa em trânsito de pedido `shipped` — a
+   regra que `_garantir_extravio` já declara. A taxa `extravio` continua a mesma, sobre a nova base; o número de
+   remessas `lost` e a cobertura do `lost` nos fatores pequenos são medidos antes e depois. **A remessa do
+   legado `returned` sem evento de devolução** (`SHP-00000081`) é falha declarada: o catálogo do legado injeta
+   `FK_ORPHAN` no `shipment_id` do evento 381 (`81` → `952899`), e o oráculo o rejeita (RVB5R-1-06). Não se
+   corrige.
+3. **F26 — a resolução, a reabertura e o encerramento** (Q22, Q24), em `_eventos`
+   (`generator/domains/atendimento.py`):
+   - o `reopened` vem sempre depois de um `resolved`, e o chamado reaberto termina `in_progress`; todo chamado
+     `resolved` ou `closed` tem o evento `resolved` — hoje 9 `closed` e 4 `resolved` não têm, porque o corte
+     `tipos[:quantidade]` conserva o `created` e o `assigned` (RVB5R-1-02);
+   - os eventos obrigatórios cabem no orçamento antes dos opcionais, e a reabertura forçada (a cobertura do
+     `reopened`) continua: só inserir o `resolved` antes do `reopened` zera as reaberturas — 14 → 0 no fator 1,
+     1 → 0 no 0,05, medido em memória pela revisão;
+   - o `closed_at` só é preenchido no `closed`, e o `resolved` fica com ele nulo; o horizonte que distribui os
+     eventos no tempo deixa de ser `closed_at or motor.fim`, que levaria a resolução até perto do fim do
+     período (RVB5R-1-03);
+   - **o que muda:** o tempo até o fechamento, nos `resolved`; e também o tempo de resolução — o chamado
+     reaberto passa a ter uma primeira resolução, e o `first_resolved_at` e o `hours_to_resolution` deixam de
+     ser nulos nele, até a média da P15. Medidos, com a proporção de `ticket_events`. O `is_closed` de
+     `trusted.support_tickets` (`resolved` ou `closed`) não lê o `closed_at`, e a descrição dele já é
+     compatível: não muda.
+4. **F27 — a reserva de estoque** (Q28): a reserva passa a ser de um SKU que está no carrinho ou no pedido dela;
+   hoje `_reservas` (`generator/domains/estoque.py`) sorteia o par armazém × variante à parte, e só 12 das 4.200
+   reservas da origem principal são de um item do próprio carrinho ou pedido (`bloco5r_f27_reservas_20261115.txt`).
+   O armazém continua saindo dos pares com movimento daquele SKU. O `draft` sai por consequência do F24.
+5. **V4 — a correção-relâmpago do estoque** (Q26): hoje, quando uma saída não tem lastro, `_ordenar_e_versionar`
+   (`generator/domains/estoque.py`, `AJU-CONFERENCIA`) cria um `adjustment_in` um minuto antes dela — 1.851
+   ajustes em 14/11/2026, e 1.212 das 1.216 linhas de giro indefinido da P11. Vale para toda saída, não só a
+   venda: transferência, devolução ao fornecedor e ajuste negativo. As duas formas que a V4 registra — repor por
+   recebimento com antecedência, ou dimensionar o estoque inicial pela demanda — são medidas em memória sobre o
+   gerador já com o F24 e o F27 (quantos ajustes sobram, por tipo de saída; o giro indefinido; a proporção de
+   referência dos movimentos) e levadas ao Owner com a recomendação antes do código; a escolha é dele.
+6. **F22 — o código do adquirente** (Q26): o `gateway_response_code` deixa de ser sorteado na lista
+   (`generator/geracao.yml`, `payment_transactions`) e passa a seguir o `transaction_result`, nos três —
+   `succeeded`, `failed` e `pending`. O mapa e o significado de cada código, pela convenção do mercado, são
+   proposta para o aceite do Owner, como na Q19; até o ciclo, o catálogo declara o que a Q17 decidiu (sem
+   significado de negócio neste dado), e o ciclo troca a declaração junto com o dado.
 
 **O que fica fora, e a interação** (Q26). O diário da janela do GCP (Pendências V3, item 3,
-`gcp/mutacoes_da_janela.yml`) não entra: ele só roda no Cloud SQL. Mas as ocorrências aptas que ele escolhe
-saem da geração do fator `dev`, que as correções mudam; o ciclo roda `tests/test_janela_legado.py` e
-registra o que ele disser, sem corrigir o diário.
+`gcp/mutacoes_da_janela.yml`) não entra: ele só roda no Cloud SQL. As ocorrências aptas que ele escolhe saem do
+manifesto do legado, gerado no fator 0,05 do `legacy/catalogo.yml`, que as correções mudam; o ciclo roda
+`tests/test_janela_legado.py`, que lê o manifesto local persistido e confere a disponibilidade das aptas, e
+registra o resultado. Ele não mede o efeito da cascata view a view, e não fecha a V3.
 
-**Os testes do gerador**, *offline*, antes de regerar: uma invariante por correção, no conjunto que o
-gerador já confere (Modelo de Dados §4) — nenhum pedido de cliente `pending`/`blocked`, nenhum item de
-`draft`, nenhum pedido de `inactive` e nenhuma venda de `discontinued` dentro da janela, nenhuma `lost` em
-pedido `delivered`, todo `reopened` depois de um `resolved`, `closed_at` nulo exatamente fora do `closed`. E
-as contraprovas: a correção desfeita faz a invariante falhar. As mesmas relações, no armazém, são os testes
-do item 4 da Parte A, que confere o significado contra o dado.
+**Os testes do gerador**, *offline*, no ramo: uma invariante por correção, no conjunto que o gerador já confere
+(Modelo de Dados §4) — nenhum pedido nem carrinho identificado de cliente `pending`/`blocked`; nenhum item de
+carrinho nem de pedido de `draft`; nenhum pedido nem carrinho de `inactive`, e nenhuma venda de
+`discontinued`, dentro da janela; nenhuma `lost` em pedido `delivered`; todo `resolved` e `closed` com o evento
+`resolved`, e todo `reopened` depois de um `resolved`; `closed_at` nulo exatamente fora do `closed`; toda
+reserva de um item do carrinho ou do pedido dela; o código do adquirente coerente com o resultado. **E a
+cobertura não vazia**, nos fatores do `retail` e do legado: a invariante universal passa por vacuidade quando
+nenhum `reopened` ou `lost` sobra (RVB5R-1-02). E as contraprovas: a correção desfeita faz a invariante falhar.
+As mesmas relações, no armazém, são as guardas do ramo.
 
-**A regeneração** segue o [roteiro da v1.1.0](https://github.com/alencardoug/bi-como-codigo/blob/2b70224/docs/regeneration_runbook.md#4-the-cycle)
-(as fases A a G), que já aplicou um gerador corrigido às duas origens **mantendo a memória do armazém**, e a
-[Execução Local §3.2](docs/execucao_local.md#32-regerar-uma-origem-que-já-alimenta-streaming). O que muda em
-relação a ele:
+**A regeneração.** O [roteiro da v1.1.0](https://github.com/alencardoug/bi-como-codigo/blob/2b70224/docs/regeneration_runbook.md#4-the-cycle)
+continua dono do procedimento geral (as fases A a G), com a
+[Execução Local §3.2](docs/execucao_local.md#32-regerar-uma-origem-que-já-alimenta-streaming). Mas ele foi escrito
+para o `mvp_eng_dados_1`, arquivado (D58), e as premissas dele mudaram (RVB5R-1-05). Antes do primeiro comando
+destrutivo, **a adaptação do ciclo de agora** é escrita aqui, como lista de parâmetros, oráculos e pontos de
+recuo, e revisada por outro agente. Ela cobre, no mínimo:
 
-- **o repositório é este**, e o *checkout* é `~/Projetos/mvp_eng_dados_2`; o roteiro foi escrito para o
-  `mvp_eng_dados_1`, arquivado (D58). Cada alvo citado é conferido aqui antes de rodar, lendo a receita, sem
-  `make -n`;
-- **as duas origens**: o legado nasce do mesmo `pipeline` (`legacy/cli.py`), com semente e fator próprios, e
-  muda junto. A captura nova entra na época seguinte do livro retido (`make ledger-baseline`, ADR-0050), e as
-  transições de chave que a regeneração produz passam declaradas no oráculo da memória
-  (`REMOCOES_ACEITAS=`, `REAPARICOES_ACEITAS=`), como na v1.1.0 ([Origem Legada §4.3](docs/origem_legada.md));
-- **o que muda de conteúdo**, tabela a tabela nas duas origens, é medido antes de carregar (a geração em
-  memória, os *hashes* por tabela) e registrado, como o §2.13 da Capacidade fez;
+- **A1**: o roteiro exige `data/source/geracao.json` ausente, e ele existe — registra a carga de 04/11/2026
+  (semente 20260904, corte 2026-09-01, fator `dev`). A adaptação diz o que ele vira no ciclo;
+- **H1**: a T1 se calibra pelo `max_event_sequence` do aprovado, que inclui os eventos do produtor — a geração
+  atual em memória tem 13.725 movimentos, o corte do aprovado em `6d93d72` tem 15.925 (2.200 a mais), e
+  `sources.oracle` acusa a diferença. A calibração distingue a geração dos eventos posteriores;
+- **A3, G5 e G10**: os pacotes e as identidades citados são os da manutenção anterior, retenções antigas
+  ([Capacidade §3](docs/capacidade_e_recuperacao.md)). O ciclo usa caminhos próprios e o ponto de recuo de
+  agora, sem misturar a cópia nova com a histórica;
+- **F4**: o roteiro esperava o catálogo sem mudança derivada; hoje o pacote publica resultados de teste e a
+  procedência da execução. A sequência de agora (`make catalog-derivados` → `make dbt-build` → `make catalog` →
+  `make test` → `make catalog` → `make check-offline`, *commit* limpo, *build* novo, embalagem) a substitui;
+- **o que se preserva**: a comparação H2 contra o **estado real**, com o `MANIFESTO_ANTES`; o aceite das remoções
+  e reaparições (`REMOCOES_ACEITAS=`, `REAPARICOES_ACEITAS=`, [Origem Legada §4.3](docs/origem_legada.md)); o T3
+  **antes** de mudar de época, como prova da continuidade; os registros de tentativa e de tratamento; uma época
+  própria depois de cada restauração (`make ledger-baseline`, ADR-0050). Abrir a linha de base nova não
+  substitui a conferência da época que se encerra;
+- **o que muda de conteúdo**, tabela a tabela nas duas origens, medido antes de carregar (a geração em memória,
+  os *hashes* por tabela), como o §2.13 da Capacidade fez;
 - **os comandos destrutivos** (`seed-data FORCE=1`, `seed-legacy FORCE=1`, `stream-down FORCE=1`,
-  `stream-reset-sink FORCE=1`, `dbt-build RESET=1`) rodam um de cada vez, com a confirmação do Owner antes de
-  cada um; a troca de ambientes pesados é a dos alvos guardados (R11), sem `FORCE=1` de memória;
-- **o pacote de recuperação** (fase G) é refeito, porque o de hoje guarda o dado que deixa de existir;
+  `stream-reset-sink FORCE=1`, `dbt-build RESET=1`), um de cada vez, com a confirmação do Owner antes de cada um;
+  cada alvo conferido lendo a receita, sem `make -n`; a troca de ambientes pesados pelos alvos guardados (R11),
+  sem `FORCE=1` de memória;
+- **o pacote de recuperação** (fase G) refeito, porque o de hoje guarda o dado que deixa de existir;
 - **nada no GCP** (Q14).
 
-**O que muda para quem consome.** Todas as 16 views mudam de valor: a correção do F24 muda quem compra e o
-que se vende, e daí todo o resto. Antes de regerar, um aviso fora do Git aos dois consumidores
-(`bi-como-codigo` e `gdados`), como os de 15/11. Depois, em Consumidores §5, uma linha `feita` por view, com
-o caso de antes e de depois, o *commit* e o `invocation_id` do *build*. O esquema não muda.
+**O que muda para quem consome.** Todas as 16 views mudam de valor: a correção do F24 muda quem compra e o que
+se vende, e daí todo o resto. Antes de regerar, um aviso fora do Git aos dois consumidores (`bi-como-codigo` e
+`gdados`), como os de 15/11. Depois, em Consumidores §5, uma linha `feita` por view, com o caso de antes e de
+depois, o *commit* e o `invocation_id` do *build*. O esquema não muda; o anúncio de esquema do Bloco 5 é outra
+linha.
 
-**A conferência, depois.** A auditoria das 16 views (Bloco 1b) roda de novo sobre o dado novo — as
-referências calculam a partir de `trusted`, e não guardam número; as reconciliações entre camadas; os
-testes do item 4 da Parte A; `make test`; a DAG de ponta a ponta. As medidas do F24 a F26
-(`bloco5_significados_contra_o_dado_20261115.txt`) repetidas dão zero.
+**A conferência, depois.** A auditoria das 16 views (Bloco 1b) roda de novo sobre o dado novo. As referências
+não guardam número; elas leem sobretudo `analytics` (a da P15 lê `trusted.support_tickets` no numerador e no
+tempo), e por isso repetem-se também as **conferências de população**, que atravessam até a camada responsável
+(`tests/auditoria/populacao/`, `dbt/tests/p13_conta_toda_remessa_entregue.sql`) (RVB5R-1-07). A igualdade da
+view com a referência não prova a semântica do gerador: quem a prova são as invariantes e as guardas entre
+camadas. Depois: as reconciliações entre camadas, `make test`, a DAG de ponta a ponta, e as medidas do F24 a
+F27 (`bloco5_significados_contra_o_dado_20261115.txt`, `bloco5r_f27_reservas_20261115.txt`) repetidas.
 
-**Critério de conclusão.** As invariantes novas passam no gerador e no armazém; as medidas de cada item da
-fila (F24 a F26, a V4, o F22 e o que entrar até o ciclo) dão zero, ou o que a forma escolhida da V4 deixar,
-declarado; as 16 views auditadas de novo; a reconciliação e a DAG verdes; o pacote de recuperação refeito; as 16
-linhas `feita` em Consumidores §5; a Geração de Dados atualizada com as regras novas, no lugar dela (§5,
-realismo e coerência).
+**Critério de conclusão.** As invariantes novas passam no gerador, com a cobertura não vazia; as guardas do
+ramo passam no armazém; nas relações tratadas, **zero contradição sem explicação comprovada** no manifesto, na
+classificação ou na quarentena do lote novo — a falha deliberada do legado não se corrige para forçar zero, e a
+explicação é conferida no lote novo, porque os alvos da injeção mudam; dispensar a origem `legacy` inteira não
+vale (RVB5R-1-06); a V4 no que a forma escolhida deixar, declarado; as 16 views auditadas de novo, com as
+populações; a reconciliação e a DAG verdes; o pacote de recuperação refeito; as 16 linhas `feita` em
+Consumidores §5. As regras novas vão à Geração de Dados §5 (realismo e coerência), e as invariantes ao Modelo
+de Dados §4, com referência entre os dois, sem repetir o catálogo dos significados.
 
 ### Bloco 6 — as chaves declaradas (F10)
 
@@ -1075,6 +1126,9 @@ desmentidos: F24 a F26.
 | **Q24** | F26: como separar o `resolved` do `closed`, com só o `closed_at` no modelo | **`closed_at` só no `closed`**: o `resolved` fica com `closed_at` nulo, e a resolução é o evento `resolved` do livro. Era a recomendada | Os dois com `closed_at`, e o significado do `resolved` reescrito |
 | **Q25** | Quando regerar, se a Parte A, a Parte B e o Bloco 6 ainda podem achar outras correções do gerador | **Uma vez, no fim da fase**, revendo o "agora" da Q21 e da Q22: uma fila da regeneração no Bloco 5R, que recebe cada achado novo do gerador; o código e as invariantes *offline* de cada correção se fazem antes; o ciclo roda depois da Parte A, da Parte B e do Bloco 6, antes do fechamento. Nenhum *commit* marcado para os consumidores fixarem até lá. Era a recomendada | Regerar agora, só com a fila de hoje; regerar depois da Parte A |
 | **Q26** | O que entra na mesma regeneração, além do F24 a F26 | **A V4** (a correção-relâmpago do estoque, que a Q8 deixava para depois da fase) **e o F22** (o código do adquirente, que a Q17 levava às Pendências). **A V3 item 3** (o diário da janela do GCP) **fica na V3**: só roda no Cloud SQL, que a Q14 fechou, e o defeito é da escolha da mutação, não do realismo do dado; o plano registra a interação. As três eram as recomendadas | Só o F24 a F26; corrigir também a declaração do diário, sem prova no Cloud SQL |
+| **Q27** | Da rodada 1 da revisão do Bloco 5R (RVB5R-1-04): quando o código das correções e as guardas que dependem do dado novo entram no `main` | **Tudo no fim, num ramo**: o código, as invariantes *offline* e as guardas do dado novo são desenhados e medidos juntos, logo antes do ciclo, e entram no `main` com ele; o `main` e o `make check` ficam como estão até lá. Revê o "código antes do ciclo" que o plano dizia. Era a recomendada | O código e as invariantes antes, no `main`, e só as guardas no ramo |
+| **Q28** | Da mesma revisão (RVB5R-1-01): a reserva de estoque, que sorteia o SKU sem olhar o carrinho ou o pedido dela | **Entra na fila (F27)**: a reserva passa a ser de um SKU do carrinho ou do pedido dela. Era a recomendada | Só tirar o `draft` da reserva; deixar fora desta fase, nas Pendências |
+| **Q29** | Se as correções do gerador pedem ADR | **Não**: são correções de realismo dentro do ADR-0005, como as da v1.1.0; as regras vão à Geração §5, as invariantes ao Modelo de Dados §4, e as escolhas do Owner (a forma da V4, o mapa do F22) ficam neste §6. Era a recomendada | Um ADR da regeneração do Bloco 5R |
 
 ## 7. Definição de pronto aplicada
 
@@ -1098,10 +1152,10 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
    perguntada antes do Bloco 4 (§3, "D66"), e a auditoria da P13 só conclui depois dela.
 5. Bloco 4.
 6. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs. Dentro do Bloco 5, pela rodada 7
-   (Q21 a Q26): o catálogo dos domínios; a revisão do Bloco 5R por outro agente; o código e as invariantes
-   *offline* da fila; as ligações e as guardas da Parte A; a Parte B; depois, o Bloco 6.
-7. O ciclo da regeneração do Bloco 5R, com a fila inteira, e as ligações e as guardas medidas de novo sobre o
-   dado novo.
+   (Q21 a Q29): o catálogo dos domínios; a revisão do Bloco 5R por outro agente; as ligações e as guardas da
+   Parte A que valem no dado de hoje; a Parte B; depois, o Bloco 6.
+7. O Bloco 5R, num ramo: o código, as invariantes e as guardas da fila inteira, a forma da V4 e o mapa do F22
+   com o Owner, a adaptação do ciclo revisada; o ciclo; as ligações medidas de novo sobre o dado novo.
 8. Fechamento.
 
 **Estimativa:** não há. O G06 sozinho foi estimado em 2 a 3 h de escrita mais a revisão do Owner
@@ -1363,3 +1417,19 @@ Q15 a Q18 e o F22). O inventário medido dos domínios está em `bloco5_inventar
 | 34 | `8800ec3` | 1 bloqueante, 6 ajustes (RVB5-1-01 a 07) | O contrato executável das métricas: fontes com junções e data, filtros, medidas, métricas e views com papel de cada coluna, montador fixo; cobertura dos domínios por todas as colunas físicas e membros desconhecidos; dois números separados; trecho gerado para o texto curto; os YAMLs nos insumos; as sondas antes do ADR |
 | 35 | `6ab3790` | 4 ajustes (RVB5-2-01 a 04) | Grão de agregação por fonte; a tabela de cada pergunta gerada do YAML (o F23); cobertura de valores por ligação; o alvo `catalog-derivados` |
 | 36 | — | nenhum | **A revisão do desenho do Bloco 5 está fechada.** |
+
+### Rodada 37 — Codex conta 1, sobre o plano do Bloco 5R (15/11/2026)
+
+Relatório em `codex1_bloco5r_r1.md`; objeto `c198a5c..52cb96e`. A regeneração única no fim foi julgada viável,
+e as causas do F24 a F26, da V4 e do F22 conferem com o código; nenhuma das decisões Q19 a Q26 foi revista.
+Respondida no *commit* que contém esta entrada, com as decisões Q27 a Q29.
+
+| # | Veredito | Achado | Situação |
+|---|---|---|---|
+| RVB5R-1-01 | bloqueante | O carrinho não exclui o `draft`: há *fallback* para todas as variantes, e no fator 0,001 a única é de `draft`; as reservas sorteiam o SKU à parte | F24 garante candidatos elegíveis em todo fator e confere as janelas também na conversão; a reserva virou o F27 (Q28) |
+| RVB5R-1-02 | bloqueante | O orçamento de eventos do chamado: só inserir o `resolved` zera as reaberturas; 9 `closed` e 4 `resolved` sem evento `resolved` | F26 reserva os eventos obrigatórios, mantém a reabertura forçada e garante o `resolved`; a cobertura não vazia entrou nas invariantes |
+| RVB5R-1-03 | ajuste | O tempo de resolução também muda, e o horizonte dos eventos depende do `closed_at` | Corrigido em F26: o horizonte se separa do `closed_at`, e o tempo de resolução está entre o que muda |
+| RVB5R-1-04 | bloqueante | Guardas que falham no dado de hoje quebram ou enfraquecem o `make check`; a lista igual à fila não prova nada | Q27: o código, as invariantes e as guardas do dado novo ficam num ramo até o ciclo; o `main` não muda; o item 4 da Parte A só conclui depois do ciclo |
+| RVB5R-1-05 | bloqueante | O roteiro da v1.1.0 não se reaproveita só com os deltas: `geracao.json` existe, a H1 calibra num corte com 2.200 eventos do produtor, os pacotes citados são antigos | "A adaptação do ciclo de agora", escrita e revisada antes do primeiro comando destrutivo, com o que se preserva |
+| RVB5R-1-06 | ajuste | O `SHP-00000081` é `FK_ORPHAN` injetado; o critério de zero absoluto conflita com a falha deliberada | Critério: zero contradição sem explicação comprovada no lote novo; o F25 registra o caso |
+| RVB5R-1-07 | ajuste | As referências da auditoria leem sobretudo `analytics`, não `trusted` | Frase corrigida; as conferências de população entram na repetição |

@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 15/11/2026 (F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 15/11/2026 (F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -390,7 +390,9 @@ inventário.
   (`generator/domains/logistica.py`) troca por `lost` a remessa sorteada como `delivered` — o contrário do
   que a *docstring* de `_garantir_extravio`, logo abaixo, diz evitar ("não de uma entregue, que seria
   contradição com o estado do pedido"). À parte, uma remessa do `legacy` (`SHP-00000081`) está
-  `returned` sem evento de devolução no livro de entrega: os eventos dela terminam em `delivered`.
+  `returned` sem evento de devolução no livro de entrega: os eventos dela terminam em `delivered`. Não é
+  defeito do gerador: o catálogo do legado injeta `FK_ORPHAN` no `shipment_id` do evento de devolução
+  (`81` → `952899`), e a limpeza o rejeita (revisão do Bloco 5R, RVB5R-1-06).
 - **Efeito:** o pedido diz que chegou e nenhuma remessa dele chegou; a pontualidade e o ciclo de entrega
   (P13, P14) contam um pedido cuja entrega não existe.
 - **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
@@ -408,6 +410,19 @@ inventário.
   não foi fechado.
 - **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
   (Q25).
+
+### F27 — A reserva de estoque não é de um item do carrinho nem do pedido · **Gravidade: baixa**
+
+- **Evidência** (medida na origem principal, `oltp`, em 15/11/2026, na revisão do Bloco 5R, RVB5R-1-01):
+  das 4.200 reservas, só 12 são de um SKU que está no carrinho ou no pedido a que pertencem; 202 são de
+  produto `draft` e 323 de `discontinued`. A causa: `_reservas` (`generator/domains/estoque.py`) sorteia o
+  par armazém × variante entre todos os que têm movimento e, à parte, o carrinho ou o pedido, sem ligar um
+  ao outro.
+- **Efeito:** a reserva ocupa saldo de um item que ninguém pediu, e a invariante 8 (reserva sempre de um
+  carrinho ou de um pedido) vale na forma, não no conteúdo. A reserva não chega a `analytics` hoje; o
+  efeito está no saldo disponível da origem e no livro de estoque.
+- **Aqui**, pela decisão do Owner (Q28 do plano da base dos consumidores): a reserva passa a ser de um SKU
+  do carrinho ou do pedido dela, no Bloco 5R, no fim da fase.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
