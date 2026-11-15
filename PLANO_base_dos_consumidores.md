@@ -886,10 +886,13 @@ proporção em `geracao.yml` é declaração, e passa pela revisão do Owner (CL
      ser nulos nele, até a média da P15. Medidos, com a proporção de `ticket_events`. O `is_closed` de
      `trusted.support_tickets` (`resolved` ou `closed`) não lê o `closed_at`, e a descrição dele já é
      compatível: não muda.
-4. **F27 — a reserva de estoque** (Q28): a reserva passa a ser de um SKU que está no carrinho ou no pedido dela;
+4. **F27 — a reserva de estoque** (Q28; não é a invariante 8, RVB5R-2-01): a reserva passa a ser de um SKU que está no carrinho ou no pedido dela;
    hoje `_reservas` (`generator/domains/estoque.py`) sorteia o par armazém × variante à parte, e só 12 das 4.200
    reservas da origem principal são de um item do próprio carrinho ou pedido (`bloco5r_f27_reservas_20261115.txt`).
-   O armazém continua saindo dos pares com movimento daquele SKU. O `draft` sai por consequência do F24.
+   O armazém continua saindo dos pares com movimento daquele SKU. O `draft` sai por consequência do F24. O
+   livro de estoque não muda; muda a projeção (o reservado e o disponível de `trusted.inventory_balances`), e
+   por ela a P12, que a auditoria repetida cobre (RVB5R-2-02). A relação nova vai ao Modelo de Dados §4 como
+   invariante própria, sem mudar o sentido da 8.
 5. **V4 — a correção-relâmpago do estoque** (Q26): hoje, quando uma saída não tem lastro, `_ordenar_e_versionar`
    (`generator/domains/estoque.py`, `AJU-CONFERENCIA`) cria um `adjustment_in` um minuto antes dela — 1.851
    ajustes em 14/11/2026, e 1.212 das 1.216 linhas de giro indefinido da P11. Vale para toda saída, não só a
@@ -1433,3 +1436,17 @@ Respondida no *commit* que contém esta entrada, com as decisões Q27 a Q29.
 | RVB5R-1-05 | bloqueante | O roteiro da v1.1.0 não se reaproveita só com os deltas: `geracao.json` existe, a H1 calibra num corte com 2.200 eventos do produtor, os pacotes citados são antigos | "A adaptação do ciclo de agora", escrita e revisada antes do primeiro comando destrutivo, com o que se preserva |
 | RVB5R-1-06 | ajuste | O `SHP-00000081` é `FK_ORPHAN` injetado; o critério de zero absoluto conflita com a falha deliberada | Critério: zero contradição sem explicação comprovada no lote novo; o F25 registra o caso |
 | RVB5R-1-07 | ajuste | As referências da auditoria leem sobretudo `analytics`, não `trusted` | Frase corrigida; as conferências de população entram na repetição |
+
+### Rodada 38 — Codex conta 1, sobre `012054a` (15/11/2026)
+
+Relatório em `codex1_bloco5r_r2.md`. **Nenhum bloqueio remanescente**: os sete achados da rodada 1 estão
+resolvidos no nível de plano, e a adaptação do ciclo pode esperar o fim, como o plano diz. Dois ajustes de texto
+no F27, respondidos no *commit* que contém esta entrada:
+
+| # | Veredito | Achado | Situação |
+|---|---|---|---|
+| RVB5R-2-01 | ajuste | O F27 atribuía à invariante 8 a regra de pertencer a um carrinho ou pedido; a 8 é a reserva encerrada fora do saldo reservado | Corrigido no F27 e no item 4 do Bloco 5R; a relação SKU → item vira invariante própria no Modelo de Dados §4, na implementação |
+| RVB5R-2-02 | ajuste | O efeito do F27 não é no livro de estoque, e sim na projeção reservado/disponível, que chega à P12 | Corrigido no F27 e no item 4; a auditoria repetida e as reconciliações cobrem o caminho |
+
+**A revisão do plano do Bloco 5R está fechada.** O que falta dele é do fim da fase: o ramo, as escolhas da V4 e do
+F22 com o Owner, a adaptação do ciclo revisada, o ciclo.

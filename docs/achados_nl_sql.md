@@ -418,9 +418,13 @@ inventário.
   produto `draft` e 323 de `discontinued`. A causa: `_reservas` (`generator/domains/estoque.py`) sorteia o
   par armazém × variante entre todos os que têm movimento e, à parte, o carrinho ou o pedido, sem ligar um
   ao outro.
-- **Efeito:** a reserva ocupa saldo de um item que ninguém pediu, e a invariante 8 (reserva sempre de um
-  carrinho ou de um pedido) vale na forma, não no conteúdo. A reserva não chega a `analytics` hoje; o
-  efeito está no saldo disponível da origem e no livro de estoque.
+- **Efeito:** a reserva ocupa saldo de um item que ninguém pediu. A `CHECK origem_unica` garante que ela
+  é de um carrinho **ou** de um pedido, não que o SKU seja de um item dele — é uma relação a mais, que não
+  é a invariante 8 (a reserva encerrada fora do saldo reservado, Modelo de Dados §4, que vale). O livro de
+  estoque não muda: as reservas nascem depois dos movimentos. O efeito está na projeção — o reservado e o
+  disponível de `trusted.inventory_balances`, pelas reservas `active` —, e chega à P12, que desconta o
+  reservado no filtro de reposição, no `is_stockout` e nos dias de cobertura. A tabela das reservas não
+  vira fato em `analytics` (revisão do Bloco 5R, RVB5R-2-01 e 02).
 - **Aqui**, pela decisão do Owner (Q28 do plano da base dos consumidores): a reserva passa a ser de um SKU
   do carrinho ou do pedido dela, no Bloco 5R, no fim da fase.
 
