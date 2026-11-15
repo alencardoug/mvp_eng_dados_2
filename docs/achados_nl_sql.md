@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 15/11/2026 (F22, achado ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 15/11/2026 (F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -352,6 +352,18 @@ inventário.
 - **Aqui**, pela decisão do Owner (Q17 do plano da base dos consumidores): o domínio do código diz que
   ele não tem significado de negócio neste dado e que o resultado está em `transaction_result`; nenhum
   número muda. Corrigir o gerador fica para uma regeneração futura, nas Pendências.
+
+### F23 — As tabelas das Perguntas de Negócio divergem das views · **Gravidade: média**
+
+- **Evidência** (revisão do desenho do Bloco 5, RVB5-2-02, conferida aqui em 15/11/2026): a tabela da P07
+  lista `cart_conversion_rate` e `abandoned_cart_value`, e as colunas da view são `cart_conversion_rate_pct`
+  e `abandoned_value_amount`; a da P08 aponta `fact_purchase_order_item`, e o CMV da view vem de
+  `fact_inventory_movement`; a da P11 ainda tem `quantity_on_hand`, que a ADR-0052 trocou pela média do
+  trimestre (`perguntas_de_negocio.md:129`, `:154`, `:195`).
+- **Efeito:** o pacote de metadados publica essas tabelas em `questions.*.facts` e `questions.*.measures`;
+  um portal, ou uma ferramenta, que procure a medida pelo nome não a acha, ou acha a fato errada.
+- **Aqui:** no Bloco 5, a tabela de cada pergunta passa a ser gerada da declaração das métricas
+  (`metricas.yml`), com os nomes físicos; o texto da pergunta fica à mão.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 

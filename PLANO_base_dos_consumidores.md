@@ -132,6 +132,7 @@ daqui. Entraram no plano, pela regra de entrada (Bloco 0, item 3):
 | F16 | "Data de referência do armazém" ambígua com `dim_warehouse` | N, G | `_analytics__models.yml:185` e outras sete | Bloco 3 |
 | L13 | O custo real da fase GCP entraria só no `mvp_eng_dados_1`, e os portais leem daqui (H2 do `gdados`) | G | `gdados/docs/alinhamento_entre_projetos.md` §4 | Em 16/11/2026, o custo entra também aqui, no mesmo dia ([Consumidores §7](docs/consumidores.md#7-o-gcp)) |
 | F22 | O `gateway_response_code` é sorteado sem relação com o resultado da transação (achado ao desenhar o Bloco 5, 15/11/2026) | N, G, B | Achados, F22; `generator/geracao.yml`, `payment_transactions` | Bloco 5, pela Q17: o domínio declara que não tem significado de negócio; o gerador, às Pendências no fechamento |
+| F23 | As tabelas das Perguntas de Negócio citam medidas e fatos que não são os das views (P07, P08, P11), e o pacote os publica em `questions` (revisão do desenho do Bloco 5, RVB5-2-02) | G, B | Achados, F23; `perguntas_de_negocio.md:129`, `:154`, `:195` | Bloco 5: a tabela vira trecho gerado do `metricas.yml` |
 
 ---
 
@@ -637,7 +638,8 @@ conferida (Q9-a). O texto das regras do F9 já existe em prosa desde o passo 1 d
 ganha a forma estruturada e o ADR (RVC-4-03).
 
 **O desenho, depois da rodada 6 de decisões (§6, Q15 a Q18, 15/11/2026)**, revisto pela rodada 1 da
-revisão do desenho (`codex1_bloco5_desenho_r1.md`, RVB5-1-01 a 07). Para revisão antes de implementar; o
+revisão do desenho (`codex1_bloco5_desenho_r1.md`, RVB5-1-01 a 07) e pela rodada 2 (`r2.md`, RVB5-2-01 a
+04). Para revisão antes de implementar; o
 ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
 
 **Parte A — os domínios (F7).**
@@ -661,8 +663,13 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
      não decide a nulidade (RVB5-1-07);
    - `impossible:` os valores do domínio que não podem aparecer **nesse papel**, com o motivo (os estados
      terminais no `from_status`, que a configuração do gerador já declara impossíveis): o teste os recusa;
-   - `not_observed:` os valores possíveis que o dado ainda não tem, com o motivo. Um valor do domínio que
-     não aparece em nenhuma ligação, e não está em `impossible` nem em `not_observed` dela, falha.
+   - `not_observed:` os valores possíveis que o dado ainda não tem **nessa coluna**, com o motivo.
+
+   A conta é **por ligação** (RVB5-2-03): os permitidos da coluna são o domínio menos os `impossible` dela;
+   o observado tem de caber neles; e cada permitido que a coluna não tem precisa estar no `not_observed`
+   dela — o `paid` presente em `fact_sales_order_item.order_status` não dispensa a justificativa no
+   `from_status`. Domínio declarado que nenhuma coluna liga também falha, salvo `reserved:` com o motivo,
+   que a revisão vê.
 
    Do catálogo e da ligação, o `make catalog` **deriva** na coluna o `meta.values` (o mapa, menos os
    impossíveis) e o `accepted_values` com exatamente esses valores. O derivado não se edita; o
@@ -696,13 +703,16 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
      quando é contagem distinta (`(source_system, order_id)`);
    - **métricas**: a razão ou a composição de medidas — a fórmula sobre os nomes das medidas, a escala (100),
      o arredondamento, e o que vale com denominador zero (nulo) ou medida ausente (zero);
-   - **views**: para cada uma das 16, o grão (coluna da view → expressão sobre os apelidos, a mesma em toda
-     fonte que a view usa), a **combinação** das fontes quando há mais de uma (como, e por quais colunas do
-     grão, com o que preenche o lado ausente), e o **papel de cada coluna**: grão, identidade, medida,
-     métrica ou referência.
+   - **views**: para cada uma das 16, o grão (coluna da view → expressão sobre os apelidos), o **grão de
+     agregação de cada fonte** — por padrão o grão inteiro; um subconjunto quando a fonte não tem a
+     coluna (as capturas da P10 por mês e meio, sem o motivo; os pedidos da P15 por mês e canal, sem a
+     categoria do chamado) —, a **combinação** das fontes (como, por quais colunas, com o que preenche o
+     lado ausente; a fonte de grão mais curto se repete em cada linha do grão mais longo que casa com
+     ela), e o **papel de cada coluna**: grão, identidade, medida, métrica ou referência (RVB5-2-01).
 
-   **O montador é fixo e pequeno**, e o ADR o descreve: para cada fonte da view, `select <grão>, <medidas>
-   from <fonte> where <filtros das medidas> group by <grão>`; as fontes combinadas pela regra declarada; as
+   **O montador é fixo e pequeno**, e o ADR o descreve: para cada fonte da view, `select <grão da fonte>,
+   <medidas> from <fonte> where <filtros das medidas> group by <grão da fonte>`; as fontes combinadas pela
+   regra declarada; as
    métricas calculadas por cima. Nenhuma regra de negócio vive no Python: o que não cabe nisso vai a
    `reference:` (item 7). Dois exemplos completos, a escrever no ADR e conferir na primeira entrega:
    - **P07, a razão simples**: fonte `fact_cart_event` com `dim_date` pela data de criação do carrinho e
@@ -711,7 +721,9 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
    - **P08, a composição entre fatos**: fonte de receita (`fact_sales_order_item`, filtro pedido realizado,
      categoria pela chave da fato) e fonte de CMV (`fact_inventory_movement`, filtro `is_sale`, categoria
      **pelo produto e pela origem**); combinação `full outer` por mês e categoria, com zero no lado
-     ausente; métricas lucro bruto e margem.
+     ausente; métricas lucro bruto e margem;
+   - **P10, o denominador de grão mais curto**: reembolsos por mês, meio e motivo; capturas por mês e meio;
+     a taxa de cada motivo sobre o capturado do mês e do meio.
 6. **A verificação, com dois números separados** (RVB5-1-04). O teste monta o SQL **só** da declaração e o
    compara com a view auditada, linha a linha (`except all` nos dois sentidos, num corte `REPEATABLE READ
    READ ONLY`). O resultado sai em dois números que não se somam: "**N de N** colunas de medida e métrica
@@ -721,7 +733,8 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
    do Bloco 1b e das conferências de população contra `trusted`, que não mudam.
    **As contraprovas**, alterando só o YAML carregado pelo montador, com view e referências intactas: tirar a
    **ligação** da medida da P02 ao filtro do pedido realizado; trocar a data da fonte da P07 (criação →
-   conversão); tirar uma chave da junção composta da P08; mudar o grão do denominador da P10; mudar a escala
+   conversão); tirar uma chave da junção composta da P08; mudar o grão de agregação das capturas da P10
+   (pôr o motivo, que elas não têm, ou tirar o meio); mudar a escala
    ou o arredondamento de uma métrica. Cada uma tem de divergir. E, nos defeitos históricos (o SQL compilado
    das versões defeituosas do F1, F2, P04 e P14, em `tests/auditoria/contraprova/`), a declaração correta
    tem de discordar da consulta defeituosa.
@@ -741,6 +754,16 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
    `make check` falha com o trecho atrasado. A prosa à mão fica com o porquê. O mesmo vale para o "como se
    conta" das Perguntas de Negócio: a regra vira trecho gerado, o porquê fica. O README do glossário ganha
    a convenção.
+
+   **As tabelas das Perguntas de Negócio** (RVB5-2-02). Cada pergunta tem a tabela Fatos · Medidas ·
+   Dimensões · View, que o pacote publica em `questions`. Nela, a pergunta pede e o contrato executável
+   responde, e as duas coisas se misturaram: o **F23** mostra a deriva (a P07 lista `cart_conversion_rate`
+   e `abandoned_cart_value`, que não são colunas; a P08 aponta `fact_purchase_order_item`, quando o CMV vem
+   de `fact_inventory_movement`; a P11 ainda tem `quantity_on_hand`, que a ADR-0052 trocou pela média). A
+   tabela passa a ser **trecho gerado** do `views` do YAML — as fatos das fontes, as medidas e métricas com
+   a aditividade, as dimensões das junções, a view —, e o texto da pergunta, que é o requisito, fica à mão.
+   O `questions` do pacote mantém o significado (o que cada pergunta lê), agora com os nomes físicos; a
+   mudança dos nomes entra em Consumidores §5 como mudança de valor.
 10. **No pacote** (RVB5-1-06). Os dois YAMLs entram nos insumos (`pacote.INSUMOS`, o digest e o carimbo do
     *build*, porque mudam o `.yml` do dbt), com a contraprova de mudar só um deles e o pacote ficar
     atrasado. `metrics` e `filters` (e as fontes, medidas e views que eles citam) entram como campos novos, no
@@ -763,10 +786,12 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
     medirem decide o mecanismo, e o ADR o registra.
 
 **Ordem.** A revisão deste desenho; a volta à V1 (item 11); as sondas (item 13); o ADR do formato, com os
-dois exemplos; a linha `prevista`; a Parte A; a Parte B. **A sequência, porque o `catalog` passa a escrever
-teste do dbt:** `make catalog` (escreve os `.yml` e os trechos) → `make dbt-build` (compila e roda os
-testes novos; o carimbo do *build*) → `make catalog` (estável: nenhuma mudança) → `make test` →
-`make catalog` → `make check-offline`. Depois, a revisão da implementação, a linha `feita` e os avisos. O
+três exemplos; a linha `prevista`; a Parte A; a Parte B. **A sequência, porque o `catalog` passa a escrever
+teste do dbt** (RVB5-2-04): o `make catalog` de hoje termina no pacote, que recusa o carimbo anterior aos
+derivados que ele acabou de escrever — a recusa é certa e fica. Por isso um alvo novo, `make catalog-derivados`,
+escreve os `.yml` e os trechos **sem** compor o pacote; e a sequência é `make catalog-derivados` →
+`make dbt-build` (compila e roda os testes novos; o carimbo) → `make catalog` (completo; os derivados
+estáveis, nenhuma mudança) → `make test` → `make catalog` → `make check-offline`. Depois, a revisão da implementação, a linha `feita` e os avisos. O
 aceite do declarativo — os dois catálogos — é do Owner (§5), separado da revisão técnica.
 
 ### Bloco 6 — as chaves declaradas (F10)
