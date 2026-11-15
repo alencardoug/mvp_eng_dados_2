@@ -687,7 +687,7 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
    remessa `lost` não tem entrega; o `returned` conta como pedido realizado; o membro desconhecido só
    aparece na chave substituta dele), um teste a confere. É o que achou o **F22**: o
    `gateway_response_code` é sorteado sem relação com `transaction_result`. Pela Q17, o domínio declara
-   isso, e corrigir o gerador fica para uma regeneração futura (Pendências, no fechamento). Antes de
+   isso até o ciclo do Bloco 5R, que corrige o gerador (Q26; antes, pela Q17, a correção ia às Pendências). Antes de
    escrever os significados, cada domínio é medido do mesmo jeito; o que se contradiz no dado vira F novo.
 
 **Parte B — as métricas (F9).**
@@ -809,6 +809,119 @@ estáveis, nenhuma mudança) → `make test` → `make catalog` → `make check-
   `config.meta.value_domain` vira um teste só, reconhecível. O ciclo até o pacote se mede no primeiro *build*.
 - **O ADR:** [ADR-0055](docs/adr/0055-dominios-e-metricas-declarados-uma-vez.md). Depois, a revisão da implementação, a linha `feita` e os avisos. O
 aceite do declarativo — os dois catálogos — é do Owner (§5), separado da revisão técnica.
+
+### Bloco 5R — a fila da regeneração e o ciclo, no fim da fase (F24 a F26, V4, F22)
+
+Pela Q21 a Q26 (§6, rodada 7). Os significados aceitos na Q19, medidos contra o dado, são desmentidos em três
+pontos, e o Owner decidiu corrigir o gerador em vez de declarar a ressalva; depois, que a regeneração é **uma
+só, no fim da fase**, e leva junto a V4 e o F22. **Para revisão antes de executar.**
+
+**Onde fica na ordem** (Q25). O ciclo roda **depois da Parte A, da Parte B e do Bloco 6, antes do
+fechamento**: as guardas da Parte A e as chaves do Bloco 6 ainda podem achar correções do gerador, e cada
+ciclo custa o roteiro inteiro (as fases A a G, o pacote de recuperação, a auditoria das 16 views, uma linha
+por view em Consumidores §5). As correções mudam a relação entre colunas, não quais valores cada coluna tem:
+as ligações da Parte A, medidas no dado de hoje, são medidas de novo no fim, e o que mudar se corrige na
+ligação. O catálogo se escreve agora, com os significados aceitos; até o ciclo, o dado ainda os contradiz
+nos pontos da fila, e por isso nenhum *commit* é marcado para os consumidores fixarem (Consumidores §6).
+
+**A fila.** Cada correção do gerador entra aqui com o achado, a causa no código e a invariante; o achado novo
+segue a regra de entrada do F22 (a evidência medida, o efeito, o que fazer aqui) e entra na fila sem esperar
+o fim. Hoje: F24, F25, F26, V4 e F22. **O código de cada correção e a invariante *offline* se escrevem
+antes do ciclo**, para a revisão do declarativo acontecer uma vez; **a medir antes do primeiro *commit*
+deles no `main`**: se algum teste compara a geração em memória com a origem carregada (o legado guarda o
+manifesto do lote), as correções esperam num ramo até o ciclo. Os testes do armazém que conferem as mesmas
+relações (item 4 da Parte A) falham no dado de hoje: ficam declarados com o achado da fila que os resolve, e
+uma guarda confere que a lista deles é exatamente a fila — nenhum teste some em silêncio, e nenhum fica
+pendente sem achado.
+
+**As correções.** São do declarativo (`generator/geracao.yml`) quando forem parâmetro, e do código do domínio
+quando forem processo; cada uma ganha a invariante que a guarda no teste do gerador.
+
+1. **F24 — quem compra e o que se vende** (Q21, Q23):
+   - o cliente `pending` ou `blocked` não tem pedido nem carrinho identificado: hoje o cliente sai de
+     `fonte.escolha(clientes)` no carrinho e no pedido de venda direta (`generator/domains/vendas.py`);
+   - o cliente `inactive` só tem pedido, e carrinho identificado, com data anterior aos 180 dias que
+     precedem o fim do período (`motor.fim`). A janela é a do glossário (`cliente_ativo.md`, `churn.md`),
+     mas o estado continua cadastral, e o `active` pode não ter comprado na janela;
+   - a variante de produto `draft` não entra em carrinho nem em pedido. O carrinho já usa só a variante
+     `is_active`, que nasce falsa no produto que não está `active` (`generator/domains/catalogo.py`); o
+     pedido usa todas (`vendas.py`) — é dali que sai a venda do `draft`;
+   - a variante de produto `discontinued` só vende antes dos 90 dias que precedem o fim do período;
+   - **a medir antes de aceitar:** quantos clientes e produtos ficam sem venda, e se a proporção de
+     referência dos pedidos (Geração §4) continua de pé. O que ela mudar volta ao Owner.
+2. **F25 — o extravio** (Q22): no laço de `remessas` (`generator/domains/logistica.py`), o extravio deixa
+   de sair da remessa sorteada como `delivered` e passa a valer para a remessa em trânsito de pedido
+   `shipped` — a regra que `_garantir_extravio` já declara. A taxa `extravio` continua a mesma, sobre a
+   nova base; o número de remessas `lost` é medido antes e depois. **A remessa do legado `returned` sem
+   evento de devolução** (`SHP-00000081`) é investigada antes de se corrigir: nas 107 do `retail` e nas
+   outras 3 do `legacy`, o evento existe. A causa pode ser o catálogo de falhas do legado; se for falha
+   declarada, não se corrige e o F25 o registra.
+3. **F26 — a reabertura e o encerramento** (Q22, Q24): em `_eventos` (`generator/domains/atendimento.py`),
+   o `reopened` vem sempre depois de um `resolved`, e o chamado reaberto termina `in_progress`; o
+   `closed_at` só é preenchido no `closed`, e o `resolved` fica com ele nulo — a resolução é o evento do
+   livro. O `is_closed` de `trusted.support_tickets` é regra do modelo (`resolved` ou `closed`) e não lê o
+   `closed_at`: ele não muda, e a descrição dele é conferida contra o significado aceito. O tempo até o
+   fechamento (`trusted.support_tickets`, a partir do `closed_at`) muda nos chamados `resolved`; o tempo
+   de resolução, que vem do evento, não.
+4. **V4 — a correção-relâmpago do estoque** (Q26): hoje, quando uma saída não tem lastro, o gerador cria
+   um `adjustment_in` um minuto antes dela (`generator/domains/estoque.py`, `AJU-CONFERENCIA`) — 1.851
+   ajustes em 14/11/2026, e 1.212 das 1.216 linhas de giro indefinido da P11. As duas formas que a V4
+   registra — repor por recebimento com antecedência, ou dimensionar o estoque inicial pela demanda — são
+   medidas em memória (quantos ajustes sobram, o giro indefinido, a proporção de referência dos
+   movimentos) e levadas ao Owner com a recomendação antes do código; a escolha é dele.
+5. **F22 — o código do adquirente** (Q26): o `gateway_response_code` deixa de ser sorteado na lista
+   (`generator/geracao.yml`, `payment_transactions`) e passa a seguir o `transaction_result`. O mapa
+   código → resultado e o significado de cada código, pela convenção do mercado, são proposta para o
+   aceite do Owner, como na Q19; até o ciclo, o catálogo declara o que a Q17 decidiu (sem significado de
+   negócio neste dado), e o ciclo troca a declaração junto com o dado.
+
+**O que fica fora, e a interação** (Q26). O diário da janela do GCP (Pendências V3, item 3,
+`gcp/mutacoes_da_janela.yml`) não entra: ele só roda no Cloud SQL. Mas as ocorrências aptas que ele escolhe
+saem da geração do fator `dev`, que as correções mudam; o ciclo roda `tests/test_janela_legado.py` e
+registra o que ele disser, sem corrigir o diário.
+
+**Os testes do gerador**, *offline*, antes de regerar: uma invariante por correção, no conjunto que o
+gerador já confere (Modelo de Dados §4) — nenhum pedido de cliente `pending`/`blocked`, nenhum item de
+`draft`, nenhum pedido de `inactive` e nenhuma venda de `discontinued` dentro da janela, nenhuma `lost` em
+pedido `delivered`, todo `reopened` depois de um `resolved`, `closed_at` nulo exatamente fora do `closed`. E
+as contraprovas: a correção desfeita faz a invariante falhar. As mesmas relações, no armazém, são os testes
+do item 4 da Parte A, que confere o significado contra o dado.
+
+**A regeneração** segue o [roteiro da v1.1.0](https://github.com/alencardoug/bi-como-codigo/blob/2b70224/docs/regeneration_runbook.md#4-the-cycle)
+(as fases A a G), que já aplicou um gerador corrigido às duas origens **mantendo a memória do armazém**, e a
+[Execução Local §3.2](docs/execucao_local.md#32-regerar-uma-origem-que-já-alimenta-streaming). O que muda em
+relação a ele:
+
+- **o repositório é este**, e o *checkout* é `~/Projetos/mvp_eng_dados_2`; o roteiro foi escrito para o
+  `mvp_eng_dados_1`, arquivado (D58). Cada alvo citado é conferido aqui antes de rodar, lendo a receita, sem
+  `make -n`;
+- **as duas origens**: o legado nasce do mesmo `pipeline` (`legacy/cli.py`), com semente e fator próprios, e
+  muda junto. A captura nova entra na época seguinte do livro retido (`make ledger-baseline`, ADR-0050), e as
+  transições de chave que a regeneração produz passam declaradas no oráculo da memória
+  (`REMOCOES_ACEITAS=`, `REAPARICOES_ACEITAS=`), como na v1.1.0 ([Origem Legada §4.3](docs/origem_legada.md));
+- **o que muda de conteúdo**, tabela a tabela nas duas origens, é medido antes de carregar (a geração em
+  memória, os *hashes* por tabela) e registrado, como o §2.13 da Capacidade fez;
+- **os comandos destrutivos** (`seed-data FORCE=1`, `seed-legacy FORCE=1`, `stream-down FORCE=1`,
+  `stream-reset-sink FORCE=1`, `dbt-build RESET=1`) rodam um de cada vez, com a confirmação do Owner antes de
+  cada um; a troca de ambientes pesados é a dos alvos guardados (R11), sem `FORCE=1` de memória;
+- **o pacote de recuperação** (fase G) é refeito, porque o de hoje guarda o dado que deixa de existir;
+- **nada no GCP** (Q14).
+
+**O que muda para quem consome.** Todas as 16 views mudam de valor: a correção do F24 muda quem compra e o
+que se vende, e daí todo o resto. Antes de regerar, um aviso fora do Git aos dois consumidores
+(`bi-como-codigo` e `gdados`), como os de 15/11. Depois, em Consumidores §5, uma linha `feita` por view, com
+o caso de antes e de depois, o *commit* e o `invocation_id` do *build*. O esquema não muda.
+
+**A conferência, depois.** A auditoria das 16 views (Bloco 1b) roda de novo sobre o dado novo — as
+referências calculam a partir de `trusted`, e não guardam número; as reconciliações entre camadas; os
+testes do item 4 da Parte A; `make test`; a DAG de ponta a ponta. As medidas do F24 a F26
+(`bloco5_significados_contra_o_dado_20261115.txt`) repetidas dão zero.
+
+**Critério de conclusão.** As invariantes novas passam no gerador e no armazém; as medidas de cada item da
+fila (F24 a F26, a V4, o F22 e o que entrar até o ciclo) dão zero, ou o que a forma escolhida da V4 deixar,
+declarado; as 16 views auditadas de novo; a reconciliação e a DAG verdes; o pacote de recuperação refeito; as 16
+linhas `feita` em Consumidores §5; a Geração de Dados atualizada com as regras novas, no lugar dela (§5,
+realismo e coerência).
 
 ### Bloco 6 — as chaves declaradas (F10)
 
@@ -949,6 +1062,20 @@ O levantamento das fontes está em `data/medicoes/base_consumidores/bloco5_fonte
 | **Q19** | F7: de onde sai o significado dos 14 domínios (59 valores) que o repositório só lista pelo nome, sem dizer o que cada valor quer dizer | **Proposta e aceite**: uma proposta de significado por valor, numa lista à parte, que o Owner revisa e aceita ou corrige de uma vez; a fonte no catálogo passa a ser esse aceite. Nada entra no catálogo antes dele. Era a recomendada | A tradução literal do nome, com a `CHECK` como fonte; deixar os 14 fora do catálogo como exceção "significado pendente" |
 | **Q20** | F7: o recorte das listas fechadas que não são `CHECK` nem *seed* de significado | **Vocabulário de filtro**: é domínio a lista que o consumidor usa para filtrar — a região, o nome do mês, o dia da semana, o grupo da categoria, os motivos do reembolso e da mudança de estado, a equipe do agente; vai à exclusão "código ou atributo de cadastro" a UF, o país ISO, a cidade, o tamanho, a cor, a embalagem e os códigos sequenciais. Era a recomendada | Só o que tem `CHECK` ou *seed* (a UF entra, o mês e a equipe saem); toda lista fechada, inclusive UF e país |
 
+**O aceite da Q19** (15/11/2026): o Owner aceitou a proposta inteira como estava
+(`data/medicoes/base_consumidores/bloco5_proposta_significados_20261115.md`), com o recorte da Q20 no fim dela.
+Medidos contra o dado (`bloco5_significados_contra_o_dado_20261115.txt`), três significados aceitos são
+desmentidos: F24 a F26.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q21** | F24: o estado do cliente e o do produto, sorteados sem relação com a venda | **Corrigir o gerador e regerar agora** (Bloco 5R). A recomendada era declarar a ressalva no domínio e levar a correção às Pendências, como na Q17 | Declarar a ressalva e ir às Pendências; trocar o significado por um rótulo cadastral sem efeito na compra |
+| **Q22** | F25 e F26: a remessa extraviada em pedido entregue; a reabertura sem resolução e o `resolved` com `closed_at` | **Corrigir o gerador e regerar agora** (Bloco 5R). A recomendada era a ressalva e as Pendências | Ressalva e Pendências; reescrever os significados para o que o dado mostra |
+| **Q23** | F24: o `inactive` e o `discontinued`, que também vendem e apontam para o estado de hoje | **Cadastral, coerente no tempo**: o estado continua cadastral e sorteado por peso, e o gerador o respeita no tempo — o cliente `inactive` só tem pedido antes dos 180 dias que precedem o fim do período, e o produto `discontinued` só vende antes dos 90 dias que o precedem. A venda antiga fica. `pending`, `blocked` e `draft` não vendem nunca. Era a recomendada. **Revista no mesmo dia:** a primeira resposta derivava o `inactive` e o `discontinued` da janela; o glossário (`cliente_ativo.md`) já define o cliente ativo pelo comportamento (`dim_customer.is_active`) e diz que o estado do cadastro é outra coisa, e a derivação o duplicaria. A recomendação anterior não tinha conferido o glossário | Derivar o estado da janela (a primeira resposta); corrigir só os três do F24, com ressalva nos outros dois; só `active` vende |
+| **Q24** | F26: como separar o `resolved` do `closed`, com só o `closed_at` no modelo | **`closed_at` só no `closed`**: o `resolved` fica com `closed_at` nulo, e a resolução é o evento `resolved` do livro. Era a recomendada | Os dois com `closed_at`, e o significado do `resolved` reescrito |
+| **Q25** | Quando regerar, se a Parte A, a Parte B e o Bloco 6 ainda podem achar outras correções do gerador | **Uma vez, no fim da fase**, revendo o "agora" da Q21 e da Q22: uma fila da regeneração no Bloco 5R, que recebe cada achado novo do gerador; o código e as invariantes *offline* de cada correção se fazem antes; o ciclo roda depois da Parte A, da Parte B e do Bloco 6, antes do fechamento. Nenhum *commit* marcado para os consumidores fixarem até lá. Era a recomendada | Regerar agora, só com a fila de hoje; regerar depois da Parte A |
+| **Q26** | O que entra na mesma regeneração, além do F24 a F26 | **A V4** (a correção-relâmpago do estoque, que a Q8 deixava para depois da fase) **e o F22** (o código do adquirente, que a Q17 levava às Pendências). **A V3 item 3** (o diário da janela do GCP) **fica na V3**: só roda no Cloud SQL, que a Q14 fechou, e o defeito é da escolha da mutação, não do realismo do dado; o plano registra a interação. As três eram as recomendadas | Só o F24 a F26; corrigir também a declaração do diário, sem prova no Cloud SQL |
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
@@ -970,8 +1097,12 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
    a definição (com o F5 e o texto do F9), a referência e a contraprova. Pela Q10-a, a D66 é
    perguntada antes do Bloco 4 (§3, "D66"), e a auditoria da P13 só conclui depois dela.
 5. Bloco 4.
-6. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs.
-7. Fechamento.
+6. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs. Dentro do Bloco 5, pela rodada 7
+   (Q21 a Q26): o catálogo dos domínios; a revisão do Bloco 5R por outro agente; o código e as invariantes
+   *offline* da fila; as ligações e as guardas da Parte A; a Parte B; depois, o Bloco 6.
+7. O ciclo da regeneração do Bloco 5R, com a fila inteira, e as ligações e as guardas medidas de novo sobre o
+   dado novo.
+8. Fechamento.
 
 **Estimativa:** não há. O G06 sozinho foi estimado em 2 a 3 h de escrita mais a revisão do Owner
 (planejado, não medido); os outros blocos não foram estimados.

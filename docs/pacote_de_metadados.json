@@ -91124,7 +91124,7 @@
       "tests/test_verificador_adr.py",
       "tests/test_vigencia_em_utc.py"
     ],
-    "inputs_sha256": "da4987388c114c04cd769def83d87d7b49794b23a838e1215984c9efea20e3ef",
+    "inputs_sha256": "9d75e18a0810d8dca765ddbab68d3dbf88cd1d438fe1814c8ac775d399e6950d",
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {

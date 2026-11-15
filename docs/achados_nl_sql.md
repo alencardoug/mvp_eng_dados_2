@@ -351,7 +351,9 @@ inventário.
   recusa errado. Foi o que o `nl_sql` declarou no F7 ("`51` é saldo insuficiente").
 - **Aqui**, pela decisão do Owner (Q17 do plano da base dos consumidores): o domínio do código diz que
   ele não tem significado de negócio neste dado e que o resultado está em `transaction_result`; nenhum
-  número muda. Corrigir o gerador fica para uma regeneração futura, nas Pendências.
+  número muda. **Revisto em 15/11/2026** (Q26): a correção do gerador entra na regeneração do Bloco 5R, no
+  fim da fase; o código passa a seguir o resultado, e o significado de cada código vira proposta para o
+  aceite do Owner. Até o ciclo, o domínio declara o que a Q17 decidiu.
 
 ### F23 — As tabelas das Perguntas de Negócio divergem das views · **Gravidade: média**
 
@@ -377,8 +379,9 @@ inventário.
 - **Efeito:** o significado aceito pelo Owner (Q19) — `pending` é cadastro não concluído, `blocked` é
   cliente impedido de comprar, `draft` é produto não publicado — é desmentido pelo próprio dado; quem
   filtra a venda pelo estado conclui que a empresa vende a quem não pode comprar.
-- **Aqui**, pela decisão do Owner (Q21 do plano da base dos consumidores): corrigir o gerador e regerar
-  as duas origens agora, no Bloco 5R; os números das views mudam.
+- **Aqui**, pela decisão do Owner (Q21 e Q23 do plano da base dos consumidores): corrigir o gerador e
+  regerar as duas origens, no Bloco 5R — uma regeneração só, no fim da fase (Q25); os números das views
+  mudam.
 
 ### F25 — A remessa extraviada aparece em pedido entregue · **Gravidade: média**
 
@@ -390,7 +393,8 @@ inventário.
   `returned` sem evento de devolução no livro de entrega: os eventos dela terminam em `delivered`.
 - **Efeito:** o pedido diz que chegou e nenhuma remessa dele chegou; a pontualidade e o ciclo de entrega
   (P13, P14) contam um pedido cuja entrega não existe.
-- **Aqui**, pela decisão do Owner (Q22): corrigir o gerador e regerar, no Bloco 5R.
+- **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
+  (Q25).
 
 ### F26 — O chamado é reaberto sem ter sido resolvido · **Gravidade: baixa**
 
@@ -402,7 +406,8 @@ inventário.
 - **Efeito:** a reabertura, que pelo significado aceito (Q19) é a de um chamado já resolvido, não tem o
   que reabrir; e o `resolved` não se distingue do `closed` pelo dado, embora o significado diga que ainda
   não foi fechado.
-- **Aqui**, pela decisão do Owner (Q22): corrigir o gerador e regerar, no Bloco 5R.
+- **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
+  (Q25).
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 

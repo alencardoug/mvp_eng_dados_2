@@ -277,7 +277,9 @@ venda.
 
 Corrigir é mudar o gerador (repor por recebimento com antecedência, ou dimensionar o estoque inicial
 pela demanda) e **regenerar as duas origens**, que é destrutivo e refaz todos os números conferidos.
-Decidido em 14/11/2026 (Q8): fica para depois da fase da base dos consumidores.
+Decidido em 14/11/2026 (Q8): fica para depois da fase da base dos consumidores. **Revisto em 15/11/2026**
+(Q26 do [plano](../PLANO_base_dos_consumidores.md)): entra na regeneração do Bloco 5R, no fim desta fase,
+junto do F24 a F26 e do F22; a forma da correção é escolha sua, com a medida das duas.
 
 *Efeito de não decidir:* o giro indefinido nesses pares, declarado na view e no glossário.
 
