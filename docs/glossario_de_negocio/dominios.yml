@@ -1,0 +1,608 @@
+# Os domínios de valores das colunas de `analytics` e `consumption`, declarados uma vez
+# (ADR-0055; Bloco 5, Parte A, do PLANO_base_dos_consumidores.md).
+#
+# É declaração: o Owner a revisa inteira (CLAUDE.md §5). Dela e da ligação de cada coluna
+# (`meta.value_domain`, no `.yml` escrito à mão), o `make catalog` deriva na coluna o `meta.values` e o
+# `accepted_values` (src/mvp_ed1/models/value_domains.py). O derivado não se edita.
+#
+# Forma:
+#   domains.<nome>.description   o que o domínio classifica, em português
+#   domains.<nome>.values        valor → {meaning, source}. O valor é sempre texto, entre aspas: o `00`
+#                                continua `00`. O nulo nunca é valor: o que ele quer dizer fica na
+#                                ligação (`null_meaning`).
+#   unknown_members.<dimensão>   os valores sentinela da linha do membro desconhecido, por coluna. Não
+#                                entram no domínio: a coluna da própria dimensão os herda, e a coluna
+#                                que os propaga declara `unknown_member: <dimensão>.<coluna>`.
+#
+# A fonte diz de onde o significado saiu. "Owner, aceite de 15/11/2026 (Q19)" é a proposta que o Owner
+# aceitou para os domínios que o repositório só listava pelo nome (rodada 7 do plano). Valor sem fonte
+# não entra: é pergunta ao Owner.
+#
+# Três significados aceitos são desmentidos pelo dado de hoje e esperam a regeneração do Bloco 5R:
+# `customer_status` e `product_status` (F24), o `lost` da remessa (F25), o `reopened` e o `resolved` do
+# chamado (F26). O `gateway_response_code` declara o que a Q17 decidiu até a mesma regeneração (F22).
+
+domains:
+
+  source_system:
+    description: Sistema que cadastrou o registro; entra na chave substituta (ADR-0021).
+    values:
+      "retail":
+        meaning: A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`.
+        source: Origem Legada §6; ADR-0021
+      "legacy":
+        meaning: A origem antiga, o banco legado, tratado e empilhado aos dados principais.
+        source: Origem Legada §6; ADR-0021
+
+  order_status:
+    description: Estado do pedido na máquina de estados do pedido.
+    values:
+      "pending":
+        meaning: Pedido criado e ainda não pago. Não é pedido realizado.
+        source: seed order_status_transitions (∅ → pending); glossário, receita_liquida.md
+      "paid":
+        meaning: Pagamento aprovado. É pedido realizado.
+        source: seed order_status_transitions (pending → paid); glossário, receita_liquida.md
+      "picking":
+        meaning: Pedido em separação no armazém. É pedido realizado.
+        source: seed order_status_transitions (paid → picking); glossário, receita_liquida.md
+      "shipped":
+        meaning: Pedido despachado do armazém. É pedido realizado.
+        source: seed order_status_transitions (picking → shipped); glossário, receita_liquida.md
+      "delivered":
+        meaning: Pedido entregue ao cliente. É pedido realizado.
+        source: seed order_status_transitions (shipped → delivered); glossário, receita_liquida.md
+      "returned":
+        meaning: Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato.
+        source: seed order_status_transitions (delivered → returned); glossário, receita_liquida.md
+      "cancelled":
+        meaning: Pedido cancelado antes do pagamento, depois de pago ou durante a separação. Não é pedido realizado. Estado terminal.
+        source: seed order_status_transitions (pending, paid e picking → cancelled); glossário, receita_liquida.md
+
+  order_change_reason:
+    description: Motivo registrado para uma mudança de estado do pedido.
+    values:
+      "Cancelado a pedido do cliente":
+        meaning: O próprio texto. Registrado na transição para `cancelled`.
+        source: generator/domains/vendas.py (_MOTIVOS); Q20
+      "Devolução dentro do prazo de arrependimento":
+        meaning: O próprio texto. Registrado na transição para `returned`.
+        source: generator/domains/vendas.py (_MOTIVOS); Q20
+
+  shipment_status:
+    description: Estado da remessa.
+    values:
+      "created":
+        meaning: Remessa criada para o pedido, ainda não separada.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "picking":
+        meaning: Itens em separação no armazém.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "dispatched":
+        meaning: Remessa expedida do armazém, ainda sem evento de trânsito; já baixa estoque.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "in_transit":
+        meaning: Remessa com a transportadora, a caminho.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "delivered":
+        meaning: Remessa entregue ao cliente.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "returned":
+        meaning: Remessa devolvida pelo cliente depois da entrega.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "lost":
+        meaning: Remessa extraviada durante o transporte; não tem entrega.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  cart_event_type:
+    description: Evento do ciclo de vida do carrinho. Não é o estado do carrinho, que usa `open` no lugar de `created`.
+    values:
+      "created":
+        meaning: Criação do carrinho.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "converted":
+        meaning: O carrinho virou pedido.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "abandoned":
+        meaning: O carrinho foi abandonado explicitamente, sem virar pedido; encerra o ciclo.
+        source: Owner, aceite de 15/11/2026 (Q19); glossário, carrinho_abandonado.md
+      "expired":
+        meaning: O carrinho passou da validade sem virar pedido; encerra o ciclo.
+        source: Owner, aceite de 15/11/2026 (Q19); glossário, carrinho_abandonado.md
+
+  customer_status:
+    description: Estado cadastral do relacionamento com o cliente. Não é o cliente ativo do glossário, que se mede pela compra (`dim_customer.is_active`).
+    values:
+      "active":
+        meaning: Cliente com relacionamento ativo; pode comprar.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "inactive":
+        meaning: Cliente sem relacionamento ativo, por iniciativa própria ou por falta de uso; o cadastro continua.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "blocked":
+        meaning: Cliente impedido de comprar por decisão da empresa.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "pending":
+        meaning: Cadastro iniciado e ainda não concluído ou confirmado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  product_status:
+    description: Estado do produto no catálogo.
+    values:
+      "draft":
+        meaning: Produto em preparação, ainda não publicado para venda.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "active":
+        meaning: Produto publicado e à venda.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "discontinued":
+        meaning: Produto retirado de linha; não é mais vendido, mas o histórico continua.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  payment_method_type:
+    description: Natureza do meio de pagamento.
+    values:
+      "credit_card":
+        meaning: Cartão de crédito.
+        source: generator/geracao.yml, payment_methods (o par código → nome)
+      "debit_card":
+        meaning: Cartão de débito.
+        source: generator/geracao.yml, payment_methods (o par código → nome)
+      "pix":
+        meaning: Pix.
+        source: generator/geracao.yml, payment_methods (o par código → nome)
+      "boleto":
+        meaning: Boleto bancário.
+        source: generator/geracao.yml, payment_methods (o par código → nome)
+      "wallet":
+        meaning: Carteira digital.
+        source: generator/geracao.yml, payment_methods (o par código → nome)
+      "voucher":
+        meaning: Vale-compra.
+        source: generator/geracao.yml, payment_methods (o par código → nome)
+
+  payment_transaction_type:
+    description: Operação financeira da transação de pagamento.
+    values:
+      "authorization":
+        meaning: Pedido de reserva do valor ao meio de pagamento; é a tentativa de autorização.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "capture":
+        meaning: Cobrança efetiva de valor autorizado; nunca excede o autorizado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "void":
+        meaning: Desfazimento de uma autorização que não foi capturada (pedido cancelado depois de pago).
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "refund":
+        meaning: Devolução ao cliente de valor já capturado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  payment_transaction_result:
+    description: Desfecho da transação de pagamento.
+    values:
+      "succeeded":
+        meaning: A operação foi aceita.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "failed":
+        meaning: A operação foi recusada.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "pending":
+        meaning: A operação aguarda resposta; ainda não foi aceita nem recusada.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  gateway_response_code:
+    description: Código de retorno do adquirente simulado. Sem significado de negócio neste dado (F22); o desfecho está em `transaction_result`.
+    values:
+      "00":
+        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
+        source: Q17; Achados, F22
+      "05":
+        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
+        source: Q17; Achados, F22
+      "51":
+        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
+        source: Q17; Achados, F22
+      "57":
+        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
+        source: Q17; Achados, F22
+      "91":
+        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
+        source: Q17; Achados, F22
+      "GW-OK":
+        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
+        source: Q17; Achados, F22
+      "GW-TIMEOUT":
+        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
+        source: Q17; Achados, F22
+
+  refund_status:
+    description: Estado do reembolso.
+    values:
+      "requested":
+        meaning: Reembolso pedido, ainda não decidido.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "completed":
+        meaning: Reembolso concluído; o valor voltou ao cliente.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "rejected":
+        meaning: Reembolso recusado; o valor não volta.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  refund_reason:
+    description: Motivo comercial do reembolso.
+    values:
+      "Produto com defeito":
+        meaning: O próprio texto.
+        source: generator/providers.py (_MOTIVOS_DE_REEMBOLSO); Q20
+      "Arrependimento em até 7 dias":
+        meaning: O próprio texto.
+        source: generator/providers.py (_MOTIVOS_DE_REEMBOLSO); Q20
+      "Entrega não realizada":
+        meaning: O próprio texto.
+        source: generator/providers.py (_MOTIVOS_DE_REEMBOLSO); Q20
+      "Divergência de item":
+        meaning: O próprio texto.
+        source: generator/providers.py (_MOTIVOS_DE_REEMBOLSO); Q20
+      "Cancelamento a pedido do cliente":
+        meaning: O próprio texto.
+        source: generator/providers.py (_MOTIVOS_DE_REEMBOLSO); Q20
+      "Sem motivo registrado":
+        meaning: A origem não informou o motivo. Só a view da P10 o escreve, no lugar do nulo; a fato guarda o nulo.
+        source: dbt/models/consumption/refund_rate_by_reason.sql; descrição da coluna
+
+  purchase_order_status:
+    description: Estado da ordem de compra.
+    values:
+      "draft":
+        meaning: Ordem em rascunho, ainda não enviada ao fornecedor.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "placed":
+        meaning: Ordem enviada ao fornecedor, sem recebimento concluído.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "partially_received":
+        meaning: Parte da quantidade pedida chegou em recebimento concluído.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "received":
+        meaning: Toda a quantidade pedida chegou em recebimento concluído.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "cancelled":
+        meaning: Ordem cancelada.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  inventory_movement_type:
+    description: Tipo controlado do movimento do livro de estoque; determina o sinal da quantidade.
+    values:
+      "purchase_receipt":
+        meaning: Entrada por recebimento de compra (quantidade positiva).
+        source: Modelo de Dados §5.3
+      "customer_return":
+        meaning: Entrada por devolução de cliente (quantidade positiva).
+        source: Modelo de Dados §5.3
+      "transfer_in":
+        meaning: Entrada por transferência entre armazéns (quantidade positiva); sempre em par com um `transfer_out`, pelo mesmo `correlation_id`.
+        source: Modelo de Dados §5.3
+      "adjustment_in":
+        meaning: Entrada por ajuste de inventário (quantidade positiva), sempre com motivo documentado.
+        source: Modelo de Dados §5.3
+      "sale_dispatch":
+        meaning: Saída por venda expedida (quantidade negativa).
+        source: Modelo de Dados §5.3
+      "supplier_return":
+        meaning: Saída por devolução ao fornecedor (quantidade negativa).
+        source: Modelo de Dados §5.3
+      "transfer_out":
+        meaning: Saída por transferência entre armazéns (quantidade negativa); sempre em par com um `transfer_in`, pelo mesmo `correlation_id`.
+        source: Modelo de Dados §5.3
+      "adjustment_out":
+        meaning: Saída por ajuste de inventário (quantidade negativa), sempre com motivo documentado.
+        source: Modelo de Dados §5.3
+
+  inventory_source_type:
+    description: Processo de negócio que originou o movimento de estoque.
+    values:
+      "purchase":
+        meaning: Recebimento de compra.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "sale":
+        meaning: Expedição de venda.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "return":
+        meaning: Devolução, de cliente ou ao fornecedor.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "transfer":
+        meaning: Transferência entre armazéns.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "adjustment":
+        meaning: Ajuste de inventário.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  sales_channel_type:
+    description: Natureza do canal de venda.
+    values:
+      "web":
+        meaning: Loja online.
+        source: Modelo de Dados §2.4; nome do canal em dim_sales_channel
+      "app":
+        meaning: Aplicativo.
+        source: Modelo de Dados §2.4; nome do canal em dim_sales_channel
+      "store":
+        meaning: Loja física.
+        source: Modelo de Dados §2.4; nome do canal em dim_sales_channel
+
+  carrier_service_level:
+    description: Modalidade de entrega da transportadora; o prazo prometido sai dela (promised_lead_time).
+    values:
+      "standard":
+        meaning: Entrega padrão, a mais lenta (ordem 1).
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "express":
+        meaning: Entrega expressa (ordem 2).
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "same_day":
+        meaning: Entrega no mesmo dia, a mais rápida (ordem 3).
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  discount_type:
+    description: Natureza do desconto do cupom.
+    values:
+      "percentage":
+        meaning: Desconto percentual; o `discount_value` é a porcentagem.
+        source: Dicionário de Dados, coupons.discount_value
+      "fixed":
+        meaning: Desconto de valor fixo; o `discount_value` é em moeda.
+        source: Dicionário de Dados, coupons.discount_value
+
+  campaign_objective:
+    description: Objetivo comercial da campanha.
+    values:
+      "acquisition":
+        meaning: Conquistar clientes novos.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "retention":
+        meaning: Manter os clientes atuais comprando.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "reactivation":
+        meaning: Trazer de volta clientes inativos.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "clearance":
+        meaning: Liquidar estoque.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  support_ticket_category:
+    description: Motivo do chamado; a chave natural de dim_support_category.
+    values:
+      "delivery":
+        meaning: Entrega — atraso, extravio ou problema na entrega.
+        source: seed support_categories
+      "payment":
+        meaning: Pagamento — falha, recusa ou cobrança indevida.
+        source: seed support_categories
+      "product":
+        meaning: Produto — defeito, divergência ou dúvida sobre o item.
+        source: seed support_categories
+      "return":
+        meaning: Devolução — pedido de devolução, troca ou arrependimento.
+        source: seed support_categories
+      "account":
+        meaning: Conta — acesso, dados cadastrais e preferências.
+        source: seed support_categories
+      "other":
+        meaning: Outros — contato que não se encaixa nas demais categorias.
+        source: seed support_categories
+
+  support_category_group:
+    description: Grupo que reúne categorias de chamado afins.
+    values:
+      "Logística":
+        meaning: Reúne a categoria Entrega (`delivery`).
+        source: seed support_categories
+      "Financeiro":
+        meaning: Reúne a categoria Pagamento (`payment`).
+        source: seed support_categories
+      "Catálogo":
+        meaning: Reúne a categoria Produto (`product`).
+        source: seed support_categories
+      "Pós-venda":
+        meaning: Reúne a categoria Devolução (`return`).
+        source: seed support_categories
+      "Cadastro":
+        meaning: Reúne a categoria Conta (`account`).
+        source: seed support_categories
+      "Geral":
+        meaning: Reúne a categoria Outros (`other`).
+        source: seed support_categories
+
+  ticket_event_type:
+    description: Natureza do evento no chamado.
+    values:
+      "created":
+        meaning: Abertura do chamado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "assigned":
+        meaning: Atribuição do chamado a um agente.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "message":
+        meaning: Mensagem trocada no chamado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "status_changed":
+        meaning: Mudança de estado do chamado sem ser resolução nem reabertura.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "resolved":
+        meaning: Resolução do chamado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "reopened":
+        meaning: Reabertura de um chamado já resolvido.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  ticket_priority:
+    description: Prioridade atribuída ao chamado.
+    values:
+      "low":
+        meaning: Prioridade baixa.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "normal":
+        meaning: Prioridade normal.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "high":
+        meaning: Prioridade alta.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "urgent":
+        meaning: Prioridade urgente, a mais alta.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  ticket_status:
+    description: Estado atual do chamado.
+    values:
+      "open":
+        meaning: Chamado aberto, ainda não em atendimento.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "in_progress":
+        meaning: Chamado em atendimento.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "waiting_customer":
+        meaning: Chamado aguardando resposta do cliente.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "resolved":
+        meaning: Chamado resolvido, ainda não fechado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+      "closed":
+        meaning: Chamado encerrado.
+        source: Owner, aceite de 15/11/2026 (Q19)
+
+  support_agent_team:
+    description: Equipe de atendimento à qual o agente pertence.
+    values:
+      "Entregas":
+        meaning: O próprio texto, a equipe de entregas.
+        source: generator/geracao.yml, support_agents.team; Q20
+      "Pagamentos":
+        meaning: O próprio texto, a equipe de pagamentos.
+        source: generator/geracao.yml, support_agents.team; Q20
+      "Produtos":
+        meaning: O próprio texto, a equipe de produtos.
+        source: generator/geracao.yml, support_agents.team; Q20
+      "Devoluções":
+        meaning: O próprio texto, a equipe de devoluções.
+        source: generator/geracao.yml, support_agents.team; Q20
+      "Cadastro":
+        meaning: O próprio texto, a equipe de cadastro.
+        source: generator/geracao.yml, support_agents.team; Q20
+
+  ibge_region:
+    description: Região do IBGE a que a unidade federativa pertence.
+    values:
+      "Norte":
+        meaning: Região Norte.
+        source: seed brazilian_states
+      "Nordeste":
+        meaning: Região Nordeste.
+        source: seed brazilian_states
+      "Centro-Oeste":
+        meaning: Região Centro-Oeste.
+        source: seed brazilian_states
+      "Sudeste":
+        meaning: Região Sudeste.
+        source: seed brazilian_states
+      "Sul":
+        meaning: Região Sul.
+        source: seed brazilian_states
+
+  month_name:
+    description: Nome do mês no calendário, em inglês, como o banco o escreve.
+    values:
+      "January":
+        meaning: Janeiro.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "February":
+        meaning: Fevereiro.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "March":
+        meaning: Março.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "April":
+        meaning: Abril.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "May":
+        meaning: Maio.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "June":
+        meaning: Junho.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "July":
+        meaning: Julho.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "August":
+        meaning: Agosto.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "September":
+        meaning: Setembro.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "October":
+        meaning: Outubro.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "November":
+        meaning: Novembro.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "December":
+        meaning: Dezembro.
+        source: calendário (dim_date, macro parte_da_data); Q20
+
+  day_of_week:
+    description: Nome do dia da semana no calendário, em inglês, como o banco o escreve.
+    values:
+      "Monday":
+        meaning: Segunda-feira.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "Tuesday":
+        meaning: Terça-feira.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "Wednesday":
+        meaning: Quarta-feira.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "Thursday":
+        meaning: Quinta-feira.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "Friday":
+        meaning: Sexta-feira.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "Saturday":
+        meaning: Sábado.
+        source: calendário (dim_date, macro parte_da_data); Q20
+      "Sunday":
+        meaning: Domingo.
+        source: calendário (dim_date, macro parte_da_data); Q20
+
+unknown_members:
+
+  dim_geography:
+    meaning: Geografia desconhecida — o cliente sem endereço de entrega principal aterrissa aqui, em vez de sair do recorte por região.
+    source: dbt/models/analytics/dim_geography.sql
+    columns:
+      country: "ZZ"
+      state_code: "ZZ"
+      state_name: "Desconhecido"
+      region: "Desconhecido"
+      city: "Desconhecido"
+
+  dim_sales_channel:
+    meaning: Canal desconhecido — o chamado que não nasceu de um pedido não tem canal. Não é de origem nenhuma.
+    source: dbt/models/analytics/dim_sales_channel.sql
+    columns:
+      source_system: "unknown"
+      sales_channel_natural_key: "-1"
+      sales_channel_code: "UNK"
+      sales_channel_name: "Sem canal"
+      channel_type: "unknown"
+
+  dim_support_agent:
+    meaning: Agente desconhecido — o evento cujo autor é o cliente, e o chamado que ainda não tem dono. Não é de origem nenhuma.
+    source: dbt/models/analytics/dim_support_agent.sql
+    columns:
+      source_system: "unknown"
+      support_agent_natural_key: "-1"
+      agent_code: "AGT-0000"
+      agent_first_name: "Sem"
+      agent_last_name: "agente"
+      agent_full_name: "Sem agente"
+      agent_email: "desconhecido@exemplo.invalid"
+      agent_team: "Desconhecido"

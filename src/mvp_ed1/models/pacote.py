@@ -68,6 +68,8 @@ INSUMOS = (
     # `models/` (`_convencoes.md`) também é texto publicado (RVB4-2-02).
     "dbt/**/*",
     "docs/glossario_de_negocio/*.md",
+    # Os catálogos do Bloco 5 (ADR-0055): estão em `docs-paths` e mudam o `.yml` do dbt (RVB5-1-06).
+    "docs/glossario_de_negocio/*.yml",
     "docs/pendencias.md",
     "docs/adr/README.md",
     "tests/auditoria/resultado.yml",
