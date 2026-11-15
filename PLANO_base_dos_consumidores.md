@@ -1146,6 +1146,12 @@ caracteres; a regra gerada do `metricas.yml`, de 140 a 560, mais uns 85 dos marc
 | **Q31** | Como se declara que medidas e métricas cada conceito cobre | **Uma seção `concepts:` no `metricas.yml`**: arquivo do conceito → medidas e métricas. Os 7 conceitos de dimensão ou de view por referência ficam só com a prosa. Era a recomendada | `concepts:` em cada medida e métrica |
 | **Q32** | Onde o "como se conta" das Perguntas de Negócio vira trecho gerado | **Em toda pergunta montada** (10 views): a regra gerada abaixo da tabela — a data, os filtros e a combinação; o parágrafo à mão fica com o porquê; as 6 por referência dizem que são conferidas por referência. Era a recomendada | Só nas que já têm o parágrafo (P10, P15) |
 
+### Rodada 9 — da revisão da implementação da Parte B: respondida em 15/11/2026
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q33** | RVB5B-1-02: o pacote publica as medidas e os filtros, mas não como cada view os monta (o grão, o grão de cada fonte, a combinação); trocar `full` por `left` na P08 muda o número e não o pacote | **Uma chave nova, `view_rules`**, por view (`consumption.x`): a pergunta, o grão, as fontes, a combinação, o papel de cada coluna e a referência. Antes, a linha `prevista` de Consumidores §5 a anuncia. Era a recomendada | Dentro de `questions`; não publicar a montagem e corrigir a `prevista` |
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
