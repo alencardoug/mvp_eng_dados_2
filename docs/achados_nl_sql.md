@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 15/11/2026 (F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 15/11/2026 (F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -364,6 +364,45 @@ inventário.
   um portal, ou uma ferramenta, que procure a medida pelo nome não a acha, ou acha a fato errada.
 - **Aqui:** no Bloco 5, a tabela de cada pergunta passa a ser gerada da declaração das métricas
   (`metricas.yml`), com os nomes físicos; o texto da pergunta fica à mão.
+
+### F24 — O estado do cliente e o do produto não têm relação com a venda · **Gravidade: média**
+
+- **Evidência** (medida no armazém local em 15/11/2026, ao medir os significados do Bloco 5 contra o dado):
+  dos pedidos realizados, 165 são de cliente `pending` e 150 de cliente `blocked`, na versão da dimensão
+  que a fato aponta; dos itens de pedido realizado, 51 são de produto `draft` e 96 de produto
+  `discontinued`. Nenhum cliente nem produto tem mais de uma versão, então o estado já era esse na venda.
+  As duas origens têm o caso (`retail`: 161 e 143 pedidos, 48 e 77 itens; `legacy`: 4 e 7, 3 e 19). A
+  causa: o gerador sorteia o estado por peso (`generator/geracao.yml`, `customers` e `products`) e escolhe
+  o cliente e a variante do pedido entre todos (`generator/domains/vendas.py`), sem olhar o estado.
+- **Efeito:** o significado aceito pelo Owner (Q19) — `pending` é cadastro não concluído, `blocked` é
+  cliente impedido de comprar, `draft` é produto não publicado — é desmentido pelo próprio dado; quem
+  filtra a venda pelo estado conclui que a empresa vende a quem não pode comprar.
+- **Aqui**, pela decisão do Owner (Q21 do plano da base dos consumidores): corrigir o gerador e regerar
+  as duas origens agora, no Bloco 5R; os números das views mudam.
+
+### F25 — A remessa extraviada aparece em pedido entregue · **Gravidade: média**
+
+- **Evidência** (a mesma medida): 13 remessas `lost` estão em pedido `delivered`; em 9 delas o pedido não
+  tem nenhuma remessa entregue. Todas são do `retail`. A causa: o laço de `remessas`
+  (`generator/domains/logistica.py`) troca por `lost` a remessa sorteada como `delivered` — o contrário do
+  que a *docstring* de `_garantir_extravio`, logo abaixo, diz evitar ("não de uma entregue, que seria
+  contradição com o estado do pedido"). À parte, uma remessa do `legacy` (`SHP-00000081`) está
+  `returned` sem evento de devolução no livro de entrega: os eventos dela terminam em `delivered`.
+- **Efeito:** o pedido diz que chegou e nenhuma remessa dele chegou; a pontualidade e o ciclo de entrega
+  (P13, P14) contam um pedido cuja entrega não existe.
+- **Aqui**, pela decisão do Owner (Q22): corrigir o gerador e regerar, no Bloco 5R.
+
+### F26 — O chamado é reaberto sem ter sido resolvido · **Gravidade: baixa**
+
+- **Evidência** (a mesma medida): os 14 chamados com evento `reopened` não têm evento `resolved` antes
+  dele, e todos estão `in_progress`; e o chamado `resolved` tem `closed_at` preenchido, como o `closed`
+  (`is_closed` verdadeiro nos dois). Todos são do `retail`. A causa: `_eventos`
+  (`generator/domains/atendimento.py`) acrescenta o `reopened` ao chamado em andamento sem a resolução
+  anterior, e o `closed_at` é preenchido para os dois estados de `_ENCERRADOS`.
+- **Efeito:** a reabertura, que pelo significado aceito (Q19) é a de um chamado já resolvido, não tem o
+  que reabrir; e o `resolved` não se distingue do `closed` pelo dado, embora o significado diga que ainda
+  não foi fechado.
+- **Aqui**, pela decisão do Owner (Q22): corrigir o gerador e regerar, no Bloco 5R.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
