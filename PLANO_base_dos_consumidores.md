@@ -791,7 +791,23 @@ teste do dbt** (RVB5-2-04): o `make catalog` de hoje termina no pacote, que recu
 derivados que ele acabou de escrever — a recusa é certa e fica. Por isso um alvo novo, `make catalog-derivados`,
 escreve os `.yml` e os trechos **sem** compor o pacote; e a sequência é `make catalog-derivados` →
 `make dbt-build` (compila e roda os testes novos; o carimbo) → `make catalog` (completo; os derivados
-estáveis, nenhuma mudança) → `make test` → `make catalog` → `make check-offline`. Depois, a revisão da implementação, a linha `feita` e os avisos. O
+estáveis, nenhuma mudança) → `make test` → `make catalog` → `make check-offline`.
+
+**Feito em 15/11/2026, antes da implementação:**
+
+- **A volta à V1, lote 3** (item 11): o escritor novo (`models/value_domains.py`) só edita o `.yml` em bloco e
+  recusa o `meta` e o `data_tests` em linha, como o item 6 pede (medido); não toca a guarda do fuso (item 7)
+  nem a fonte de pacote (item 8), e não acrescenta macro nem muda o `dbt_project.yml` (item 9). A lista da V1
+  segue inteira.
+- **As sondas** (item 13), em `tests/test_dominios_de_valores.py`, 14 testes: o `00` continua texto; o nulo fica
+  fora do mapa e decide o `not_null`, e o `not_null` à mão com `null_meaning` é recusado; o `accepted_values`
+  à mão é substituído sem duplicar; duas gerações não mudam nada; o domínio alterado troca a subárvore inteira;
+  a ligação removida leva o derivado e preserva o que é à mão; a forma em linha é recusada; o significado com
+  quebra de linha e dois-pontos volta igual; a linha vazia do fim do bloco fica fora dele (achado da sonda,
+  corrigido); o catálogo recusa o código sem aspas e a chave repetida. E um `dbt parse` numa cópia do projeto:
+  o `meta.values` chega ao *manifest* com `"00"` como texto, e o `accepted_values` com `arguments` e
+  `config.meta.value_domain` vira um teste só, reconhecível. O ciclo até o pacote se mede no primeiro *build*.
+- **O ADR:** [ADR-0055](docs/adr/0055-dominios-e-metricas-declarados-uma-vez.md). Depois, a revisão da implementação, a linha `feita` e os avisos. O
 aceite do declarativo — os dois catálogos — é do Owner (§5), separado da revisão técnica.
 
 ### Bloco 6 — as chaves declaradas (F10)

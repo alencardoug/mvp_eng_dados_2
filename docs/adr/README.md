@@ -91,6 +91,7 @@ decisão.
 | [0052](0052-giro-pelo-estoque-medio-do-trimestre.md) | Calcular o giro pelo estoque médio do trimestre, a custo médio móvel | Aceita | — (Q2 e Q8 do `PLANO_base_dos_consumidores.md`) |
 | [0053](0053-fato-no-grao-da-remessa.md) | Medir a pontualidade numa fato no grão da remessa | Aceita | D66 |
 | [0054](0054-procedencia-do-armazem-no-log-de-execucao.md) | Provar a procedência do armazém pelo log de execução do dbt | Aceita | L5 do plano da base dos consumidores |
+| [0055](0055-dominios-e-metricas-declarados-uma-vez.md) | Declarar uma vez os domínios de valores e as métricas, e derivar o resto | Aceita | Q3 e Q15 a Q18 do plano da base dos consumidores |
 
 ---
 
