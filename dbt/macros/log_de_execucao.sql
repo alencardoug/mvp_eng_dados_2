@@ -10,8 +10,8 @@
 
     Só os comandos que escrevem o armazém registram: `build`, `run`, `seed`, `snapshot` (e o `retry` deles,
     que herda o comando). `full_build` é **medido**: os resultados executados cobrem todo nó do grafo
-    (modelos, *seeds*, *snapshots*, testes) **e** todo teste de unidade habilitado, que o dbt guarda numa
-    coleção à parte, `graph.unit_tests` (RVL5I-1-01). O `retry`, o `--select` e o
+    (modelos, *seeds*, *snapshots*, testes) **e** todo teste de unidade e toda função habilitados, que o
+    dbt guarda em coleções à parte, `graph.unit_tests` e `graph.functions` (RVL5I-1-01, RVL5I-2-01). O `retry`, o `--select` e o
     `--exclude-resource-type unit_test` não cobrem (RVL5-2-01). O commit e a
     sujeira vêm do ambiente que o `CARIMBO_ANTES` do `Makefile` exporta; sem ele (a DAG), ficam nulos.
 -#}
@@ -57,9 +57,11 @@
         {%- for no in graph.nodes.values() if no.resource_type in ['model', 'seed', 'snapshot', 'test'] -%}
             {%- if no.unique_id not in executados -%}{%- do faltam.append(no.unique_id) -%}{%- endif -%}
         {%- endfor -%}
-        {#- os testes de unidade não estão em `graph.nodes` (RVL5I-1-01) -#}
-        {%- for unidade in graph.get('unit_tests', {}).values() -%}
-            {%- if unidade.unique_id not in executados -%}{%- do faltam.append(unidade.unique_id) -%}{%- endif -%}
+        {#- os testes de unidade e as funções não estão em `graph.nodes` (RVL5I-1-01, RVL5I-2-01) -#}
+        {%- for colecao in ['unit_tests', 'functions'] -%}
+            {%- for outro in graph.get(colecao, {}).values() -%}
+                {%- if outro.unique_id not in executados -%}{%- do faltam.append(outro.unique_id) -%}{%- endif -%}
+            {%- endfor -%}
         {%- endfor -%}
         {%- set integral = flags.WHICH == 'build' and faltam | length == 0 and not flags.EMPTY -%}
         {%- set reprovou = contagem.keys() | select('in', ['error', 'fail', 'runtime error', 'skipped', 'partial success']) | list -%}

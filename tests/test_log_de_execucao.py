@@ -44,7 +44,8 @@ def _fecho(resultados: list[tuple[str, str]], comando: str = "build", vazio: boo
     no = lambda uid, tipo: {"unique_id": uid, "resource_type": tipo}           # noqa: E731
     grafo = {"nodes": {u: no(u, tipo) for u, tipo in (("model.p.m", "model"), ("seed.p.s", "seed"),
                                                      ("test.p.t", "test"), ("operation.p.h", "operation"))},
-             "unit_tests": {"unit_test.p.m.u": no("unit_test.p.m.u", "unit_test")}}
+             "unit_tests": {"unit_test.p.m.u": no("unit_test.p.m.u", "unit_test")},
+             "functions": {"function.p.f": no("function.p.f", "function")}}
     ambiente = jinja2.Environment(extensions=["jinja2.ext.do"])
     modulo = ambiente.from_string(fonte).make_module({
         "escreve": True, "graph": grafo, "invocation_id": "i", "tojson": json.dumps,
@@ -55,9 +56,11 @@ def _fecho(resultados: list[tuple[str, str]], comando: str = "build", vazio: boo
 
 def test_o_fecho_exige_tambem_os_testes_de_unidade_do_grafo() -> None:
     """RVL5I-1-01: `--exclude-resource-type unit_test` executa tudo menos as unidades — não é integral."""
-    todos = [("model.p.m", "success"), ("seed.p.s", "success"), ("test.p.t", "pass"), ("unit_test.p.m.u", "pass")]
+    todos = [("model.p.m", "success"), ("seed.p.s", "success"), ("test.p.t", "pass"), ("unit_test.p.m.u", "pass"),
+             ("function.p.f", "success")]
     assert "full_build = true" in _fecho(todos)
     assert "full_build = false" in _fecho([r for r in todos if not r[0].startswith("unit_test.")])
+    assert "full_build = false" in _fecho([r for r in todos if not r[0].startswith("function.")])   # RVL5I-2-01
     assert "full_build = false" in _fecho([r for r in todos if r[0] != "test.p.t"])
     assert "full_build = false" in _fecho(todos, comando="run")
     assert "full_build = false" in _fecho(todos, vazio=True)
@@ -385,3 +388,33 @@ def test_a_restauracao_da_memoria_conclui_e_preserva_o_log_e_a_ordem(armazem, tm
     _linha(armazem)
     with armazem.connect() as conexao:                                   # a identidade continua a do armazém
         assert conexao.execute(text(f"select max(sequence) from {governance.LOG}")).scalar_one() == log[-1][1] + 1
+
+
+@pytest.mark.parametrize("quantos, desde, codigo, diz", [
+    (40, None, 0, "a listagem trouxe todos"),
+    (100, None, 1, "nada se conclui"),
+    (100, "2026-11-01T00:00:00Z", 1, "nada se conclui"),             # o instante é anterior ao que ela alcança
+    (100, "2026-11-15T00:00:00Z", 0, "nenhum job em curso desde"),
+    (100, "2026-11-15 00:41:21.950938+00:00", 0, "nenhum job em curso desde"),   # como o psql escreve
+])
+def test_a_conferencia_dos_ativos_so_conclui_com_a_listagem_que_alcanca(monkeypatch, capsys, quantos, desde,
+                                                                        codigo, diz) -> None:
+    """RVL5I-2-02: um job antigo em curso pode estar fora dos 100 mais recentes; a página cheia não prova nada,
+    salvo se alcança o instante de abertura da linha que se quer abandonar."""
+    from mvp_ed1 import airbyte
+
+    terminais = [{"jobId": i, "status": "succeeded", "startTime": f"2026-11-{10 + i % 5:02d}T12:00:00Z"}
+                 for i in range(quantos)]
+    monkeypatch.setattr(airbyte, "token", lambda: "jwt")
+    monkeypatch.setattr(airbyte, "jobs", lambda jwt, limite=100: {"data": terminais[:limite]})
+    assert airbyte.main(["ativos"] + (["--desde", desde] if desde else [])) == codigo
+    assert diz in capsys.readouterr().out
+
+
+def test_a_conferencia_dos_ativos_recusa_com_job_em_curso(monkeypatch, capsys) -> None:
+    from mvp_ed1 import airbyte
+
+    monkeypatch.setattr(airbyte, "token", lambda: "jwt")
+    monkeypatch.setattr(airbyte, "jobs", lambda jwt, limite=100: {"data": [{"jobId": 1, "status": "running"}]})
+    assert airbyte.main(["ativos", "--desde", "2000-01-01T00:00:00Z"]) == 1
+    assert "em curso" in capsys.readouterr().out

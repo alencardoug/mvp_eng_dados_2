@@ -586,8 +586,8 @@ sync-airbyte: require-env require-abctl ## Sincroniza oltp -> raw; RESET=1 desca
 		$(if $(filter 1,$(RESET)),.venv/bin/python -m mvp_ed1.airbyte reset &&) \
 		.venv/bin/python -m mvp_ed1.airbyte sync
 
-airbyte-ativos: require-abctl ## Lista os jobs do Airbyte local em curso, de qualquer conexão; falha se houver (antes do governance-abandonar de um airbyte_sync)
-	@$(CREDENCIAIS); .venv/bin/python -m mvp_ed1.airbyte ativos
+airbyte-ativos: require-abctl ## Lista os jobs do Airbyte local em curso, de qualquer conexão; falha se houver, ou se a listagem não alcançar DESDE= (antes do governance-abandonar de um airbyte_sync)
+	@$(CREDENCIAIS); .venv/bin/python -m mvp_ed1.airbyte ativos $(if $(DESDE),--desde "$(DESDE)")
 
 sync-legacy: require-env require-abctl ## Captura o legado -> raw_legacy e a certifica (ADR-0044); cada execução acrescenta um snapshot; JOB_EM= grava o jobId
 	@# Sem RESET: o modo é `full_refresh_append` (ADR-0037), e descartar o

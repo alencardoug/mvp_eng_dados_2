@@ -164,6 +164,32 @@ def jobs(jwt: str, limite: int = 100) -> Any:
     return _chamar(caminho_dos_jobs(limite), jwt)
 
 
+#: Quantos *jobs* a conferência `ativos` lista, os mais recentes primeiro.
+JOBS_DA_LISTAGEM = 100
+
+
+def _instante(valor: Any):
+    import datetime as dt
+
+    if isinstance(valor, (int, float)):
+        return dt.datetime.fromtimestamp(valor, dt.timezone.utc)
+    instante = dt.datetime.fromisoformat(str(valor).replace("Z", "+00:00").replace(" ", "T", 1))
+    return instante if instante.tzinfo else instante.replace(tzinfo=dt.timezone.utc)
+
+
+def mais_antigo_se_cheia(listagem: Any, limite: int):
+    """`None` se a listagem trouxe tudo (veio com menos que `limite`); senão, o início do mais antigo dela.
+
+    Uma listagem cheia sem nenhum início legível também não prova nada: devolve o instante máximo."""
+    import datetime as dt
+
+    dados = (listagem or {}).get("data", [])
+    if len(dados) < limite:
+        return None
+    inicios = [_instante(j["startTime"]) for j in dados if j.get("startTime")]
+    return min(inicios) if inicios else dt.datetime.max.replace(tzinfo=dt.timezone.utc)
+
+
 def em_curso(listagem: Any) -> list[dict]:
     """Os *jobs* que ainda não terminaram, de qualquer conexão (RVT-1-04).
 
@@ -343,6 +369,11 @@ def main(argv: list[str] | None = None) -> int:
         help="mede a origem legada antes do job e confere origem e bruto depois (ADR-0044)",
     )
     parser.add_argument(
+        "--desde",
+        metavar="INSTANTE",
+        help="com `ativos`: a listagem precisa alcançar este instante para concluir que nada está em curso",
+    )
+    parser.add_argument(
         "--job-em",
         metavar="ARQUIVO",
         help="grava o jobId da sincronização concluída — é como o passo 9 da restauração o recebe",
@@ -357,11 +388,26 @@ def main(argv: list[str] | None = None) -> int:
             print(workspace(jwt))
             return 0
         if args.comando == "ativos":
-            ativos = em_curso(jobs(jwt))
+            listagem = jobs(jwt, JOBS_DA_LISTAGEM)
+            ativos = em_curso(listagem)
             for item in ativos:
                 print(f"  job {item.get('jobId')}: {item.get('status', '?')} · conexão {item.get('connectionId')}")
-            print("airbyte: nenhum job em curso" if not ativos else f"ERRO: {len(ativos)} job(s) do Airbyte em curso")
-            return 1 if ativos else 0
+            if ativos:
+                print(f"ERRO: {len(ativos)} job(s) do Airbyte em curso")
+                return 1
+            # A ausência na página não prova ausência global (RVL5I-2-02): a listagem traz os mais
+            # recentes, e um job antigo em curso pode estar fora dela.
+            antigo = mais_antigo_se_cheia(listagem, JOBS_DA_LISTAGEM)
+            if antigo is None:
+                print("airbyte: nenhum job em curso (a listagem trouxe todos)")
+                return 0
+            if args.desde and antigo <= _instante(args.desde):
+                print(f"airbyte: nenhum job em curso desde {args.desde} (a listagem vai até {antigo.isoformat()})")
+                return 0
+            print(f"ERRO: nenhum em curso entre os {JOBS_DA_LISTAGEM} mais recentes, que só vão até "
+                  f"{antigo.isoformat()}" + (f", depois de {args.desde}" if args.desde else "")
+                  + "; um job mais antigo não aparece, e nada se conclui. Passe DESDE=<started_at da linha aberta>")
+            return 1
         connection_id = conexao(args.connection, jwt)
         if args.comando == "status":
             print(f"{args.connection}: {connection_id}")
