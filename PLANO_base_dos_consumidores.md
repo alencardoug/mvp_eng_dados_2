@@ -1196,3 +1196,14 @@ Consumidores §3 digam que o BI a lê na transação de captura. Nenhuma das dez
 implementação o pegou: as sondas de acesso conferiam a política, e a política não tinha a view. O Owner
 decidiu conceder ao `analyst` só a view, sem ADR; medido com o login real, a view lê e as tabelas de
 `governance` continuam negadas.
+
+### Rodadas 34 a 36 — Codex conta 1, sobre o desenho do Bloco 5 (15/11/2026)
+
+Relatórios em `codex1_bloco5_desenho_r1.md` a `r3.md`; objeto inicial `3794424` (o desenho com as decisões
+Q15 a Q18 e o F22). O inventário medido dos domínios está em `bloco5_inventario_dominios_20261115.txt`.
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 34 | `8800ec3` | 1 bloqueante, 6 ajustes (RVB5-1-01 a 07) | O contrato executável das métricas: fontes com junções e data, filtros, medidas, métricas e views com papel de cada coluna, montador fixo; cobertura dos domínios por todas as colunas físicas e membros desconhecidos; dois números separados; trecho gerado para o texto curto; os YAMLs nos insumos; as sondas antes do ADR |
+| 35 | `6ab3790` | 4 ajustes (RVB5-2-01 a 04) | Grão de agregação por fonte; a tabela de cada pergunta gerada do YAML (o F23); cobertura de valores por ligação; o alvo `catalog-derivados` |
+| 36 | — | nenhum | **A revisão do desenho do Bloco 5 está fechada.** |
