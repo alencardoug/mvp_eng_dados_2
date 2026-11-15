@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 15/11/2026 (F22, achado ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -338,6 +338,20 @@ inventário.
   o pedido com item aceito, ao lado da receita do mesmo item. A receita do pedido de itens rejeitados
   não é conhecida, e contá-lo com receita zero baixaria o ticket médio da P02. A conferência de
   população da P02 declara a exceção.
+
+### F22 — O código de retorno do adquirente não tem relação com o resultado · **Gravidade: média**
+
+- **Evidência** (medida no armazém local em 15/11/2026, ao desenhar o Bloco 5): o gerador sorteia o
+  `gateway_response_code` na lista `00`, `05`, `51`, `57`, `91`, `GW-OK`, `GW-TIMEOUT`
+  (`generator/geracao.yml`, `payment_transactions`), sem olhar o resultado. Em
+  `fact_payment_transaction`, o `51` — saldo insuficiente, pela convenção do mercado — aparece em 520
+  autorizações aprovadas, o `00` em 30 recusadas, e o `GW-TIMEOUT` em 467 capturas bem-sucedidas; a
+  distribuição dos resultados é a mesma para todo código, dentro da variação do sorteio.
+- **Efeito:** uma ferramenta, ou uma pessoa, que leia o código pelo significado convencional explica a
+  recusa errado. Foi o que o `nl_sql` declarou no F7 ("`51` é saldo insuficiente").
+- **Aqui**, pela decisão do Owner (Q17 do plano da base dos consumidores): o domínio do código diz que
+  ele não tem significado de negócio neste dado e que o resultado está em `transaction_result`; nenhum
+  número muda. Corrigir o gerador fica para uma regeneração futura, nas Pendências.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 

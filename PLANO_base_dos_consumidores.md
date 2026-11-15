@@ -131,6 +131,7 @@ daqui. Entraram no plano, pela regra de entrada (Bloco 0, item 3):
 | F15 | Descrições que apontam para o que não está na `analytics` (`order_status_history`, seções de documento, invariantes, ADRs) | N, G | `_analytics__models.yml:667`, `:1878`, `:2105` e outras | Bloco 3: a regra no lugar da referência, no texto que vai ao BigQuery (o curto do F4) |
 | F16 | "Data de referência do armazém" ambígua com `dim_warehouse` | N, G | `_analytics__models.yml:185` e outras sete | Bloco 3 |
 | L13 | O custo real da fase GCP entraria só no `mvp_eng_dados_1`, e os portais leem daqui (H2 do `gdados`) | G | `gdados/docs/alinhamento_entre_projetos.md` §4 | Em 16/11/2026, o custo entra também aqui, no mesmo dia ([Consumidores §7](docs/consumidores.md#7-o-gcp)) |
+| F22 | O `gateway_response_code` é sorteado sem relação com o resultado da transação (achado ao desenhar o Bloco 5, 15/11/2026) | N, G, B | Achados, F22; `generator/geracao.yml`, `payment_transactions` | Bloco 5, pela Q17: o domínio declara que não tem significado de negócio; o gerador, às Pendências no fechamento |
 
 ---
 
@@ -635,6 +636,65 @@ resultado já foi conferido contra o cálculo independente; métrica sem view au
 conferida (Q9-a). O texto das regras do F9 já existe em prosa desde o passo 1 do Bloco 1b; aqui ele
 ganha a forma estruturada e o ADR (RVC-4-03).
 
+**O desenho, depois da rodada 6 de decisões (§6, Q15 a Q18, 15/11/2026).** Para revisão antes de
+implementar; o ADR do formato sai depois da revisão, como na L5.
+
+**Parte A — os domínios (F7).**
+
+1. **A declaração, uma vez só** (Q15). Um catálogo, `docs/glossario_de_negocio/dominios.yml`: cada domínio
+   tem nome em inglês (`order_status`, `gateway_response_code`, `unknown_member`…), a descrição, e o mapa
+   valor → significado em português; o significado do nulo, quando a coluna admite nulo (o `from_status`
+   do primeiro evento). Cada significado cita a **fonte** daqui de onde saiu — o dicionário, um ADR, a
+   Origem Legada, a configuração do gerador, uma pergunta de negócio. **Valor sem fonte é pergunta ao
+   Owner, nunca texto escrito por dedução** (CLAUDE.md §5, P5).
+2. **A ligação.** Cada coluna de `analytics` e de `consumption` que carrega um domínio declara, no `.yml`
+   escrito à mão, `meta.value_domain: <nome>` (Q18). Do catálogo, o `make catalog` **deriva** na coluna o
+   `meta.values` (o mapa) e o `accepted_values` com exatamente os valores do domínio — o significado
+   chega ao pacote pelo `meta`, que ele repassa como está, sem mudar o esquema. O derivado não se edita;
+   o `make check` falha com o `.yml` atrás do catálogo. **O mecanismo** — o escritor de `models/` inserindo
+   as duas coisas no `.yml` em bloco, ou um teste genérico que lê o domínio — é medido antes de escolher,
+   sem mudar o contrato; o que for escolhido vai ao ADR.
+3. **A cobertura, contra o medido** (oráculo). Toda coluna de texto de `analytics` e `consumption` com
+   até 40 valores distintos no armazém (o inventário de 15/11/2026 achou 118, ~70 de domínio) tem
+   `value_domain` **ou** está numa lista de excluídas com o motivo (código de cadastro como `CMP-001` e
+   `SKU-…`, cidade, cor e tamanho de variante, `year_month`). Domínio declarado que nenhuma coluna usa, e
+   valor declarado que não aparece no dado, também falham — ou o valor diz `absent_in_data` com o motivo.
+4. **O significado conferido contra o dado.** Onde o significado afirma relação com outra coluna (a
+   remessa `lost` não tem entrega; o `returned` conta como pedido realizado; o membro desconhecido só
+   aparece na chave substituta dele), um teste a confere. É o que achou o **F22**: o
+   `gateway_response_code` é sorteado sem relação com `transaction_result`. Pela Q17, o domínio declara
+   isso, e corrigir o gerador fica para uma regeneração futura (Pendências, no fechamento).
+5. **A V1, lote 3, antes** (RVC-1-06): mexer no escritor de `src/mvp_ed1/models/` pede revisitar os itens
+   6 a 9 (o `.yml` fora do bloco, a guarda do fuso, a fonte de pacote, as premissas da compilação).
+
+**Parte B — as métricas (F9).**
+
+6. **A declaração** (Q16). `docs/glossario_de_negocio/metricas.yml`, com dois conjuntos:
+   - **filtros nomeados**, declarados uma vez e citados pelas métricas: o pedido realizado, o carrinho
+     fechado, a tentativa de autorização, o capturado do mês, a versão vigente do cliente…;
+   - **métricas**, uma por medida das 16 views: o conceito do glossário (o bloco `docs`), a pergunta
+     (P01 a P16), a view e a coluna, o grão, a data que define o período, o numerador e o denominador
+     (relação de `analytics`, expressão, filtros), a fórmula e a aditividade. Cada campo tem a forma
+     legível, em português, e o fragmento SQL que o implementa.
+7. **A verificação só pela declaração.** Um teste monta o SQL **apenas** dos fragmentos declarados e o
+   compara com a view auditada, linha a linha (`except all` nos dois sentidos, num corte `REPEATABLE READ
+   READ ONLY`), como as referências do Bloco 1b. O critério do `nl_sql` — reproduzir o número só a partir
+   das definições — vira oráculo: "N de N métricas reproduzidas". A contraprova: tirar um filtro
+   declarado (o pedido realizado da P02) tem de fazer o teste acusar, como a mutação do Bloco 1b.
+8. **O que não cabe na forma.** A métrica que pede mais que uma relação filtrada e agrupada — o estoque
+   médio do trimestre da P11, os deltas do caminho quente da P12 — declara `reference:` com o teste do
+   Bloco 1b que a confere e o motivo. A cobertura (toda coluna numérica de cada view coberta por uma
+   métrica ou por uma referência) é conferida como a dos domínios.
+9. **Quem é dono do quê.** O `metricas.yml` passa a ser o dono da fórmula, do filtro, da data e do grão;
+   o `.md` de cada conceito fica com o porquê e aponta para a métrica. A prosa que hoje repete a fórmula
+   é encurtada para não divergir. O texto curto que vai ao BigQuery (F4) não muda.
+10. **No pacote.** `metrics` e `filters` entram como campos novos, no formato 1 (regra 3) — e, desta vez,
+    com a linha `prevista` em Consumidores §5 **num *commit* anterior ao que os gera** (RVL5I-1-05).
+
+**Ordem.** A revisão deste desenho; o ADR do formato; a linha `prevista`; a volta à V1; a Parte A; a Parte B;
+o pacote; a sequência de publicação (`catalog` → `test` → `catalog` → `check-offline`); a revisão da
+implementação; a linha `feita`; os avisos.
+
 ### Bloco 6 — as chaves declaradas (F10)
 
 Pela Q4-a. O ADR declara **o ciclo de vida das *constraints***, sem o qual elas se perdem em silêncio
@@ -755,6 +815,15 @@ recomendadas. As opções, como foram apresentadas:
 | **Q5** | A primeira *tag* deste repositório | **`v2.1.0`, no fim da fase**, depois dos Blocos 5 e 6: continua a numeração do `v2.0.0`, porque nada quebra para quem lê. Era a recomendada | `v3.0.0` no fim da fase; `v2.1.0` já, em `7d9548f` |
 
 **Os textos do Bloco 3: aprovados pelo Owner em 15/11/2026**, sem a revisão integral, que ele declarou não poder fazer; a aprovação se apoia nas três rodadas de revisão do Bloco 3 (§9, rodadas 18 a 20).
+
+### Rodada 6 — o formato do Bloco 5: respondida em 15/11/2026
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q15** | F7: onde se declara o significado de cada valor, se o mesmo domínio aparece em várias colunas (o estado do pedido, em 6 colunas de 4 fatos) | **Catálogo único**: cada domínio declarado uma vez; cada coluna aponta para ele (`meta.value_domain`), e o `make catalog` deriva na coluna o `meta.values` e o `accepted_values`. Dentro da Q3-a, sem repetir a declaração. Era a recomendada | O mapa escrito em cada coluna, com guarda de igualdade; na origem (SQLAlchemy), herdado por transporte, que não alcança as colunas que o legado mapeia por `case` |
+| **Q16** | F9: a forma estruturada das regras que só estão no SQL das views | **YAML no glossário**, com filtros nomeados e um teste que monta o SQL só da declaração e o compara com a view auditada; o que não cabe na forma aponta para a referência do Bloco 1b. Campo novo no pacote, com a `prevista` antes. Era a recomendada | Cabeçalho YAML em cada `.md` do glossário; só prosa estruturada, sem teste próprio |
+| **Q17** | F22: que significado o catálogo declara para o `gateway_response_code`, sorteado sem relação com o resultado | **Declarar sem significado de negócio**, dizendo por quê e de onde vem o resultado (`transaction_result`); nenhum número muda; corrigir o gerador vai às Pendências. Era a recomendada | Corrigir o gerador e regerar os dados agora; tirar a coluna de `analytics` |
+| **Q18** | F7: o alcance | **`analytics` e `consumption`**, as camadas que os consumidores leem, com a lista das excluídas e o motivo. Era a recomendada | Todas as camadas |
 
 ## 7. Definição de pronto aplicada
 
