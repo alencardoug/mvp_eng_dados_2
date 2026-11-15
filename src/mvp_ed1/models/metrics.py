@@ -110,6 +110,8 @@ def _conferir_view(caminho, doc, nome, view) -> None:
             raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: medida `{alvo}` não declarada")
         if papel_nome == "metric" and alvo not in doc["metrics"]:
             raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: métrica `{alvo}` não declarada")
+        if isinstance(papel, dict) and papel.get("additivity") not in (None, *ADDITIVITY):
+            raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: `additivity` é um de {ADDITIVITY}")
     if faltam := sorted(set(view["grain"]) - set(view["columns"])):
         raise ValueError(f"{caminho}: view `{nome}`: grão {faltam} sem coluna")
     if "reference" in {role(c, p)[0] for c, p in view["columns"].items()}:
@@ -124,18 +126,66 @@ def _conferir_referencia(caminho, nome, view) -> None:
     if not view.get("columns"):
         raise ValueError(f"{caminho}: view `{nome}` sem `columns`")
     for coluna, papel in view["columns"].items():
-        if role(coluna, papel)[0] not in ("grain", "identity", "reference"):
+        papel_nome = role(coluna, papel)[0]
+        if papel_nome not in ("grain", "identity", "reference"):
             raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: numa view por referência, o papel é `grain`, `identity` ou `reference`")
+        if papel_nome == "reference" and (not isinstance(papel, dict) or papel["reference"] not in ADDITIVITY):
+            raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: `reference` leva a aditividade ({ADDITIVITY})")
+    if not view.get("facts") or not view.get("dimensions"):
+        raise ValueError(f"{caminho}: view `{nome}`: a view por referência declara `facts` e `dimensions`")
     if view.get("sources") or view.get("grain"):
         raise ValueError(f"{caminho}: view `{nome}`: `reference` não se monta — tire `sources` e `grain`")
 
 
+ADDITIVITY = ("additive", "semi_additive", "non_additive")
+PAPEL_CHAVES = {"additivity", "note"}
+
+
 def role(coluna: str, papel) -> tuple[str, str]:
-    """(papel, nome declarado): `measure` é a medida do mesmo nome; `{measure: x}`, a medida `x`."""
+    """(papel, nome declarado): `measure` é a medida do mesmo nome; `{measure: x}`, a medida `x`; a coluna pode
+    trazer `additivity` (quando o grão da view muda a da medida) e `note`. Na view por referência,
+    `{reference: <aditividade>}`."""
     if isinstance(papel, str):
         return papel, coluna
-    (nome, alvo), = papel.items()
-    return nome, alvo
+    nomes = [k for k in papel if k in ROLES]
+    if len(nomes) != 1 or set(papel) - set(nomes) - PAPEL_CHAVES:
+        raise ValueError(f"coluna `{coluna}`: papel {papel!r} fora da forma")
+    nome = nomes[0]
+    alvo = papel[nome]
+    return nome, (alvo if nome != "reference" and isinstance(alvo, str) else coluna)
+
+
+def additivity(doc: dict, view: dict, coluna: str) -> str:
+    """A aditividade da coluna na view: a declarada nela, a da referência, a da medida, ou a da métrica."""
+    papel = view["columns"][coluna]
+    nome, alvo = role(coluna, papel)
+    if isinstance(papel, dict) and papel.get("additivity"):
+        return papel["additivity"]
+    if nome == "reference":
+        return papel["reference"] if isinstance(papel, dict) else None
+    if nome == "measure":
+        return doc["measures"][alvo]["additivity"]
+    if nome == "metric":
+        return _aditividade_da_metrica(doc, alvo)
+    return None
+
+
+def _aditividade_da_metrica(doc: dict, nome: str) -> str:
+    if nome in doc["measures"]:
+        return doc["measures"][nome]["additivity"]
+    m = doc["metrics"][nome]
+    if m["kind"] == "ratio":
+        return "non_additive"
+    partes = {_aditividade_da_metrica(doc, m["minuend"]), _aditividade_da_metrica(doc, m["subtrahend"])}
+    return "additive" if partes == {"additive"} else "non_additive"
+
+
+def note(doc: dict, view: dict, coluna: str) -> str | None:
+    papel = view["columns"][coluna]
+    nome, alvo = role(coluna, papel)
+    if isinstance(papel, dict) and papel.get("note"):
+        return papel["note"]
+    return doc["measures"][alvo].get("note") if nome == "measure" else None
 
 
 # ── A montagem ──────────────────────────────────────────────────────────────────────
@@ -215,16 +265,7 @@ def _cte_da_fonte(doc: dict, view: dict, fonte: dict) -> tuple[str, list[str], l
                          *(_apelidos(_agregado(doc["measures"][m])) for m in medidas),
                          *(_apelidos(doc["filters"][f]["predicate"]) for f in filtros))
     juncoes = declarada.get("joins") or []
-    incluir: set[str] = set()
-    pendentes = [j for j in juncoes if j["alias"] in usados]
-    while pendentes:
-        j = pendentes.pop()
-        if j["alias"] in incluir:
-            continue
-        incluir.add(j["alias"])
-        for par in j.get("match") or []:
-            for apelido in _apelidos(" ".join(par)):
-                pendentes += [k for k in juncoes if k["alias"] == apelido and k["alias"] not in incluir]
+    incluir = _juncoes_incluidas(juncoes, usados)
     base = declarada["alias"]
     linhas = [f"select {', '.join(selecao)}", f"from {declarada['relation']} {base}"]
     if "d" in usados:
@@ -240,6 +281,71 @@ def _cte_da_fonte(doc: dict, view: dict, fonte: dict) -> tuple[str, list[str], l
         linhas.append("where " + " and ".join(f"({doc['filters'][f]['predicate']})" for f in filtros))
     linhas.append("group by " + ", ".join(str(i + 1) for i in range(len(grao))))
     return "\n".join(linhas), grao, medidas
+
+
+def _juncoes_incluidas(juncoes: list[dict], usados: set[str]) -> set[str]:
+    """Os apelidos das junções que a view usa, com as de que elas dependem pelo `match`."""
+    incluir: set[str] = set()
+    pendentes = [j for j in juncoes if j["alias"] in usados]
+    while pendentes:
+        j = pendentes.pop()
+        if j["alias"] in incluir:
+            continue
+        incluir.add(j["alias"])
+        for par in j.get("match") or []:
+            for apelido in _apelidos(" ".join(par)):
+                pendentes += [k for k in juncoes if k["alias"] == apelido and k["alias"] not in incluir]
+    return incluir
+
+
+def relations(doc: dict, nome_da_view: str) -> tuple[list[str], list[str]]:
+    """(fatos, dimensões) de `analytics` que a view lê: das fontes e das junções que a montagem usa, ou os
+    declarados na view por referência. O teste os confere contra o `depends_on` do *manifest*."""
+    view = doc["views"][nome_da_view]
+    if "reference" in view:
+        return list(view["facts"]), list(view["dimensions"])
+    fatos, dims = [], []
+    for fonte in view["sources"]:
+        declarada = doc["sources"][fonte["source"]]
+        sql = _cte_da_fonte(doc, view, fonte)[0]
+        if declarada["relation"] not in fatos:
+            fatos.append(declarada["relation"])
+        if "join analytics.dim_date d " in sql and "analytics.dim_date" not in dims:
+            dims.append("analytics.dim_date")
+        for j in declarada.get("joins") or []:
+            if f"join {j['relation']} {j['alias']} " in sql and j["relation"] not in dims:
+                dims.append(j["relation"])
+    return fatos, dims
+
+
+ROTULO = {"additive": "aditiva", "semi_additive": "**semiaditiva**", "non_additive": "**não aditiva**"}
+
+
+def question_table(doc: dict, nome_da_view: str) -> str:
+    """A tabela Fatos · Medidas · Dimensões · View da pergunta, gerada da declaração (F23)."""
+    view = doc["views"][nome_da_view]
+    fatos, dims = relations(doc, nome_da_view)
+    curto = lambda r: f"`{r.split('.', 1)[1]}`"
+    fato = " · ".join(curto(f) for f in fatos) + (f" — {view['facts_note']}" if view.get("facts_note") else "")
+    medidas = []
+    for coluna, papel in view["columns"].items():
+        if role(coluna, papel)[0] in ("measure", "metric", "reference"):
+            n = note(doc, view, coluna)
+            medidas.append(f"`{coluna}` ({ROTULO[additivity(doc, view, coluna)]}{' — ' + n if n else ''})")
+    return "\n".join([
+        "| | |", "|---|---|",
+        f"| **{'Fato' if len(fatos) == 1 else 'Fatos'}** | {fato} |",
+        f"| **Medidas** | {' · '.join(medidas)} |",
+        f"| **Dimensões** | {' · '.join(curto(d) for d in dims)} |",
+        f"| **View** | `{nome_da_view}` |",
+    ])
+
+
+def question_tables(doc: dict | None = None) -> list[str]:
+    """As 16 tabelas, na ordem das perguntas (P01 a P16)."""
+    doc = load_catalog() if doc is None else doc
+    por_pergunta = {v["question"]: n for n, v in doc["views"].items()}
+    return [question_table(doc, por_pergunta[f"P{i:02d}"]) for i in range(1, 17)]
 
 
 def _expressao(doc: dict, nome: str) -> str:

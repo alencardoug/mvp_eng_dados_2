@@ -29,6 +29,8 @@ FIM = "<!-- fim do trecho gerado -->"
 ROOT = Path(__file__).resolve().parents[3]
 DICIONARIO = ROOT / "docs/dicionario_de_dados.md"
 MODELO = ROOT / "docs/modelo_de_dados.md"
+#: As Perguntas de Negócio: a tabela de cada pergunta é trecho gerado de `metricas.yml` (Bloco 5, item 9; F23).
+PERGUNTAS = ROOT / "docs/glossario_de_negocio/perguntas_de_negocio.md"
 
 #: Ordinal de cada domínio na seção 2 do Modelo de Dados.
 _TITULOS = {
@@ -234,10 +236,20 @@ def _substituir(caminho: Path, conteudo: str, ocorrencia: int = 0) -> None:
 #: Os trechos que este módulo escreve: documento, ocorrência e o gerador dela.
 #: A ocorrência 1 do Dicionário é a linhagem, de `lineage.py`, com conferência
 #: própria.
+def _tabela_da_pergunta(indice: int):
+    def gerar() -> str:
+        from mvp_ed1.models import metrics
+        return metrics.question_tables()[indice]
+    gerar.__name__ = f"tabela_da_pergunta_P{indice + 1:02d}"
+    return gerar
+
+
 TRECHOS = (
     (DICIONARIO, 0, dicionario_markdown),
     (MODELO, 0, inventario_markdown),
     (MODELO, 1, diagrama_markdown),
+    # As 16 perguntas, na ordem P01 a P16 do documento: a ocorrência n é a pergunta n + 1.
+    *((PERGUNTAS, i, _tabela_da_pergunta(i)) for i in range(16)),
 )
 
 

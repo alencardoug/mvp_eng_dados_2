@@ -439,7 +439,7 @@ models:
           sensitivity: public
         data_type: text
       - name: order_count
-        description: "Aditiva — pedidos realizados distintos, contados pela origem e pelo número, por canal e mês."
+        description: "Não aditiva entre categorias — pedidos realizados distintos, contados pela origem e pelo número; um pedido com itens de duas categorias raiz conta nas duas."
         meta:
           sensitivity: internal
         data_type: bigint

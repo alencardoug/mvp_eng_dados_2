@@ -129,7 +129,10 @@ measures:
     aggregate: count_distinct
     identity: [f.source_system, f.order_id]
     filters: [realised_order]
-    additivity: non_additive
+    # Aditiva enquanto o grão não parte o pedido: o pedido tem um canal, uma data e um cliente. A view que
+    # agrupa por categoria a declara não aditiva (P01, P06; F28).
+    additivity: additive
+    note: contagem distinta de pedido
   unit_count:
     source: sales_items
     aggregate: sum
@@ -423,7 +426,7 @@ views:
       channel_type: grain
       root_category_name: grain
       category_name: grain
-      order_count: measure
+      order_count: {measure: order_count, additivity: non_additive, note: "entre categorias: um pedido com itens de duas categorias conta nas duas"}
       unit_count: measure
       gross_revenue_amount: measure
       discount_amount: measure
@@ -492,7 +495,7 @@ views:
       sales_channel_name: grain
       channel_type: grain
       root_category_name: grain
-      order_count: measure
+      order_count: {measure: order_count, additivity: non_additive, note: "entre categorias: um pedido com itens de duas categorias conta nas duas"}
       gross_revenue_amount: measure
       discount_amount: measure
       net_revenue_amount: measure
@@ -571,11 +574,12 @@ views:
       refund_reason: grain
       refund_count: measure
       refunded_amount: measure
-      captured_amount: measure
+      captured_amount: {measure: captured_amount, additivity: non_additive, note: o capturado do mês e do meio se repete em cada motivo}
       refund_rate_pct: metric
 
   on_time_delivery_rate_by_carrier:
     question: P13
+    facts_note: "toda remessa entregue, inclusive a de itens rejeitados em cascata ([ADR-0053](../adr/0053-fato-no-grao-da-remessa.md))"
     grain:
       year_number: d.year_number
       month_number: d.month_number
@@ -605,6 +609,7 @@ views:
 
   order_to_delivery_time_by_region:
     question: P14
+    facts_note: a remessa que fecha o ciclo do pedido; inclusive o pedido de itens rejeitados em cascata (F17)
     grain:
       year_number: d.year_number
       month_number: d.month_number
@@ -632,6 +637,7 @@ views:
 
   support_tickets_per_hundred_orders:
     question: P15
+    facts_note: o denominador vem de `fact_order_status_event`, pelo grão do pedido (F21)
     grain:
       year_number: d.year_number
       month_number: d.month_number
@@ -669,8 +675,10 @@ views:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/top_skus_by_revenue.sql
       reason: O ranking e o corte — `rank()` sobre a receita dentro da categoria, e a participação na receita da categoria — não cabem no montador.
+    facts: [analytics.fact_sales_order_item]
+    dimensions: [analytics.dim_product, analytics.dim_category, analytics.dim_brand]
     columns:
-      revenue_rank: reference
+      revenue_rank: {reference: non_additive}
       product_natural_key: identity
       sku: identity
       product_name: grain
@@ -678,10 +686,10 @@ views:
       root_category_name: grain
       brand_name: grain
       is_deleted: grain
-      unit_count: reference
-      net_revenue_amount: reference
-      category_net_revenue_amount: reference
-      category_revenue_share_pct: reference
+      unit_count: {reference: additive}
+      net_revenue_amount: {reference: additive}
+      category_net_revenue_amount: {reference: non_additive}
+      category_revenue_share_pct: {reference: non_additive}
 
   new_and_repeat_customers_by_month:
     question: P04
@@ -689,15 +697,18 @@ views:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/new_and_repeat_customers_by_month.sql
       reason: A estreia e a recompra saem de uma janela sobre a ordem dos pedidos realizados de cada cliente (F18), que o montador não faz.
+    facts: [analytics.fact_order_status_event]
+    dimensions: [analytics.dim_date, analytics.dim_sales_channel, analytics.dim_customer]
+    facts_note: "a estreia e a recompra, pelo evento de criação do pedido realizado; inclusive o pedido de itens rejeitados em cascata (F18)"
     columns:
       year_month: grain
       year_number: grain
       month_number: grain
       sales_channel_name: grain
       customer_segment_name: grain
-      new_customer_count: reference
-      returning_customer_count: reference
-      repeat_purchase_rate_pct: reference
+      new_customer_count: {reference: additive}
+      returning_customer_count: {reference: additive}
+      repeat_purchase_rate_pct: {reference: non_additive}
 
   payment_approval_rate_by_method:
     question: P09
@@ -705,6 +716,8 @@ views:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/payment_approval_rate_by_method.sql
       reason: O capturado é atribuído à primeira autorização aprovada do pagamento (D67), por uma janela; as tentativas e a aprovação vêm da mesma leitura.
+    facts: [analytics.fact_payment_transaction]
+    dimensions: [analytics.dim_date, analytics.dim_payment_method]
     columns:
       year_month: grain
       year_number: grain
@@ -713,11 +726,11 @@ views:
       method_type: grain
       installments: identity
       is_instalment_plan: grain
-      authorization_attempt_count: reference
-      approved_authorization_count: reference
-      approval_rate_pct: reference
-      authorized_amount: reference
-      captured_amount: reference
+      authorization_attempt_count: {reference: additive}
+      approved_authorization_count: {reference: additive}
+      approval_rate_pct: {reference: non_additive}
+      authorized_amount: {reference: additive}
+      captured_amount: {reference: additive}
 
   inventory_turnover_by_sku_and_warehouse:
     question: P11
@@ -725,6 +738,8 @@ views:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/inventory_turnover_by_sku_and_warehouse.sql
       reason: O giro é pelo estoque médio do trimestre (ADR-0052), reconstruído dia a dia a partir do livro; o montador agrega, não reconstrói saldo.
+    facts: [analytics.fact_inventory_movement]
+    dimensions: [analytics.dim_date, analytics.dim_product, analytics.dim_category, analytics.dim_warehouse]
     columns:
       year_number: grain
       quarter_number: grain
@@ -734,11 +749,11 @@ views:
       category_name: grain
       warehouse_name: grain
       warehouse_region: grain
-      quantity_out: reference
-      cost_of_goods_sold: reference
-      avg_quantity_on_hand: reference
-      avg_inventory_value_amount: reference
-      inventory_turnover: reference
+      quantity_out: {reference: additive}
+      cost_of_goods_sold: {reference: additive}
+      avg_quantity_on_hand: {reference: semi_additive, note: "soma por armazém e SKU, nunca ao longo do tempo"}
+      avg_inventory_value_amount: {reference: semi_additive, note: "soma por armazém e SKU, nunca ao longo do tempo"}
+      inventory_turnover: {reference: non_additive}
 
   skus_below_reorder_point:
     question: P12
@@ -746,6 +761,9 @@ views:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/skus_below_reorder_point.sql
       reason: O saldo de agora é o do lote mais os deltas do caminho quente, e a demanda diária e a cobertura saem de janelas sobre o livro; nada disso é agregado de uma fonte.
+    facts: [analytics.fact_inventory_movement]
+    dimensions: [analytics.dim_product, analytics.dim_warehouse]
+    facts_note: "e os deltas que ela ainda não absorveu, pelo saldo de `trusted.inventory_balances`"
     columns:
       warehouse_name: grain
       warehouse_region: grain
@@ -753,17 +771,17 @@ views:
       product_name: grain
       category_name: grain
       brand_name: grain
-      quantity_on_hand: reference
-      quantity_reserved: reference
-      quantity_available: reference
-      quantity_from_batch: reference
-      quantity_from_stream: reference
-      stream_movement_count: reference
-      reorder_point: reference
-      is_stockout: reference
-      daily_demand_units: reference
-      days_of_cover: reference
-      last_movement_at: reference
+      quantity_on_hand: {reference: semi_additive}
+      quantity_reserved: {reference: semi_additive}
+      quantity_available: {reference: semi_additive}
+      quantity_from_batch: {reference: semi_additive}
+      quantity_from_stream: {reference: semi_additive}
+      stream_movement_count: {reference: additive}
+      reorder_point: {reference: non_additive}
+      is_stockout: {reference: non_additive}
+      daily_demand_units: {reference: non_additive}
+      days_of_cover: {reference: non_additive}
+      last_movement_at: {reference: non_additive}
 
   repeat_purchase_rate_after_support:
     question: P16
@@ -771,6 +789,8 @@ views:
       test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
       query: tests/auditoria/repeat_purchase_rate_after_support.sql
       reason: O pedido seguinte de cada cliente, dentro da janela, sai de uma janela sobre os pedidos realizados; o montador não ordena pedidos.
+    facts: [analytics.fact_sales_order_item, analytics.fact_support_ticket_event]
+    dimensions: [analytics.dim_date, analytics.dim_sales_channel, analytics.dim_support_category]
     columns:
       year_number: grain
       month_number: grain
@@ -778,7 +798,7 @@ views:
       sales_channel_name: grain
       has_support_ticket: grain
       support_category_name: grain
-      order_count: reference
-      repeat_order_count: reference
-      repeat_purchase_rate: reference
-      avg_days_to_next_order: reference
+      order_count: {reference: additive}
+      repeat_order_count: {reference: non_additive}
+      repeat_purchase_rate: {reference: non_additive}
+      avg_days_to_next_order: {reference: non_additive}

@@ -53,24 +53,28 @@ tomada ao redigir esta lista, e registrada no
 
 ### P01 — Qual a receita líquida por mês, canal e categoria de produto?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_sales_order_item` |
-| **Medidas** | `net_revenue_amount` (aditiva) · `gross_revenue_amount` (aditiva) · `discount_amount` (aditiva) · `quantity` (aditiva) |
-| **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_category` · `dim_product` |
+| **Medidas** | `order_count` (**não aditiva** — entre categorias: um pedido com itens de duas categorias conta nas duas) · `unit_count` (aditiva) · `gross_revenue_amount` (aditiva) · `discount_amount` (aditiva) · `net_revenue_amount` (aditiva) |
+| **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_category` |
 | **View** | `monthly_revenue_by_channel_and_category` |
+<!-- fim do trecho gerado -->
 
 É a pergunta base do datamart: todas as outras a recortam de outra forma. É também a que fixa a
 definição de [receita líquida](receita_liquida.md), da qual dependem P02, P03, P05 e P06.
 
 ### P02 — Qual o ticket médio por pedido, por canal e por segmento de cliente, mês a mês?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_sales_order_item` |
-| **Medidas** | `net_revenue_amount` (aditiva) · `order_count` (aditiva, contagem distinta de pedido) · `average_order_value` (**não aditiva** — razão entre as duas) |
+| **Medidas** | `order_count` (aditiva — contagem distinta de pedido) · `net_revenue_amount` (aditiva) · `average_order_value` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_customer` |
 | **View** | `average_order_value_by_channel_and_segment` |
+<!-- fim do trecho gerado -->
 
 O [ticket médio](ticket_medio.md) é razão, não soma: a média das médias mensais não é a média do
 ano. A view entrega numerador e denominador ao lado do resultado, para que qualquer reagregação
@@ -78,44 +82,52 @@ seja possível sem recalcular errado.
 
 ### P03 — Quais os 25 SKUs de maior receita no período, e quanto cada um pesa na receita da sua categoria?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_sales_order_item` |
-| **Medidas** | `net_revenue_amount` (aditiva) · `quantity` (aditiva) · `category_revenue_share` (**não aditiva** — fração) |
-| **Dimensões** | `dim_product` · `dim_category` · `dim_brand` · `dim_date` |
+| **Medidas** | `revenue_rank` (**não aditiva**) · `unit_count` (aditiva) · `net_revenue_amount` (aditiva) · `category_net_revenue_amount` (**não aditiva**) · `category_revenue_share_pct` (**não aditiva**) |
+| **Dimensões** | `dim_product` · `dim_category` · `dim_brand` |
 | **View** | `top_skus_by_revenue` |
+<!-- fim do trecho gerado -->
 
 ### P04 — Quantos clientes compraram pela primeira vez em cada mês, e quantos deles voltaram a comprar em 90 dias?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
-| **Fato** | `fact_order_status_event` (a estreia e a recompra, pelo evento de criação do pedido realizado; inclusive o pedido de itens rejeitados em cascata, F18) |
-| **Medidas** | `new_customer_count` (aditiva) · `returning_customer_count` (aditiva) · `repeat_purchase_rate_90d` (**não aditiva**) |
+| **Fato** | `fact_order_status_event` — a estreia e a recompra, pelo evento de criação do pedido realizado; inclusive o pedido de itens rejeitados em cascata (F18) |
+| **Medidas** | `new_customer_count` (aditiva) · `returning_customer_count` (aditiva) · `repeat_purchase_rate_pct` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_customer` |
 | **View** | `new_and_repeat_customers_by_month` |
+<!-- fim do trecho gerado -->
 
 Depende dos conceitos de [cliente ativo](cliente_ativo.md) e
 [recorrência de compra](recorrencia_de_compra.md). É a pergunta que a Etapa 9 estende para *churn*.
 
 ### P05 — Qual a receita e o número de pedidos por estado e região de entrega, por trimestre?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_sales_order_item` |
-| **Medidas** | `net_revenue_amount` (aditiva) · `order_count` (aditiva) |
-| **Dimensões** | `dim_date` · `dim_geography` · `dim_sales_channel` |
+| **Medidas** | `order_count` (aditiva — contagem distinta de pedido) · `customer_version_count` (**não aditiva**) · `unit_count` (aditiva) · `net_revenue_amount` (aditiva) |
+| **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_geography` |
 | **View** | `revenue_by_delivery_region` |
+<!-- fim do trecho gerado -->
 
 `dim_geography` é conformada: a mesma dimensão atende entrega aqui e origem de remessa na Etapa 8.
 
 ### P06 — Qual o desconto concedido como fração da receita bruta, por canal e mês?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_sales_order_item` |
-| **Medidas** | `gross_revenue_amount` (aditiva) · `discount_amount` (aditiva) · `discount_share` (**não aditiva**) |
+| **Medidas** | `order_count` (**não aditiva** — entre categorias: um pedido com itens de duas categorias conta nas duas) · `gross_revenue_amount` (aditiva) · `discount_amount` (aditiva) · `net_revenue_amount` (aditiva) · `discount_share_pct` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_category` |
 | **View** | `discount_share_by_channel` |
+<!-- fim do trecho gerado -->
 
 Na Etapa 9, com `fact_coupon_redemption` construída, esta pergunta ganha o recorte por campanha —
 mas a view atual permanece: mudança quebrante nasce como `v2`
@@ -123,12 +135,14 @@ mas a view atual permanece: mudança quebrante nasce como `v2`
 
 ### P07 — Qual a taxa de conversão de carrinho em pedido, por canal e mês?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_cart_event` |
-| **Medidas** | `cart_count` (aditiva) · `converted_cart_count` (aditiva) · `cart_conversion_rate` (**não aditiva**) · `abandoned_cart_value` (aditiva) |
-| **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_customer` |
+| **Medidas** | `cart_count` (aditiva) · `closed_cart_count` (aditiva) · `converted_cart_count` (aditiva) · `abandoned_cart_count` (aditiva) · `cart_conversion_rate_pct` (**não aditiva**) · `cart_value_amount` (aditiva) · `abandoned_value_amount` (aditiva) |
+| **Dimensões** | `dim_date` · `dim_sales_channel` |
 | **View** | `cart_conversion_rate_by_channel` |
+<!-- fim do trecho gerado -->
 
 Usa [carrinho abandonado](carrinho_abandonado.md) e [taxa de conversão](taxa_de_conversao.md). É a
 pergunta que justifica a décima fato ([ADR-0028](../adr/0028-fato-de-carrinho-para-o-funil.md)):
@@ -149,21 +163,25 @@ cada uma agregada ao seu grão e depois cruzadas na granularidade comum
 Usa [lucro bruto](lucro_bruto.md) e
 [custo do produto vendido](custo_do_produto_vendido.md).
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
-| **Fatos** | `fact_sales_order_item` · `fact_purchase_order_item` |
-| **Medidas** | `net_revenue_amount` (aditiva) · `cost_of_goods_sold` (aditiva) · `gross_profit_amount` (aditiva) · `gross_margin_pct` (**não aditiva**) |
+| **Fatos** | `fact_sales_order_item` · `fact_inventory_movement` |
+| **Medidas** | `net_revenue_amount` (aditiva) · `cost_of_goods_sold` (aditiva) · `gross_profit_amount` (aditiva) · `gross_margin_pct` (**não aditiva**) · `unit_count` (aditiva) · `dispatched_unit_count` (aditiva) |
 | **Dimensões** | `dim_date` · `dim_category` · `dim_product` |
 | **View** | `gross_margin_by_category` |
+<!-- fim do trecho gerado -->
 
 ### P09 — Qual a taxa de aprovação de pagamento por meio de pagamento e número de parcelas?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_payment_transaction` |
-| **Medidas** | `attempt_count` (aditiva) · `approved_count` (aditiva) · `approval_rate` (**não aditiva**) |
-| **Dimensões** | `dim_date` · `dim_payment_method` · `dim_sales_channel` |
+| **Medidas** | `authorization_attempt_count` (aditiva) · `approved_authorization_count` (aditiva) · `approval_rate_pct` (**não aditiva**) · `authorized_amount` (aditiva) · `captured_amount` (aditiva) |
+| **Dimensões** | `dim_date` · `dim_payment_method` |
 | **View** | `payment_approval_rate_by_method` |
+<!-- fim do trecho gerado -->
 
 **Como se conta.** O denominador é a **tentativa de autorização**, não o pagamento: cada transação
 de autorização é uma tentativa, e o numerador são as aprovadas. É o atrito que se quer ver — um
@@ -174,12 +192,14 @@ da fato, nem mais nem menos (D67).
 
 ### P10 — Qual o valor reembolsado como fração do capturado, por motivo e mês?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fatos** | `fact_refund` · `fact_payment_transaction` |
-| **Medidas** | `refunded_amount` (aditiva) · `captured_amount` (aditiva) · `refund_rate` (**não aditiva**) |
-| **Dimensões** | `dim_date` · `dim_payment_method` · `dim_category` |
+| **Medidas** | `refund_count` (aditiva) · `refunded_amount` (aditiva) · `captured_amount` (**não aditiva** — o capturado do mês e do meio se repete em cada motivo) · `refund_rate_pct` (**não aditiva**) |
+| **Dimensões** | `dim_date` · `dim_payment_method` |
 | **View** | `refund_rate_by_reason` |
+<!-- fim do trecho gerado -->
 
 **Como se conta.** O numerador é o valor dos reembolsos **concluídos**, no mês do reembolso, por meio
 de pagamento e motivo; a contagem de reembolsos inclui também os solicitados e os recusados. O
@@ -189,12 +209,14 @@ cada linha de motivo do mesmo mês e meio, e não se soma entre motivos.
 
 ### P11 — Qual o giro de estoque por SKU e armazém no trimestre?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
 | **Fato** | `fact_inventory_movement` |
-| **Medidas** | `quantity_out` (aditiva) · `quantity_on_hand` (**semiaditiva** — soma por armazém e SKU, nunca ao longo do tempo) · `inventory_turnover` (**não aditiva**) |
-| **Dimensões** | `dim_date` · `dim_product` · `dim_warehouse` |
+| **Medidas** | `quantity_out` (aditiva) · `cost_of_goods_sold` (aditiva) · `avg_quantity_on_hand` (**semiaditiva** — soma por armazém e SKU, nunca ao longo do tempo) · `avg_inventory_value_amount` (**semiaditiva** — soma por armazém e SKU, nunca ao longo do tempo) · `inventory_turnover` (**não aditiva**) |
+| **Dimensões** | `dim_date` · `dim_product` · `dim_category` · `dim_warehouse` |
 | **View** | `inventory_turnover_by_sku_and_warehouse` |
+<!-- fim do trecho gerado -->
 
 É a pergunta que exige a aditividade declarada: somar `quantity_on_hand` de três meses produz um
 estoque que nunca existiu.
@@ -205,12 +227,14 @@ estoque que nunca existiu.
 
 ### P12 — Quais SKUs estão abaixo do ponto de reposição agora, por armazém?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
-| **Fato** | `fact_inventory_movement` + os deltas que ela ainda não absorveu |
-| **Medidas** | `quantity_available` (**semiaditiva**) · `days_of_cover` (**não aditiva**) |
+| **Fato** | `fact_inventory_movement` — e os deltas que ela ainda não absorveu, pelo saldo de `trusted.inventory_balances` |
+| **Medidas** | `quantity_on_hand` (**semiaditiva**) · `quantity_reserved` (**semiaditiva**) · `quantity_available` (**semiaditiva**) · `quantity_from_batch` (**semiaditiva**) · `quantity_from_stream` (**semiaditiva**) · `stream_movement_count` (aditiva) · `reorder_point` (**não aditiva**) · `is_stockout` (**não aditiva**) · `daily_demand_units` (**não aditiva**) · `days_of_cover` (**não aditiva**) · `last_movement_at` (**não aditiva**) |
 | **Dimensões** | `dim_product` · `dim_warehouse` |
 | **View** | `skus_below_reorder_point` |
+<!-- fim do trecho gerado -->
 
 Depende de [ruptura de estoque](ruptura_de_estoque.md) e de
 [cobertura de estoque](cobertura_de_estoque.md) — os dois conceitos escritos na Etapa 7, que é a
@@ -240,21 +264,25 @@ remessa ([ADR-0034](../adr/0034-entrega-do-livro-de-eventos.md)).
 
 ### P13 — Qual a fração de entregas dentro do prazo prometido, por transportadora e modalidade, mês a mês?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
-| **Fatos** | `fact_shipment` — toda remessa entregue, inclusive a de itens rejeitados em cascata ([ADR-0053](../adr/0053-fato-no-grao-da-remessa.md)) |
-| **Medidas** | `delivered_count` (aditiva) · `on_time_count` (aditiva) · `on_time_rate` (**não aditiva**) |
+| **Fato** | `fact_shipment` — toda remessa entregue, inclusive a de itens rejeitados em cascata ([ADR-0053](../adr/0053-fato-no-grao-da-remessa.md)) |
+| **Medidas** | `delivered_count` (aditiva) · `on_time_count` (aditiva) · `late_count` (aditiva) · `split_order_shipment_count` (aditiva) · `on_time_rate` (**não aditiva**) · `avg_delay_days_when_late` (**não aditiva**) · `avg_transit_days` (**não aditiva**) · `failed_attempt_count` (aditiva) |
 | **Dimensões** | `dim_date` · `dim_carrier` · `dim_warehouse` |
 | **View** | `on_time_delivery_rate_by_carrier` |
+<!-- fim do trecho gerado -->
 
 ### P14 — Qual o tempo médio entre pedido e entrega, por região e modalidade?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
-| **Fatos** | `fact_shipment` (a remessa que fecha o ciclo do pedido; inclusive o pedido de itens rejeitados em cascata, F17) |
-| **Medidas** | `order_to_delivery_days` (**não aditiva** — média) · `delivered_count` (aditiva) |
-| **Dimensões** | `dim_date` · `dim_geography` · `dim_carrier` |
+| **Fato** | `fact_shipment` — a remessa que fecha o ciclo do pedido; inclusive o pedido de itens rejeitados em cascata (F17) |
+| **Medidas** | `order_count` (aditiva) · `split_order_count` (aditiva) · `shipment_count` (aditiva) · `avg_order_to_delivery_days` (**não aditiva**) · `median_order_to_delivery_days` (**não aditiva**) · `max_order_to_delivery_days` (**não aditiva**) |
+| **Dimensões** | `dim_date` · `dim_carrier` · `dim_geography` |
 | **View** | `order_to_delivery_time_by_region` |
+<!-- fim do trecho gerado -->
 
 ---
 
@@ -274,12 +302,14 @@ clientes de uma coorte de estreia, esta conta pedidos.
 
 ### P15 — Quantos chamados por 100 pedidos, por categoria de chamado e canal, mês a mês?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
-| **Fatos** | `fact_support_ticket_event` · `fact_order_status_event` (o denominador, pelo grão do pedido, F21) |
-| **Medidas** | `ticket_count` (aditiva) · `order_count` (aditiva) · `tickets_per_hundred_orders` (**não aditiva**) |
-| **Dimensões** | `dim_date` · `dim_support_category` · `dim_sales_channel` |
+| **Fatos** | `fact_support_ticket_event` · `fact_order_status_event` — o denominador vem de `fact_order_status_event`, pelo grão do pedido (F21) |
+| **Medidas** | `ticket_count` (aditiva) · `high_priority_ticket_count` (aditiva) · `reopened_ticket_count` (aditiva) · `solved_first_time_count` (aditiva) · `channel_order_count` (**não aditiva**) · `tickets_per_hundred_orders` (**não aditiva**) · `avg_hours_to_resolution` (**não aditiva**) |
+| **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_support_category` |
 | **View** | `support_tickets_per_hundred_orders` |
+<!-- fim do trecho gerado -->
 
 **Como se conta.** O numerador são os chamados **abertos** no mês (o evento de criação), por canal e
 categoria de chamado, pelo **nome**. O denominador são os pedidos realizados distintos do mês e do
@@ -288,12 +318,14 @@ chamado sem pedido fica no canal "Sem canal", sem denominador, e a taxa é nula 
 
 ### P16 — Qual a taxa de recompra em 90 dias dos clientes que abriram chamado, comparada à dos que não abriram?
 
+<!-- gerado a partir dos modelos; não editar à mão -->
 | | |
 |---|---|
-| **Fatos** | `fact_support_ticket_event` · `fact_sales_order_item` |
-| **Medidas** | `order_count` (aditiva) · `repeat_order_count` (aditiva) · `repeat_purchase_rate` (**não aditiva**) |
+| **Fatos** | `fact_sales_order_item` · `fact_support_ticket_event` |
+| **Medidas** | `order_count` (aditiva) · `repeat_order_count` (**não aditiva**) · `repeat_purchase_rate` (**não aditiva**) · `avg_days_to_next_order` (**não aditiva**) |
 | **Dimensões** | `dim_date` · `dim_sales_channel` · `dim_support_category` |
 | **View** | `repeat_purchase_rate_after_support` |
+<!-- fim do trecho gerado -->
 
 A unidade é o **pedido**, não o cliente: é o que permite comparar quem abriu chamado com quem não
 abriu sob a mesma âncora. Depende de [recompra pós-pedido](recompra_pos_pedido.md) e de
