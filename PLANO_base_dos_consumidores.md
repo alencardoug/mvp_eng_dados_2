@@ -1002,87 +1002,118 @@ executado lá. Se o desenho mudar a materialização, ele volta ao Owner antes d
 
 #### O que foi medido (15/11/2026, antes do desenho)
 
-Sobre o *manifest* e o `information_schema` do armazém construído em `7a197dd` (só leitura), e duas
-sondas num projeto dbt mínimo, num banco efêmero do servidor do armazém (`warehouse_sonda_b6`, criado e
-apagado pela sonda). As sondas e as saídas estão em `data/medicoes/base_consumidores/bloco6_sonda/`
-(`rodar.sh`, `resultado_fk_no_contract.txt`, `resultado_fk_no_fim.txt`). dbt-core 1.12.3, dbt-postgres
-1.11.0, dbt-bigquery 1.12.2.
+Sobre o *manifest* e o `information_schema` do armazém construído em `7a197dd` (só leitura), e sondas num
+projeto dbt mínimo, num banco efêmero do servidor do armazém (`warehouse_sonda_b6`, criado e apagado por
+cada sonda). Tudo em `data/medicoes/base_consumidores/bloco6_sonda/`: as duas primeiras (`rodar.sh`,
+variantes `fk_no_contract/` e `fk_no_fim/`, uma *thread*) e a **representativa** (`representativa/`,
+`rodar.sh` → `resultado.txt`, `tipos.sh` → `resultado_tipos.txt`), feita depois da revisão (RVB6-1-03):
+quatro *threads*, FK de dimensão para dimensão, a incremental com o `pre_hook` do ramo legado lendo uma
+fonte, os *hooks* na ordem do projeto e um log aberto/fechado que imita o da procedência. dbt-core 1.12.3,
+dbt-postgres 1.11.0, dbt-bigquery 1.12.2.
 
 - **O inventário.** 26 modelos e 513 colunas em `analytics`; nenhuma com `data_type`, nenhum modelo com
   *contract*, nenhuma *constraint* no armazém. Cada modelo tem uma chave substituta com `unique` e
-  `not_null` (a `dim_date` também tem `full_date` única, e a `dim_support_category`, a chave natural);
-  11 `unique_combination_of_columns` nas chaves naturais.
+  `not_null` (a `dim_date` também tem `full_date` única; a `dim_support_category`, a chave natural; a
+  `fact_inventory_movement`, o `movement_id`); 11 `unique_combination_of_columns` nas chaves naturais.
 - **As 58 `relationships` são FKs prontas.** Toda uma aponta para a chave única de uma dimensão; nenhuma
   tem `where`, todas são `severity: error`, nenhuma se repete. Dez colunas de FK admitem nulo (a FK
   aceita). Uma é de dimensão para dimensão: `dim_warehouse.geography_key` → `dim_geography`.
 - **Os tipos físicos.** `text` 120, `character varying` sem limite 107, `boolean` 90, `bigint` 64,
   `timestamp with time zone` 48, `integer` 32, `numeric` sem precisão 29, `numeric(12,4)` 10, `date` 9,
-  `numeric(12,6)` 2, `numeric(12,2)` 1, `character varying(20)` 1. O *contract* do PostgreSQL distingue
-  `text` de `character varying`.
-- **A FK no *contract* se perde** (sonda `fk_no_contract`). O dbt cria a PK e a FK na tabela temporária
-  e troca os nomes; ao recriar a dimensão, o `drop … cascade` da antiga leva a FK de toda fato que a
-  aponta. A fato em tabela a recria na sua vez; **a incremental não: perde a FK na segunda execução
-  normal** e só a recupera no `--full-refresh`. Recriada só a dimensão, nenhuma fato fica com FK até ser
-  recriada. Com a dimensão sem uma chave, a fato em tabela falha ao recriar (a FK impõe), e **a
-  incremental recebe os órfãos calada**.
-- **A FK instalada no fim se mantém** (sonda `fk_no_fim`). Uma macro no `on-run-end` lê as
-  `relationships` do grafo e instala, com nome estável, a FK que falta, só em `run` e `build`. As duas
-  FKs estão no lugar depois da carga inicial, da segunda execução, da reconstrução só da dimensão, do
-  `dbt test` (que não toca nelas), do `--full-refresh` e da recuperação. Com órfão, a instalação falha
-  e a execução sai com erro (`rc=2`); a incremental recebeu os órfãos durante a execução, mas a falha
-  não é calada.
-- **O *contract* numa incremental que já existe não cria a PK** (sonda à parte, mesmo banco efêmero):
-  a tabela continua sem PK depois de ligar o *contract* e rodar o incremental. É a migração que o
-  RVC-1-01 previa.
-- **Os nomes da PK do dbt oscilam** entre `x__dbt_tmp_pkey` e `x__dbt_tmp_pkey1`, conforme a tabela
-  antiga ainda existe ao criar a nova. A guarda lê a *constraint* por tipo e colunas, nunca pelo nome.
-- **O `data_type` não chama macro do projeto** (`'tipo' is undefined`). A expressão em linha com
-  `target.type`, a mesma do `consumption`, funciona.
-- **O dbt-bigquery traduz só `TEXT`, `FLOAT` e `INTEGER`.** `bigint`, `boolean`, `numeric` e `date` são
-  nomes que o BigQuery aceita; `character varying` e `timestamp with time zone` precisam da expressão em
-  linha (`string`, `timestamp`).
-- **A fato incremental já tem `on_schema_change='fail'`**, que o *contract* exige numa incremental
-  (`append_new_columns` ou `fail`; a sonda recusou `ignore`).
-- **Não medido:** o tempo de validar as 58 FKs no armazém real (a maior fato tem 81.354 linhas); o
-  comportamento no BigQuery (a `create or replace` de uma dimensão e as FKs que a apontam; o `NUMERIC`
-  sem precisão, de escala 9, recebendo um cálculo de mais casas); dar nome à PK, que colidiria com o
-  índice da tabela antiga (inferido, não sondado).
+  `numeric(12,6)` 2, `numeric(12,2)` 1, `character varying(20)` 1.
+- **A FK no *contract* se perde** (`fk_no_contract`). O dbt cria a PK e a FK na tabela temporária e troca
+  os nomes; ao recriar a dimensão, o `drop … cascade` da antiga leva a FK de toda fato que a aponta. A
+  fato em tabela a recria na sua vez; **a incremental não: perde a FK na segunda execução normal** e só a
+  recupera no `--full-refresh`. Com a dimensão sem uma chave, **a incremental recebe os órfãos calada**.
+- **Instalar a FK só no fim trava com quatro *threads*** (representativa, primeira versão). Duas tabelas
+  ligadas por FK e sem `ref` entre elas se reconstroem ao mesmo tempo, e o `drop … cascade` do *backup* de
+  uma pede trava na FK da outra: `deadlock detected`. A transação da troca de nomes já foi confirmada: fica
+  o `dim_a__dbt_backup`, com as FKs das fatos apontando para ele, e toda execução seguinte falha. A sonda
+  de uma *thread* não mostrava isso. No projeto, a `dim_date` e as fatos que a apontam sem `ref` são o
+  mesmo caso.
+- **Retirar as FKs no começo e instalar no fim se mantém** (representativa, versão final; `resultado.txt`).
+  As FKs de `analytics` saem no `on-run-start` e voltam no `on-run-end`, com a PK declarada que falta. Nas
+  13 situações: a instalação inicial sobre a incremental que existia sem PK (a macro a instala, depois as
+  FKs); a segunda execução incremental; a reconstrução só de uma dimensão, com a outra dimensão fora da
+  seleção apontando para ela; uma FK retirada à mão; o `build` com teste reprovado (os *hooks* rodam e as
+  FKs voltam; `rc=1`); a falha do *hook* de acesso em execução (os *hooks* seguintes não rodam, as FKs ficam
+  de fora e a linha do log fica `started`); a recuperação depois dela (as FKs voltam; a linha `started` velha
+  continua); a dimensão sem uma chave (órfão na incremental: a instalação falha, `rc=2`, linha `started`);
+  a recuperação com a chave de volta; a seleção parcial com uma fato apagada (a macro a pula); o `build`
+  depois; o `--full-refresh`. Toda *constraint* lida com `pg_get_constraintdef` e `convalidated = true`.
+- **O *contract* numa incremental que já existe não cria a PK** (representativa, situação 2): a macro a
+  instala. É a migração que o RVC-1-01 previa.
+- **O *contract* do PostgreSQL pega a troca do tipo base e não pega precisão nem escala**
+  (`resultado_tipos.txt`). Recusa `text` calculado contra `numeric` declarado — na tabela, na incremental
+  em execução normal e quando só o `.yml` da incremental muda. Aceita `numeric(12,6)` calculado contra
+  `numeric(12,4)` declarado (`rc=0`): a tabela nasce com o tipo declarado e o valor é **arredondado ao
+  gravar, calado** (o físico continua `numeric(12,4)`). A revisão leu nas fontes que o incremental normal
+  pulava a checagem; medido, não pula.
+- **Os nomes da PK do dbt oscilam** entre `x__dbt_tmp_pkey` e `x__dbt_tmp_pkey1`. A guarda lê a
+  *constraint* por tipo e colunas, nunca pelo nome.
+- **O `data_type` não chama macro do projeto** (`'tipo' is undefined`); a expressão em linha com
+  `target.type`, a do `consumption`, funciona.
+- **O BigQuery recusa o tipo parametrizado no `cast`** (`numeric(12,4)`; Registro da fase GCP, a tabela
+  das recusas), e o dbt-bigquery o põe cru no `cast` da checagem do contrato (RVB6-1-01, lido nas fontes,
+  não executado). Ele traduz só `TEXT`, `FLOAT` e `INTEGER`; `bigint`, `boolean`, `numeric` e `date` o
+  BigQuery aceita; `character varying`, `timestamp with time zone` e `numeric(p,s)` pedem a expressão em
+  linha. O arredondamento na escala, no BigQuery, já é do SQL (`decimal_fixo`).
+- **A fato incremental já tem `on_schema_change='fail'`**, que o *contract* exige numa incremental.
+- **Não medido:** o tempo de retirar e validar as 58 FKs a cada execução no armazém real (a maior fato tem
+  81.354 linhas); a ausência de *deadlock* no grafo real; a execução interrompida no meio (as FKs ficariam
+  de fora até a seguinte); o `RESET=1` com as chaves SCD reais (a sonda faz só `--full-refresh`, sem
+  *snapshot*); o BigQuery inteiro (L9).
 
 #### O desenho proposto (para a revisão e para a rodada 10 do §6)
 
 1. ***Contract* em toda a camada**, declarado onde a camada é declarada: `+contract: {enforced: true}`
    em `analytics` no `dbt_project.yml`.
-2. **`data_type` nas 513 colunas**, o tipo físico de hoje (Q35): escrito uma vez por um script que lê o
-   `information_schema` de um *build* limpo, com a expressão em linha para `character varying` e
-   `timestamp with time zone`, e o `numeric` com a precisão física quando ela existe. Depois disso é
-   declaração: mudar o tipo de uma coluna passa a ser mudança no `.yml`, e o *build* falha antes de o
-   consumidor ler o tipo novo.
-3. **PK na chave substituta de cada modelo** (26), como `constraints: [{type: primary_key}]` da coluna,
+2. **`data_type` nas 513 colunas**, o tipo físico de hoje (Q35): escrito uma vez por um script, do esquema
+   que o próprio adaptador lê de um `select` sem linhas de cada modelo, com os modificadores do catálogo
+   físico. Por alvo, na expressão em linha: `character varying` → `string`, `timestamp with time zone` →
+   `timestamp`, `numeric(p,s)` → `numeric` (a escala no BigQuery continua a do SQL; nenhuma precisão
+   nova, nenhum `BIGNUMERIC`, nenhum arredondamento a mais). Depois disso é declaração.
+3. **O que o tipo declarado garante, e o que não.** O *contract* faz o *build* falhar quando o tipo base
+   calculado muda; quando só a precisão, a escala ou o comprimento mudam, ele grava no tipo declarado e
+   arredonda calado (medido). A guarda complementar do item 7 fecha isso no PostgreSQL.
+4. **PK na chave substituta de cada modelo** (26), como `constraints: [{type: primary_key}]` da coluna,
    dentro do *contract*: nasce com a tabela, e na incremental fica.
-4. **FK das 58 `relationships`**, que são a declaração: nada se declara duas vezes (Q34). A macro
-   `instalar_chaves` no `on-run-end`, depois do acesso e antes do fecho do log, instala a FK que falta,
-   com o nome `fk_<tabela>__<coluna>`, só de `analytics` para `analytics`, só em `run` e `build`. Ela
-   instala também a PK declarada que falta (a incremental que já existe, medido acima): nenhuma migração
-   à mão. Com órfão, a instalação falha, a execução sai com erro, o fecho não grava e a procedência fica
-   `not_verified` (ADR-0054) — a falha aparece onde o consumidor já olha.
-5. **O BigQuery**: a PK pelo *contract* (o dbt-bigquery a escreve `NOT ENFORCED`), a FK pela mesma macro,
-   por despacho de adaptador (`alter table … add constraint … not enforced`; a existência por
-   `INFORMATION_SCHEMA.TABLE_CONSTRAINTS`). Sem GCP nesta fase, nada disso é exercitado (L9).
-6. **As guardas.** Sem banco, sobre o *manifest*: todo modelo de `analytics` com *contract*, toda
-   coluna com `data_type`, uma PK por modelo e ela é a coluna com `unique` e `not_null`; o oráculo das 58
-   `relationships`. No armazém, sobre o `pg_constraint`: as 26 PKs e as 58 FKs declaradas, por colunas e
-   tabela apontada, e nenhuma outra. Contraprova: tirar uma FK à mão num banco efêmero e ver a execução
-   seguinte reinstalá-la; uma dimensão sem uma chave faz a execução falhar.
-7. **A prova das quatro situações** no projeto real, lendo o `pg_constraint` e o `consumption` no fim:
-   a instalação inicial (o primeiro *build* com *contract* sobre o armazém de hoje), a segunda execução
-   incremental e a reconstrução só de dimensão, na entrega; o `RESET=1`, que apaga o histórico SCD
-   (permanente, ADR-0017), onde a Q37 disser.
-8. **O que não muda:** a materialização (ADR-0016), o `relationships`, o `unique` e o `not_null` (o teste
-   prova o valor; a *constraint* declara e, no PostgreSQL, impõe), o `consumption`. O pacote já publica
-   `data_type` por coluna: as 513 deixam de ser `null`, mudança de valor que entra em Consumidores §5
-   como `prevista` antes do *commit* que a faz. As chaves não ganham campo novo no pacote (Q36).
-9. **O ADR** (o próximo número, 0056) se escreve depois das respostas da rodada 10 e da revisão deste
-   desenho, e declara o ciclo de vida medido acima.
+5. **FK das 58 `relationships`**, que são a declaração (Q34): nada se declara duas vezes, e só se
+   interpreta a `relationships` de `analytics` para `analytics`, sem `where` (a guarda recusa a que fugir
+   disso). Duas macros, só em `run` e `build`: no `on-run-start`, depois da abertura do log, **retirar toda
+   FK de `analytics`** — sem ela, nenhum `cascade` nem trava entre modelos durante a execução; no
+   `on-run-end`, depois do acesso e antes do fecho, **instalar a PK declarada que falta e cada FK**, com o
+   nome `fk_<tabela>__<coluna>`, conferindo a existência pela definição. As FKs existem entre execuções,
+   não durante.
+6. **A falha.** Órfão faz a instalação falhar; a execução sai com erro, o fecho não grava e a procedência
+   fica `not_verified` (ADR-0054). O que fica: as linhas órfãs na fato e a FK de fora; o `relationships` do
+   mesmo *build* diz quantas e onde. A recuperação é a de hoje: refazer a dimensão, ou reconstruir a
+   incremental pelo `--full-refresh` dela, que relê `trusted`. **Nenhuma linha se apaga para a FK
+   passar**: remoção ou outro destino é tratamento novo, com motivo e decisão do Owner (CLAUDE.md §6,
+   regra 4). A linha `started` que a falha deixa só sai pelo abandono do custodiante, como hoje.
+7. **As guardas.** Sem banco, sobre o *manifest*: todo modelo de `analytics` com *contract*, toda coluna
+   com `data_type`, uma PK por modelo e ela é uma coluna com `unique` e `not_null`; toda `relationships` de
+   `analytics` cabe na regra do item 5; o oráculo das 58. No armazém: sobre o `pg_constraint`, as 26 PKs e
+   as 58 FKs declaradas, por colunas, tabela apontada e `convalidated`, e nenhuma outra; e o tipo que o
+   `select` sem linhas de cada modelo calcula — com precisão, escala e comprimento — é o declarado (o que o
+   *contract* não pega). Contraprovas: FK retirada à mão volta na execução seguinte; dimensão sem uma
+   chave faz a execução falhar; escala trocada num modelo faz a guarda de tipo falhar.
+8. **O BigQuery**: a PK pelo *contract* (o dbt-bigquery a escreve `NOT ENFORCED`); a retirada e a
+   instalação da FK pelas mesmas macros, por despacho de adaptador (`alter table … add constraint … not
+   enforced`; a existência por `INFORMATION_SCHEMA.TABLE_CONSTRAINTS`). Sem GCP nesta fase, nada disso é
+   exercitado (L9), nem o efeito no Gemini e no Knowledge Catalog, que é o alvo do F10.
+9. **A prova no projeto real**, na entrega, lendo o `pg_constraint` e o `consumption` no fim: a instalação
+   inicial (o primeiro *build* com *contract* sobre o armazém de hoje), a segunda execução incremental, a
+   reconstrução só de dimensão, o tempo das 58 FKs e a ausência de *deadlock* com quatro *threads*. O
+   `RESET=1`, que apaga o histórico SCD (permanente, ADR-0017), onde a Q37 disser; até lá é pendência, não
+   evidência.
+10. **O que não muda:** a materialização (ADR-0016), o `relationships`, o `unique` e o `not_null` (o teste
+    prova o valor; a *constraint* declara e, no PostgreSQL, impõe), o `consumption`, o abandono da linha
+    aberta (ADR-0054). O pacote já publica `data_type` por coluna: as 513 deixam de ser `null`, mudança de
+    valor que entra em Consumidores §5 como `prevista` antes do *commit* que a faz. As chaves não ganham
+    campo no pacote se a Q36 ficar na recomendação.
+11. **O ADR** (o próximo número, 0056) se escreve depois das respostas da rodada 10 e da revisão deste
+    desenho, e separa o ciclo medido nas sondas do que só a entrega e o Bloco 5R vão provar.
 
 ### Fechamento
 
@@ -1243,10 +1274,10 @@ Medido antes de perguntar: Bloco 6, "O que foi medido". A recomendação de cada
 
 | | Pergunta | Recomendação | Alternativas |
 |---|---|---|---|
-| **Q34** | Onde a FK se declara e como se instala, se a FK no *contract* se perde na fato incremental e na reconstrução de dimensão (medido) | **As 58 `relationships` são a declaração; uma macro no `on-run-end` instala a FK que falta (e a PK que falta), com nome estável.** Nada se declara duas vezes; o ciclo de vida é um só, para tabela e incremental; órfão faz a execução falhar e a procedência ficar `not_verified` | (b) `foreign_key` no *contract* e, nos *post-hooks* de cada dimensão e da incremental, a reinstalação do que o `cascade` levou — duas declarações (teste e *constraint*) e a ordem do grafo para acertar, inclusive no `RESET=1`, quando a dimensão nova chega antes da fato velha; (c) mudar a materialização das dimensões para não recriar a tabela — volta ao ADR-0016 |
-| **Q35** | De onde vem o `data_type` das 513 colunas | **O tipo físico de hoje, escrito uma vez por script** a partir de um *build* limpo; depois é declaração, e mudar um tipo é mudar o `.yml` | (b) derivado a cada `make catalog-derivados` — o *contract* passaria a seguir o modelo, e mudança de tipo não falharia nunca; (c) escrito à mão, coluna a coluna (R14) |
-| **Q36** | O alcance das *constraints* | **PK e FK, e só**: o `not_null` e as chaves naturais continuam como teste; o pacote não ganha campo de chaves (a PK e a FK já se leem nos testes que ele publica) | (b) também um campo `keys` por relação no pacote — mudança de esquema, com a linha `prevista`; (c) também o `not_null` como *constraint* nas 164 colunas — no BigQuery vira `REQUIRED`, imposto |
-| **Q37** | Onde se prova o `RESET=1`, se ele apaga o histórico SCD, que é permanente | **No ciclo do Bloco 5R**, que já regera a origem e roda o `RESET=1` (Q25): a prova vai junto, sem apagar nada a mais | (b) agora, no armazém — apaga o histórico SCD fora do ciclo; (c) agora, num clone (`create database … template warehouse`), que pede o armazém sem nenhuma conexão: pausar o Airflow |
+| **Q34** | Onde a FK se declara e como vive, se a FK no *contract* se perde na fato incremental e na reconstrução de dimensão, e instalar só no fim trava com quatro *threads* (medido) | **As 58 `relationships` são a declaração; uma macro retira as FKs de `analytics` no `on-run-start` e outra instala no `on-run-end` a PK que falta e as FKs**, conferidas pela definição. Nada se declara duas vezes; um ciclo só, para tabela e incremental; nenhuma trava entre modelos durante a execução. Órfão faz a execução falhar e a procedência ficar `not_verified`; as linhas ficam, e a recuperação é a de hoje (refazer a dimensão ou o `--full-refresh` da incremental) — apagar linha para a FK passar é decisão sua | (b) `foreign_key` no *contract* e, nos *post-hooks* de cada dimensão e da incremental, a reinstalação do que o `cascade` levou — duas declarações, a ordem do grafo para acertar (no `RESET=1` a dimensão nova chega antes da fato velha) e o mesmo `cascade` concorrente que travou a sonda; (c) mudar a materialização das dimensões para não recriar a tabela — volta ao ADR-0016 |
+| **Q35** | De onde vem o `data_type` das 513 colunas, e o que ele garante | **O tipo físico de hoje, escrito uma vez por script** (o esquema do `select` sem linhas, com os modificadores do catálogo), por alvo onde o BigQuery pede (`character varying`, `timestamptz`, `numeric(p,s)`); depois é declaração. O *contract* pega a troca do tipo base, não a de precisão, escala ou comprimento, que ele arredonda calado (medido): uma guarda no armazém compara o tipo calculado com o declarado | (b) derivado a cada `make catalog-derivados` — o *contract* passaria a seguir o modelo, e mudança de tipo não falharia nunca; (c) escrito à mão, coluna a coluna (R14); (d) sem a guarda de tipo — aceitar que a mudança de escala passe arredondada |
+| **Q36** | O alcance das *constraints* e onde o consumidor lê as chaves | **PK e FK, e só**: o `not_null` e as chaves naturais continuam como teste, e o pacote não ganha campo de chaves. O consumidor lê as chaves no banco (no BigQuery, o alvo do F10) e no `.yml`; o pacote **não** as dá por inteiro: os testes que ele publica não trazem o destino da FK (`to`, `field`) nem distinguem a PK de outra coluna única (a `dim_date` tem `date_key` e `full_date`) | (b) um campo `keys` por relação no pacote, ou os argumentos nos testes publicados — mudança de esquema, com a linha `prevista`; (c) também o `not_null` como *constraint* nas 164 colunas — no BigQuery vira `REQUIRED`, imposto |
+| **Q37** | Onde se prova o `RESET=1`, se ele apaga o histórico SCD, que é permanente | **No ciclo do Bloco 5R**, que já regera a origem e roda o `RESET=1` (Q25): a prova vai junto, sem apagar nada a mais; até lá é pendência declarada | (b) agora, no armazém — apaga o histórico SCD fora do ciclo; (c) agora, num clone (`create database … template warehouse`), que pede o armazém sem nenhuma conexão: pausar o Airflow; (d) uma sonda isolada com *snapshots* de brinquedo, que exercita a troca das chaves SCD sem tocar no armazém |
 
 ## 7. Definição de pronto aplicada
 
