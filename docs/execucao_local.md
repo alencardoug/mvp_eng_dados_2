@@ -735,7 +735,8 @@ no meio ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)).
 De propósito, nada é verificado enquanto ela estiver aberta: uma execução antiga pode ainda estar
 escrevendo. Confira que ela não escreve mais (o processo; o *job* do Airbyte — com ou sem `job_id`,
 por `make airbyte-ativos DESDE=<started_at da linha>`, que falha se houver *job* em curso ou se a
-listagem, que traz os 100 mais recentes, não alcançar esse instante), marque-a com
+listagem, que traz os 100 mais recentes, não alcançar esse instante com folga de um segundo — o
+Airbyte dá o início em segundos), marque-a com
 `make governance-abandonar INVOCACAO=<invocation_id>` e rode um `make dbt-build` de um *checkout* limpo.
 O `invocation_id` da linha aberta sai de `select * from governance.dbt_invocations where status = 'started'`.
 

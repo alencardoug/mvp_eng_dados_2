@@ -1533,7 +1533,7 @@ gcp-airbyte-interno: gcp-preflight ## Depois de cada sincronização: o airbyte_
 	echo "ERRO: $$n tabela(s) no airbyte_internal — cópia bruta fora da exceção do G4 (RVT-1-02):"; \
 	printf '%s' "$$saida" | .venv/bin/python -c 'import json,sys; [print("  " + t["tableReference"]["tableId"]) for t in json.load(sys.stdin)]'; exit 1
 
-gcp-airbyte-ativos: gcp-preflight require-kubectl ## Antes do passo 3 do desmonte: nenhum job do Airbyte do GKE em curso (RVT-1-04); falha se houver
+gcp-airbyte-ativos: gcp-preflight require-kubectl ## Antes do passo 3 do desmonte: nenhum job do Airbyte do GKE em curso (RVT-1-04); falha se houver, e também com 100 jobs ou mais no histórico, porque a listagem não prova a ausência global (Pendências V3, item 10)
 	@$(GCP_ENV); $(GCP_LIMPEZA); $(GKE_KUBECTL); $(GKE_AIRBYTE); \
 	.venv/bin/python -m mvp_ed1.airbyte ativos
 

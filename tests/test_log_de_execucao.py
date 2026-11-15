@@ -411,6 +411,23 @@ def test_a_conferencia_dos_ativos_so_conclui_com_a_listagem_que_alcanca(monkeypa
     assert diz in capsys.readouterr().out
 
 
+def test_o_segundo_da_fronteira_nao_prova_o_alcance(monkeypatch, capsys) -> None:
+    """RVL5I-3-01, a contraprova do revisor: o `startTime` vem em segundos; o mais antigo listado e um ativo
+    omitido nascem no mesmo segundo da abertura, depois dela. A listagem não alcança a abertura."""
+    from mvp_ed1 import airbyte
+
+    universo = ([{"jobId": 200 - i, "status": "succeeded", "startTime": "2026-11-14T12:05:00Z"} for i in range(99)]
+                + [{"jobId": 101, "status": "succeeded", "startTime": "2026-11-14T12:00:00Z"},   # criado às .700
+                   {"jobId": 100, "status": "running", "startTime": "2026-11-14T12:00:00Z"}])    # criado às .600
+    monkeypatch.setattr(airbyte, "token", lambda: "jwt")
+    monkeypatch.setattr(airbyte, "jobs", lambda jwt, limite=100: {"data": universo[:limite]})
+    assert airbyte.em_curso({"data": universo}) != []
+    assert airbyte.main(["ativos", "--desde", "2026-11-14T12:00:00.500000Z"]) == 1
+    assert airbyte.main(["ativos", "--desde", "2026-11-14T12:00:00.999999Z"]) == 1
+    assert airbyte.main(["ativos", "--desde", "2026-11-14T12:00:01Z"]) == 0            # o segundo inteiro antes
+    capsys.readouterr()
+
+
 def test_a_conferencia_dos_ativos_recusa_com_job_em_curso(monkeypatch, capsys) -> None:
     from mvp_ed1 import airbyte
 

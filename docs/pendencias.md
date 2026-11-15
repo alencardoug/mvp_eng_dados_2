@@ -254,6 +254,9 @@ do item 9.
     de hoje usam `clock_timestamp()`, `::jsonb` e `commit;`), a ordem sem identidade e o IAM da tabela.
     E o funil do Airbyte (`mvp_ed1.airbyte.sincronizar`) registra sempre no PostgreSQL do `.env`: no
     `gcp-sync-retail` e no `gcp-sync-legacy`, a linha iria para o armazém local, não para o BigQuery.
+    E o `gcp-airbyte-ativos` do passo 3 do desmonte recusa sempre que o histórico chega a 100 *jobs*: a
+    listagem traz só os mais recentes e não prova a ausência global (RVL5I-3-02). Falta uma prova que
+    a dê — paginar a listagem, ou filtrar os ativos no servidor —, medida contra a API do Airbyte.
     É código ausente, não só teste real pendente; nada disso se cria com a fase encerrada (Q14).
 
 *Efeito de não decidir:* nenhum no projeto local. Os itens 1, 2, 6, 7 e 10 voltam se a fase GCP for
