@@ -2774,8 +2774,11 @@ sources:
         meta:
           domain: transversal
           owner: data_custodian
+          # O `analyst` (o login de leitura dos consumidores) lê **só esta view** em `governance`, porque
+          # o BI a consulta na transação de captura (ADR-0054); a view roda com os privilégios do dono, e
+          # a tabela do log continua negada a ele (decisão do Owner, 15/11/2026).
           grants:
-            select: [auditor, transformer]
+            select: [analyst, auditor, transformer]
         columns:
           - name: status
             description: "`verified` ou `not_verified`."

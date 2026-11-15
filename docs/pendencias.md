@@ -251,7 +251,8 @@ do item 9.
     RVL5I-1-06): a [ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md) declara a
     paridade, mas no código só existe o DDL da tabela `governance.dbt_invocations` em
     `MIGRACOES_BIGQUERY`. Faltam a view `warehouse_provenance`, os *hooks* no dialeto do BigQuery (os
-    de hoje usam `clock_timestamp()`, `::jsonb` e `commit;`), a ordem sem identidade e o IAM da tabela.
+    de hoje usam `clock_timestamp()`, `::jsonb` e `commit;`), a ordem sem identidade, o IAM da tabela e
+    a leitura da view pelo grupo do `analyst`.
     E o funil do Airbyte (`mvp_ed1.airbyte.sincronizar`) registra sempre no PostgreSQL do `.env`: no
     `gcp-sync-retail` e no `gcp-sync-legacy`, a linha iria para o armazém local, não para o BigQuery.
     E o `gcp-airbyte-ativos` do passo 3 do desmonte recusa sempre que o histórico chega a 100 *jobs*: a

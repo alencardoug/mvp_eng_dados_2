@@ -65,7 +65,12 @@ EXCECOES: dict[tuple[str, str], dict[str, list[str]]] = {
     # O log de execução (ADR-0054): o dbt o abre e fecha; leem o auditor e o dbt.
     ("governance", "dbt_invocations"): {"select": ["auditor", "transformer"], "insert": ["transformer"],
                                         "update": ["transformer"]},
+    # A procedência, que o BI lê pelo login de leitura na transação de captura (ADR-0054; Owner, 15/11/2026).
+    ("governance", "warehouse_provenance"): {"select": ["analyst", "auditor", "transformer"]},
 }
+
+#: O que o `analyst` lê fora de `consumption`: só a view da procedência, nunca a tabela do log.
+FORA_DE_CONSUMPTION_DO_ANALYST = ["governance.warehouse_provenance"]
 
 ATERRISSAGEM = ("raw", "inventory_movements_stream")
 
@@ -215,9 +220,11 @@ def test_cada_papel_le_exatamente_o_que_a_politica_permite(leituras, materializa
 
 
 def test_o_perfil_de_analise_nao_alcanca_raw_staging_nem_trusted(leituras, materializadas) -> None:
-    """O critério da Etapa 11, pelo nome: `analyst` lê `consumption` inteira e nada fora dela."""
+    """O critério da Etapa 11, pelo nome: `analyst` lê `consumption` inteira e, fora dela, só a view da
+    procedência (ADR-0054) — que tem de estar entre as sondadas, e a tabela do log, negada."""
     alcancou = sorted(f"{s}.{t}" for (p, s, t), ok in leituras.items() if p == "analyst" and ok and s != "consumption")
-    assert alcancou == [], f"analyst alcançou: {alcancou}"
+    assert alcancou == FORA_DE_CONSUMPTION_DO_ANALYST, f"analyst alcançou: {alcancou}"
+    assert leituras[("analyst", "governance", "dbt_invocations")] is False
     nao_leu = sorted(f"{s}.{t}" for (p, s, t), ok in leituras.items() if p == "analyst" and not ok and s == "consumption")
     assert nao_leu == [], f"analyst não leu em consumption: {nao_leu}"
     assert {s for s, _ in materializadas} >= {"raw", "staging", "trusted", "consumption"}
@@ -293,11 +300,13 @@ def test_o_login_de_leitura_e_membro_so_de_analyst_e_sem_superpoderes(motor) -> 
 
 
 def test_o_login_de_leitura_le_consumption_e_nada_mais(leitor, materializadas, record_property) -> None:
+    """O login dos consumidores: `consumption` inteira e, fora dela, só a view da procedência (ADR-0054)."""
+    assert set(FORA_DE_CONSUMPTION_DO_ANALYST) <= {f"{s}.{t}" for s, t in materializadas}
     divergentes: list[str] = []
     with leitor.connect().execution_options(isolation_level="AUTOCOMMIT") as conexao:
         for schema, tabela in materializadas:
             conseguiu = _tenta(conexao, f"select 1 from {schema}.{tabela} limit 0")
-            if conseguiu != (schema == "consumption"):
+            if conseguiu != (schema == "consumption" or f"{schema}.{tabela}" in FORA_DE_CONSUMPTION_DO_ANALYST):
                 divergentes.append(f"{'leu' if conseguiu else 'não leu'} {schema}.{tabela}")
     record_property("probes", len(materializadas))
     assert divergentes == [], "\n".join(divergentes[:20])

@@ -63,8 +63,8 @@ opera (`make`). Um consumidor que lê o armazém entra pelo próprio login, hoje
    corte consistente.
 4. **Qual *build* está no banco.** Cada *build* que muda o que um consumidor lê entra na §5, com o
    *commit* e o `invocation_id`. E, desde 15/11/2026, o próprio armazém responde
-   ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)): na mesma transação da leitura,
-   `select * from governance.warehouse_provenance` diz `verified`, com o *commit* e a execução, ou
+   ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)): na mesma transação da leitura, pelo
+   próprio login (que em `governance` só lê esta *view*), `select * from governance.warehouse_provenance` diz `verified`, com o *commit* e a execução, ou
    `not_verified`, com o motivo. Para a leitura sair verificada, **antes de abrir a janela** esta
    sessão roda `make dbt-build` de um *checkout* limpo, sem nada depois dele: execução parcial, da DAG,
    sincronização, restauração ou linha aberta tiram o `verified`. Ele afirma o código da última execução

@@ -10,10 +10,10 @@
 
 | Campo | Informação |
 |---|---|
-| Versão | 2.24 |
+| Versão | 2.25 |
 | Situação | Vigente para a fase local |
 | Responsável | Líder de Governança |
-| Última revisão | 15/11/2026 — §6, a procedência do armazém pelo log de execução (ADR-0054); 10/11/2026 — §5.2 alinhada às decisões D79 e D80 da Etapa 13; 05/11/2026 — §5.1: a coluna é achada pelo nome que o YAML lê, e todo conteúdo final é lido estrito antes de qualquer escrita; o domínio é escrito e conferido no `meta` efetivo; o limite do escritor em bloco (rodadas 11 e 12 do lote 3 da v1.1.0) |
+| Última revisão | 15/11/2026 — §6, a procedência do armazém pelo log de execução (ADR-0054); §7, o `analyst` lê a view da procedência; 10/11/2026 — §5.2 alinhada às decisões D79 e D80 da Etapa 13; 05/11/2026 — §5.1: a coluna é achada pelo nome que o YAML lê, e todo conteúdo final é lido estrito antes de qualquer escrita; o domínio é escrito e conferido no `meta` efetivo; o limite do escritor em bloco (rodadas 11 e 12 do lote 3 da v1.1.0) |
 
 ---
 
@@ -307,7 +307,7 @@ são *roles* do PostgreSQL; na fase GCP, contas de serviço e grupos IAM por dat
 | `ingestor` | `raw`, `raw_legacy`, `governance` | as próprias | Conta de serviço do Airbyte |
 | `transformer` | `staging`, `trusted`, `analytics`, `consumption`, `quarantine`, `snapshots` | camadas anteriores | Conta de serviço do dbt |
 | `streamer` | `raw.inventory_movements_stream` | a própria | Conta de serviço do Dataflow |
-| `analyst` | — | `consumption` apenas | Grupo IAM no dataset das views |
+| `analyst` | — | `consumption`, e em `governance` só a *view* `warehouse_provenance`, que o BI lê na transação de captura ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)) | Grupo IAM no dataset das views |
 | `auditor` | — | `quarantine`, `governance` | Grupo IAM de auditoria |
 
 `governance` e `snapshots` não são camadas de fluxo: `governance` recebe o certificado de captura
