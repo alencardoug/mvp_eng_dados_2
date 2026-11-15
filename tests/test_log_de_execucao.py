@@ -428,6 +428,18 @@ def test_o_segundo_da_fronteira_nao_prova_o_alcance(monkeypatch, capsys) -> None
     capsys.readouterr()
 
 
+@pytest.mark.parametrize("item", [{}, {"startTime": None}])
+def test_a_pagina_cheia_sem_inicio_legivel_recusa_sem_estourar(monkeypatch, capsys, item) -> None:
+    """RVL5I-4-01: sem nenhum início legível, a sentinela é `datetime.max`; a recusa continua, com o diagnóstico."""
+    from mvp_ed1 import airbyte
+
+    monkeypatch.setattr(airbyte, "token", lambda: "jwt")
+    monkeypatch.setattr(airbyte, "jobs", lambda jwt, limite=100: {
+        "data": [{"jobId": i, "status": "succeeded"} | item for i in range(limite)]})
+    assert airbyte.main(["ativos", "--desde", "2026-11-15T00:00:00Z"]) == 1
+    assert "nada se conclui" in capsys.readouterr().out
+
+
 def test_a_conferencia_dos_ativos_recusa_com_job_em_curso(monkeypatch, capsys) -> None:
     from mvp_ed1 import airbyte
 

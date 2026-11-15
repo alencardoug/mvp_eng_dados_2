@@ -405,8 +405,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             # O `startTime` vem em segundos (como em `capture_recovery._em_segundos`): o mais antigo listado
             # nasceu em algum ponto do segundo dele, e um omitido do mesmo segundo pode ser posterior à
-            # abertura. Só o segundo **inteiro** antes de `--desde` prova o alcance (RVL5I-3-01).
-            if args.desde and antigo + dt.timedelta(seconds=1) <= _instante(args.desde):
+            # abertura. Só o segundo **inteiro** antes de `--desde` prova o alcance (RVL5I-3-01). O segundo sai
+            # de `--desde`, e não soma ao `antigo`, que pode ser a sentinela `datetime.max` (RVL5I-4-01).
+            if args.desde and antigo <= _instante(args.desde) - dt.timedelta(seconds=1):
                 print(f"airbyte: nenhum job em curso desde {args.desde} (a listagem vai até {antigo.isoformat()})")
                 return 0
             print(f"ERRO: nenhum em curso entre os {JOBS_DA_LISTAGEM} mais recentes, que só vão até "

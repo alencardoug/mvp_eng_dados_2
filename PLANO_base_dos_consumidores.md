@@ -607,7 +607,8 @@ revisão do desenho achou a quarta (RVL5-1-06), e o Owner a incluiu em 15/11/202
 o dicionário e a linhagem — saem da regeneração. A linha `prevista` em Consumidores §5 sai num *commit*
 antes do que renomeia, e vira `feita` com o *build*.
 
-**Implementado em 15/11/2026** (a Q6 em `5fcda58`, `4f10bca`; a L5 em `b56b2bc` e no *commit* seguinte):
+**Implementado em 15/11/2026** (a Q6 em `5fcda58`, `4f10bca`; a L5 em `b56b2bc`, `db6d78c` e `1182240`, com as
+respostas à revisão em `8818005`, `4152272`, `8db57e3` e no *commit* que a fecha; rodadas 29 a 32 do §9):
 exercitado no armazém de trabalho um `make dbt-build` integral (`full_build` medido, aprovado, insumos
 confirmados; `dirty_tree` enquanto a mudança não estava versionada), um `--select` (`partial_execution`) e um
 `dbt test` (sem linha). Num armazém efêmero, a regra de leitura inteira, o registro da sincronização do
@@ -616,6 +617,12 @@ filtro da lista desligado, o log é substituído). **Não exercitados:** o teste
 (exige `make test FATO=1`, que o Owner autoriza); o `dbt retry` depois de uma falha e o *hook* de acesso
 falhando antes do fecho, num `build` de verdade (a cobertura e a ordem dos *hooks* estão provadas por
 construção e pelo log); a restauração no armazém de trabalho (`RESTAURAR=1`).
+
+**Medido depois da revisão:** o primeiro `verified` — o *build* do `make check` em `1182240`, com a árvore limpa
+(invocação `7416daae-e3e3-48b6-b236-3ac3da0d92f6`), na *view* e no leitor do pacote com o *manifest* da mesma
+invocação; e um `make dbt-build DBT_ARGS='--exclude-resource-type unit_test'` (941 nós, os 948 menos os 7 testes de
+unidade) que sai `partial_execution` (RVL5I-1-01). A sincronização real do Airbyte e a DAG com o log continuam
+não exercitadas; o que falta no BigQuery está nas Pendências, V3, item 10.
 
 ### Bloco 5 — domínios e métricas (F7, F9)
 
@@ -995,3 +1002,21 @@ perda ou invenção de item com documento escrito de boa-fé; forma exótica, ob
 contrato. A primeira versão do pacote, que os consumidores fixam, é a de `acb26d0` (Consumidores §6).
 Seguem com o Owner a L5 (procedência do armazém, tabela nova em `governance`) e a L10 (evidências do GCP).
 
+### Rodadas 29 a 32 — Codex conta 1, sobre a implementação da L5 e da Q6 (15/11/2026)
+
+Relatórios em `codex1_l5_impl_r1.md` a `r4.md`; objeto inicial `523f661..1182240` (a Q6, as duas partes da L5 e a
+linha `feita` de Consumidores §5). O desenho tinha passado por seis rodadas antes (seção "L5 e Q6"). Antes de
+enviar, achado meu: o pacote de `b56b2bc` estava atrasado (os insumos só viam o rastreado), corrigido em
+`db6d78c`.
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 29 | `8818005` | 2 bloqueantes, 3 ajustes, 1 observação (RVL5I-1-01 a 06) | A cobertura do *build* integral exige os testes de unidade; o POST do Airbyte só fecha `failed` com recusa provada; a sincronização garante o `governance`; o log sai das contagens dos dois lados; a linha de §5 diz que faltou a `prevista`; a paridade do BigQuery vai às Pendências (V3, item 10). Achado meu na resposta: o `make sync-airbyte` não carregava o `.env` desde `db6d78c` |
+| 30 | `4152272` | 2 observações | As funções do dbt entram na cobertura; `make airbyte-ativos` só conclui com a listagem completa ou que alcança `DESDE=` |
+| 31 | `8db57e3` | 2 observações | O alcance exige o segundo inteiro (o Airbyte dá o início em segundos); a recusa do `gcp-airbyte-ativos` com 100 *jobs* fica dita |
+| 32 | este fecho | 1 observação | O segundo de folga sai do `DESDE`, sem aritmética na sentinela de página sem início legível |
+
+**A revisão da implementação da L5 e da Q6 está fechada.** Da rodada 30 em diante, nenhuma achou bloqueio; a
+observação da 32 é de diagnóstico, com o conserto de uma linha provado pela contraprova do próprio revisor, e
+por isso foi respondida no *commit* de fecho, sem rodada 33. A calibração foi a do desenho: bloqueante só para
+caminho concreto, com operação suportada, que quebre promessa da ADR-0054 ou do contrato do pacote.
