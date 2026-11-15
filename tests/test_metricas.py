@@ -53,6 +53,9 @@ def test_referencias_quebradas_sao_recusadas(tmp_path) -> None:
         ("  ticket_medio.md: [average_order_value]", "  ticket_medio.md: [ticket_medio]", "não é medida nem métrica"),
         ("  ticket_medio.md: [average_order_value]", "  ticket_inventado.md: [average_order_value]", "não existe no glossário"),
         ("  ticket_medio.md: [average_order_value]", "  ticket_medio.md: []", "sem medidas"),
+        ("  average_order_value_by_channel_and_segment:\n    question: P02\n",
+         "  average_order_value_by_channel_and_segment:\n    question: P02\n    combine: {type: full, keys: [year_month]}\n",
+         "uma fonte e `combine`"),                                                              # RVB5B-2-01
     ]
     for de, para, erro in casos:
         assert texto.count(de) >= 1, de
@@ -82,33 +85,57 @@ def test_fatos_e_dimensoes_da_tabela_sao_os_que_a_view_le() -> None:
         assert set(fatos) | set(dims) == {r for r in lidas if r.startswith("analytics.")}, no["name"]
 
 
-def test_a_aditividade_declarada_e_a_do_comeco_da_descricao() -> None:
-    """Toda coluna de medida, métrica ou referência de `consumption` começa a descrição pela aditividade, e ela é
-    a da declaração (F28; RVB5B-1-01). A única dispensa é a descrição que é só o bloco do conceito
-    (`{{ doc(...) }}`), que o mecanismo de herança das descrições guarda; nenhuma outra passa calada."""
+def _aditividade_contra_a_descricao(doc: dict) -> tuple[list[str], list[str], int]:
+    """(sem rótulo, divergentes, conferidas): o começo da descrição de cada coluna de medida, métrica ou
+    referência de `consumption` contra a aditividade que `doc` declara."""
     import re
     import yaml
     rotulo = {"Aditiva": "additive", "Semiaditiva": "semi_additive", "Não aditiva": "non_additive"}
     texto = (metrics.sensitivity.ROOT / "dbt" / "models" / "consumption" / "_consumption__models.yml").read_text(encoding="utf-8")
-    divergentes, sem_rotulo, conferidas, do_conceito = [], [], 0, 0
+    divergentes, sem_rotulo, conferidas = [], [], 0
     for modelo in yaml.safe_load(texto)["models"]:
-        view = DOC["views"][modelo["name"]]
+        view = doc["views"][modelo["name"]]
         for coluna in modelo.get("columns") or []:
             if metrics.role(coluna["name"], view["columns"][coluna["name"]])[0] not in ("measure", "metric", "reference"):
                 continue
             descricao = (coluna.get("description") or "").strip()
-            if re.fullmatch(r"\{\{ doc\([\"']\w+[\"']\) \}\}", descricao):
-                do_conceito += 1
-                continue
             m = re.match(r"(?:\*\*)?(Aditiva|Semiaditiva|Não aditiva)\b", descricao)
             if not m:
                 sem_rotulo.append(f"{modelo['name']}.{coluna['name']}")
                 continue
             conferidas += 1
-            if metrics.additivity(DOC, view, coluna["name"]) != rotulo[m.group(1)]:
+            if metrics.additivity(doc, view, coluna["name"]) != rotulo[m.group(1)]:
                 divergentes.append(f"{modelo['name']}.{coluna['name']}")
+    return sem_rotulo, divergentes, conferidas
+
+
+def test_a_aditividade_declarada_e_a_do_comeco_da_descricao() -> None:
+    """Toda coluna de medida, métrica ou referência de `consumption` começa a descrição pela aditividade, e ela é
+    a da declaração (F28; RVB5B-1-01). Sem dispensa: a descrição que traz o bloco do conceito também leva o
+    rótulo antes dele (RVB5B-2-02) — herdar o texto do conceito não certifica a classificação."""
+    sem_rotulo, divergentes, conferidas = _aditividade_contra_a_descricao(DOC)
     assert sem_rotulo == [] and divergentes == []
-    assert conferidas > 75 and do_conceito < 10
+    assert conferidas == 88
+
+
+@pytest.mark.parametrize(("view", "coluna", "para"), [
+    pytest.param("repeat_purchase_rate_after_support", "order_count", "additive", id="P16-contagem-entre-categorias"),
+    pytest.param("skus_below_reorder_point", "quantity_available", "additive", id="P12-saldo-do-conceito"),
+    pytest.param("on_time_delivery_rate_by_carrier", "on_time_rate", "additive", id="P13-taxa-do-conceito"),
+])
+def test_a_guarda_de_aditividade_recusa_a_classificacao_trocada(view: str, coluna: str, para: str) -> None:
+    """Contraprova: trocar só a classificação de uma coluna — inclusive uma descrita pelo bloco do conceito —
+    faz a guarda apontar aquela coluna."""
+    alterado = copy.deepcopy(DOC)
+    colunas = alterado["views"][view]["columns"]
+    papel = colunas[coluna]
+    if isinstance(papel, str):
+        colunas[coluna] = {papel: coluna, "additivity": para}
+    else:
+        colunas[coluna] = {**papel, ("reference" if "reference" in papel else "additivity"): para}
+    assert metrics.additivity(alterado, alterado["views"][view], coluna) == para
+    _, divergentes, _ = _aditividade_contra_a_descricao(alterado)
+    assert divergentes == [f"{view}.{coluna}"]
 
 
 def test_a_tabela_gerada_e_lida_pelo_pacote_com_os_nomes_fisicos() -> None:

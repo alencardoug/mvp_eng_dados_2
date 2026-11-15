@@ -162,6 +162,14 @@ def _sem(dado: dict, *caminho: str) -> dict:
     return copia
 
 
+_COMBINA = {"type": "full", "keys": ["year_month"], "missing": None}
+
+
+def _fontes(dado: dict, n: int) -> list:
+    """`n` cópias da fonte da view do exemplo — a forma válida, para a contagem ser o que muda."""
+    return [copy.deepcopy(dado["view_rules"][VIEW]["sources"][0]) for _ in range(n)]
+
+
 def _com(dado: dict, valor, *caminho: str) -> dict:
     copia = copy.deepcopy(dado)
     alvo = copia
@@ -231,6 +239,9 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
         pytest.param(lambda e: _com(e, "additive", "view_rules", VIEW, "columns", "year_month", "additivity"), id="grao-com-aditividade"),
         pytest.param(lambda e: _com(e, [], "view_rules", VIEW, "sources"), id="view-montada-sem-fonte"),
         pytest.param(lambda e: _com(e, {"test": "t", "query": "q", "reason": "r"}, "view_rules", VIEW, "reference"), id="referencia-com-montagem"),
+        pytest.param(lambda e: _com(e, _fontes(e, 2), "view_rules", VIEW, "sources"), id="duas-fontes-sem-combinacao"),
+        pytest.param(lambda e: _com(_com(e, _COMBINA, "view_rules", VIEW, "combine"), _fontes(e, 3), "view_rules", VIEW, "sources"), id="tres-fontes"),
+        pytest.param(lambda e: _com(e, _COMBINA, "view_rules", VIEW, "combine"), id="uma-fonte-com-combinacao"),
         pytest.param(
             lambda e: _com(
                 e,
@@ -244,3 +255,10 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
 )
 def test_o_esquema_recusa_o_exemplo_alterado(validador, exemplo, alterar) -> None:
     assert list(validador.iter_errors(alterar(exemplo)))
+
+
+def test_o_esquema_aceita_duas_fontes_combinadas(validador, exemplo) -> None:
+    """O controle das contraprovas da combinação (RVB5B-2-01): duas fontes com `combine` passam — a recusa
+    acima vem da falta da combinação ou da contagem de fontes, não da forma da fonte copiada."""
+    alterado = _com(_com(exemplo, _COMBINA, "view_rules", VIEW, "combine"), _fontes(exemplo, 2), "view_rules", VIEW, "sources")
+    assert list(validador.iter_errors(alterado)) == []

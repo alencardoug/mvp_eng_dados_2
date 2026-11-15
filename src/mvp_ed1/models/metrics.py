@@ -111,6 +111,8 @@ def _conferir_view(caminho, doc, nome, view) -> None:
             raise ValueError(f"{caminho}: view `{nome}` com duas fontes e sem `combine` (`full` ou `left`, `keys`)")
         if len(fontes) != 2:
             raise ValueError(f"{caminho}: view `{nome}`: o montador combina duas fontes")
+    elif view.get("combine"):
+        raise ValueError(f"{caminho}: view `{nome}` com uma fonte e `combine`: só duas fontes se combinam")
     for coluna, papel in view["columns"].items():
         papel_nome, alvo = role(coluna, papel)
         if papel_nome not in ROLES:

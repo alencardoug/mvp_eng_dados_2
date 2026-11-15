@@ -1947,7 +1947,29 @@
             "type": "object"
           },
           "sources": {
-            "minItems": 1
+            "minItems": 1,
+            "maxItems": 2
+          }
+        },
+        "if": {
+          "properties": {
+            "sources": {
+              "minItems": 2
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "combine": {
+              "type": "object"
+            }
+          }
+        },
+        "else": {
+          "properties": {
+            "combine": {
+              "type": "null"
+            }
           }
         }
       },

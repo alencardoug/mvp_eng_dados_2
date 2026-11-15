@@ -536,7 +536,7 @@ models:
       - name: abandoned_cart_count
         meta:
           sensitivity: internal
-        description: '{{ doc("abandoned_cart") }}'
+        description: 'Aditiva. {{ doc("abandoned_cart") }}'
         data_type: bigint
       - name: cart_conversion_rate_pct
         meta:
@@ -981,7 +981,7 @@ models:
       - name: quantity_available
         meta:
           sensitivity: internal
-        description: '{{ doc("stock_availability") }}'
+        description: 'Semiaditiva. {{ doc("stock_availability") }}'
         data_type: integer
       - name: quantity_from_batch
         meta:
@@ -1006,7 +1006,7 @@ models:
       - name: is_stockout
         meta:
           sensitivity: internal
-        description: '{{ doc("stockout") }}'
+        description: 'Não aditiva. {{ doc("stockout") }}'
         data_type: boolean
       - name: daily_demand_units
         meta:
@@ -1016,7 +1016,7 @@ models:
       - name: days_of_cover
         meta:
           sensitivity: internal
-        description: '{{ doc("days_of_cover") }}'
+        description: 'Não aditiva. {{ doc("days_of_cover") }}'
         data_type: numeric
       - name: last_movement_at
         description: "Não aditiva — instante do último movimento do SKU no armazém."
@@ -1143,7 +1143,7 @@ models:
         meta:
           sensitivity: internal
           description_reason: o conceito do glossário define a medida e a marca de que ela é feita, com o mesmo bloco
-        description: '{{ doc("on_time_delivery") }}'
+        description: 'Não aditiva. {{ doc("on_time_delivery") }}'
         data_type: numeric
       - name: avg_delay_days_when_late
         meta:
@@ -1270,7 +1270,7 @@ models:
         meta:
           sensitivity: internal
           description_reason: o conceito do glossário define a medida e a marca de que ela é feita, com o mesmo bloco
-        description: '{{ doc("order_to_delivery_cycle") }}'
+        description: 'Não aditiva. {{ doc("order_to_delivery_cycle") }}'
         data_type: numeric
       - name: median_order_to_delivery_days
         meta:
@@ -1476,7 +1476,7 @@ models:
       - name: repeat_purchase_rate
         meta:
           sensitivity: internal
-        description: '{{ doc("post_order_repeat_purchase") }}'
+        description: 'Não aditiva. {{ doc("post_order_repeat_purchase") }}'
         data_type: numeric
       - name: avg_days_to_next_order
         meta:
