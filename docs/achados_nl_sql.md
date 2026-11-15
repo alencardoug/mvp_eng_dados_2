@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 15/11/2026 (F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -427,6 +427,19 @@ inventário.
   vira fato em `analytics` (revisão do Bloco 5R, RVB5R-2-01 e 02).
 - **Aqui**, pela decisão do Owner (Q28 do plano da base dos consumidores): a reserva passa a ser de um SKU
   do carrinho ou do pedido dela, no Bloco 5R, no fim da fase.
+
+### F28 — A contagem de pedidos da P06 se diz aditiva e se repete entre categorias · **Gravidade: baixa**
+
+- **Evidência** (medida no armazém local em 15/11/2026, ao declarar a aditividade das métricas do Bloco 5,
+  `bloco5_aditividade_order_count_20261115.txt`): a soma de `order_count` em `discount_share_by_channel` dá
+  5.826 contra 3.292 pedidos realizados distintos; o pedido com itens de duas categorias raiz conta nas duas.
+  A descrição da coluna diz "Aditiva — pedidos realizados distintos […], por canal e mês", mas o grão da view
+  tem também a categoria raiz. Na P01 a mesma contagem já se diz "Não aditiva entre categorias"; na P02 e na
+  P05, que não agrupam por categoria, a soma dá os 3.292, e "Aditiva" está certo.
+- **Efeito:** quem soma a coluna pelas categorias, como a descrição autoriza, conta pedidos a mais.
+- **Aqui:** a descrição passa a "Não aditiva entre categorias", como a da P01, e o grão certo; e a aditividade
+  de cada coluna das views passa a ser declarada no `metricas.yml` e conferida contra o começo da descrição
+  (Bloco 5, Parte B, a tabela gerada das perguntas). Muda o texto, não o valor nem o esquema.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
