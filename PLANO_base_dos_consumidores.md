@@ -940,6 +940,15 @@ recomendadas. As opções, como foram apresentadas:
 | **Q17** | F22: que significado o catálogo declara para o `gateway_response_code`, sorteado sem relação com o resultado | **Declarar sem significado de negócio**, dizendo por quê e de onde vem o resultado (`transaction_result`); nenhum número muda; corrigir o gerador vai às Pendências. Era a recomendada | Corrigir o gerador e regerar os dados agora; tirar a coluna de `analytics` |
 | **Q18** | F7: o alcance | **`analytics` e `consumption`**, as camadas que os consumidores leem, com a lista das excluídas e o motivo. Era a recomendada | Todas as camadas |
 
+### Rodada 7 — os significados e o recorte da Parte A: respondida em 15/11/2026
+
+O levantamento das fontes está em `data/medicoes/base_consumidores/bloco5_fontes_dos_significados_20261115.md`.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q19** | F7: de onde sai o significado dos 14 domínios (59 valores) que o repositório só lista pelo nome, sem dizer o que cada valor quer dizer | **Proposta e aceite**: uma proposta de significado por valor, numa lista à parte, que o Owner revisa e aceita ou corrige de uma vez; a fonte no catálogo passa a ser esse aceite. Nada entra no catálogo antes dele. Era a recomendada | A tradução literal do nome, com a `CHECK` como fonte; deixar os 14 fora do catálogo como exceção "significado pendente" |
+| **Q20** | F7: o recorte das listas fechadas que não são `CHECK` nem *seed* de significado | **Vocabulário de filtro**: é domínio a lista que o consumidor usa para filtrar — a região, o nome do mês, o dia da semana, o grupo da categoria, os motivos do reembolso e da mudança de estado, a equipe do agente; vai à exclusão "código ou atributo de cadastro" a UF, o país ISO, a cidade, o tamanho, a cor, a embalagem e os códigos sequenciais. Era a recomendada | Só o que tem `CHECK` ou *seed* (a UF entra, o mês e a equipe saem); toda lista fechada, inclusive UF e país |
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
