@@ -1485,3 +1485,19 @@ e sim a transcrição deles e das fontes: nenhum erro de transcrição, nenhum d
 
 **A revisão da implementação da Parte A está fechada.** O que falta dela é do fim da fase (Q27): as guardas
 de relação do item 4, que esperam o ramo da regeneração. Isso não é o aceite do declarativo, que é do Owner.
+
+### Rodadas 43 a 45 — Codex contas 1 e 2, sobre a implementação da Parte B do Bloco 5 (15/11/2026)
+
+Relatórios em `codex1_bloco5_parteB_r1.md` (conta 1), `codex2_bloco5_parteB_r2.md` e `r3.md` (conta 2, a
+pedido do Owner); objeto inicial `9ca6c1a`..`1926877` (as métricas declaradas uma vez, os trechos gerados e os
+campos `metrics` e `filters` do pacote).
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 43 | `1ed63db`, `24498fe` | 4 bloqueantes (RVB5B-1-01 a 04) | A `order_count` da P16 passa a não aditiva entre categorias, e a guarda de aditividade deixa de pular coluna sem rótulo (12 descrições o ganham); o pacote ganha `view_rules`, a montagem de cada view (Q33, linha `prevista` em `1ed63db`); o esquema exige o que cada agregado pede; os motivos das referências P03, P04 e P16 dizem o que a view faz. Achado do autor: `questions.P15` listava uma fato duas vezes |
+| 44 | `0ddf56b` | 1 bloqueante, 1 ajuste (RVB5B-2-01 e 02) | O esquema liga `combine` ao número de fontes (obrigatória com duas, nula com uma, no máximo duas) e o carregador recusa uma fonte com combinação; a guarda de aditividade perde a dispensa do bloco do conceito — as sete descrições que eram só `doc(...)` ganham o rótulo |
+| 45 | — | nenhum | — |
+
+**A revisão da implementação da Parte B está fechada.** Falta dela a linha `feita` em
+[Consumidores §5](docs/consumidores.md), que espera um `make dbt-build` em *commit* limpo para o
+`invocation_id`. Isso não é o aceite do declarativo, que é do Owner.
