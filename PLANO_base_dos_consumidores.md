@@ -636,64 +636,138 @@ resultado já foi conferido contra o cálculo independente; métrica sem view au
 conferida (Q9-a). O texto das regras do F9 já existe em prosa desde o passo 1 do Bloco 1b; aqui ele
 ganha a forma estruturada e o ADR (RVC-4-03).
 
-**O desenho, depois da rodada 6 de decisões (§6, Q15 a Q18, 15/11/2026).** Para revisão antes de
-implementar; o ADR do formato sai depois da revisão, como na L5.
+**O desenho, depois da rodada 6 de decisões (§6, Q15 a Q18, 15/11/2026)**, revisto pela rodada 1 da
+revisão do desenho (`codex1_bloco5_desenho_r1.md`, RVB5-1-01 a 07). Para revisão antes de implementar; o
+ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
 
 **Parte A — os domínios (F7).**
 
-1. **A declaração, uma vez só** (Q15). Um catálogo, `docs/glossario_de_negocio/dominios.yml`: cada domínio
-   tem nome em inglês (`order_status`, `gateway_response_code`, `unknown_member`…), a descrição, e o mapa
-   valor → significado em português; o significado do nulo, quando a coluna admite nulo (o `from_status`
-   do primeiro evento). Cada significado cita a **fonte** daqui de onde saiu — o dicionário, um ADR, a
-   Origem Legada, a configuração do gerador, uma pergunta de negócio. **Valor sem fonte é pergunta ao
-   Owner, nunca texto escrito por dedução** (CLAUDE.md §5, P5).
-2. **A ligação.** Cada coluna de `analytics` e de `consumption` que carrega um domínio declara, no `.yml`
-   escrito à mão, `meta.value_domain: <nome>` (Q18). Do catálogo, o `make catalog` **deriva** na coluna o
-   `meta.values` (o mapa) e o `accepted_values` com exatamente os valores do domínio — o significado
-   chega ao pacote pelo `meta`, que ele repassa como está, sem mudar o esquema. O derivado não se edita;
-   o `make check` falha com o `.yml` atrás do catálogo. **O mecanismo** — o escritor de `models/` inserindo
-   as duas coisas no `.yml` em bloco, ou um teste genérico que lê o domínio — é medido antes de escolher,
-   sem mudar o contrato; o que for escolhido vai ao ADR.
-3. **A cobertura, contra o medido** (oráculo). Toda coluna de texto de `analytics` e `consumption` com
-   até 40 valores distintos no armazém (o inventário de 15/11/2026 achou 118, ~70 de domínio) tem
-   `value_domain` **ou** está numa lista de excluídas com o motivo (código de cadastro como `CMP-001` e
-   `SKU-…`, cidade, cor e tamanho de variante, `year_month`). Domínio declarado que nenhuma coluna usa, e
-   valor declarado que não aparece no dado, também falham — ou o valor diz `absent_in_data` com o motivo.
+1. **A declaração, uma vez só** (Q15). Um catálogo, `docs/glossario_de_negocio/dominios.yml`, com duas seções:
+   - **domínios**: nome em inglês (`order_status`, `gateway_response_code`, `day_of_week`…), a descrição e
+     o mapa valor → significado em português. Os valores são sempre texto no catálogo (o `00` e o `05`
+     não viram número), e o nulo **não** é valor do mapa: o que ele significa fica na ligação (item 2).
+   - **membros desconhecidos**: por dimensão, os valores sentinela da linha do membro desconhecido
+     (`-1` na chave natural, `UNK`, `AGT-0000`, `Desconhecido`, `ZZ`, `desconhecido@exemplo.invalid`) e o
+     que significam ali. A guarda lê a linha do membro em cada dimensão e exige que toda coluna dela com
+     valor sentinela esteja declarada (RVB5-1-02).
+
+   Cada significado cita a **fonte** daqui de onde saiu — o dicionário, um ADR, a Origem Legada, a
+   configuração do gerador, uma pergunta de negócio. **Valor sem fonte é pergunta ao Owner, nunca texto
+   escrito por dedução** (CLAUDE.md §5, P5).
+2. **A ligação, por coluna.** Cada coluna de `analytics` e de `consumption` que carrega um domínio declara,
+   no `.yml` escrito à mão, `meta.value_domain: <nome>` (Q18) e, quando for o caso:
+   - `null_meaning:` o que o nulo quer dizer nessa coluna (o `from_status` do primeiro evento), e então
+     ela admite nulo; sem `null_meaning`, a coluna ganha `not_null` — o `accepted_values` usa `not in` e
+     não decide a nulidade (RVB5-1-07);
+   - `impossible:` os valores do domínio que não podem aparecer **nesse papel**, com o motivo (os estados
+     terminais no `from_status`, que a configuração do gerador já declara impossíveis): o teste os recusa;
+   - `not_observed:` os valores possíveis que o dado ainda não tem, com o motivo. Um valor do domínio que
+     não aparece em nenhuma ligação, e não está em `impossible` nem em `not_observed` dela, falha.
+
+   Do catálogo e da ligação, o `make catalog` **deriva** na coluna o `meta.values` (o mapa, menos os
+   impossíveis) e o `accepted_values` com exatamente esses valores. O derivado não se edita; o
+   `make check` falha com o `.yml` atrás do catálogo. A ligação é conferida em toda coluna que a declara,
+   qualquer que seja a cardinalidade de hoje.
+3. **A cobertura, pelo papel da coluna** (RVB5-1-02). O inventário por cardinalidade de 15/11/2026 foi
+   descoberta, não prova: deixou de fora `dim_date.month_name`, `day_name`, `dim_geography.state_name` e a
+   chave natural de `dim_support_category`. A guarda passa a percorrer **todas** as colunas físicas de
+   `analytics` e `consumption` (de `information_schema.columns`, em qualquer tipo) e exige que cada uma tenha
+   exatamente uma classificação: `value_domain`; ou uma das regras de exclusão declaradas no catálogo, cada
+   uma com o motivo — chave substituta e natural, medida numérica, data e instante, texto livre, código de
+   cadastro (com o sentinela coberto pelos membros desconhecidos), *flag* booleana cujo significado está na
+   descrição; ou uma exceção nominal com o motivo. O oráculo é "N de N colunas classificadas".
 4. **O significado conferido contra o dado.** Onde o significado afirma relação com outra coluna (a
    remessa `lost` não tem entrega; o `returned` conta como pedido realizado; o membro desconhecido só
    aparece na chave substituta dele), um teste a confere. É o que achou o **F22**: o
    `gateway_response_code` é sorteado sem relação com `transaction_result`. Pela Q17, o domínio declara
-   isso, e corrigir o gerador fica para uma regeneração futura (Pendências, no fechamento).
-5. **A V1, lote 3, antes** (RVC-1-06): mexer no escritor de `src/mvp_ed1/models/` pede revisitar os itens
-   6 a 9 (o `.yml` fora do bloco, a guarda do fuso, a fonte de pacote, as premissas da compilação).
+   isso, e corrigir o gerador fica para uma regeneração futura (Pendências, no fechamento). Antes de
+   escrever os significados, cada domínio é medido do mesmo jeito; o que se contradiz no dado vira F novo.
 
 **Parte B — as métricas (F9).**
 
-6. **A declaração** (Q16). `docs/glossario_de_negocio/metricas.yml`, com dois conjuntos:
-   - **filtros nomeados**, declarados uma vez e citados pelas métricas: o pedido realizado, o carrinho
-     fechado, a tentativa de autorização, o capturado do mês, a versão vigente do cliente…;
-   - **métricas**, uma por medida das 16 views: o conceito do glossário (o bloco `docs`), a pergunta
-     (P01 a P16), a view e a coluna, o grão, a data que define o período, o numerador e o denominador
-     (relação de `analytics`, expressão, filtros), a fórmula e a aditividade. Cada campo tem a forma
-     legível, em português, e o fragmento SQL que o implementa.
-7. **A verificação só pela declaração.** Um teste monta o SQL **apenas** dos fragmentos declarados e o
-   compara com a view auditada, linha a linha (`except all` nos dois sentidos, num corte `REPEATABLE READ
-   READ ONLY`), como as referências do Bloco 1b. O critério do `nl_sql` — reproduzir o número só a partir
-   das definições — vira oráculo: "N de N métricas reproduzidas". A contraprova: tirar um filtro
-   declarado (o pedido realizado da P02) tem de fazer o teste acusar, como a mutação do Bloco 1b.
-8. **O que não cabe na forma.** A métrica que pede mais que uma relação filtrada e agrupada — o estoque
-   médio do trimestre da P11, os deltas do caminho quente da P12 — declara `reference:` com o teste do
-   Bloco 1b que a confere e o motivo. A cobertura (toda coluna numérica de cada view coberta por uma
-   métrica ou por uma referência) é conferida como a dos domínios.
-9. **Quem é dono do quê.** O `metricas.yml` passa a ser o dono da fórmula, do filtro, da data e do grão;
-   o `.md` de cada conceito fica com o porquê e aponta para a métrica. A prosa que hoje repete a fórmula
-   é encurtada para não divergir. O texto curto que vai ao BigQuery (F4) não muda.
-10. **No pacote.** `metrics` e `filters` entram como campos novos, no formato 1 (regra 3) — e, desta vez,
-    com a linha `prevista` em Consumidores §5 **num *commit* anterior ao que os gera** (RVL5I-1-05).
+5. **A declaração** (Q16, RVB5-1-01). `docs/glossario_de_negocio/metricas.yml`, em cinco seções, cada uma
+   citada pelo nome pelas seguintes:
+   - **fontes**: a relação base de `analytics` com um apelido, as junções (relação, apelido, tipo, chave), e a
+     **data** que define o período — a coluna de data da fato que se liga a `dim_date` (a criação do
+     carrinho, a entrega da remessa), com o rótulo legível;
+   - **filtros**: predicado SQL sobre os apelidos de uma fonte, com o rótulo e o conceito do glossário de que
+     sai (o pedido realizado, o carrinho fechado, a tentativa de autorização…);
+   - **medidas**: um agregado sobre **uma** fonte, com os filtros dela, a aditividade e a identidade contada
+     quando é contagem distinta (`(source_system, order_id)`);
+   - **métricas**: a razão ou a composição de medidas — a fórmula sobre os nomes das medidas, a escala (100),
+     o arredondamento, e o que vale com denominador zero (nulo) ou medida ausente (zero);
+   - **views**: para cada uma das 16, o grão (coluna da view → expressão sobre os apelidos, a mesma em toda
+     fonte que a view usa), a **combinação** das fontes quando há mais de uma (como, e por quais colunas do
+     grão, com o que preenche o lado ausente), e o **papel de cada coluna**: grão, identidade, medida,
+     métrica ou referência.
 
-**Ordem.** A revisão deste desenho; o ADR do formato; a linha `prevista`; a volta à V1; a Parte A; a Parte B;
-o pacote; a sequência de publicação (`catalog` → `test` → `catalog` → `check-offline`); a revisão da
-implementação; a linha `feita`; os avisos.
+   **O montador é fixo e pequeno**, e o ADR o descreve: para cada fonte da view, `select <grão>, <medidas>
+   from <fonte> where <filtros das medidas> group by <grão>`; as fontes combinadas pela regra declarada; as
+   métricas calculadas por cima. Nenhuma regra de negócio vive no Python: o que não cabe nisso vai a
+   `reference:` (item 7). Dois exemplos completos, a escrever no ADR e conferir na primeira entrega:
+   - **P07, a razão simples**: fonte `fact_cart_event` com `dim_date` pela data de criação do carrinho e
+     `dim_sales_channel`; medidas `converted_cart_count` e `closed_cart_count`, aditivas; métrica
+     `cart_conversion_rate_pct` = 100 × convertidos ÷ fechados, duas casas, nulo com zero fechados;
+   - **P08, a composição entre fatos**: fonte de receita (`fact_sales_order_item`, filtro pedido realizado,
+     categoria pela chave da fato) e fonte de CMV (`fact_inventory_movement`, filtro `is_sale`, categoria
+     **pelo produto e pela origem**); combinação `full outer` por mês e categoria, com zero no lado
+     ausente; métricas lucro bruto e margem.
+6. **A verificação, com dois números separados** (RVB5-1-04). O teste monta o SQL **só** da declaração e o
+   compara com a view auditada, linha a linha (`except all` nos dois sentidos, num corte `REPEATABLE READ
+   READ ONLY`). O resultado sai em dois números que não se somam: "**N de N** colunas de medida e métrica
+   reproduzidas pela declaração" e "**M** conferidas por referência". **O limite fica escrito:** a
+   comparação prova que a declaração e a view auditada dizem o mesmo; se os fragmentos copiarem a leitura
+   que a view fez da regra, um erro comum às duas fica — a independência continua sendo a das referências
+   do Bloco 1b e das conferências de população contra `trusted`, que não mudam.
+   **As contraprovas**, alterando só o YAML carregado pelo montador, com view e referências intactas: tirar a
+   **ligação** da medida da P02 ao filtro do pedido realizado; trocar a data da fonte da P07 (criação →
+   conversão); tirar uma chave da junção composta da P08; mudar o grão do denominador da P10; mudar a escala
+   ou o arredondamento de uma métrica. Cada uma tem de divergir. E, nos defeitos históricos (o SQL compilado
+   das versões defeituosas do F1, F2, P04 e P14, em `tests/auditoria/contraprova/`), a declaração correta
+   tem de discordar da consulta defeituosa.
+7. **O que não cabe, e o que não vale como reprodução** (RVB5-1-01, 04). `reference:` aponta para **um teste
+   do Bloco 1b que cobre aquela view e aquela coluna**, com o motivo; a guarda confere que o teste existe,
+   que roda na mesma execução e que compara a coluna citada. Candidatas, a confirmar por coluna: o ranking e
+   o corte da P03, o estoque médio da P11, os deltas do caminho quente da P12, a atribuição do capturado à
+   primeira autorização aprovada da P09 (D67). Toda exceção é revisada na entrega, uma a uma.
+8. **A cobertura das views, pelo papel** (RVB5-1-03). Toda coluna das 16 views tem papel declarado; o conjunto
+   tem de ser igual ao das colunas da view. `year_number`, `month_number`, `product_natural_key`,
+   `installments` são grão ou identidade, sem fórmula; o `is_stockout` da P12 e o `revenue_rank` da P03 são
+   medidas (por declaração ou por referência).
+9. **Quem é dono do quê** (RVB5-1-05). O `metricas.yml` é o dono da fórmula, do filtro, da data e do grão.
+   Para o texto curto do BigQuery (F4), que é o começo do bloco `docs` até a marca, não mudar de sentido, a
+   regra operacional de cada conceito passa a ser um **trecho gerado** dentro do bloco, antes da marca,
+   escrito pelo `make catalog` a partir do YAML — o mecanismo dos trechos gerados do Dicionário — e o
+   `make check` falha com o trecho atrasado. A prosa à mão fica com o porquê. O mesmo vale para o "como se
+   conta" das Perguntas de Negócio: a regra vira trecho gerado, o porquê fica. O README do glossário ganha
+   a convenção.
+10. **No pacote** (RVB5-1-06). Os dois YAMLs entram nos insumos (`pacote.INSUMOS`, o digest e o carimbo do
+    *build*, porque mudam o `.yml` do dbt), com a contraprova de mudar só um deles e o pacote ficar
+    atrasado. `metrics` e `filters` (e as fontes, medidas e views que eles citam) entram como campos novos, no
+    formato 1 (regra 3), com contrato, esquema e exemplo atualizados. A linha `prevista` em Consumidores §5,
+    **num *commit* anterior ao que os gera** (RVL5I-1-05), anuncia também o `meta.value_domain`, o
+    `meta.values` e o `null_meaning` nas colunas, que cabem no `meta` aberto mas são conteúdo novo.
+
+**O mecanismo do derivado (Parte A), medido antes do ADR** (RVB5-1-07).
+
+11. **A V1, lote 3, antes** (RVC-1-06): mexer no escritor de `src/mvp_ed1/models/` pede revisitar os itens 6 a
+    9 (o `.yml` fora do bloco, a guarda do fuso, a fonte de pacote, as premissas da compilação).
+12. **O caminho**: ampliar o escritor no endereço da coluna já documentada, com serialização própria do mapa,
+    substituição estrutural (não deixa filhos antigos), preservação dos outros testes e leitura estrita do
+    resultado. Um segundo `.yml` para o mesmo modelo colide com a recusa de duplicidade
+    (`descriptions._documents`); um teste genérico sozinho não materializa o mapa que a Q15 pede; o Jinja
+    em `meta` e em argumento de teste não se presume.
+13. **As sondas, antes do ADR**: código com zero à esquerda, o nulo fora do mapa, domínio alterado e
+    removido, idempotência (duas gerações, nenhuma diferença), testes que já existem na forma de fluxo e
+    de bloco, chave repetida, texto com quebra de linha, e o ciclo disco → *manifest* → pacote. O que elas
+    medirem decide o mecanismo, e o ADR o registra.
+
+**Ordem.** A revisão deste desenho; a volta à V1 (item 11); as sondas (item 13); o ADR do formato, com os
+dois exemplos; a linha `prevista`; a Parte A; a Parte B. **A sequência, porque o `catalog` passa a escrever
+teste do dbt:** `make catalog` (escreve os `.yml` e os trechos) → `make dbt-build` (compila e roda os
+testes novos; o carimbo do *build*) → `make catalog` (estável: nenhuma mudança) → `make test` →
+`make catalog` → `make check-offline`. Depois, a revisão da implementação, a linha `feita` e os avisos. O
+aceite do declarativo — os dois catálogos — é do Owner (§5), separado da revisão técnica.
 
 ### Bloco 6 — as chaves declaradas (F10)
 
