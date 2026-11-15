@@ -10,6 +10,7 @@ declarada na coluna, no `.yml` escrito à mão de `analytics` e de `consumption`
       null_meaning: "…"          # só se a coluna admite nulo; sem ele, a coluna ganha `not_null`
       impossible: {paid: "…"}    # valores do domínio que não podem aparecer nesse papel, com o motivo
       not_observed: {lost: "…"}  # valores possíveis que o dado ainda não tem nessa coluna, com o motivo
+      unknown_member: dim_geography.region   # só na coluna que propaga o membro desconhecido de outra relação
 
 Do catálogo e da ligação, `make catalog` **deriva** na coluna:
 
@@ -17,6 +18,12 @@ Do catálogo e da ligação, `make catalog` **deriva** na coluna:
 * o `accepted_values` com exatamente esses valores, marcado por `config.meta.value_domain` para ser
   reconhecido como derivado (e removido se a ligação sair);
 * o `not_null`, quando a ligação não tem `null_meaning`.
+
+O **membro desconhecido** não entra no domínio: o sentinela dele (`unknown`, `Desconhecido`) é da linha de
+aterrissagem de uma dimensão, não um valor do negócio. O catálogo o declara por dimensão
+(`unknown_members`); a coluna da própria dimensão o herda, e a coluna que o propaga — a view que agrupa
+pela região da geografia — o declara com `unknown_member: <dimensão>.<coluna>`. Assim as colunas que nunca
+o têm não precisam repeti-lo como impossível.
 
 O derivado não se edita à mão. O escritor é o de linhas de `sensitivity`, estendido para substituir a
 subárvore inteira (`meta.values`, o item do `accepted_values`) — nunca linha a linha, que deixaria filhos
@@ -33,9 +40,10 @@ from dataclasses import dataclass, field
 
 from mvp_ed1.models import sensitivity
 
-CATALOG = sensitivity.ROOT / "docs" / "glossario_de_negocio" / "dominios.yml"
+CATALOG_RELATIVE = pathlib.Path("docs") / "glossario_de_negocio" / "dominios.yml"
+CATALOG = sensitivity.ROOT / CATALOG_RELATIVE
 LAYERS = ("analytics", "consumption")
-LINK_KEYS = ("value_domain", "null_meaning", "impossible", "not_observed")
+LINK_KEYS = ("value_domain", "null_meaning", "impossible", "not_observed", "unknown_member")
 
 
 # ── O catálogo ────────────────────────────────────────────────────────────────────
@@ -55,7 +63,71 @@ def load_catalog(caminho: pathlib.Path = CATALOG, conteudo: str | None = None) -
                 raise ValueError(f"{caminho}: `{nome}`: o valor {valor!r} não é texto — escreva-o entre aspas")
             if not isinstance(significado, dict) or not significado.get("meaning") or not significado.get("source"):
                 raise ValueError(f"{caminho}: `{nome}.{valor}` sem `meaning` e `source`")
+    membros = documento.get("unknown_members") or {}
+    if not isinstance(membros, dict):
+        raise ValueError(f"{caminho}: `unknown_members` é um mapa dimensão → membro")
+    for dimensao, membro in membros.items():
+        if not isinstance(membro, dict) or not membro.get("meaning") or not membro.get("source"):
+            raise ValueError(f"{caminho}: membro desconhecido de `{dimensao}` sem `meaning` e `source`")
+        colunas = membro.get("columns")
+        if not isinstance(colunas, dict) or not colunas:
+            raise ValueError(f"{caminho}: membro desconhecido de `{dimensao}` sem `columns`")
+        for coluna, valor in colunas.items():
+            if not isinstance(valor, str):
+                raise ValueError(f"{caminho}: `{dimensao}.{coluna}`: o sentinela {valor!r} não é texto — escreva-o entre aspas")
+    for grupo in ("by_type", "by_name"):
+        for nome, regra in ((documento.get("exclusions") or {}).get(grupo) or {}).items():
+            if not isinstance(regra, dict) or not regra.get("reason"):
+                raise ValueError(f"{caminho}: regra de exclusão `{nome}` sem `reason`")
+    for endereco, motivo in ((documento.get("exclusions") or {}).get("exceptions") or {}).items():
+        if not isinstance(motivo, str) or not motivo.strip():
+            raise ValueError(f"{caminho}: exceção `{endereco}` sem motivo")
     return documento
+
+
+TEXT_TYPES = frozenset({"text", "character varying", "character"})
+
+
+def coverage(colunas, ligadas: set[tuple[str, str]], catalogo: dict) -> tuple[dict[str, str], list[str]]:
+    """A classificação de cada coluna física (Bloco 5, item 3): `(classificação por endereço, problemas)`.
+
+    `colunas` são `(schema, relação, coluna, tipo)`, como o `information_schema` as dá; `ligadas`, os
+    `(relação, coluna)` com `meta.value_domain`. A coluna ligada é `value_domain`; a não ligada cai numa
+    exceção nominal, ou em **exatamente uma** regra — de tipo, se não for texto; de nome, se for. Nenhuma
+    regra, ou duas, é problema: o oráculo é "N de N colunas classificadas"."""
+    regras = catalogo.get("exclusions") or {}
+    por_tipo = regras.get("by_type") or {}
+    por_nome = regras.get("by_name") or {}
+    excecoes = regras.get("exceptions") or {}
+    saida: dict[str, str] = {}
+    problemas: list[str] = []
+    for schema, relacao, coluna, tipo in colunas:
+        endereco = f"{schema}.{relacao}.{coluna}"
+        if (relacao, coluna) in ligadas:
+            saida[endereco] = "value_domain"
+            continue
+        if f"{relacao}.{coluna}" in excecoes:
+            saida[endereco] = "exception"
+            continue
+        if tipo in TEXT_TYPES:
+            casam = [n for n, r in por_nome.items()
+                     if coluna in (r.get("names") or []) or any(coluna.endswith(s) for s in r.get("suffixes") or [])]
+        else:
+            casam = [n for n, r in por_tipo.items() if tipo in (r.get("types") or [])]
+        if len(casam) == 1:
+            saida[endereco] = casam[0]
+        else:
+            problemas.append(f"{endereco} ({tipo}): {'nenhuma regra' if not casam else 'duas regras: ' + ', '.join(casam)}")
+    return saida, problemas
+
+
+def sentinel(catalogo: dict, endereco: str) -> tuple[str, str] | None:
+    """(valor, significado) do sentinela em `<dimensão>.<coluna>`, ou `None` se a coluna não o tem."""
+    dimensao, _, coluna = endereco.partition(".")
+    membro = (catalogo.get("unknown_members") or {}).get(dimensao)
+    if not membro or coluna not in membro["columns"]:
+        return None
+    return membro["columns"][coluna], f"Membro desconhecido — {membro['meaning']}"
 
 
 # ── As ligações ───────────────────────────────────────────────────────────────────
@@ -69,6 +141,7 @@ class Link:
     null_meaning: str | None
     impossible: dict
     not_observed: dict
+    unknown_member: str | None = None
 
     @property
     def label(self) -> str:
@@ -96,7 +169,7 @@ def links(disco: dict) -> list[Link]:
             if entrada.kind != "hand":
                 raise ValueError(f"{nome}.{coluna}: `value_domain` fora de um `.yml` à mão ({entrada.path.name})")
             saida.append(Link(entrada.path, nome, coluna, meta["value_domain"], meta.get("null_meaning"),
-                              meta.get("impossible") or {}, meta.get("not_observed") or {}))
+                              meta.get("impossible") or {}, meta.get("not_observed") or {}, meta.get("unknown_member")))
     return saida
 
 
@@ -124,7 +197,20 @@ def allowed(link: Link, catalogo: dict) -> dict[str, str]:
     for chave, motivos in (("impossible", link.impossible), ("not_observed", link.not_observed)):
         if not isinstance(motivos, dict) or not all(isinstance(m, str) and m.strip() for m in motivos.values()):
             raise ValueError(f"{link.label}: `{chave}` é um mapa valor → motivo, com motivo escrito")
-    return {v: s["meaning"] for v, s in valores.items() if v not in link.impossible}
+    permitidos = {v: s["meaning"] for v, s in valores.items() if v not in link.impossible}
+    proprio = sentinel(catalogo, f"{link.model}.{link.column}")
+    if link.unknown_member is not None:
+        if proprio is not None:
+            raise ValueError(f"{link.label}: `unknown_member` sobra — a coluna é da própria dimensão e já herda o sentinela")
+        proprio = sentinel(catalogo, link.unknown_member)
+        if proprio is None:
+            raise ValueError(f"{link.label}: `unknown_member: {link.unknown_member}` não existe em `unknown_members`")
+    if proprio is not None:
+        valor, significado = proprio
+        if valor in valores:
+            raise ValueError(f"{link.label}: o sentinela {valor!r} colide com um valor do domínio `{link.domain}`")
+        permitidos[valor] = significado
+    return permitidos
 
 
 def derive(catalogo: dict, ligacoes: list[Link], disco: dict) -> Derived:

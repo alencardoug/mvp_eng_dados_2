@@ -50,7 +50,20 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: sales_channel_type
+          values:
+            "app": "Aplicativo."
+            "store": "Loja física."
+            "web": "Loja online."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["app", "store", "web"]
+              config:
+                meta:
+                  value_domain: sales_channel_type
       - name: root_category_name
         description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
         meta:
@@ -302,7 +315,24 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: ibge_region
+          unknown_member: dim_geography.region
+          values:
+            "Centro-Oeste": "Região Centro-Oeste."
+            "Desconhecido": "Membro desconhecido — Geografia desconhecida — o cliente sem endereço de entrega principal aterrissa aqui, em vez de sair do recorte por região."
+            "Nordeste": "Região Nordeste."
+            "Norte": "Região Norte."
+            "Sudeste": "Região Sudeste."
+            "Sul": "Região Sul."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Centro-Oeste", "Desconhecido", "Nordeste", "Norte", "Sudeste", "Sul"]
+              config:
+                meta:
+                  value_domain: ibge_region
       - name: state_code
         description: "Unidade federativa em sigla de duas letras."
         meta:
@@ -379,7 +409,20 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: sales_channel_type
+          values:
+            "app": "Aplicativo."
+            "store": "Loja física."
+            "web": "Loja online."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["app", "store", "web"]
+              config:
+                meta:
+                  value_domain: sales_channel_type
       - name: root_category_name
         description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
         meta:
@@ -449,7 +492,20 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: sales_channel_type
+          values:
+            "app": "Aplicativo."
+            "store": "Loja física."
+            "web": "Loja online."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["app", "store", "web"]
+              config:
+                meta:
+                  value_domain: sales_channel_type
       - name: cart_count
         meta:
           sensitivity: internal
@@ -612,7 +668,24 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: ibge_region
+          not_observed:
+            "Norte": "Os cinco armazéns declarados (generator/geracao.yml, warehouses) ficam em São Paulo, Extrema, Recife, Canoas e Goiânia; nenhum no Norte."
+          values:
+            "Centro-Oeste": "Região Centro-Oeste."
+            "Nordeste": "Região Nordeste."
+            "Norte": "Região Norte."
+            "Sudeste": "Região Sudeste."
+            "Sul": "Região Sul."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
+              config:
+                meta:
+                  value_domain: ibge_region
       - name: quantity_out
         description: "Aditiva — unidades do SKU que saíram em venda do armazém, no trimestre."
         meta:
@@ -676,7 +749,23 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: payment_method_type
+          values:
+            "boleto": "Boleto bancário."
+            "credit_card": "Cartão de crédito."
+            "debit_card": "Cartão de débito."
+            "pix": "Pix."
+            "voucher": "Vale-compra."
+            "wallet": "Carteira digital."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["boleto", "credit_card", "debit_card", "pix", "voucher", "wallet"]
+              config:
+                meta:
+                  value_domain: payment_method_type
       - name: installments
         description: "Número de parcelas acordadas."
         meta:
@@ -750,7 +839,23 @@ models:
         description: "Motivo do reembolso; 'Sem motivo registrado' quando a origem não o informa."
         meta:
           sensitivity: internal
+          value_domain: refund_reason
+          values:
+            "Arrependimento em até 7 dias": "O próprio texto."
+            "Cancelamento a pedido do cliente": "O próprio texto."
+            "Divergência de item": "O próprio texto."
+            "Entrega não realizada": "O próprio texto."
+            "Produto com defeito": "O próprio texto."
+            "Sem motivo registrado": "A origem não informou o motivo. Só a view da P10 o escreve, no lugar do nulo; a fato guarda o nulo."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Arrependimento em até 7 dias", "Cancelamento a pedido do cliente", "Divergência de item", "Entrega não realizada", "Produto com defeito", "Sem motivo registrado"]
+              config:
+                meta:
+                  value_domain: refund_reason
       - name: refund_count
         description: "Aditiva — reembolsos, por mês, meio de pagamento e motivo."
         meta:
@@ -795,7 +900,24 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: ibge_region
+          not_observed:
+            "Norte": "Os cinco armazéns declarados (generator/geracao.yml, warehouses) ficam em São Paulo, Extrema, Recife, Canoas e Goiânia; nenhum no Norte."
+          values:
+            "Centro-Oeste": "Região Centro-Oeste."
+            "Nordeste": "Região Nordeste."
+            "Norte": "Região Norte."
+            "Sudeste": "Região Sudeste."
+            "Sul": "Região Sul."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
+              config:
+                meta:
+                  value_domain: ibge_region
       - name: sku
         description: "Código de estoque da variante; chave natural do SKU."
         meta:
@@ -923,8 +1045,21 @@ models:
         meta:
           sensitivity: public
           description_reason: "liga a coluna ao conceito do glossário de negócio que ela determina"
+          value_domain: carrier_service_level
+          values:
+            "express": "Entrega expressa (ordem 2)."
+            "same_day": "Entrega no mesmo dia, a mais rápida (ordem 3)."
+            "standard": "Entrega padrão, a mais lenta (ordem 1)."
         description: '{{ doc("promised_lead_time") }}'
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["express", "same_day", "standard"]
+              config:
+                meta:
+                  value_domain: carrier_service_level
       - name: warehouse_name
         description: "Nome do armazém."
         meta:
@@ -936,7 +1071,24 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: ibge_region
+          not_observed:
+            "Norte": "Os cinco armazéns declarados (generator/geracao.yml, warehouses) ficam em São Paulo, Extrema, Recife, Canoas e Goiânia; nenhum no Norte."
+          values:
+            "Centro-Oeste": "Região Centro-Oeste."
+            "Nordeste": "Região Nordeste."
+            "Norte": "Região Norte."
+            "Sudeste": "Região Sudeste."
+            "Sul": "Região Sul."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
+              config:
+                meta:
+                  value_domain: ibge_region
       - name: delivered_count
         meta:
           sensitivity: internal
@@ -1014,7 +1166,24 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: ibge_region
+          unknown_member: dim_geography.region
+          values:
+            "Centro-Oeste": "Região Centro-Oeste."
+            "Desconhecido": "Membro desconhecido — Geografia desconhecida — o cliente sem endereço de entrega principal aterrissa aqui, em vez de sair do recorte por região."
+            "Nordeste": "Região Nordeste."
+            "Norte": "Região Norte."
+            "Sudeste": "Região Sudeste."
+            "Sul": "Região Sul."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Centro-Oeste", "Desconhecido", "Nordeste", "Norte", "Sudeste", "Sul"]
+              config:
+                meta:
+                  value_domain: ibge_region
       - name: state_code
         description: "Unidade federativa em sigla de duas letras."
         meta:
@@ -1025,8 +1194,21 @@ models:
         meta:
           sensitivity: public
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
+          value_domain: carrier_service_level
+          values:
+            "express": "Entrega expressa (ordem 2)."
+            "same_day": "Entrega no mesmo dia, a mais rápida (ordem 3)."
+            "standard": "Entrega padrão, a mais lenta (ordem 1)."
         description: Modalidade da remessa que **fechou** o ciclo.
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["express", "same_day", "standard"]
+              config:
+                meta:
+                  value_domain: carrier_service_level
       - name: carrier_name
         description: "Nome da transportadora."
         meta:
@@ -1112,7 +1294,22 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: sales_channel_type
+          unknown_member: dim_sales_channel.channel_type
+          values:
+            "app": "Aplicativo."
+            "store": "Loja física."
+            "unknown": "Membro desconhecido — Canal desconhecido — o chamado que não nasceu de um pedido não tem canal. Não é de origem nenhuma."
+            "web": "Loja online."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["app", "store", "unknown", "web"]
+              config:
+                meta:
+                  value_domain: sales_channel_type
       - name: support_category_name
         description: "Nome da categoria de chamado."
         meta:
@@ -1124,7 +1321,23 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: support_category_group
+          values:
+            "Cadastro": "Reúne a categoria Conta (`account`)."
+            "Catálogo": "Reúne a categoria Produto (`product`)."
+            "Financeiro": "Reúne a categoria Pagamento (`payment`)."
+            "Geral": "Reúne a categoria Outros (`other`)."
+            "Logística": "Reúne a categoria Entrega (`delivery`)."
+            "Pós-venda": "Reúne a categoria Devolução (`return`)."
         data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Cadastro", "Catálogo", "Financeiro", "Geral", "Logística", "Pós-venda"]
+              config:
+                meta:
+                  value_domain: support_category_group
       - name: ticket_count
         description: "Aditiva — chamados abertos, por mês, canal e categoria de chamado."
         meta:

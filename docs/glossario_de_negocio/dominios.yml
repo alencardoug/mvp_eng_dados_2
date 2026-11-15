@@ -606,3 +606,49 @@ unknown_members:
       agent_full_name: "Sem agente"
       agent_email: "desconhecido@exemplo.invalid"
       agent_team: "Desconhecido"
+
+# A cobertura (Bloco 5, item 3): toda coluna física de `analytics` e de `consumption` tem exatamente uma
+# classificação — a ligação a um domínio, uma regra abaixo ou uma exceção nominal, cada uma com o motivo.
+# As regras de tipo valem para as colunas que não são de texto; as de nome, só para as de texto não
+# ligadas. Coluna que cai em duas regras, ou em nenhuma, falha a guarda.
+exclusions:
+
+  by_type:
+    number:
+      types: [bigint, integer, smallint, numeric, double precision, real]
+      reason: Número — chave, contagem, medida ou ordem. O domínio de valores é de texto; o que um número quer dizer está na descrição da coluna.
+    flag:
+      types: [boolean]
+      reason: Flag booleana; o significado do verdadeiro está na descrição da coluna.
+    temporal:
+      types: [date, timestamp with time zone, timestamp without time zone]
+      reason: Data ou instante.
+
+  by_name:
+    key:
+      suffixes: [_key]
+      reason: Chave substituta ou técnica, um hash sem significado de negócio.
+    business_code:
+      suffixes: [_code, _number]
+      names: [sku, barcode, movement_id, correlation_id, source_id]
+      reason: Código ou identificador de cadastro; o sentinela do membro desconhecido é coberto por `unknown_members`.
+    registry_name:
+      suffixes: [_name]
+      reason: Nome de cadastro (de marca, categoria, canal, armazém, transportadora, pessoa); muda com o cadastro, não é vocabulário fechado.
+    geography:
+      names: [city, country, warehouse_city, warehouse_country, warehouse_state, brand_country, supplier_country]
+      reason: País ISO, cidade e a UF do armazém são atributos de cadastro, não vocabulário de filtro (Q20); a região do IBGE é domínio. O `state_code` cai em código de cadastro.
+    variant_attribute:
+      names: [variant_size, variant_color, variant_package]
+      reason: Atributo de cadastro da variante (Q20).
+    period_label:
+      names: [year_month, year_quarter]
+      reason: Rótulo do período, derivado da data.
+    free_text:
+      names: [support_category_description, tracking_url_template]
+      reason: Texto livre ou modelo de texto.
+    personal:
+      names: [customer_document, agent_email]
+      reason: Dado pessoal ou de contato (sintético); classificado pela sensibilidade, não por domínio.
+
+  exceptions: {}

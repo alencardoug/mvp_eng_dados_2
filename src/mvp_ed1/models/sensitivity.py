@@ -1048,15 +1048,16 @@ def render_generated(modelos: dict[str, dict[str, str]], chave: str = "models", 
     return GENERATED_HEADER + "\n" + yaml.safe_dump(corpo, sort_keys=False, allow_unicode=True, width=120)
 
 
-def render_files(plano: Plan, textos=None, dominios=None) -> dict[pathlib.Path, str]:
-    """Conteúdo final de cada arquivo que mudaria: a sensibilidade primeiro, a descrição (`descriptions.Texts`)
-    e o domínio (`domains.Domains`) por cima."""
-    from mvp_ed1.models import descriptions, domains
+def render_files(plano: Plan, textos=None, dominios=None, valores=None) -> dict[pathlib.Path, str]:
+    """Conteúdo final de cada arquivo que mudaria: a sensibilidade primeiro, a descrição (`descriptions.Texts`),
+    o domínio do modelo (`domains.Domains`) e o domínio de valores da coluna (`value_domains.Derived`) por cima."""
+    from mvp_ed1.models import descriptions, domains, value_domains
     saida: dict[pathlib.Path, str] = {}
     a_descrever = textos.patches if textos is not None else {}
     a_marcar = textos.marks if textos is not None else {}
     a_classificar = dominios.patches if dominios is not None else {}
-    for caminho in sorted(set(plano.patches) | set(a_descrever) | set(a_marcar) | set(a_classificar)):
+    a_valorar = set(valores.patches) | set(valores.removals) if valores is not None else set()
+    for caminho in sorted(set(plano.patches) | set(a_descrever) | set(a_marcar) | set(a_classificar) | a_valorar):
         texto = caminho.read_text(encoding="utf-8")
         if caminho in plano.patches:
             texto = patch_yaml(texto, plano.patches[caminho])
@@ -1066,6 +1067,9 @@ def render_files(plano: Plan, textos=None, dominios=None) -> dict[pathlib.Path, 
             texto = patch_meta(texto, a_marcar[caminho])
         if caminho in a_classificar:
             texto = domains.patch_domains(texto, a_classificar[caminho])
+        if caminho in a_valorar:
+            texto = value_domains.patch_value_domains(texto, valores.patches.get(caminho, {}),
+                                                      valores.removals.get(caminho, {}))
         saida[caminho] = texto
     for caminho, modelos in plano.generated.items():
         saida[caminho] = render_generated(modelos, "snapshots" if caminho.parent.name == "snapshots" else "models",
@@ -1096,7 +1100,7 @@ def main(argv: list[str] | None = None) -> int:
     if not MANIFEST.exists():
         print(f"sem {MANIFEST.relative_to(ROOT)}; rode `make dbt-build` antes", file=sys.stderr)
         return 2
-    from mvp_ed1.models import descriptions, domains
+    from mvp_ed1.models import descriptions, domains, value_domains
     manifest, derivacao = load()
     if atrasados := stale_nodes(manifest):
         print(f"manifest atrasado: {len(atrasados)} modelo(s) mudaram no disco depois do último build "
@@ -1122,7 +1126,19 @@ def main(argv: list[str] | None = None) -> int:
         disco = descriptions.disk_entries()
         textos = descriptions.derive_texts(manifest, derivacao, disco=disco)
         dominios = domains.derive_domains(manifest, disco)
-        arquivos = render_files(plano, textos, dominios)
+        # Os domínios de valores (ADR-0055): do catálogo e das ligações no `.yml` à mão, lidos do disco. O
+        # catálogo é o da raiz do projeto de agora; sem ele (um projeto de teste) não há o que derivar — no
+        # repositório ele existe, e `tests/test_dominios_de_valores.py` o confere.
+        caminho_catalogo = ROOT / value_domains.CATALOG_RELATIVE
+        if caminho_catalogo.exists():
+            catalogo = value_domains.load_catalog(caminho_catalogo)
+            ligacoes = value_domains.links(disco)
+            valores = value_domains.derive(catalogo, ligacoes, disco)
+            if orfaos := value_domains.orphan_domains(catalogo, ligacoes):
+                raise ValueError(f"domínio sem coluna ligada e sem `reserved`: {', '.join(orfaos)}")
+        else:
+            valores = value_domains.Derived()
+        arquivos = render_files(plano, textos, dominios, valores)
         # Todo conteúdo final, lido estrito antes de qualquer escrita: uma ocorrência que o
         # escritor duplicou não pode sair com 0 para ser recusada só na rodada seguinte (RVL3-11-01).
         for caminho, texto in arquivos.items():
@@ -1144,6 +1160,10 @@ def main(argv: list[str] | None = None) -> int:
                 domains.verify(caminho, texto, dominios.patches[caminho])
             elif caminho in plano.generated:
                 domains.verify(caminho, texto, {m: dominios.generated[m] for m in plano.generated[caminho] if m in dominios.generated})
+        # O domínio de valores, conferido no YAML carregado em todo arquivo que o recebe, mude ou não.
+        for caminho in sorted(set(valores.patches) | set(valores.removals)):
+            value_domains.verify(caminho, arquivos.get(caminho, caminho.read_text(encoding="utf-8")),
+                                 valores.patches.get(caminho, {}), valores.removals.get(caminho, {}))
     except (ValueError, RuntimeError, KeyError) as erro:
         print(f"recusado: {erro.args[0] if erro.args else erro} — nenhum arquivo é tocado", file=sys.stderr)
         return 1

@@ -183,3 +183,99 @@ def test_a_ligacao_confere_impossiveis_e_nao_observados() -> None:
 def test_o_dominio_sem_ligacao_falha_salvo_reservado() -> None:
     catalogo = {"domains": {"a": {"values": {}}, "b": {"values": {}, "reserved": "uso futuro"}}}
     assert vd.orphan_domains(catalogo, []) == ["a"]
+
+
+# ── O membro desconhecido (Bloco 5, item 1: o sentinela fora do domínio) ──────────
+
+def _com_membro() -> dict:
+    return {"domains": {"ibge_region": {"values": {"Sul": {"meaning": "Região Sul.", "source": "s"}}}},
+            "unknown_members": {"dim_geography": {"meaning": "Sem endereço.", "source": "dim_geography.sql",
+                                                   "columns": {"region": "Desconhecido", "country": "ZZ"}}}}
+
+
+def _ligacao(model: str, column: str, unknown_member: str | None = None) -> vd.Link:
+    return vd.Link(path=CAMINHO, model=model, column=column, domain="ibge_region", null_meaning=None,
+                   impossible={}, not_observed={}, unknown_member=unknown_member)
+
+
+def test_a_coluna_da_propria_dimensao_herda_o_sentinela() -> None:
+    permitidos = vd.allowed(_ligacao("dim_geography", "region"), _com_membro())
+    assert permitidos == {"Sul": "Região Sul.", "Desconhecido": "Membro desconhecido — Sem endereço."}
+
+
+def test_a_coluna_que_propaga_o_membro_o_declara_e_a_que_nao_propaga_nao_o_tem() -> None:
+    assert "Desconhecido" in vd.allowed(_ligacao("revenue_by_delivery_region", "region", "dim_geography.region"), _com_membro())
+    assert vd.allowed(_ligacao("dim_warehouse", "warehouse_region"), _com_membro()) == {"Sul": "Região Sul."}
+
+
+def test_unknown_member_que_sobra_ou_que_nao_existe_e_recusado() -> None:
+    with pytest.raises(ValueError, match="sobra"):
+        vd.allowed(_ligacao("dim_geography", "region", "dim_geography.region"), _com_membro())
+    with pytest.raises(ValueError, match="não existe"):
+        vd.allowed(_ligacao("revenue_by_delivery_region", "region", "dim_geography.state_name"), _com_membro())
+
+
+def test_o_sentinela_que_colide_com_um_valor_do_dominio_e_recusado() -> None:
+    catalogo = _com_membro()
+    catalogo["unknown_members"]["dim_geography"]["columns"]["region"] = "Sul"
+    with pytest.raises(ValueError, match="colide"):
+        vd.allowed(_ligacao("dim_geography", "region"), catalogo)
+
+
+def test_o_catalogo_recusa_membro_sem_significado_e_sentinela_que_nao_e_texto(tmp_path) -> None:
+    base = CATALOGO + 'unknown_members:\n  dim_x:\n    meaning: "M."\n    source: "x.sql"\n    columns:\n      natural_key: "-1"\n'
+    assert vd.load_catalog(tmp_path / "d.yml", base)["unknown_members"]["dim_x"]["columns"]["natural_key"] == "-1"
+    with pytest.raises(ValueError, match="não é texto"):
+        vd.load_catalog(tmp_path / "d.yml", base.replace('natural_key: "-1"', "natural_key: -1"))
+    with pytest.raises(ValueError, match="meaning"):
+        vd.load_catalog(tmp_path / "d.yml", base.replace('    meaning: "M."\n', ""))
+
+
+def test_o_catalogo_do_repositorio_carrega_e_cada_dominio_tem_ligacao() -> None:
+    """O `dominios.yml` versionado, lido estrito; a guarda de domínio órfão é a do `make catalog`."""
+    catalogo = vd.load_catalog()
+    assert set(catalogo["unknown_members"]) == {"dim_geography", "dim_sales_channel", "dim_support_agent"}
+    from mvp_ed1.models import descriptions
+    ligacoes = vd.links(descriptions.disk_entries())
+    assert vd.orphan_domains(catalogo, ligacoes) == []
+    for ligacao in ligacoes:
+        vd.allowed(ligacao, catalogo)
+
+
+# ── A cobertura (Bloco 5, item 3) ─────────────────────────────────────────────────
+
+def _regras() -> dict:
+    return {"exclusions": {
+        "by_type": {"number": {"types": ["bigint"], "reason": "r"}},
+        "by_name": {"key": {"suffixes": ["_key"], "reason": "r"}, "code": {"suffixes": ["_code"], "reason": "r"},
+                    "geo": {"names": ["state_code"], "reason": "r"}},
+        "exceptions": {"dim_x.nota": "texto livre"}}}
+
+
+def test_a_cobertura_exige_exatamente_uma_classificacao() -> None:
+    colunas = [("analytics", "dim_x", "x_key", "text"), ("analytics", "dim_x", "x_id", "bigint"),
+               ("analytics", "dim_x", "status", "text"), ("analytics", "dim_x", "nota", "text"),
+               ("analytics", "dim_x", "carrier_code", "text")]
+    classificadas, problemas = vd.coverage(colunas, {("dim_x", "status")}, _regras())
+    assert classificadas == {"analytics.dim_x.x_key": "key", "analytics.dim_x.x_id": "number",
+                             "analytics.dim_x.status": "value_domain", "analytics.dim_x.nota": "exception",
+                             "analytics.dim_x.carrier_code": "code"}
+    assert problemas == []
+
+
+def test_coluna_em_duas_regras_ou_em_nenhuma_falha() -> None:
+    colunas = [("analytics", "dim_x", "state_code", "text"), ("analytics", "dim_x", "nome", "text"),
+               ("analytics", "dim_x", "x_flag", "boolean")]
+    _, problemas = vd.coverage(colunas, set(), _regras())
+    assert problemas == ["analytics.dim_x.state_code (text): duas regras: code, geo",
+                         "analytics.dim_x.nome (text): nenhuma regra",
+                         "analytics.dim_x.x_flag (boolean): nenhuma regra"]
+
+
+def test_o_catalogo_recusa_regra_e_excecao_sem_motivo(tmp_path) -> None:
+    base = CATALOGO + "exclusions:\n  by_type:\n    number: {types: [bigint], reason: \"N.\"}\n  exceptions:\n    dim_x.nota: \"Livre.\"\n"
+    assert vd.load_catalog(tmp_path / "d.yml", base)["exclusions"]["exceptions"] == {"dim_x.nota": "Livre."}
+    with pytest.raises(ValueError, match="sem `reason`"):
+        vd.load_catalog(tmp_path / "d.yml", base.replace(', reason: "N."', ""))
+    with pytest.raises(ValueError, match="sem motivo"):
+        vd.load_catalog(tmp_path / "d.yml", base.replace('"Livre."', '""'))

@@ -159,7 +159,7 @@ else \
 fi
 endef
 
-.PHONY: help env install up down reset ps logs psql-source psql-legacy psql-warehouse \
+.PHONY: help env install up down reset ps logs psql-source psql-legacy psql-warehouse catalog-derivados \
         pgcli-source pgcli-legacy pgcli-warehouse \
         migrate migrate-down migrate-new migrate-status migrate-legacy migrate-legacy-down \
         migrate-legacy-status migrate-legacy-new catalog seed-data seed-plan size-report test test-carga \
@@ -311,6 +311,13 @@ catalog: require-venv ## Regenera dicionário, inventário, diagrama ER, a class
 	@# completo, com os resultados.
 	@# A procedência do armazém (ADR-0054) é a única leitura do banco que o pacote faz: o `.env` dá a conexão.
 	@set -a; [ -f .env ] && . ./.env; set +a; .venv/bin/python -m mvp_ed1.models.pacote
+
+catalog-derivados: require-venv ## Escreve os .yml derivados (classificação, descrição, domínios de valores) sem compor o pacote
+	@# O `make catalog` passa a escrever teste do dbt (o `accepted_values` e o `not_null` dos domínios de
+	@# valores, ADR-0055), e o pacote recusa o carimbo anterior a eles. A sequência de publicação é este
+	@# alvo, `make dbt-build`, `make catalog`, `make test`, `make catalog` (plano da base dos consumidores,
+	@# Bloco 5, "Ordem"). Precisa do manifest de um `make dbt-build` recente, como o `catalog`.
+	@.venv/bin/python -m mvp_ed1.models.sensitivity
 
 seed-data: require-env require-venv ## Gera e carrega os dados sintéticos; SCALE, SEED, AS_OF, FORCE=1
 	@$(GERADOR) seed \

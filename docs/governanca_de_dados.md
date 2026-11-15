@@ -238,6 +238,18 @@ geografia —, e o `legado` dos objetos do gerador. O texto de uma medida diz a 
 mede e o grão ou o filtro ("Aditiva — receita líquida dos itens de pedidos realizados, por mês, canal
 e categoria"); o conceito fica no [Glossário de Negócio](glossario_de_negocio/), que a view aponta.
 
+**Os domínios de valores, também de uma vez** (desde 15/11/2026, [ADR-0055](adr/0055-dominios-e-metricas-declarados-uma-vez.md)).
+O significado de cada valor de uma coluna de `analytics` ou de `consumption` é declarado uma vez, no
+catálogo [`dominios.yml`](glossario_de_negocio/dominios.yml), com a fonte de cada significado; a coluna
+aponta para ele no `.yml` à mão (`meta.value_domain`, e `null_meaning`, `impossible`, `not_observed` ou
+`unknown_member` quando cabem). O `make catalog` (`models/value_domains.py`) deriva na coluna o
+`meta.values` e o `accepted_values` — e o `not_null`, sem `null_meaning` —, e os confere no valor que o
+dbt lê, nos dois modos; domínio sem coluna ligada recusa. Como ele escreve teste do dbt, a publicação
+começa por `make catalog-derivados` e passa por um `make dbt-build` antes do `make catalog`. As guardas
+contra o armazém (`tests/test_dominios_no_armazem.py`) classificam toda coluna física — a ligação ou
+uma regra de exclusão do catálogo, exatamente uma —, cobram o `not_observed` de cada ligação e conferem
+a linha do membro desconhecido de cada dimensão.
+
 **Como se mede a descrição** (desde 03/11/2026): `tests/test_descricao.py` conta, por camada, as
 colunas que existem no armazém sem descrição no `manifest.json` e os objetos sem `domain` ou `owner`.
 É uma catraca de **faltas**, não de percentual: o número tem de ser igual ao teto — coluna nova sem

@@ -53,6 +53,28 @@ models:
         description: "Nome do mês por extenso, no idioma do banco."
         meta:
           sensitivity: internal
+          value_domain: month_name
+          values:
+            "April": "Abril."
+            "August": "Agosto."
+            "December": "Dezembro."
+            "February": "Fevereiro."
+            "January": "Janeiro."
+            "July": "Julho."
+            "June": "Junho."
+            "March": "Março."
+            "May": "Maio."
+            "November": "Novembro."
+            "October": "Outubro."
+            "September": "Setembro."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["April", "August", "December", "February", "January", "July", "June", "March", "May", "November", "October", "September"]
+              config:
+                meta:
+                  value_domain: month_name
       - name: year_month
         description: "Ano e mês, no formato AAAA-MM."
         meta:
@@ -69,6 +91,23 @@ models:
         description: "Nome do dia da semana por extenso, no idioma do banco."
         meta:
           sensitivity: internal
+          value_domain: day_of_week
+          values:
+            "Friday": "Sexta-feira."
+            "Monday": "Segunda-feira."
+            "Saturday": "Sábado."
+            "Sunday": "Domingo."
+            "Thursday": "Quinta-feira."
+            "Tuesday": "Terça-feira."
+            "Wednesday": "Quarta-feira."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Friday", "Monday", "Saturday", "Sunday", "Thursday", "Tuesday", "Wednesday"]
+              config:
+                meta:
+                  value_domain: day_of_week
       - name: iso_week_number
         description: "Número da semana ISO no ano."
         meta:
@@ -133,6 +172,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: customer_code
         description: "Chave natural do cliente na origem; estável entre cargas."
         meta:
@@ -203,6 +254,20 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: customer_status
+          values:
+            "active": "Cliente com relacionamento ativo; pode comprar."
+            "blocked": "Cliente impedido de comprar por decisão da empresa."
+            "inactive": "Cliente sem relacionamento ativo, por iniciativa própria ou por falta de uso; o cadastro continua."
+            "pending": "Cadastro iniciado e ainda não concluído ou confirmado."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["active", "blocked", "inactive", "pending"]
+              config:
+                meta:
+                  value_domain: customer_status
       - name: customer_segment_id
         description: "Segmento comercial ao qual o cliente pertence."
         meta:
@@ -279,6 +344,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: sku
         description: "Código de estoque da variante; chave natural do SKU."
         meta:
@@ -334,6 +411,19 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: product_status
+          values:
+            "active": "Produto publicado e à venda."
+            "discontinued": "Produto retirado de linha; não é mais vendido, mas o histórico continua."
+            "draft": "Produto em preparação, ainda não publicado para venda."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["active", "discontinued", "draft"]
+              config:
+                meta:
+                  value_domain: product_status
       - name: variant_is_active
         description: "Indica se o SKU continua disponível para venda."
         meta:
@@ -426,6 +516,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: category_name
         description: "Nome comercial da categoria."
         meta:
@@ -463,6 +565,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: brand_natural_key
         description: "Identificador da marca na origem, gerado pelo banco transacional."
         meta:
@@ -500,14 +614,38 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: sales_channel_type
+          values:
+            "app": "Aplicativo."
+            "store": "Loja física."
+            "unknown": "Membro desconhecido — Canal desconhecido — o chamado que não nasceu de um pedido não tem canal. Não é de origem nenhuma."
+            "web": "Loja online."
         data_tests:
+          - not_null
           - accepted_values:
-              values: [web, app, store, unknown]
+              arguments:
+                values: ["app", "store", "unknown", "web"]
+              config:
+                meta:
+                  value_domain: sales_channel_type
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+            "unknown": "Membro desconhecido — Canal desconhecido — o chamado que não nasceu de um pedido não tem canal. Não é de origem nenhuma."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail", "unknown"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: sales_channel_natural_key
         description: "Identificador do canal de venda na origem, gerado pelo banco transacional."
         meta:
@@ -551,10 +689,22 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: ibge_region
+          values:
+            "Centro-Oeste": "Região Centro-Oeste."
+            "Desconhecido": "Membro desconhecido — Geografia desconhecida — o cliente sem endereço de entrega principal aterrissa aqui, em vez de sair do recorte por região."
+            "Nordeste": "Região Nordeste."
+            "Norte": "Região Norte."
+            "Sudeste": "Região Sudeste."
+            "Sul": "Região Sul."
         data_tests:
           - not_null
           - accepted_values:
-              values: [Norte, Nordeste, Centro-Oeste, Sudeste, Sul, Desconhecido]
+              arguments:
+                values: ["Centro-Oeste", "Desconhecido", "Nordeste", "Norte", "Sudeste", "Sul"]
+              config:
+                meta:
+                  value_domain: ibge_region
       - name: country
         description: "País em código ISO de duas letras."
         meta:
@@ -665,6 +815,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: brand_key
         description: "Chave substituta da marca: hash de `source_system` e `brand_id` (ADR-0017)."
         meta:
@@ -692,6 +854,23 @@ models:
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
+          value_domain: order_status
+          values:
+            "cancelled": "Pedido cancelado antes do pagamento, depois de pago ou durante a separação. Não é pedido realizado. Estado terminal."
+            "delivered": "Pedido entregue ao cliente. É pedido realizado."
+            "paid": "Pagamento aprovado. É pedido realizado."
+            "pending": "Pedido criado e ainda não pago. Não é pedido realizado."
+            "picking": "Pedido em separação no armazém. É pedido realizado."
+            "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
+            "shipped": "Pedido despachado do armazém. É pedido realizado."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
+              config:
+                meta:
+                  value_domain: order_status
       - name: order_date
         description: "Data do pedido, no fuso de São Paulo."
         meta:
@@ -818,15 +997,37 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: cart_event_type
+          values:
+            "abandoned": "O carrinho foi abandonado explicitamente, sem virar pedido; encerra o ciclo."
+            "converted": "O carrinho virou pedido."
+            "created": "Criação do carrinho."
+            "expired": "O carrinho passou da validade sem virar pedido; encerra o ciclo."
         data_tests:
           - not_null
           - accepted_values:
-              values: [created, converted, abandoned, expired]
+              arguments:
+                values: ["abandoned", "converted", "created", "expired"]
+              config:
+                meta:
+                  value_domain: cart_event_type
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: cart_id
         description: "Identificador do carrinho na origem, gerado pelo banco transacional."
         meta:
@@ -907,14 +1108,39 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: payment_method_type
+          values:
+            "boleto": "Boleto bancário."
+            "credit_card": "Cartão de crédito."
+            "debit_card": "Cartão de débito."
+            "pix": "Pix."
+            "voucher": "Vale-compra."
+            "wallet": "Carteira digital."
         data_tests:
+          - not_null
           - accepted_values:
-              values: [credit_card, debit_card, pix, boleto, wallet, voucher]
+              arguments:
+                values: ["boleto", "credit_card", "debit_card", "pix", "voucher", "wallet"]
+              config:
+                meta:
+                  value_domain: payment_method_type
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: payment_method_natural_key
         description: "Identificador do meio de pagamento na origem, gerado pelo banco transacional."
         meta:
@@ -980,6 +1206,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: supplier_code
         description: "Chave natural do fornecedor na origem."
         meta:
@@ -1041,6 +1279,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: warehouse_natural_key
         description: "Identificador do armazém na origem, gerado pelo banco transacional."
         meta:
@@ -1076,6 +1326,23 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: ibge_region
+          not_observed:
+            "Norte": "Os cinco armazéns declarados (generator/geracao.yml, warehouses) ficam em São Paulo, Extrema, Recife, Canoas e Goiânia; nenhum no Norte."
+          values:
+            "Centro-Oeste": "Região Centro-Oeste."
+            "Nordeste": "Região Nordeste."
+            "Norte": "Região Norte."
+            "Sudeste": "Região Sudeste."
+            "Sul": "Região Sul."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
+              config:
+                meta:
+                  value_domain: ibge_region
       - name: warehouse_country
         description: "País, em código ISO."
         meta:
@@ -1148,22 +1415,55 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: payment_transaction_type
+          values:
+            "authorization": "Pedido de reserva do valor ao meio de pagamento; é a tentativa de autorização."
+            "capture": "Cobrança efetiva de valor autorizado; nunca excede o autorizado."
+            "refund": "Devolução ao cliente de valor já capturado."
+            "void": "Desfazimento de uma autorização que não foi capturada (pedido cancelado depois de pago)."
         data_tests:
+          - not_null
           - accepted_values:
-              values: [authorization, capture, void, refund]
+              arguments:
+                values: ["authorization", "capture", "refund", "void"]
+              config:
+                meta:
+                  value_domain: payment_transaction_type
       - name: transaction_result
         description: "Desfecho da operação: succeeded, failed ou pending."
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: payment_transaction_result
+          values:
+            "failed": "A operação foi recusada."
+            "pending": "A operação aguarda resposta; ainda não foi aceita nem recusada."
+            "succeeded": "A operação foi aceita."
         data_tests:
+          - not_null
           - accepted_values:
-              values: [succeeded, failed, pending]
+              arguments:
+                values: ["failed", "pending", "succeeded"]
+              config:
+                meta:
+                  value_domain: payment_transaction_result
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: sales_channel_key
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
@@ -1206,6 +1506,23 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: gateway_response_code
+          values:
+            "00": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+            "05": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+            "51": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+            "57": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+            "91": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+            "GW-OK": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+            "GW-TIMEOUT": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["00", "05", "51", "57", "91", "GW-OK", "GW-TIMEOUT"]
+              config:
+                meta:
+                  value_domain: gateway_response_code
       - name: occurred_at
         description: "Momento de negócio da operação."
         meta:
@@ -1297,6 +1614,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: payment_method_key
         description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
         meta:
@@ -1353,11 +1682,41 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: refund_reason
+          null_meaning: "A origem não informou o motivo."
+          impossible:
+            "Sem motivo registrado": "Rótulo que só a view da P10 escreve no lugar do nulo; a fato guarda o nulo."
+          values:
+            "Arrependimento em até 7 dias": "O próprio texto."
+            "Cancelamento a pedido do cliente": "O próprio texto."
+            "Divergência de item": "O próprio texto."
+            "Entrega não realizada": "O próprio texto."
+            "Produto com defeito": "O próprio texto."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Arrependimento em até 7 dias", "Cancelamento a pedido do cliente", "Divergência de item", "Entrega não realizada", "Produto com defeito"]
+              config:
+                meta:
+                  value_domain: refund_reason
       - name: refund_status
         description: "Estado do reembolso: requested, completed ou rejected."
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: refund_status
+          values:
+            "completed": "Reembolso concluído; o valor voltou ao cliente."
+            "rejected": "Reembolso recusado; o valor não volta."
+            "requested": "Reembolso pedido, ainda não decidido."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["completed", "rejected", "requested"]
+              config:
+                meta:
+                  value_domain: refund_status
       - name: refunded_at
         description: "Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado e no recusado, e só marca a conclusão quando o estado é completed."
         meta:
@@ -1434,6 +1793,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: date_key
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
@@ -1468,6 +1839,21 @@ models:
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
+          value_domain: purchase_order_status
+          values:
+            "cancelled": "Ordem cancelada."
+            "draft": "Ordem em rascunho, ainda não enviada ao fornecedor."
+            "partially_received": "Parte da quantidade pedida chegou em recebimento concluído."
+            "placed": "Ordem enviada ao fornecedor, sem recebimento concluído."
+            "received": "Toda a quantidade pedida chegou em recebimento concluído."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["cancelled", "draft", "partially_received", "placed", "received"]
+              config:
+                meta:
+                  value_domain: purchase_order_status
       - name: ordered_at
         description: "Momento de emissão da ordem."
         meta:
@@ -1614,15 +2000,41 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: inventory_movement_type
+          values:
+            "adjustment_in": "Entrada por ajuste de inventário (quantidade positiva), sempre com motivo documentado."
+            "adjustment_out": "Saída por ajuste de inventário (quantidade negativa), sempre com motivo documentado."
+            "customer_return": "Entrada por devolução de cliente (quantidade positiva)."
+            "purchase_receipt": "Entrada por recebimento de compra (quantidade positiva)."
+            "sale_dispatch": "Saída por venda expedida (quantidade negativa)."
+            "supplier_return": "Saída por devolução ao fornecedor (quantidade negativa)."
+            "transfer_in": "Entrada por transferência entre armazéns (quantidade positiva); sempre em par com um `transfer_out`, pelo mesmo `correlation_id`."
+            "transfer_out": "Saída por transferência entre armazéns (quantidade negativa); sempre em par com um `transfer_in`, pelo mesmo `correlation_id`."
         data_tests:
+          - not_null
           - accepted_values:
-              values: [purchase_receipt, customer_return, transfer_in, adjustment_in,
-                       sale_dispatch, supplier_return, transfer_out, adjustment_out]
+              arguments:
+                values: ["adjustment_in", "adjustment_out", "customer_return", "purchase_receipt", "sale_dispatch", "supplier_return", "transfer_in", "transfer_out"]
+              config:
+                meta:
+                  value_domain: inventory_movement_type
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: event_sequence
         description: "Ordem do evento dentro da sua origem. No varejo, a sequência técnica que o banco atribui; no legado, a identidade física da linha na captura — desempate técnico, sem promessa de ordem de negócio (D40)."
         meta:
@@ -1633,6 +2045,21 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: inventory_source_type
+          values:
+            "adjustment": "Ajuste de inventário."
+            "purchase": "Recebimento de compra."
+            "return": "Devolução, de cliente ou ao fornecedor."
+            "sale": "Expedição de venda."
+            "transfer": "Transferência entre armazéns."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["adjustment", "purchase", "return", "sale", "transfer"]
+              config:
+                meta:
+                  value_domain: inventory_source_type
       - name: source_id
         description: "Identificador do registro que causou o movimento."
         meta:
@@ -1733,10 +2160,20 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: carrier_service_level
+          values:
+            "express": "Entrega expressa (ordem 2)."
+            "same_day": "Entrega no mesmo dia, a mais rápida (ordem 3)."
+            "standard": "Entrega padrão, a mais lenta (ordem 1)."
         description: "Modalidade: standard, express ou same_day."
         data_tests:
           - not_null
-          - accepted_values: {values: [standard, express, same_day]}
+          - accepted_values:
+              arguments:
+                values: ["express", "same_day", "standard"]
+              config:
+                meta:
+                  value_domain: carrier_service_level
       - name: is_deleted
         description: "{{ doc(\"is_deleted\") }}"
         meta:
@@ -1748,6 +2185,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: carrier_code
         description: "Código estável da transportadora."
         meta:
@@ -1887,15 +2336,40 @@ models:
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
+          value_domain: shipment_status
+          values:
+            "created": "Remessa criada para o pedido, ainda não separada."
+            "delivered": "Remessa entregue ao cliente."
+            "dispatched": "Remessa expedida do armazém, ainda sem evento de trânsito; já baixa estoque."
+            "in_transit": "Remessa com a transportadora, a caminho."
+            "lost": "Remessa extraviada durante o transporte; não tem entrega."
+            "picking": "Itens em separação no armazém."
+            "returned": "Remessa devolvida pelo cliente depois da entrega."
         data_tests:
           - not_null
           - accepted_values:
-              values: [created, picking, dispatched, in_transit, delivered, returned, lost]
+              arguments:
+                values: ["created", "delivered", "dispatched", "in_transit", "lost", "picking", "returned"]
+              config:
+                meta:
+                  value_domain: shipment_status
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: shipment_id
         description: "Remessa à qual o item pertence."
         meta:
@@ -1931,6 +2405,27 @@ models:
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
+          value_domain: order_status
+          not_observed:
+            "pending": "O gerador só cria remessa para pedido em separação ou adiante (generator/domains/logistica.py, _ESTADO_POR_PEDIDO); o pedido cancelado não chega a ter remessa."
+            "paid": "O gerador só cria remessa para pedido em separação ou adiante (generator/domains/logistica.py, _ESTADO_POR_PEDIDO); o pedido cancelado não chega a ter remessa."
+            "cancelled": "O gerador só cria remessa para pedido em separação ou adiante (generator/domains/logistica.py, _ESTADO_POR_PEDIDO); o pedido cancelado não chega a ter remessa."
+          values:
+            "cancelled": "Pedido cancelado antes do pagamento, depois de pago ou durante a separação. Não é pedido realizado. Estado terminal."
+            "delivered": "Pedido entregue ao cliente. É pedido realizado."
+            "paid": "Pagamento aprovado. É pedido realizado."
+            "pending": "Pedido criado e ainda não pago. Não é pedido realizado."
+            "picking": "Pedido em separação no armazém. É pedido realizado."
+            "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
+            "shipped": "Pedido despachado do armazém. É pedido realizado."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
+              config:
+                meta:
+                  value_domain: order_status
       - name: placed_at
         description: "Momento de negócio em que o pedido foi feito."
         meta:
@@ -2122,15 +2617,40 @@ models:
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
+          value_domain: shipment_status
+          values:
+            "created": "Remessa criada para o pedido, ainda não separada."
+            "delivered": "Remessa entregue ao cliente."
+            "dispatched": "Remessa expedida do armazém, ainda sem evento de trânsito; já baixa estoque."
+            "in_transit": "Remessa com a transportadora, a caminho."
+            "lost": "Remessa extraviada durante o transporte; não tem entrega."
+            "picking": "Itens em separação no armazém."
+            "returned": "Remessa devolvida pelo cliente depois da entrega."
         data_tests:
           - not_null
           - accepted_values:
-              values: [created, picking, dispatched, in_transit, delivered, returned, lost]
+              arguments:
+                values: ["created", "delivered", "dispatched", "in_transit", "lost", "picking", "returned"]
+              config:
+                meta:
+                  value_domain: shipment_status
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: shipment_id
         description: "Identificador da remessa na origem, gerado pelo banco transacional."
         meta:
@@ -2161,6 +2681,27 @@ models:
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
+          value_domain: order_status
+          not_observed:
+            "pending": "O gerador só cria remessa para pedido em separação ou adiante (generator/domains/logistica.py, _ESTADO_POR_PEDIDO); o pedido cancelado não chega a ter remessa."
+            "paid": "O gerador só cria remessa para pedido em separação ou adiante (generator/domains/logistica.py, _ESTADO_POR_PEDIDO); o pedido cancelado não chega a ter remessa."
+            "cancelled": "O gerador só cria remessa para pedido em separação ou adiante (generator/domains/logistica.py, _ESTADO_POR_PEDIDO); o pedido cancelado não chega a ter remessa."
+          values:
+            "cancelled": "Pedido cancelado antes do pagamento, depois de pago ou durante a separação. Não é pedido realizado. Estado terminal."
+            "delivered": "Pedido entregue ao cliente. É pedido realizado."
+            "paid": "Pagamento aprovado. É pedido realizado."
+            "pending": "Pedido criado e ainda não pago. Não é pedido realizado."
+            "picking": "Pedido em separação no armazém. É pedido realizado."
+            "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
+            "shipped": "Pedido despachado do armazém. É pedido realizado."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
+              config:
+                meta:
+                  value_domain: order_status
       - name: placed_at
         description: "Momento de negócio em que o pedido foi feito."
         meta:
@@ -2312,18 +2853,46 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: order_status
+          values:
+            "cancelled": "Pedido cancelado antes do pagamento, depois de pago ou durante a separação. Não é pedido realizado. Estado terminal."
+            "delivered": "Pedido entregue ao cliente. É pedido realizado."
+            "paid": "Pagamento aprovado. É pedido realizado."
+            "pending": "Pedido criado e ainda não pago. Não é pedido realizado."
+            "picking": "Pedido em separação no armazém. É pedido realizado."
+            "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
+            "shipped": "Pedido despachado do armazém. É pedido realizado."
         data_tests:
           - not_null
           - accepted_values:
-              values: [pending, paid, picking, shipped, delivered, cancelled, returned]
+              arguments:
+                values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
+              config:
+                meta:
+                  value_domain: order_status
       - name: from_status
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: order_status
+          null_meaning: "O primeiro evento do pedido, a criação, não tem estado anterior."
+          impossible:
+            "cancelled": "Estado terminal: nenhuma transição sai dele (seed order_status_transitions; generator/geracao.yml, cobertura_dispensada de order_status_history)."
+            "returned": "Estado terminal: nenhuma transição sai dele (seed order_status_transitions; generator/geracao.yml, cobertura_dispensada de order_status_history)."
+          values:
+            "delivered": "Pedido entregue ao cliente. É pedido realizado."
+            "paid": "Pagamento aprovado. É pedido realizado."
+            "pending": "Pedido criado e ainda não pago. Não é pedido realizado."
+            "picking": "Pedido em separação no armazém. É pedido realizado."
+            "shipped": "Pedido despachado do armazém. É pedido realizado."
         description: "Estado anterior; nulo na criação do pedido."
         data_tests:
           - accepted_values:
-              values: [pending, paid, picking, shipped, delivered, cancelled, returned]
+              arguments:
+                values: ["delivered", "paid", "pending", "picking", "shipped"]
+              config:
+                meta:
+                  value_domain: order_status
       - name: hours_in_previous_status
         meta:
           description_reason: "diz como somar no grão da transição, que o texto herdado não diz"
@@ -2339,6 +2908,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: order_id
         description: "Pedido cujo estado mudou."
         meta:
@@ -2354,6 +2935,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: order_change_reason
+          null_meaning: "A transição não tem motivo registrado; só a ida para `cancelled` e para `returned` o registra."
+          values:
+            "Cancelado a pedido do cliente": "O próprio texto. Registrado na transição para `cancelled`."
+            "Devolução dentro do prazo de arrependimento": "O próprio texto. Registrado na transição para `returned`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Cancelado a pedido do cliente", "Devolução dentro do prazo de arrependimento"]
+              config:
+                meta:
+                  value_domain: order_change_reason
       - name: status_sequence
         description: "Posição da transição na história do pedido, por ordem de data (1 é a criação)."
         meta:
@@ -2379,6 +2972,23 @@ models:
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
           sensitivity: internal
+          value_domain: order_status
+          values:
+            "cancelled": "Pedido cancelado antes do pagamento, depois de pago ou durante a separação. Não é pedido realizado. Estado terminal."
+            "delivered": "Pedido entregue ao cliente. É pedido realizado."
+            "paid": "Pagamento aprovado. É pedido realizado."
+            "pending": "Pedido criado e ainda não pago. Não é pedido realizado."
+            "picking": "Pedido em separação no armazém. É pedido realizado."
+            "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
+            "shipped": "Pedido despachado do armazém. É pedido realizado."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
+              config:
+                meta:
+                  value_domain: order_status
       - name: is_order_creation
         description: "Verdadeiro na primeira transição do pedido, que não vem de estado nenhum."
         meta:
@@ -2440,15 +3050,37 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: campaign_objective
+          values:
+            "acquisition": "Conquistar clientes novos."
+            "clearance": "Liquidar estoque."
+            "reactivation": "Trazer de volta clientes inativos."
+            "retention": "Manter os clientes atuais comprando."
         data_tests:
           - not_null
           - accepted_values:
-              values: [acquisition, retention, reactivation, clearance]
+              arguments:
+                values: ["acquisition", "clearance", "reactivation", "retention"]
+              config:
+                meta:
+                  value_domain: campaign_objective
       - name: source_system
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: campaign_code
         description: "Código estável da campanha."
         meta:
@@ -2513,7 +3145,23 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
-        data_tests: [unique, not_null]
+          value_domain: support_ticket_category
+          values:
+            "account": "Conta — acesso, dados cadastrais e preferências."
+            "delivery": "Entrega — atraso, extravio ou problema na entrega."
+            "other": "Outros — contato que não se encaixa nas demais categorias."
+            "payment": "Pagamento — falha, recusa ou cobrança indevida."
+            "product": "Produto — defeito, divergência ou dúvida sobre o item."
+            "return": "Devolução — pedido de devolução, troca ou arrependimento."
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["account", "delivery", "other", "payment", "product", "return"]
+              config:
+                meta:
+                  value_domain: support_ticket_category
       - name: support_category_name
         description: "Nome da categoria de chamado."
         meta:
@@ -2525,6 +3173,22 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: support_category_group
+          values:
+            "Cadastro": "Reúne a categoria Conta (`account`)."
+            "Catálogo": "Reúne a categoria Produto (`product`)."
+            "Financeiro": "Reúne a categoria Pagamento (`payment`)."
+            "Geral": "Reúne a categoria Outros (`other`)."
+            "Logística": "Reúne a categoria Entrega (`delivery`)."
+            "Pós-venda": "Reúne a categoria Devolução (`return`)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Cadastro", "Catálogo", "Financeiro", "Geral", "Logística", "Pós-venda"]
+              config:
+                meta:
+                  value_domain: support_category_group
       - name: support_category_description
         description: "O que a categoria de chamado cobre."
         meta:
@@ -2559,9 +3223,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: discount_type
+          values:
+            "fixed": "Desconto de valor fixo; o `discount_value` é em moeda."
+            "percentage": "Desconto percentual; o `discount_value` é a porcentagem."
         data_tests:
           - not_null
-          - accepted_values: {values: [percentage, fixed]}
+          - accepted_values:
+              arguments:
+                values: ["fixed", "percentage"]
+              config:
+                meta:
+                  value_domain: discount_type
       - name: is_deleted
         description: "{{ doc(\"is_deleted\") }}"
         meta:
@@ -2573,6 +3246,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: coupon_code
         description: "Código digitado pelo cliente."
         meta:
@@ -2633,6 +3318,20 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: campaign_objective
+          values:
+            "acquisition": "Conquistar clientes novos."
+            "clearance": "Liquidar estoque."
+            "reactivation": "Trazer de volta clientes inativos."
+            "retention": "Manter os clientes atuais comprando."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["acquisition", "clearance", "reactivation", "retention"]
+              config:
+                meta:
+                  value_domain: campaign_objective
       - name: discount_value
         description: "Valor do desconto: percentual quando `percentage`, moeda quando `fixed`."
         meta:
@@ -2689,7 +3388,24 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
-        data_tests: [not_null]
+          value_domain: support_agent_team
+          not_observed:
+            "Entregas": "O gerador sorteia a equipe entre as cinco (generator/geracao.yml, support_agents.team), e nenhum agente do dado de hoje caiu em Entregas."
+          values:
+            "Cadastro": "O próprio texto, a equipe de cadastro."
+            "Desconhecido": "Membro desconhecido — Agente desconhecido — o evento cujo autor é o cliente, e o chamado que ainda não tem dono. Não é de origem nenhuma."
+            "Devoluções": "O próprio texto, a equipe de devoluções."
+            "Entregas": "O próprio texto, a equipe de entregas."
+            "Pagamentos": "O próprio texto, a equipe de pagamentos."
+            "Produtos": "O próprio texto, a equipe de produtos."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Cadastro", "Desconhecido", "Devoluções", "Entregas", "Pagamentos", "Produtos"]
+              config:
+                meta:
+                  value_domain: support_agent_team
       - name: is_deleted
         description: "{{ doc(\"is_deleted\") }}"
         meta:
@@ -2701,6 +3417,19 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+            "unknown": "Membro desconhecido — Agente desconhecido — o evento cujo autor é o cliente, e o chamado que ainda não tem dono. Não é de origem nenhuma."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail", "unknown"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: agent_code
         description: "Chave natural do agente."
         meta:
@@ -2865,6 +3594,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: coupon_id
         description: "Cupom utilizado."
         meta:
@@ -2885,11 +3626,37 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: discount_type
+          values:
+            "fixed": "Desconto de valor fixo; o `discount_value` é em moeda."
+            "percentage": "Desconto percentual; o `discount_value` é a porcentagem."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["fixed", "percentage"]
+              config:
+                meta:
+                  value_domain: discount_type
       - name: campaign_objective
         description: "Objetivo comercial da campanha."
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: campaign_objective
+          values:
+            "acquisition": "Conquistar clientes novos."
+            "clearance": "Liquidar estoque."
+            "reactivation": "Trazer de volta clientes inativos."
+            "retention": "Manter os clientes atuais comprando."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["acquisition", "clearance", "reactivation", "retention"]
+              config:
+                meta:
+                  value_domain: campaign_objective
       - name: redemption_sequence
         description: "Posição do resgate entre os do mesmo cupom, por ordem de data (1 é o primeiro); é ela que mede o limite de usos."
         meta:
@@ -3034,10 +3801,22 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: ticket_event_type
+          values:
+            "assigned": "Atribuição do chamado a um agente."
+            "created": "Abertura do chamado."
+            "message": "Mensagem trocada no chamado."
+            "reopened": "Reabertura de um chamado já resolvido."
+            "resolved": "Resolução do chamado."
+            "status_changed": "Mudança de estado do chamado sem ser resolução nem reabertura."
         data_tests:
           - not_null
           - accepted_values:
-              values: [created, assigned, message, status_changed, resolved, reopened]
+              arguments:
+                values: ["assigned", "created", "message", "reopened", "resolved", "status_changed"]
+              config:
+                meta:
+                  value_domain: ticket_event_type
       - name: event_count
         meta:
           sensitivity: internal
@@ -3048,6 +3827,18 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
       - name: support_ticket_id
         description: "Chamado ao qual o evento pertence."
         meta:
@@ -3068,16 +3859,61 @@ models:
         meta:
           description_inherited: true
           sensitivity: public
+          value_domain: support_ticket_category
+          values:
+            "account": "Conta — acesso, dados cadastrais e preferências."
+            "delivery": "Entrega — atraso, extravio ou problema na entrega."
+            "other": "Outros — contato que não se encaixa nas demais categorias."
+            "payment": "Pagamento — falha, recusa ou cobrança indevida."
+            "product": "Produto — defeito, divergência ou dúvida sobre o item."
+            "return": "Devolução — pedido de devolução, troca ou arrependimento."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["account", "delivery", "other", "payment", "product", "return"]
+              config:
+                meta:
+                  value_domain: support_ticket_category
       - name: ticket_priority
         description: "Prioridade atribuída ao chamado."
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: ticket_priority
+          values:
+            "high": "Prioridade alta."
+            "low": "Prioridade baixa."
+            "normal": "Prioridade normal."
+            "urgent": "Prioridade urgente, a mais alta."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["high", "low", "normal", "urgent"]
+              config:
+                meta:
+                  value_domain: ticket_priority
       - name: ticket_status
         description: "Estado atual do chamado."
         meta:
           description_inherited: true
           sensitivity: internal
+          value_domain: ticket_status
+          values:
+            "closed": "Chamado encerrado."
+            "in_progress": "Chamado em atendimento."
+            "open": "Chamado aberto, ainda não em atendimento."
+            "resolved": "Chamado resolvido, ainda não fechado."
+            "waiting_customer": "Chamado aguardando resposta do cliente."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["closed", "in_progress", "open", "resolved", "waiting_customer"]
+              config:
+                meta:
+                  value_domain: ticket_status
       - name: event_sequence
         description: "Posição do evento na história do chamado, por ordem de data (1 é a abertura)."
         meta:

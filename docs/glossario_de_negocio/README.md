@@ -35,6 +35,9 @@ colunas que a implementam.
 - Conceitos se referenciam com links relativos: a definição de *churn* aponta para a de *cliente
   ativo*, e vice-versa.
 - Todo conceito declara **como é calculado** e **em qual modelo dbt** está implementado.
+- O significado de cada **valor** de uma coluna (o estado do pedido, o tipo do movimento) não vive nos
+  `.md`: vive no catálogo [`dominios.yml`](dominios.yml), declarado uma vez, de onde o `make catalog` o
+  deriva nas colunas ([Governança §5.1](../governanca_de_dados.md#51-padrão-de-metadados)).
 
 ### 2.1 Formato
 
