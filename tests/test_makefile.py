@@ -410,6 +410,17 @@ def _receitas(texto: str) -> dict[str, list[str]]:
     return receitas
 
 
+def test_todo_alvo_que_sincroniza_carrega_o_env_do_log_de_execucao():
+    """`sincronizar` se registra no armazém antes do POST (ADR-0054); o Makefile não exporta o `.env` sozinho,
+    e o `make sync-airbyte` sem ele recusava antes de disparar (achado na resposta ao RVL5I-1-03)."""
+    receitas = _receitas((RAIZ / "Makefile").read_text(encoding="utf-8"))
+    sincronizam = {alvo: " ; ".join(linhas) for alvo, linhas in receitas.items()
+                   if any(re.search(r"mvp_ed1\.airbyte (sync|reset)\b", l) for l in linhas)}
+    assert sorted(sincronizam) == ["gcp-sync-legacy", "gcp-sync-retail", "sync-airbyte", "sync-legacy"]
+    sem_env = [a for a, r in sincronizam.items() if ". ./.env" not in r and "$(GCP_ENV)" not in r]
+    assert sem_env == [], sem_env
+
+
 def test_todo_alvo_que_liga_ambiente_pesado_passa_pelo_preflight():
     """D54: `airbyte-resume`, `stream-resume` e `airflow-resume` religavam sem
     conferir memória nem conflito, e o próprio preflight mandava retomar por

@@ -36,7 +36,15 @@ CONCLUIDOS = {"succeeded", "failed", "cancelled", "incomplete"}
 
 
 class AirbyteIndisponivel(Exception):
-    """A API não respondeu, ou respondeu o que não devia."""
+    """A API não respondeu, ou respondeu o que não devia.
+
+    `recusado` só é verdadeiro quando há **prova** de que o pedido não criou nada: o servidor respondeu
+    4xx, ou a conexão foi recusada antes de o pedido sair. *Timeout*, resposta truncada e 5xx não provam
+    — o servidor pode ter aceitado o *job* e a resposta se perdido (RVL5I-1-02)."""
+
+    def __init__(self, mensagem: str, recusado: bool = False) -> None:
+        super().__init__(mensagem)
+        self.recusado = recusado
 
 
 def _chamar(caminho: str, token: str | None = None, corpo: dict | None = None) -> Any:
@@ -50,10 +58,12 @@ def _chamar(caminho: str, token: str | None = None, corpo: dict | None = None) -
             return json.load(resposta)
     except urllib.error.HTTPError as erro:
         detalhe = erro.read().decode(errors="replace")[:400]
-        raise AirbyteIndisponivel(f"{erro.code} em {caminho}: {detalhe}") from erro
+        raise AirbyteIndisponivel(f"{erro.code} em {caminho}: {detalhe}",
+                                  recusado=400 <= erro.code < 500) from erro
     except urllib.error.URLError as erro:
         raise AirbyteIndisponivel(
-            f"Airbyte não respondeu em {_base()}. Rode `make airbyte-up`. ({erro.reason})"
+            f"Airbyte não respondeu em {_base()}. Rode `make airbyte-up`. ({erro.reason})",
+            recusado=isinstance(erro.reason, ConnectionRefusedError),
         ) from erro
 
 
@@ -107,16 +117,27 @@ def sincronizar(connection_id: str, jwt: str, tipo: str = "sync") -> dict:
     `full_refresh_overwrite` com `drop_cascade`, e a sincronização derruba as views de `staging` que
     dependem da tabela. A linha `airbyte_sync` abre e confirma antes; recebe o *job*; e só fecha quando
     `acompanhar` observa o estado terminal. Perder quem espera não prova que o *job* parou: a linha
-    fica aberta e bloqueia a procedência até `make governance-abandonar`."""
+    fica aberta e bloqueia a procedência até `make governance-abandonar`.
+
+    O mesmo vale para o POST que falha **sem prova de recusa** (RVL5I-1-02): *timeout*, resposta
+    perdida, 5xx ou interrupção podem ter deixado um *job* criado no servidor, e uma linha fechada como
+    `failed` seria superada pelo *build* seguinte enquanto o *job* ainda derruba o que ele construiu. Só
+    a recusa provada (`AirbyteIndisponivel.recusado`) fecha a linha; o resto a deixa aberta, e quem
+    conferir na listagem do Airbyte que nada ficou no ar a abandona.
+
+    Na instalação nova, a primeira sincronização vem antes do primeiro *build*: as migrações do
+    `governance` são garantidas aqui, antes de qualquer POST (RVL5I-1-03)."""
     from mvp_ed1 import governance
 
     armazem = _armazem()
+    governance.garantir(armazem)
     invocacao = f"airbyte_sync-{uuid.uuid4()}"
     governance.abrir(armazem, invocacao, "airbyte_sync")
     try:
         criado = _chamar("/jobs", jwt, {"connectionId": connection_id, "jobType": tipo})
-    except BaseException:
-        governance.fechar(armazem, invocacao, "failed")
+    except AirbyteIndisponivel as erro:
+        if erro.recusado:
+            governance.fechar(armazem, invocacao, "failed")
         raise
     governance.associar_job(armazem, invocacao, criado["jobId"])
     return criado

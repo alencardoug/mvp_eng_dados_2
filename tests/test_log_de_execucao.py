@@ -11,6 +11,7 @@ está no registro da entrega; o teste singular `governanca_execucao_aberta_visiv
 from __future__ import annotations
 
 import os
+import pathlib
 import subprocess
 import uuid
 
@@ -25,6 +26,45 @@ COMMIT = "a" * 40
 
 
 # ── Sem banco ────────────────────────────────────────────────────────────────────
+
+
+def _fecho(resultados: list[tuple[str, str]], comando: str = "build", vazio: bool = False) -> str:
+    """Renderiza a macro **real** `registrar_fecho` sobre um grafo sintético, com o Jinja do dbt.
+
+    Só o `_escreve_o_armazem()` é trocado por uma variável: o `return()` dele é do dbt, não do Jinja."""
+    import json
+    import types
+
+    import jinja2
+
+    fonte = (pathlib.Path(__file__).resolve().parents[1] / "dbt" / "macros" / "log_de_execucao.sql").read_text(
+        encoding="utf-8")
+    assert fonte.count("{%- if _escreve_o_armazem() -%}") == 2
+    fonte = fonte.replace("{%- if _escreve_o_armazem() -%}", "{%- if escreve -%}")
+    no = lambda uid, tipo: {"unique_id": uid, "resource_type": tipo}           # noqa: E731
+    grafo = {"nodes": {u: no(u, tipo) for u, tipo in (("model.p.m", "model"), ("seed.p.s", "seed"),
+                                                     ("test.p.t", "test"), ("operation.p.h", "operation"))},
+             "unit_tests": {"unit_test.p.m.u": no("unit_test.p.m.u", "unit_test")}}
+    ambiente = jinja2.Environment(extensions=["jinja2.ext.do"])
+    modulo = ambiente.from_string(fonte).make_module({
+        "escreve": True, "graph": grafo, "invocation_id": "i", "tojson": json.dumps,
+        "flags": types.SimpleNamespace(WHICH=comando, EMPTY=vazio)})
+    return str(modulo.registrar_fecho([types.SimpleNamespace(status=s, node=types.SimpleNamespace(unique_id=u))
+                                       for u, s in resultados]))
+
+
+def test_o_fecho_exige_tambem_os_testes_de_unidade_do_grafo() -> None:
+    """RVL5I-1-01: `--exclude-resource-type unit_test` executa tudo menos as unidades — não é integral."""
+    todos = [("model.p.m", "success"), ("seed.p.s", "success"), ("test.p.t", "pass"), ("unit_test.p.m.u", "pass")]
+    assert "full_build = true" in _fecho(todos)
+    assert "full_build = false" in _fecho([r for r in todos if not r[0].startswith("unit_test.")])
+    assert "full_build = false" in _fecho([r for r in todos if r[0] != "test.p.t"])
+    assert "full_build = false" in _fecho(todos, comando="run")
+    assert "full_build = false" in _fecho(todos, vazio=True)
+    assert "full_build = false" in _fecho([(u, "reused" if u == "model.p.m" else s) for u, s in todos])
+    falhou = _fecho([(u, "fail" if u == "unit_test.p.m.u" else s) for u, s in todos])
+    assert "status = 'failed'" in falhou and "full_build = true" in falhou
+
 
 def test_o_git_do_ambiente_so_aceita_commit_completo_e_sujeira_booleana() -> None:
     assert governance._git_do_ambiente({"MVP_GIT_COMMIT": COMMIT, "MVP_GIT_TREE_DIRTY": "false"}) == (COMMIT, False)
@@ -237,15 +277,75 @@ def test_a_sincronizacao_do_airbyte_abre_antes_do_post_e_fecha_no_estado_termina
     airbyte.acompanhar(77, "jwt", intervalo=0)
     assert _estado(armazem) == ("not_verified", "partial_execution")       # fechada, e mais nova que o build
 
-    def post_que_falha(caminho, _jwt, corpo=None):
-        raise airbyte.AirbyteIndisponivel("recusado")
-    monkeypatch.setattr(airbyte, "_chamar", post_que_falha)
+    def post_recusado(caminho, _jwt, corpo=None):
+        raise airbyte.AirbyteIndisponivel("400 em /jobs", recusado=True)
+    monkeypatch.setattr(airbyte, "_chamar", post_recusado)
     with pytest.raises(airbyte.AirbyteIndisponivel):
         airbyte.sincronizar("conexao", "jwt")
-    assert _estado(armazem) == ("not_verified", "failed_execution")
+    assert _estado(armazem) == ("not_verified", "failed_execution")     # recusa provada: nada foi criado
     with armazem.connect() as conexao:
         assert conexao.execute(text(f"select job_id, status from {governance.LOG} where command = 'airbyte_sync' "
                                     "order by sequence")).all() == [(77, "success"), (None, "failed")]
+
+
+@pytest.mark.integracao
+@pytest.mark.parametrize("falha", [TimeoutError("resposta perdida"), KeyboardInterrupt(),
+                                   "503", "sem jobId"])
+def test_o_post_sem_prova_de_recusa_deixa_a_linha_aberta(armazem, monkeypatch, falha) -> None:
+    """RVL5I-1-02: o servidor pode ter aceitado o *job* e a resposta se perdido; a linha fechada seria superada
+    pelo *build* seguinte enquanto o *job* derruba o que ele construiu. Fica aberta, e o *build* não verifica."""
+    from mvp_ed1 import airbyte
+
+    monkeypatch.setattr(airbyte, "_armazem", lambda: armazem)
+
+    def chamar(caminho, _jwt, corpo=None):
+        if falha == "503":
+            raise airbyte.AirbyteIndisponivel("503 em /jobs")
+        if falha == "sem jobId":
+            return {}
+        raise falha
+    monkeypatch.setattr(airbyte, "_chamar", chamar)
+    with pytest.raises(BaseException):
+        airbyte.sincronizar("conexao", "jwt")
+    assert _estado(armazem) == ("not_verified", "open_execution")
+    _linha(armazem)                                     # o build limpo depois não passa por cima
+    assert _estado(armazem) == ("not_verified", "open_execution")
+
+
+def test_so_o_4xx_e_a_conexao_recusada_provam_que_nada_foi_criado(monkeypatch) -> None:
+    """A classificação do `_chamar`, com o transporte substituído: o resto não prova recusa (RVL5I-1-02)."""
+    import io
+    import urllib.error
+
+    from mvp_ed1 import airbyte
+
+    for erro, recusado in ((urllib.error.HTTPError("u", 400, "x", {}, io.BytesIO(b"")), True),
+                           (urllib.error.HTTPError("u", 422, "x", {}, io.BytesIO(b"")), True),
+                           (urllib.error.HTTPError("u", 500, "x", {}, io.BytesIO(b"")), False),
+                           (urllib.error.HTTPError("u", 504, "x", {}, io.BytesIO(b"")), False),
+                           (urllib.error.URLError(ConnectionRefusedError(111, "recusada")), True),
+                           (urllib.error.URLError(TimeoutError("timed out")), False)):
+        def abrir(_req, timeout, erro=erro):
+            raise erro
+        monkeypatch.setattr(airbyte.urllib.request, "urlopen", abrir)
+        with pytest.raises(airbyte.AirbyteIndisponivel) as pego:
+            airbyte._chamar("/jobs", "jwt", {"a": 1})
+        assert pego.value.recusado is recusado, erro
+
+
+@pytest.mark.integracao
+def test_a_primeira_sincronizacao_prepara_o_log_antes_do_post(armazem, monkeypatch) -> None:
+    """RVL5I-1-03: na instalação nova, a sincronização vem antes do primeiro *build* e do legado."""
+    from mvp_ed1 import airbyte
+
+    with armazem.begin() as conexao:
+        conexao.execute(text(f"drop schema {governance.SCHEMA} cascade"))
+    monkeypatch.setattr(airbyte, "_armazem", lambda: armazem)
+    vistos = []
+    monkeypatch.setattr(airbyte, "_chamar", lambda caminho, _jwt, corpo=None: vistos.append(_estado(armazem))
+                        or {"jobId": 5})
+    assert airbyte.sincronizar("conexao", "jwt")["jobId"] == 5
+    assert vistos == [("not_verified", "open_execution")]
 
 
 @pytest.mark.integracao

@@ -427,8 +427,10 @@ MIGRACOES_BIGQUERY: tuple[tuple[str, tuple[str, ...]], ...] = (
         ),
     ),
     (
-        # Sem identidade nem `check` no BigQuery: a ordem vem de quem escreve (o maior `sequence` mais
-        # um, numa transação de várias instruções), e as regras de estado e de fecho, de testes da fonte.
+        # Só a **tabela**, sem identidade nem `check` (RVL5I-1-06): no BigQuery ainda faltam a view
+        # `warehouse_provenance`, um escritor que dê a ordem (os *hooks* de `log_de_execucao.sql` são
+        # PostgreSQL: `clock_timestamp()`, `::jsonb`, `commit;`) e o IAM da tabela. A fase GCP está
+        # encerrada (Q14); o que falta está nas Pendências, V3, item 10.
         "0003_dbt_invocations",
         (
             """

@@ -247,8 +247,16 @@ do item 9.
    Claude in Chrome, na sua sessão — por serviço, consumo bruto, créditos e líquido, captura 19 —, e
    você confirma. O desmonte provou os recursos removidos, o faturamento desligado e a exclusão
    pedida, não custo residual zero ([§58](registro_fase_gcp.md#58-o-desmonte-sete-horas-e-meia-depois-do-limite-13112026-0033--0136)). O número entra na [Capacidade §2.14](capacidade_e_recuperacao.md#214-a-estimativa-da-janela-da-etapa-13--07112026).
+10. **A procedência do armazém no BigQuery** (acrescentado em 15/11/2026, da revisão da L5,
+    RVL5I-1-06): a [ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md) declara a
+    paridade, mas no código só existe o DDL da tabela `governance.dbt_invocations` em
+    `MIGRACOES_BIGQUERY`. Faltam a view `warehouse_provenance`, os *hooks* no dialeto do BigQuery (os
+    de hoje usam `clock_timestamp()`, `::jsonb` e `commit;`), a ordem sem identidade e o IAM da tabela.
+    E o funil do Airbyte (`mvp_ed1.airbyte.sincronizar`) registra sempre no PostgreSQL do `.env`: no
+    `gcp-sync-retail` e no `gcp-sync-legacy`, a linha iria para o armazém local, não para o BigQuery.
+    É código ausente, não só teste real pendente; nada disso se cria com a fase encerrada (Q14).
 
-*Efeito de não decidir:* nenhum no projeto local. Os itens 1, 2, 6 e 7 voltam se a fase GCP for
+*Efeito de não decidir:* nenhum no projeto local. Os itens 1, 2, 6, 7 e 10 voltam se a fase GCP for
 reaberta; o 9 fecha o critério de custo do M6.
 
 ### V4 — a correção-relâmpago do gerador de estoque (registrada em 14/11/2026)

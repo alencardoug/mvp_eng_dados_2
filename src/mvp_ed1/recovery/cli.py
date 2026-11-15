@@ -310,9 +310,11 @@ def _conferir_contra_o_banco(manifesto: pacote.Manifesto) -> list[str]:
     try:
         problemas += _comparar("contagens em source_db", dados["contagens"]["source_db"], leitura.contagens(origem, ["oltp"]))
         problemas += _comparar("contagens em legacy_db", dados["contagens"]["legacy_db"], leitura.contagens(legado, ["legacy"]))
+        # O filtro dos dois lados (RVL5I-1-04): um manifesto que ainda conte o log — feito antes das
+        # exclusões da ADR-0054 — não exige a chave que a restauração, de propósito, não repõe.
         problemas += _comparar(
             "contagens em warehouse_db",
-            dados["contagens"]["warehouse_db"],
+            _da_memoria(dados["contagens"]["warehouse_db"]),
             _da_memoria(leitura.contagens(armazem, list(pacote.SCHEMAS_DE_MEMORIA))),
         )
         problemas += _comparar(

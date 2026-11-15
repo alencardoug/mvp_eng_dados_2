@@ -18,9 +18,10 @@ O que **não** sai daqui:
   `make gcp-dataflow-tabela`), e o IAM dela vai com ela, no degrau do Dataflow
   (`terraform/dataflow.tf`, que lê `pendentes_por_tabela` deste arquivo);
 - a concessão por tabela de `governance` — a do log de execução (ADR-0054), que o `transformer`
-  abre e fecha. No BigQuery a tabela nasce com `governance.garantir_bigquery`, e o IAM dela vai com
-  ela, como o da tabela do *stream* vai com o Dataflow. A fase GCP está encerrada e nada novo se cria
-  nela (Q14): fica declarada no dbt, aplicada no PostgreSQL e fora deste arquivo, até a fase voltar.
+  abre e fecha. No BigQuery só o DDL da tabela existe (`governance.garantir_bigquery`); o IAM dela,
+  a view e o escritor compatível **não existem ainda** (RVL5I-1-06, Pendências V3, item 10). A fase
+  GCP está encerrada e nada novo se cria nela (Q14): fica declarada no dbt, aplicada no PostgreSQL e
+  fora deste arquivo, até a fase voltar.
 """
 
 from __future__ import annotations

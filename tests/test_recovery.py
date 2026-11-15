@@ -794,6 +794,17 @@ def test_o_passo_5_recusa_o_armazem_sem_a_memoria_em_vez_de_estourar():
     ], problemas
 
 
+def test_o_passo_5_aceita_o_manifesto_antigo_que_ainda_conta_o_log():
+    """RVL5I-1-04: o log fica fora da memória dos dois lados — o manifesto que o contava não exige a chave."""
+    antigo = copy.deepcopy(MANIFESTO)
+    antigo["contagens"]["warehouse_db"] = antigo["contagens"]["warehouse_db"] | {"governance.dbt_invocations": 4}
+    agora = ESTADO_DO_PACOTE | {"contagens": lambda engine, schemas: copy.deepcopy(
+        {"oltp": MANIFESTO["contagens"]["source_db"], "legacy": MANIFESTO["contagens"]["legacy_db"]}.get(
+            schemas[0], MANIFESTO["contagens"]["warehouse_db"] | {"governance.dbt_invocations": 7}))}
+    with _leituras(agora):
+        assert cli._conferir_contra_o_banco(pacote.Manifesto(antigo)) == []
+
+
 def test_o_passo_5_aceita_o_mesmo_estado_do_pacote_antes_e_depois_do_rebase():
     with _leituras(ESTADO_DO_PACOTE):
         assert cli._conferir_contra_o_banco(pacote.Manifesto(copy.deepcopy(MANIFESTO))) == []

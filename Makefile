@@ -164,7 +164,7 @@ endef
         migrate migrate-down migrate-new migrate-status migrate-legacy migrate-legacy-down \
         migrate-legacy-status migrate-legacy-new catalog seed-data seed-plan size-report test test-carga \
         tools airbyte-up airbyte-down airbyte-credentials airbyte-config airbyte-plan sync-airbyte \
-        dbt-build dbt-drop-snapshots governance-abandonar dbt-test dbt-docs airflow-up airflow-down dag-run dag-status \
+        dbt-build dbt-drop-snapshots governance-abandonar airbyte-ativos dbt-test dbt-docs airflow-up airflow-down dag-run dag-status \
         stream-up stream-down stream-connector stream-status stream-run stream-produce \
         stream-duplicate stream-alerts stream-reset-sink \
         preflight airbyte-pause airbyte-resume stream-pause stream-resume \
@@ -581,9 +581,13 @@ airbyte-plan: require-env require-terraform ## Mostra o que o airbyte-config mud
 		esac
 
 sync-airbyte: require-env require-abctl ## Sincroniza oltp -> raw; RESET=1 descarta o cursor antes
-	@$(CREDENCIAIS); \
+	@# O `.env` é do log de execução: a sincronização se registra no armazém antes do POST (ADR-0054).
+	@set -a; . ./.env; set +a; $(CREDENCIAIS); \
 		$(if $(filter 1,$(RESET)),.venv/bin/python -m mvp_ed1.airbyte reset &&) \
 		.venv/bin/python -m mvp_ed1.airbyte sync
+
+airbyte-ativos: require-abctl ## Lista os jobs do Airbyte local em curso, de qualquer conexão; falha se houver (antes do governance-abandonar de um airbyte_sync)
+	@$(CREDENCIAIS); .venv/bin/python -m mvp_ed1.airbyte ativos
 
 sync-legacy: require-env require-abctl ## Captura o legado -> raw_legacy e a certifica (ADR-0044); cada execução acrescenta um snapshot; JOB_EM= grava o jobId
 	@# Sem RESET: o modo é `full_refresh_append` (ADR-0037), e descartar o
