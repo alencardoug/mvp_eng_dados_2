@@ -345,3 +345,33 @@ def test_o_catalogo_ausente_com_ligacao_no_disco_recusa(tmp_path, monkeypatch, c
     for argv in ([], ["--check"]):
         assert s.main(argv) == 1
         assert "ausente" in capsys.readouterr().err
+
+
+# ── A revisão da implementação, rodada 2 (RVB5A-2-01 e 02) ───────────────────────
+
+COMENTARIO = "          - not_null  # teste manual; independente de value_domain: order_status"
+
+
+def test_comentario_com_value_domain_nao_faz_o_not_null_a_mao_derivado() -> None:
+    """RVB5A-2-01: a procedência é a da estrutura; o manual fica na remoção e contradiz o `null_meaning`."""
+    texto = _aplicar().replace("          - not_null\n", COMENTARIO + "\n", 1)
+    sem = vd.patch_value_domains(texto, {}, {"fact_x": ["order_status"]})
+    assert _colunas(sem)["order_status"]["data_tests"] == ["not_null"]
+    vd.verify(CAMINHO, sem, {}, {"fact_x": ["order_status"]})
+    with pytest.raises(ValueError, match="à mão"):
+        vd.patch_value_domains(texto, {"fact_x": {"order_status": _pedido("order_status", ESTADOS, not_null=False)}})
+
+
+DESLIGADO = "          - not_null:\n              config:\n                enabled: false"
+
+
+@pytest.mark.parametrize("com_derivado", [False, True])
+def test_not_null_a_mao_desligado_nao_vale_e_e_recusado(com_derivado: bool) -> None:
+    """RVB5A-2-02: o `enabled: false` não é garantia; o escritor e o `verify` recusam, com ou sem o derivado junto."""
+    derivado = "\n          - not_null:\n              config:\n                meta:\n                  value_domain: order_status"
+    texto = _aplicar().replace("          - not_null\n", DESLIGADO + (derivado if com_derivado else "") + "\n", 1)
+    assert (sum(1 for t in _colunas(texto)["order_status"]["data_tests"] if vd._marcado(t, "not_null")) == 1) == com_derivado
+    with pytest.raises(ValueError, match="desligado"):
+        vd.patch_value_domains(texto, {"fact_x": {"order_status": _pedido("order_status", ESTADOS)}})
+    with pytest.raises(RuntimeError, match="desligado"):
+        vd.verify(CAMINHO, texto, {"fact_x": {"order_status": _pedido("order_status", ESTADOS)}})

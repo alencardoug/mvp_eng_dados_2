@@ -35,8 +35,11 @@ from __future__ import annotations
 
 import json
 import pathlib
+import textwrap
 from collections import defaultdict
 from dataclasses import dataclass, field
+
+import yaml
 
 from mvp_ed1.models import sensitivity
 
@@ -249,8 +252,30 @@ def _marcado(teste, tipo: str | None = None) -> bool:
 
 
 def _not_null_a_mao(testes) -> bool:
-    """O `not_null` escrito à mão: o texto solto, ou o bloco sem a marca do derivado."""
-    return any(t == "not_null" or (isinstance(t, dict) and "not_null" in t and not _marcado(t)) for t in testes)
+    """O `not_null` escrito à mão e **ativo**: o texto solto, ou o bloco sem a marca do derivado e sem `enabled: false`."""
+    return any(t == "not_null" or (isinstance(t, dict) and "not_null" in t and not _marcado(t) and not _desligado(t))
+               for t in testes)
+
+
+def _desligado(teste) -> bool:
+    return isinstance(teste, dict) and len(teste) == 1 and \
+        (((next(iter(teste.values())) or {}).get("config") or {}).get("enabled") is False)
+
+
+def _not_null_a_mao_desligado(testes) -> bool:
+    """O `not_null` à mão com `enabled: false`: o dbt não o roda (`manifest.add_disabled`), e ele não vale como
+    garantia de não nulo (RVB5A-2-02)."""
+    return any(isinstance(t, dict) and "not_null" in t and not _marcado(t) and _desligado(t) for t in testes)
+
+
+def _item_marcado(linhas: list[str], ini: int, fim: int, tipo: str) -> bool:
+    """O item da lista é o derivado pela **estrutura** carregada, não pelo texto: um comentário com
+    `value_domain:` não o faz derivado (RVB5A-2-01)."""
+    try:
+        carregado = yaml.safe_load(textwrap.dedent("\n".join(linhas[ini:_recuar(linhas, ini, fim)])))
+    except yaml.YAMLError:
+        return False
+    return isinstance(carregado, list) and len(carregado) == 1 and _marcado(carregado[0], tipo)
 
 
 def has_derived(disco: dict) -> bool:
@@ -351,12 +376,17 @@ def patch_value_domains(texto: str, entradas: dict[str, dict[str, dict]], remoco
             recuo_item = sensitivity._indent(linhas[itens[0][0]]) if itens else recuo + 4
             aceitos = [(a, b) for a, b in itens if _e_teste(linhas[a], "accepted_values")]
             nulos = [(a, b) for a, b in itens if _e_teste(linhas[a], "not_null")]
-            nulos_derivados = [(a, b) for a, b in nulos if "value_domain:" in "\n".join(linhas[a:b])]
+            nulos_derivados = [(a, b) for a, b in nulos if _item_marcado(linhas, a, b, "not_null")]
             nulos_a_mao = [x for x in nulos if x not in nulos_derivados]
             if len(aceitos) > 1:
                 raise ValueError(f"`{modelo}.{coluna}` tem {len(aceitos)} `accepted_values`")
             if nulos_a_mao and not pedido["not_null"]:
                 raise ValueError(f"`{modelo}.{coluna}`: `not_null` à mão, mas a ligação declara `null_meaning`")
+            if pedido["not_null"]:
+                carregados = yaml.safe_load(textwrap.dedent("\n".join(linhas[idx_t + 1:fim_t]))) or []
+                if _not_null_a_mao_desligado(carregados):
+                    raise ValueError(f"`{modelo}.{coluna}`: `not_null` à mão desligado (`enabled: false`), mas a ligação exige "
+                                     "`not_null` — ligue-o ou tire-o, na declaração")
             bloco_av = [
                 " " * recuo_item + "- accepted_values:",
                 " " * (recuo_item + 4) + "arguments:",
@@ -400,8 +430,8 @@ def patch_value_domains(texto: str, entradas: dict[str, dict[str, dict]], remoco
             idx_t, fim_t = _subchave(linhas, ini + 1, fim, recuo + 2, "data_tests")
             if idx_t is not None:
                 for a, b in reversed(_itens_da_lista(linhas, idx_t, fim_t)):
-                    if (_e_teste(linhas[a], "accepted_values") or _e_teste(linhas[a], "not_null")) \
-                            and "value_domain:" in "\n".join(linhas[a:b]):
+                    if any(_e_teste(linhas[a], tipo) and _item_marcado(linhas, a, b, tipo)
+                           for tipo in ("accepted_values", "not_null")):
                         del linhas[a:_recuar(linhas, a, b)]
                 # A lista que perdeu o último item leva a chave junto: `data_tests:` vazio é nulo, e o dbt recusa (RVB5A-1-01).
                 ini, fim, recuo = _item_da_coluna(linhas, modelo, coluna)
@@ -430,6 +460,8 @@ def verify(caminho: pathlib.Path, conteudo: str, entradas: dict[str, dict[str, d
                 raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}` não ficou com o `accepted_values` do catálogo")
             derivados = sum(1 for t in testes if _marcado(t, "not_null"))
             a_mao = _not_null_a_mao(testes)
+            if pedido["not_null"] and _not_null_a_mao_desligado(testes):
+                raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}`: `not_null` à mão desligado, e a ligação exige `not_null`")
             if pedido["not_null"] != (a_mao or derivados == 1) or derivados > (0 if a_mao else 1) or (a_mao and derivados):
                 raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}`: `not_null` diverge da ligação")
     for modelo, colunas in (remocoes or {}).items():
