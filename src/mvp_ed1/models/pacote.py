@@ -46,7 +46,7 @@ import xml.etree.ElementTree as ET
 
 import yaml
 
-from mvp_ed1.models import lineage, sensitivity
+from mvp_ed1.models import lineage, metrics, sensitivity
 
 ROOT = sensitivity.ROOT
 DBT = sensitivity.DBT
@@ -571,6 +571,7 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT, le
     caminhos = insumos()
     relacoes = _relacoes(manifest)
     checks = _verificacoes(junit)
+    metricas, filtros = metrics.package_fields()
     # JUnit parcial ou de outra coleção não é publicado: é **sem resultado**, como o relatório ausente
     # (regra 4). É também o primeiro `make catalog` da sequência de publicação, antes do `make test`.
     if checks and (motivo := completo(checks, coletados())):
@@ -597,6 +598,9 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT, le
         "lineage": lineage.to_json(linhagem, manifest),
         "crossings": [dict(zip(("origin", "destination", "mechanism", "frequency", "note"), c)) for c in lineage.crossings()],
         "questions": _perguntas(PERGUNTAS.read_text(encoding="utf-8")),
+        # As medidas, métricas e filtros das views, do `metricas.yml` (Bloco 5, item 10; ADR-0055).
+        "metrics": metricas,
+        "filters": filtros,
         "description_gaps": _faltas(relacoes),
         "tests": _testes(manifest, run),
         "view_audits": _auditorias(yaml.safe_load(RESULTADO.read_text(encoding="utf-8"))),

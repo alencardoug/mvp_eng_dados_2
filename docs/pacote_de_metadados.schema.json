@@ -12,6 +12,8 @@
     "lineage",
     "crossings",
     "questions",
+    "metrics",
+    "filters",
     "description_gaps",
     "tests",
     "view_audits",
@@ -51,6 +53,24 @@
       },
       "additionalProperties": {
         "$ref": "#/$defs/question"
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/metric"
+      }
+    },
+    "filters": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/filter"
       }
     },
     "description_gaps": {
@@ -1012,6 +1032,511 @@
       "description": "Instante ISO 8601 em UTC ou com fuso, ancorado nas duas pontas, com as faixas de mês, dia, hora, minuto e segundo. O calendário (31 de fevereiro) não cabe numa expressão regular: o gerador confere cada instante com datetime.fromisoformat, e o teste do exemplo também.",
       "type": "string",
       "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])(?![\\s\\S])"
+    },
+    "metric_source": {
+      "description": "A fonte da medida como as expressões a leem: a relação de `analytics`, o apelido, a data que define o período (ligada a `dim_date`, apelido `d`) e as junções, na ordem declarada.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "alias",
+        "date",
+        "joins"
+      ],
+      "properties": {
+        "relation": {
+          "$ref": "#/$defs/relation_id"
+        },
+        "alias": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "date": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "column",
+            "label"
+          ],
+          "properties": {
+            "column": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "joins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "relation",
+              "alias",
+              "using",
+              "match"
+            ],
+            "properties": {
+              "relation": {
+                "$ref": "#/$defs/relation_id"
+              },
+              "alias": {
+                "type": "string",
+                "pattern": "^[a-z_][a-z0-9_]*$"
+              },
+              "using": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "match": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "oneOf": [
+              {
+                "properties": {
+                  "using": {
+                    "type": "array"
+                  },
+                  "match": {
+                    "type": "null"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "using": {
+                    "type": "null"
+                  },
+                  "match": {
+                    "type": "array"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "metric": {
+      "description": "Uma medida (`kind: measure`, um agregado sobre uma fonte) ou uma métrica (`ratio`, `difference`, sobre os nomes de outras medidas e métricas), como `metricas.yml` a declara. As expressões são SQL sobre os apelidos da fonte. Toda chave presente; `null` onde o tipo não a usa.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "additivity",
+        "note",
+        "columns",
+        "source",
+        "aggregate",
+        "expression",
+        "identity",
+        "where",
+        "filters",
+        "cast",
+        "numerator",
+        "denominator",
+        "minuend",
+        "subtrahend",
+        "scale",
+        "zero_denominator",
+        "round"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "measure",
+            "ratio",
+            "difference"
+          ]
+        },
+        "additivity": {
+          "enum": [
+            "additive",
+            "semi_additive",
+            "non_additive"
+          ]
+        },
+        "note": {
+          "$ref": "#/$defs/text_or_null"
+        },
+        "columns": {
+          "description": "As colunas das views montadas que publicam a medida ou a métrica, com a aditividade na view, que o grão pode mudar.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "column",
+              "additivity"
+            ],
+            "properties": {
+              "column": {
+                "$ref": "#/$defs/column_id"
+              },
+              "additivity": {
+                "enum": [
+                  "additive",
+                  "semi_additive",
+                  "non_additive"
+                ]
+              }
+            }
+          }
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/metric_source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "aggregate": {
+          "anyOf": [
+            {
+              "enum": [
+                "sum",
+                "count",
+                "count_distinct",
+                "count_where",
+                "avg",
+                "max",
+                "median"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expression": {
+          "$ref": "#/$defs/text_or_null"
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "where": {
+          "$ref": "#/$defs/text_or_null"
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cast": {
+          "anyOf": [
+            {
+              "enum": [
+                "numeric"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "numerator": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "denominator": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minuend": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subtrahend": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scale": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "round": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zero_denominator": {
+          "description": "Na razão, o que vale com o denominador zero: `\"null\"` (texto) = a métrica dá nulo. `null` = não se aplica.",
+          "enum": [
+            "null",
+            null
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "measure"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source": {
+                "$ref": "#/$defs/metric_source"
+              },
+              "aggregate": {
+                "type": "string"
+              },
+              "filters": {
+                "type": "array"
+              },
+              "numerator": {
+                "type": "null"
+              },
+              "denominator": {
+                "type": "null"
+              },
+              "minuend": {
+                "type": "null"
+              },
+              "subtrahend": {
+                "type": "null"
+              },
+              "scale": {
+                "type": "null"
+              },
+              "zero_denominator": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "ratio"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "numerator": {
+                "type": "string"
+              },
+              "denominator": {
+                "type": "string"
+              },
+              "zero_denominator": {
+                "const": "null"
+              },
+              "source": {
+                "type": "null"
+              },
+              "aggregate": {
+                "type": "null"
+              },
+              "expression": {
+                "type": "null"
+              },
+              "identity": {
+                "type": "null"
+              },
+              "where": {
+                "type": "null"
+              },
+              "filters": {
+                "type": "null"
+              },
+              "cast": {
+                "type": "null"
+              },
+              "minuend": {
+                "type": "null"
+              },
+              "subtrahend": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "difference"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "minuend": {
+                "type": "string"
+              },
+              "subtrahend": {
+                "type": "string"
+              },
+              "source": {
+                "type": "null"
+              },
+              "aggregate": {
+                "type": "null"
+              },
+              "expression": {
+                "type": "null"
+              },
+              "identity": {
+                "type": "null"
+              },
+              "where": {
+                "type": "null"
+              },
+              "filters": {
+                "type": "null"
+              },
+              "cast": {
+                "type": "null"
+              },
+              "numerator": {
+                "type": "null"
+              },
+              "denominator": {
+                "type": "null"
+              },
+              "scale": {
+                "type": "null"
+              },
+              "zero_denominator": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "filter": {
+      "description": "Um filtro de fonte: o predicado SQL sobre os apelidos da fonte, o rótulo e o conceito do glossário de que ele sai.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "predicate",
+        "label",
+        "concept"
+      ],
+      "properties": {
+        "relation": {
+          "$ref": "#/$defs/relation_id"
+        },
+        "predicate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "concept": {
+          "description": "Link para o documento do conceito, relativo a `provenance.link_base`.",
+          "type": "string",
+          "pattern": "^glossario_de_negocio/[a-z0-9_]+\\.md$"
+        }
+      }
     }
   }
 }

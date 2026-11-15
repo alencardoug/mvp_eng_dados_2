@@ -348,6 +348,58 @@ def question_tables(doc: dict | None = None) -> list[str]:
     return [question_table(doc, por_pergunta[f"P{i:02d}"]) for i in range(1, 17)]
 
 
+# ── O que o pacote publica (Bloco 5, item 10) ───────────────────────────────────────
+
+#: O glossário, relativo a `provenance.link_base` (`docs/`): o `concept` do filtro é um link.
+GLOSSARIO = "glossario_de_negocio/"
+
+
+def _fonte_publicada(fonte: dict) -> dict:
+    """A fonte como as expressões a leem: a relação, o apelido, a data e as junções, na ordem declarada."""
+    return {
+        "relation": fonte["relation"], "alias": fonte["alias"],
+        "date": {"column": fonte["date"]["column"], "label": fonte["date"]["label"]},
+        "joins": [{"relation": j["relation"], "alias": j["alias"], "using": j.get("using"), "match": j.get("match")}
+                  for j in fonte.get("joins") or []],
+    }
+
+
+def package_fields(doc: dict | None = None) -> tuple[dict, dict]:
+    """(`metrics`, `filters`) do pacote: a declaração, sem regra nova; toda chave presente, `null` onde não se aplica.
+
+    `metrics` tem uma entrada por medida (`kind: measure`) e por métrica (`ratio`, `difference`), com a fonte
+    resolvida e as colunas das views montadas que a publicam (`columns`), cada uma com a aditividade dela."""
+    doc = load_catalog() if doc is None else doc
+    filtros = {nome: {"relation": doc["sources"][f["source"]]["relation"], "predicate": f["predicate"],
+                      "label": f["label"], "concept": GLOSSARIO + f["concept"]}
+               for nome, f in doc["filters"].items()}
+    publicada: dict[str, list[dict]] = {n: [] for n in (*doc["measures"], *doc["metrics"])}
+    for nome_view, view in doc["views"].items():
+        if "reference" in view:
+            continue
+        for coluna, papel in view["columns"].items():
+            papel_nome, alvo = role(coluna, papel)
+            if papel_nome in ("measure", "metric"):
+                # A aditividade é a da coluna na view: o grão pode mudá-la (a `order_count` por categoria, F28).
+                publicada[alvo].append({"column": f"consumption.{nome_view}.{coluna}",
+                                        "additivity": additivity(doc, view, coluna)})
+    vazio = dict.fromkeys(("source", "aggregate", "expression", "identity", "where", "filters", "cast",
+                           "numerator", "denominator", "minuend", "subtrahend", "scale", "round", "zero_denominator"))
+    saida = {}
+    for nome, m in doc["measures"].items():
+        saida[nome] = {**vazio, "kind": "measure", "additivity": m["additivity"], "note": m.get("note"),
+                       "source": _fonte_publicada(doc["sources"][m["source"]]), "aggregate": m["aggregate"],
+                       "expression": m.get("expression"), "identity": m.get("identity"), "where": m.get("where"),
+                       "filters": list(m.get("filters") or []), "cast": m.get("cast"), "round": m.get("round")}
+    for nome, m in doc["metrics"].items():
+        saida[nome] = {**vazio, "kind": m["kind"], "additivity": _aditividade_da_metrica(doc, nome), "note": None,
+                       **{k: m.get(k) for k in ("numerator", "denominator", "minuend", "subtrahend", "scale", "round",
+                                                "zero_denominator")}}
+    for nome, entrada in saida.items():
+        entrada["columns"] = sorted(publicada[nome], key=lambda x: x["column"])
+    return saida, filtros
+
+
 def _expressao(doc: dict, nome: str) -> str:
     """A expressão de uma medida ou métrica sobre as colunas da combinação."""
     if nome in doc["measures"]:

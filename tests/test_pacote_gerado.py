@@ -48,11 +48,16 @@ def test_o_pacote_esta_na_forma_deterministica(gerado) -> None:
     assert pacote.PACOTE.read_text(encoding="utf-8") == pacote.serializar(gerado)
 
 
-def test_um_insumo_alterado_muda_o_digest() -> None:
+@pytest.mark.parametrize("alvo", [
+    "docs/glossario_de_negocio/receita_liquida.md",
+    # Os dois catálogos do Bloco 5, um de cada vez: mudar só um deles atrasa o pacote (item 10, RVB5-1-06).
+    "docs/glossario_de_negocio/dominios.yml",
+    "docs/glossario_de_negocio/metricas.yml",
+])
+def test_um_insumo_alterado_muda_o_digest(alvo: str) -> None:
     """Contraprova: a guarda acusa a mudança de qualquer insumo."""
     caminhos = pacote.insumos()
     original = pacote.digest(caminhos)
-    alvo = "docs/glossario_de_negocio/receita_liquida.md"
     assert alvo in caminhos
     # O controle sem mutação primeiro: a leitura do callback é a do digest, e só o alvo muda (RVB4-2-06).
     assert pacote.digest(caminhos, conteudo=lambda c: pacote._conteudo(RAIZ, c)) == original

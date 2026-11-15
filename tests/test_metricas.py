@@ -109,3 +109,39 @@ def test_a_tabela_gerada_e_lida_pelo_pacote_com_os_nomes_fisicos() -> None:
         for medida in q["measures"]:
             assert medida["column"] in view["columns"], (pergunta, medida["column"])
             assert medida["additivity"] == metrics.additivity(DOC, view, medida["column"]), (pergunta, medida["column"])
+
+
+# ── O que o pacote publica (Bloco 5, item 10) ───────────────────────────────────
+
+def test_o_pacote_publica_toda_medida_metrica_e_filtro_da_declaracao() -> None:
+    """`metrics` e `filters` são a declaração inteira: nenhuma medida, métrica ou filtro fica de fora, e todo
+    nome citado (filtro da medida, parte da métrica) está publicado."""
+    publicadas, filtros = metrics.package_fields(DOC)
+    assert set(publicadas) == set(DOC["measures"]) | set(DOC["metrics"])
+    assert set(filtros) == set(DOC["filters"])
+    for nome, m in publicadas.items():
+        assert set(m["filters"] or []) <= set(filtros), nome
+        assert {m[k] for k in ("numerator", "denominator", "minuend", "subtrahend") if m[k]} <= set(publicadas), nome
+        assert (m["source"] is None) == (m["kind"] != "measure"), nome
+    for f in filtros.values():
+        assert (metrics.sensitivity.ROOT / "docs" / f["concept"]).is_file(), f["concept"]
+
+
+def test_as_colunas_publicadas_casam_com_as_medidas_das_perguntas() -> None:
+    """O oráculo é o `questions` do pacote, lido da tabela gerada: cada medida da pergunta montada é coluna de
+    exatamente uma medida ou métrica, com a mesma aditividade; e nenhuma coluna publicada sobra."""
+    from mvp_ed1.models import pacote
+    publicadas, _ = metrics.package_fields(DOC)
+    por_coluna: dict[str, list[str]] = {}
+    for nome, m in publicadas.items():
+        for c in m["columns"]:
+            por_coluna.setdefault(c["column"], []).append(c["additivity"])
+    lidas = pacote._perguntas(metrics.sensitivity.ROOT.joinpath(
+        "docs", "glossario_de_negocio", "perguntas_de_negocio.md").read_text(encoding="utf-8"))
+    esperadas = {}
+    for q in lidas.values():
+        if "reference" in DOC["views"][q["view"].split(".", 1)[1]]:
+            continue
+        for medida in q["measures"]:
+            esperadas[f"{q['view']}.{medida['column']}"] = [medida["additivity"]]
+    assert por_coluna == esperadas

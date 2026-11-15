@@ -211,6 +211,16 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
         pytest.param(lambda e: _com(e, "X1", "open_items", 0, "id"), id="item-aberto-com-id-invalido"),
         pytest.param(lambda e: _com(e, "README.md#x", "open_items", 0, "anchor"), id="ancora-fora-de-docs"),
         pytest.param(lambda e: _com(e, "closed", "open_items", 0, "state"), id="item-aberto-fechado"),
+        pytest.param(lambda e: _sem(e, "metrics"), id="sem-as-metricas"),
+        pytest.param(lambda e: _sem(e, "filters"), id="sem-os-filtros"),
+        pytest.param(lambda e: _com(e, "percent", "metrics", "average_order_value", "kind"), id="tipo-de-metrica-fora-da-lista"),
+        pytest.param(lambda e: _com(e, None, "metrics", "order_count", "source"), id="medida-sem-fonte"),
+        pytest.param(lambda e: _com(e, None, "metrics", "average_order_value", "zero_denominator"), id="razao-sem-o-denominador-zero"),
+        pytest.param(lambda e: _com(e, "order_count", "metrics", "order_count", "numerator"), id="medida-com-campo-de-razao"),
+        pytest.param(lambda e: _sem(e, "metrics", "order_count", "where"), id="medida-com-chave-omitida"),
+        pytest.param(lambda e: _com(e, [{"column": "order_count", "additivity": "additive"}], "metrics", "order_count", "columns"), id="coluna-publicada-sem-endereco"),
+        pytest.param(lambda e: _com(e, ["sales_channel_key"], "metrics", "order_count", "source", "joins", 0, "match"), id="juncao-com-using-e-match"),
+        pytest.param(lambda e: _com(e, "../README.md", "filters", "realised_order", "concept"), id="conceito-fora-do-glossario"),
         pytest.param(
             lambda e: _com(
                 e,

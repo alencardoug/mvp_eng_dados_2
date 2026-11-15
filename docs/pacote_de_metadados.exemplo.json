@@ -114,6 +114,14 @@
       "title": "Evidências coletadas no GCP antes do desmonte"
     }
   ],
+  "filters": {
+    "realised_order": {
+      "concept": "glossario_de_negocio/receita_liquida.md",
+      "label": "Só pedido realizado — pago, em separação, enviado, entregue ou devolvido.",
+      "predicate": "f.is_realised",
+      "relation": "analytics.fact_sales_order_item"
+    }
+  },
   "format": 1,
   "lineage": {
     "format": 1,
@@ -218,6 +226,172 @@
           }
         }
       }
+    }
+  },
+  "metrics": {
+    "average_order_value": {
+      "additivity": "non_additive",
+      "aggregate": null,
+      "cast": null,
+      "columns": [
+        {
+          "additivity": "non_additive",
+          "column": "consumption.average_order_value_by_channel_and_segment.average_order_value"
+        }
+      ],
+      "denominator": "order_count",
+      "expression": null,
+      "filters": null,
+      "identity": null,
+      "kind": "ratio",
+      "minuend": null,
+      "note": null,
+      "numerator": "net_revenue_amount",
+      "round": 2,
+      "scale": null,
+      "source": null,
+      "subtrahend": null,
+      "where": null,
+      "zero_denominator": "null"
+    },
+    "net_revenue_amount": {
+      "additivity": "additive",
+      "aggregate": "sum",
+      "cast": null,
+      "columns": [
+        {
+          "additivity": "additive",
+          "column": "consumption.average_order_value_by_channel_and_segment.net_revenue_amount"
+        }
+      ],
+      "denominator": null,
+      "expression": "f.net_revenue_amount",
+      "filters": [
+        "realised_order"
+      ],
+      "identity": null,
+      "kind": "measure",
+      "minuend": null,
+      "note": null,
+      "numerator": null,
+      "round": null,
+      "scale": null,
+      "source": {
+        "alias": "f",
+        "date": {
+          "column": "date_key",
+          "label": "a data do pedido"
+        },
+        "joins": [
+          {
+            "alias": "ch",
+            "match": null,
+            "relation": "analytics.dim_sales_channel",
+            "using": [
+              "sales_channel_key"
+            ]
+          },
+          {
+            "alias": "cat",
+            "match": null,
+            "relation": "analytics.dim_category",
+            "using": [
+              "category_key"
+            ]
+          },
+          {
+            "alias": "c",
+            "match": null,
+            "relation": "analytics.dim_customer",
+            "using": [
+              "customer_key"
+            ]
+          },
+          {
+            "alias": "g",
+            "match": null,
+            "relation": "analytics.dim_geography",
+            "using": [
+              "geography_key"
+            ]
+          }
+        ],
+        "relation": "analytics.fact_sales_order_item"
+      },
+      "subtrahend": null,
+      "where": null,
+      "zero_denominator": null
+    },
+    "order_count": {
+      "additivity": "additive",
+      "aggregate": "count_distinct",
+      "cast": null,
+      "columns": [
+        {
+          "additivity": "additive",
+          "column": "consumption.average_order_value_by_channel_and_segment.order_count"
+        }
+      ],
+      "denominator": null,
+      "expression": null,
+      "filters": [
+        "realised_order"
+      ],
+      "identity": [
+        "f.source_system",
+        "f.order_id"
+      ],
+      "kind": "measure",
+      "minuend": null,
+      "note": "contagem distinta de pedido",
+      "numerator": null,
+      "round": null,
+      "scale": null,
+      "source": {
+        "alias": "f",
+        "date": {
+          "column": "date_key",
+          "label": "a data do pedido"
+        },
+        "joins": [
+          {
+            "alias": "ch",
+            "match": null,
+            "relation": "analytics.dim_sales_channel",
+            "using": [
+              "sales_channel_key"
+            ]
+          },
+          {
+            "alias": "cat",
+            "match": null,
+            "relation": "analytics.dim_category",
+            "using": [
+              "category_key"
+            ]
+          },
+          {
+            "alias": "c",
+            "match": null,
+            "relation": "analytics.dim_customer",
+            "using": [
+              "customer_key"
+            ]
+          },
+          {
+            "alias": "g",
+            "match": null,
+            "relation": "analytics.dim_geography",
+            "using": [
+              "geography_key"
+            ]
+          }
+        ],
+        "relation": "analytics.fact_sales_order_item"
+      },
+      "subtrahend": null,
+      "where": null,
+      "zero_denominator": null
     }
   },
   "open_items": [
