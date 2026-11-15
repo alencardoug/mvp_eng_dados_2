@@ -230,6 +230,7 @@ origem e destinos; não contorne a falha enfraquecendo a imutabilidade ou editan
 | `make source-oracle MEDIDA=` | Lê `source_db` e `legacy_db` em sessão somente leitura contra uma medida: conteúdo por tabela, as colunas que o banco gera (`event_sequence` de 1 a n, `quantity_available`) e o legado com o diário de mutações do manifesto encadeado. `CALIBRACAO=1` exclui o que o produtor do *streaming* move — `inventory_balances` e o livro depois do `max_event_sequence` do pacote aprovado | v1.1.0 |
 | `make catalog` | Regenera dicionário, inventário de tabelas e diagrama ER dos modelos e da configuração, e a classificação de sensibilidade derivada nos `.yml` do dbt (precisa do `manifest` de um `make dbt-build` recente) | Etapa 3 · 11 |
 | `make dbt-drop-snapshots` | **Destrói** o histórico SCD; só depois de regerar a origem | Etapa 5 |
+| `make governance-abandonar INVOCACAO=…` | Marca **abandonada** uma execução aberta do log de execução, que bloqueia a procedência do armazém ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)). Ato do custodiante, depois de conferir que ela não escreve mais; nunca a dá por sucesso. A linha aberta e o motivo saem de `python -m mvp_ed1.governance procedencia` | L5 |
 | `make tools` | Baixa `abctl` e Terraform nas versões fixadas, para `.tools/` | Etapa 5 |
 | `make airbyte-credentials` | Mostra as credenciais do Airbyte local | Etapa 5 |
 | `make airbyte-plan` | O que o `airbyte-config` mudaria no Airbyte local, sem aplicar; falha se há mudança ou erro, e a última linha diz qual. Precisa do Airbyte de pé | Etapa 13 |
@@ -722,6 +723,16 @@ select slot_name, active, pg_size_pretty(
     pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) as wal_retido
 from pg_replication_slots;
 ```
+
+### A procedência do armazém diz `not_verified` com `open_execution`
+
+Uma execução registrada no log não fechou: o dbt foi interrompido, um *hook* do fim falhou, uma
+sincronização do Airbyte perdeu quem a esperava, ou uma escrita fora do dbt (o descarte dos *snapshots*,
+o teste da fato, a restauração) morreu no meio ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)).
+De propósito, nada é verificado enquanto ela estiver aberta: uma execução antiga pode ainda estar
+escrevendo. Confira que ela não escreve mais (o processo, o *job* do Airbyte), marque-a com
+`make governance-abandonar INVOCACAO=<invocation_id>` e rode um `make dbt-build` de um *checkout* limpo.
+O `invocation_id` da linha aberta sai de `select * from governance.dbt_invocations where status = 'started'`.
 
 ### `make seed-data` recusa executar
 

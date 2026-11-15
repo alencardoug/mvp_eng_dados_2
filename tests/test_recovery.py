@@ -664,17 +664,27 @@ def test_restore_dumps_garante_os_papeis_antes_de_qualquer_dump(tmp_path):
     os papéis ainda não existem — o `pg_restore` recusava e desfazia o dump inteiro (medido num destino
     novo em 25/09/2026). Os papéis vêm antes do primeiro dump: sem eles, nada é tocado."""
     ordem: list[str] = []
+
+    @contextlib.contextmanager
+    def registro(_motor, comando):
+        ordem.append(f"abre {comando}")
+        yield comando
+        ordem.append(f"fecha {comando}")
     # O `_env` também simulado: sem ele o teste lia seis variáveis do `.env` e falhava fora do
     # `make` (RVB5-2-03), embora nada aqui chegue a banco.
     with patch.object(cli, "_pasta_do_pacote", return_value=tmp_path), \
             patch.object(cli, "_env", side_effect=lambda nome: f"<{nome}>"), \
             patch.object(cli, "_motor", return_value="motor-do-armazem"), \
             patch.object(cli.governance, "garantir_papeis", side_effect=lambda motor: ordem.append(f"papéis em {motor}")), \
+            patch.object(cli.governance, "garantir", side_effect=lambda motor: ordem.append("log de execução")), \
+            patch.object(cli.governance, "registrar_mutacao", side_effect=registro), \
             patch.object(cli, "_pg_restore", side_effect=lambda servico, *a: ordem.append(servico)), \
             contextlib.redirect_stdout(io.StringIO()):
         assert cli.comando_restore_dumps(argparse.Namespace(dir=None)) == 0
 
-    assert ordem == ["papéis em motor-do-armazem", "source_db", "legacy_db", "warehouse_db"], ordem
+    # ADR-0054: o log existe antes da memória, e a restauração dela é registrada em volta do pg_restore.
+    assert ordem == ["papéis em motor-do-armazem", "log de execução", "source_db", "legacy_db",
+                     "abre recovery_restore", "warehouse_db", "fecha recovery_restore"], ordem
 
 
 MANIFESTO = {
@@ -1232,3 +1242,35 @@ def test_pacote_sem_registro_de_links_e_refeito_e_nao_restaurado(tmp_path):
     codigo, saida = _restaurar_artefatos(checkout, pasta)
 
     assert codigo == 1 and "make recovery-pack" in saida
+
+
+def test_a_lista_de_restauracao_deixa_o_log_e_o_schema_governance_de_fora():
+    """ADR-0054, RVL5-6-01: o `--clean` não descarta o schema `governance`, que guarda o log, e nenhuma
+    entrada do log, da procedência ou da identidade sai do arquivo — nem de um arquivo antigo que as traga."""
+    toc = """;
+; Archive created at 2026-11-15
+219; 2615 16386 SCHEMA - governance postgres
+220; 1259 16387 TABLE governance legacy_captures postgres
+221; 1259 16400 TABLE governance dbt_invocations postgres
+222; 1259 16399 SEQUENCE governance dbt_invocations_sequence_seq postgres
+223; 1259 16410 VIEW governance warehouse_provenance postgres
+224; 0 16387 TABLE DATA governance legacy_captures postgres
+225; 0 16400 TABLE DATA governance dbt_invocations postgres
+226; 0 0 ACL governance TABLE dbt_invocations postgres
+227; 1259 16420 TABLE snapshots scd_product postgres
+"""
+    lista = cli._sem_o_log(toc)
+    assert "legacy_captures" in lista and "scd_product" in lista and "; Archive created" in lista
+    assert "SCHEMA - governance" not in lista
+    assert "dbt_invocations" not in lista and "warehouse_provenance" not in lista
+
+
+def test_o_dump_da_memoria_exclui_o_log(tmp_path):
+    chamado: list[list[str]] = []
+    with patch.object(cli, "_conteineres", return_value="c"), \
+            patch.object(cli.subprocess, "run", side_effect=lambda cmd, **_k: chamado.append(cmd) or
+                         argparse.Namespace(returncode=0, stderr=b"")):
+        cli._pg_dump("warehouse_db", "u", "b", tmp_path / "m.dump", pacote.SCHEMAS_DE_MEMORIA)
+    comando = chamado[0]
+    assert [comando[i + 1] for i, a in enumerate(comando) if a == "--exclude-table"] == list(pacote.FORA_DA_MEMORIA)
+    assert cli._da_memoria({"governance.legacy_captures": 3, "governance.dbt_invocations": 9}) == {"governance.legacy_captures": 3}

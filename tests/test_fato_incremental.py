@@ -40,6 +40,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
+from mvp_ed1 import governance
 from mvp_ed1.db import WAREHOUSE, database_url
 
 pytestmark = pytest.mark.integracao
@@ -132,68 +133,72 @@ def test_o_reprocessamento_remove_e_corrige_o_ramo_legado(engine, record_propert
     assert ocorrido_em < corte, "o alvo precisa estar fora da janela para a prova valer"
     record_property("target_movement_outside_window_by_days", (corte - ocorrido_em).days)
 
-    try:
-        with engine.begin() as conexao:
-            colunas = _colunas(conexao)
-            # Fantasma: cópia de uma linha legada real com outra identidade, para
-            # que ela seja indistinguível de uma linha legítima que a captura
-            # anterior trouxe e a corrente não traz mais.
-            projecao = ", ".join(
-                f"'{FANTASMA}' as {c}"
-                if c == "movement_id"
-                else f"md5('{FANTASMA}') as {c}"
-                if c == "movement_key"
-                else c
-                for c in colunas
-            )
-            conexao.execute(
-                text(
-                    f"insert into {FATO} select {projecao} from {FATO} "
-                    "where source_system = 'legacy' order by movement_id limit 1"
+    # A adulteração é escrita no armazém de trabalho fora do dbt (ADR-0054, RVL5-4-01): registrada antes
+    # de acontecer e fechada depois do reparo. Morto no meio, o teste deixa a linha aberta, e a procedência
+    # fica bloqueada até `make governance-abandonar` — o estrago não passa por armazém verificado.
+    with governance.registrar_mutacao(engine, "test_fato"):
+        try:
+            with engine.begin() as conexao:
+                colunas = _colunas(conexao)
+                # Fantasma: cópia de uma linha legada real com outra identidade, para
+                # que ela seja indistinguível de uma linha legítima que a captura
+                # anterior trouxe e a corrente não traz mais.
+                projecao = ", ".join(
+                    f"'{FANTASMA}' as {c}"
+                    if c == "movement_id"
+                    else f"md5('{FANTASMA}') as {c}"
+                    if c == "movement_key"
+                    else c
+                    for c in colunas
                 )
+                conexao.execute(
+                    text(
+                        f"insert into {FATO} select {projecao} from {FATO} "
+                        "where source_system = 'legacy' order by movement_id limit 1"
+                    )
+                )
+                # Divergência de valor num movimento fora da janela.
+                conexao.execute(
+                    text(
+                        f"update {FATO} set quantity_delta = quantity_delta + 1000 "
+                        "where source_system = 'legacy' and movement_id = :m"
+                    ),
+                    {"m": movimento},
+                )
+
+            with engine.connect() as conexao:
+                assert conexao.execute(
+                    text(f"select count(*) from {FATO} where movement_id = :m"),
+                    {"m": FANTASMA},
+                ).scalar_one() == 1, "o fantasma precisa existir antes do reprocessamento"
+
+            execucao = _reprocessar()
+            assert execucao.returncode == 0, f"dbt run falhou:\n{execucao.stdout}\n{execucao.stderr}"
+
+            with engine.connect() as conexao:
+                sobrou = conexao.execute(
+                    text(f"select count(*) from {FATO} where movement_id = :m"),
+                    {"m": FANTASMA},
+                ).scalar_one()
+                depois = conexao.execute(
+                    text(
+                        f"select quantity_delta from {FATO} "
+                        "where source_system = 'legacy' and movement_id = :m"
+                    ),
+                    {"m": movimento},
+                ).scalar_one()
+
+            assert sobrou == 0, (
+                "o movimento ausente da captura sobreviveu ao reprocessamento — é o "
+                "caminho que o `merge` sozinho nunca fecha, porque `merge` só faz upsert"
             )
-            # Divergência de valor num movimento fora da janela.
-            conexao.execute(
-                text(
-                    f"update {FATO} set quantity_delta = quantity_delta + 1000 "
-                    "where source_system = 'legacy' and movement_id = :m"
-                ),
-                {"m": movimento},
+            assert depois == valor_correto, (
+                f"o valor divergente não foi corrigido ({depois} != {valor_correto}); "
+                "o movimento está fora da janela de atraso, então só o recorte por "
+                "captura poderia relê-lo"
             )
-
-        with engine.connect() as conexao:
-            assert conexao.execute(
-                text(f"select count(*) from {FATO} where movement_id = :m"),
-                {"m": FANTASMA},
-            ).scalar_one() == 1, "o fantasma precisa existir antes do reprocessamento"
-
-        execucao = _reprocessar()
-        assert execucao.returncode == 0, f"dbt run falhou:\n{execucao.stdout}\n{execucao.stderr}"
-
-        with engine.connect() as conexao:
-            sobrou = conexao.execute(
-                text(f"select count(*) from {FATO} where movement_id = :m"),
-                {"m": FANTASMA},
-            ).scalar_one()
-            depois = conexao.execute(
-                text(
-                    f"select quantity_delta from {FATO} "
-                    "where source_system = 'legacy' and movement_id = :m"
-                ),
-                {"m": movimento},
-            ).scalar_one()
-
-        assert sobrou == 0, (
-            "o movimento ausente da captura sobreviveu ao reprocessamento — é o "
-            "caminho que o `merge` sozinho nunca fecha, porque `merge` só faz upsert"
-        )
-        assert depois == valor_correto, (
-            f"o valor divergente não foi corrigido ({depois} != {valor_correto}); "
-            "o movimento está fora da janela de atraso, então só o recorte por "
-            "captura poderia relê-lo"
-        )
-    finally:
-        _desfazer_o_estrago(engine, movimento, valor_correto)
+        finally:
+            _desfazer_o_estrago(engine, movimento, valor_correto)
 
 
 def _desfazer_o_estrago(engine, movimento: str, valor_correto) -> None:

@@ -212,3 +212,76 @@ def test_o_transformer_insere_so_com_insert_porque_a_sequence_e_identidade(armaz
         conexao.execute(text(f"grant insert, update, select on {governance.LOG} to transformer"))
         conexao.execute(text("set local role transformer"))
         conexao.execute(text(f"insert into {governance.LOG} (invocation_id, command) values ('pelo-transformer', 'run')"))
+
+
+@pytest.mark.integracao
+def test_a_sincronizacao_do_airbyte_abre_antes_do_post_e_fecha_no_estado_terminal(armazem, monkeypatch) -> None:
+    """RVL5-5-02: o `drop_cascade` do destino derruba views de `staging`; a sincronização é escrita registrada."""
+    from mvp_ed1 import airbyte
+
+    monkeypatch.setattr(airbyte, "_armazem", lambda: armazem)
+    _linha(armazem)
+    vistos: list[tuple] = []
+
+    def chamar(caminho, _jwt, corpo=None):
+        if caminho == "/jobs":
+            vistos.append(_estado(armazem))                         # o POST vê a linha já aberta
+            return {"jobId": 77}
+        return {"status": "succeeded", "rowsSynced": 1}
+    monkeypatch.setattr(airbyte, "_chamar", chamar)
+    monkeypatch.setattr(airbyte.time, "sleep", lambda _s: None)
+
+    assert airbyte.sincronizar("conexao", "jwt")["jobId"] == 77
+    assert vistos == [("not_verified", "open_execution")]
+    assert _estado(armazem) == ("not_verified", "open_execution")          # quem espera ainda não viu o fim
+    airbyte.acompanhar(77, "jwt", intervalo=0)
+    assert _estado(armazem) == ("not_verified", "partial_execution")       # fechada, e mais nova que o build
+
+    def post_que_falha(caminho, _jwt, corpo=None):
+        raise airbyte.AirbyteIndisponivel("recusado")
+    monkeypatch.setattr(airbyte, "_chamar", post_que_falha)
+    with pytest.raises(airbyte.AirbyteIndisponivel):
+        airbyte.sincronizar("conexao", "jwt")
+    assert _estado(armazem) == ("not_verified", "failed_execution")
+    with armazem.connect() as conexao:
+        assert conexao.execute(text(f"select job_id, status from {governance.LOG} where command = 'airbyte_sync' "
+                                    "order by sequence")).all() == [(77, "success"), (None, "failed")]
+
+
+@pytest.mark.integracao
+def test_a_restauracao_da_memoria_conclui_e_preserva_o_log_e_a_ordem(armazem, tmp_path) -> None:
+    """RVL5-5-01, RVL5-6-01: os mesmos `_pg_dump` e `_pg_restore` da recuperação, num armazém efêmero. O
+    arquivo "antigo" traz o log dentro (sem a exclusão); a restauração conclui, não o substitui, a linha que a
+    registra sobrevive e a `sequence` continua a do armazém. Interrompida antes do *rebuild*: não verificado."""
+    from mvp_ed1.recovery import cli
+
+    banco, usuario = os.environ["WAREHOUSE_DB_NAME"], os.environ["WAREHOUSE_DB_USER"]
+    antiga = _linha(armazem)
+    with armazem.begin() as conexao:                       # um certificado qualquer, para ver o resto voltar
+        conexao.execute(text(f"insert into {governance.SCHEMA}.legacy_captures (capture_attempt_id, source_table, "
+                             "connection_name, source_rows_before, source_hash_before, status, started_at) "
+                             "values ('t1', 'brands', 'c', 1, 'h', 'complete', clock_timestamp())"))
+    arquivo = tmp_path / "memoria_antiga.dump"
+    original = cli.pacote.FORA_DA_MEMORIA
+    try:                                                   # o arquivo antigo: sem a exclusão do log
+        cli.pacote.FORA_DA_MEMORIA = ()
+        cli._pg_dump("warehouse_db", usuario, banco, arquivo, ("governance",))
+    finally:
+        cli.pacote.FORA_DA_MEMORIA = original
+    with armazem.begin() as conexao:
+        conexao.execute(text(f"delete from {governance.SCHEMA}.legacy_captures"))
+    nova = _linha(armazem)                                 # um build depois do arquivo
+
+    with governance.registrar_mutacao(armazem, "recovery_restore") as restauracao:
+        cli._pg_restore("warehouse_db", usuario, banco, arquivo)
+
+    with armazem.connect() as conexao:
+        log = conexao.execute(text(f"select invocation_id, sequence from {governance.LOG} order by sequence")).all()
+        certificados = conexao.execute(text(f"select count(*) from {governance.SCHEMA}.legacy_captures")).scalar_one()
+    assert [i for i, _ in log] == [antiga, nova, restauracao]           # o log não voltou ao do arquivo
+    assert [s for _, s in log] == sorted(s for _, s in log) and len({s for _, s in log}) == 3
+    assert certificados == 1                                             # o resto de `governance` voltou
+    assert _estado(armazem) == ("not_verified", "partial_execution")     # interrompida antes do rebuild
+    _linha(armazem)
+    with armazem.connect() as conexao:                                   # a identidade continua a do armazém
+        assert conexao.execute(text(f"select max(sequence) from {governance.LOG}")).scalar_one() == log[-1][1] + 1

@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import time
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -90,8 +91,35 @@ def conexao(nome: str, jwt: str) -> str:
     )
 
 
+def _armazem():
+    """O armazém, para o log de execução (ADR-0054); criado na primeira sincronização."""
+    from sqlalchemy import create_engine
+
+    from mvp_ed1.db import WAREHOUSE, database_url
+
+    return create_engine(database_url(WAREHOUSE))
+
+
 def sincronizar(connection_id: str, jwt: str, tipo: str = "sync") -> dict:
-    return _chamar("/jobs", jwt, {"connectionId": connection_id, "jobType": tipo})
+    """O POST que cria o *job* — o único caminho, por `disparar` e por `sincronizar_certificando`.
+
+    **Registrado no log de execução antes do POST** (ADR-0054, RVL5-5-02): o destino `retail` usa
+    `full_refresh_overwrite` com `drop_cascade`, e a sincronização derruba as views de `staging` que
+    dependem da tabela. A linha `airbyte_sync` abre e confirma antes; recebe o *job*; e só fecha quando
+    `acompanhar` observa o estado terminal. Perder quem espera não prova que o *job* parou: a linha
+    fica aberta e bloqueia a procedência até `make governance-abandonar`."""
+    from mvp_ed1 import governance
+
+    armazem = _armazem()
+    invocacao = f"airbyte_sync-{uuid.uuid4()}"
+    governance.abrir(armazem, invocacao, "airbyte_sync")
+    try:
+        criado = _chamar("/jobs", jwt, {"connectionId": connection_id, "jobType": tipo})
+    except BaseException:
+        governance.fechar(armazem, invocacao, "failed")
+        raise
+    governance.associar_job(armazem, invocacao, criado["jobId"])
+    return criado
 
 
 #: A ordenação da listagem, como a API a escreve: `campo|sentido`. O `|` é
@@ -208,6 +236,9 @@ def acompanhar(job_id: int, jwt: str, intervalo: float = 15.0) -> dict:
         linhas = job.get("rowsSynced") or 0
         print(f"  job {job_id}: {estado} · {linhas:,} linhas".replace(",", "."), flush=True)
         if estado in CONCLUIDOS:
+            from mvp_ed1 import governance
+
+            governance.fechar_por_job(_armazem(), job_id, estado)
             return job
         time.sleep(intervalo)
 

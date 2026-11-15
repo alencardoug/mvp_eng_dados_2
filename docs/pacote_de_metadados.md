@@ -16,7 +16,7 @@
 | Consumidores | `gdados` (E1) e `bi-como-codigo` (etapa 2.7): dois portais, um pacote (Q12, 14/11/2026) |
 | Esquema | [`pacote_de_metadados.schema.json`](pacote_de_metadados.schema.json), JSON Schema 2020-12 |
 | Exemplo | [`pacote_de_metadados.exemplo.json`](pacote_de_metadados.exemplo.json), validado pelo esquema no `check-offline` |
-| Campos acrescentados | 14/11/2026, a pedido do `bi-como-codigo` (UQ-12 a UQ-15): `relations.*.grain`, `relations.*.grants_select`, `checks` e `open_items`. Campo novo, sem mudar o número (§2, regra 3) |
+| Campos acrescentados | 14/11/2026, a pedido do `bi-como-codigo` (UQ-12 a UQ-15): `relations.*.grain`, `relations.*.grants_select`, `checks` e `open_items`. 15/11/2026, a L5 (ADR-0054): `provenance.warehouse.reason`, `built_from_commit` e `built_at`, e o valor `verified`. Campo novo, sem mudar o número (§2, regra 3) |
 
 ---
 
@@ -79,11 +79,11 @@
 | Chave | O que traz | De onde vem |
 |---|---|---|
 | `format` | `1` | — |
-| `provenance.inputs` e `provenance.inputs_sha256` | A lista dos arquivos rastreados pelo Git que alimentam o pacote e o SHA-256 do conteúdo deles, em ordem. Do módulo de teste, o conteúdo é a primeira linha da *docstring*, o único trecho que o pacote lê dele (o `summary` de `checks`) | Os arquivos, no momento da geração |
+| `provenance.inputs` e `provenance.inputs_sha256` | A lista dos arquivos que alimentam o pacote — os rastreados pelo Git e os não rastreados e não ignorados que já estão no lugar, que o dbt e o `pytest` leem do mesmo jeito — e o SHA-256 do conteúdo deles, em ordem. No pacote versionado, todos são rastreados. Do módulo de teste, o conteúdo é a primeira linha da *docstring*, o único trecho que o pacote lê dele (o `summary` de `checks`) | Os arquivos, no momento da geração |
 | `provenance.tree_dirty_at_generation` | Se algum arquivo rastreado diferia do `HEAD` quando o pacote foi gerado. No fluxo normal (mudar a declaração, `make catalog`, *commit*) é `true`, e por isso não prova nada sozinho: quem prova que o pacote versionado bate com os insumos versionados é o `inputs_sha256`, conferido no *commit* fixado. É a "árvore limpa ou suja" da D91, sem citar o próprio *commit* | `git`, no momento da geração |
 | `provenance.environment.dbt_target` | O *target* do *profile* do dbt com que os artefatos foram produzidos (hoje só `local`). É o "ambiente" da D91 | O *profile* lido pelo gerador |
 | `provenance.dbt` | Versão do dbt, adaptador, `generated_at` e `invocation_id` do *manifest* e do `run_results.json`, todos preenchidos (regra 4) | `dbt/target/` |
-| `provenance.warehouse` | Que execução construiu o armazém. Na versão 1, **sempre** `not_verified` e `null`, e o esquema só aceita isso (L5). O estado `verified` entra com o desenho do Bloco 4, como mudança do esquema | Desenho do Bloco 4 |
+| `provenance.warehouse` | Que execução construiu o armazém, **no momento da geração** (L5, [ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)): `status` (`verified` ou `not_verified`), `reason` (por que não, ou `null`), `built_by_invocation_id`, `built_from_commit` e `built_at`. `verified` só quando a última execução registrada é um *build* integral, aprovado, de *commit* conhecido e limpo, com os insumos confirmados, sem nada aberto nem sobreposto, **e** é a que produziu o *manifest* deste pacote (senão `other_execution`); sem conexão, `no_connection`. Não certifica a origem de cada linha retida (a fato incremental e os *snapshots* guardam histórico). O pacote versionado é gerado antes do próprio *commit*, com a árvore suja: ele só diz `verified` se for gerado depois de um `make dbt-build` limpo, e o `built_from_commit` é então o *commit* anterior ao que o versiona | A *view* `governance.warehouse_provenance` — a **única** leitura do banco que o pacote faz, pela conexão do `.env` |
 | `provenance.link_base` | Contra onde resolvem os links relativos dos textos | — |
 | `relations` | Cada *source*, *seed*, modelo e *snapshot*: tipo, materialização, descrição, `meta` (domínio, dono, escritores, retenção…) e as colunas, com descrição, tipo declarado, sensibilidade e `meta` | *Manifest* |
 | `relations.*.grain` | O grão declarado: o texto entre `**Grão:` e `**` no início da descrição da relação, a convenção das fatos e das dimensões. `null` quando a relação não o declara | Descrição do *manifest* |
@@ -100,7 +100,7 @@
 
 **O universo das faltas.** A catraca do `make check` (`tests/test_descricao.py`) percorre as colunas
 **materializadas** no armazém e acusa também a coluna que existe no banco e não está declarada. O
-pacote não lê o banco, então não vê esse caso: `description_gaps` é a lista das faltas **declaradas**, e
+pacote não lê o inventário do banco (a única leitura dele é a procedência), então não vê esse caso: `description_gaps` é a lista das faltas **declaradas**, e
 o portal não a apresenta como inventário físico. Quem garante que não há coluna materializada sem
 declaração é a catraca, no `check` completo.
 
@@ -128,7 +128,9 @@ guardas (revisão do Bloco 4, RVB4-1-01 e 02):
   conteúdo antigo. O dbt rodado fora do `Makefile` não carimba, e o gerador recusa até o
   `make dbt-build`;
 - **a 5ª etapa do `make check`**, depois do `pytest`: monta o pacote sem escrever e o compara com o
-  versionado, fora os instantes, as execuções e o `tree_dirty_at_generation`. Resultado de teste ou de
+  versionado, fora os instantes, as execuções, o `tree_dirty_at_generation` e o `provenance.warehouse`
+  inteiro — a procedência é do ambiente, como o instante: o pacote é gerado antes do próprio *commit*, e
+  um `make check` num *checkout* limpo a veria `verified`. Resultado de teste ou de
   `pytest` que mudou, teste novo ou sumido, descrição nova: o pacote está atrasado, e o `check` falha
   até o `make catalog` e o *commit*.
 

@@ -575,6 +575,22 @@ def registrar_mutacao(engine: Engine, command: str, ambiente: dict[str, str] | N
     fechar(engine, invocacao, "success")
 
 
+def associar_job(engine: Engine, invocation_id: str, job_id: int) -> None:
+    """A sincronização do Airbyte (`airbyte_sync`): o *job* que o POST criou, gravado na linha aberta."""
+    with engine.begin() as conexao:
+        conexao.execute(text(f"update {LOG} set job_id = :j where invocation_id = :i and status = 'started'"),
+                        {"j": job_id, "i": invocation_id})
+
+
+def fechar_por_job(engine: Engine, job_id: int, estado: str) -> int:
+    """O fecho da sincronização quando quem espera **observa** o estado terminal do *job*: `succeeded` é
+    `success`; `failed`, `cancelled` e `incomplete` são `failed`. Se quem espera morre, a linha fica aberta."""
+    with engine.begin() as conexao:
+        return conexao.execute(text(f"update {LOG} set status = :s, finished_at = clock_timestamp() "
+                                    "where command = 'airbyte_sync' and job_id = :j and status = 'started'"),
+                               {"s": "success" if estado == "succeeded" else "failed", "j": job_id}).rowcount
+
+
 def abandonar(engine: Engine, invocation_id: str) -> int:
     """O ato explícito do custodiante: a linha aberta passa a `abandoned`, com o instante — nunca a sucesso."""
     with engine.begin() as conexao:

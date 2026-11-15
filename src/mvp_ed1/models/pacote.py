@@ -102,8 +102,12 @@ ADITIVIDADE = {"aditiva": "additive", "semiaditiva": "semi_additive", "não adit
 # ── A guarda ────────────────────────────────────────────────────────────────────
 
 def insumos(raiz: pathlib.Path = ROOT) -> list[str]:
-    """Os arquivos rastreados que alimentam o pacote, em ordem."""
-    rastreados = subprocess.run(["git", "ls-files", "-z"], cwd=raiz, capture_output=True, check=True).stdout.decode().split("\0")
+    """Os arquivos que alimentam o pacote, em ordem: os rastreados **e** os não rastreados e não ignorados
+    que já estão no lugar — o dbt e o pytest os leem do mesmo jeito. Só rastreados, o digest dependia do
+    índice do Git: um modelo novo ficava fora dele até o `git add`, e o carimbo do *build* e o pacote
+    mudavam no *commit* sem nenhum conteúdo mudar (achado na implementação da L5)."""
+    rastreados = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=raiz,
+                                capture_output=True, check=True).stdout.decode().split("\0")
     escolhidos = {p for p in rastreados if p and any(pathlib.PurePosixPath(p).match(g) or _casa(p, g) for g in INSUMOS)}
     return sorted(escolhidos)
 
@@ -519,7 +523,46 @@ def _abertos(texto: str, registro: str | None = None) -> list[dict]:
 
 # ── O pacote ────────────────────────────────────────────────────────────────────
 
-def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT) -> dict:
+def _ler_a_view() -> dict | None:
+    """A linha de `governance.warehouse_provenance`, pela conexão do `.env`; `None` sem conexão."""
+    if not os.environ.get("WAREHOUSE_DB_PASSWORD"):
+        return None
+    try:
+        from sqlalchemy import create_engine
+
+        from mvp_ed1 import governance
+        from mvp_ed1.db import WAREHOUSE, database_url
+
+        motor = create_engine(database_url(WAREHOUSE))
+        try:
+            return governance.procedencia(motor)
+        finally:
+            motor.dispose()
+    except Exception:  # noqa: BLE001 — sem banco, a procedência não é verificável; o texto do erro não sai
+        return None
+
+
+def procedencia_do_armazem(manifest: dict, leitor=None) -> dict:
+    """`provenance.warehouse` (ADR-0054): o que a *view* diz **no momento da geração**, e `verified` só se a
+    execução verificada é a que produziu o *manifest* — é então que "o armazém é o do *manifest*".
+
+    É a única leitura do banco que o pacote faz. Sem conexão, `no_connection`; com a execução verificada de
+    outra invocação, `other_execution`. O texto de erro do banco nunca entra no pacote."""
+    linha = (leitor or _ler_a_view)()
+    vazio = {"built_by_invocation_id": None, "built_from_commit": None, "built_at": None}
+    if linha is None:
+        return {"status": "not_verified", "reason": "no_connection", **vazio}
+    instante = linha.get("built_at")
+    feito = {"built_by_invocation_id": linha.get("invocation_id"), "built_from_commit": linha.get("built_from_commit"),
+             "built_at": instante.astimezone(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+             if isinstance(instante, dt.datetime) else instante}
+    if linha["status"] == "verified" and linha.get("invocation_id") == manifest["metadata"]["invocation_id"]:
+        return {"status": "verified", "reason": None, **feito}
+    motivo = linha.get("reason") if linha["status"] != "verified" else "other_execution"
+    return {"status": "not_verified", "reason": motivo, **feito}
+
+
+def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT, leitor_da_procedencia=None) -> dict:
     linhagem = lineage.build(manifest, derivacao)
     if linhagem.problems:
         raise SystemExit(f"linhagem incompleta ({len(linhagem.problems)} problema(s)): pacote não escrito")
@@ -545,7 +588,7 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT) ->
                     "manifest_invocation_id": manifest["metadata"]["invocation_id"],
                     "run_results_generated_at": run["metadata"]["generated_at"],
                     "run_results_invocation_id": run["metadata"]["invocation_id"]},
-            "warehouse": {"status": "not_verified", "built_by_invocation_id": None},
+            "warehouse": procedencia_do_armazem(manifest, leitor_da_procedencia),
             "link_base": "docs/",
         },
         "relations": relacoes,
@@ -612,7 +655,10 @@ EXECUCAO_DO_PACOTE = (("provenance", "tree_dirty_at_generation"),
                       ("provenance", "dbt", "manifest_generated_at"), ("provenance", "dbt", "manifest_invocation_id"),
                       ("provenance", "dbt", "run_results_generated_at"), ("provenance", "dbt", "run_results_invocation_id"),
                       ("lineage", "manifest_generated_at"),
-                      ("provenance", "warehouse", "built_by_invocation_id"))   # sempre nulo na versão 1 (L5)
+                      # A procedência do armazém é do **ambiente**, como o instante da execução: o pacote é
+                      # gerado antes do próprio commit (árvore suja), e um `make check` num checkout limpo a
+                      # veria `verified` — compará-la faria todo checkout limpo acusar o pacote (ADR-0054).
+                      ("provenance", "warehouse"))
 EXECUCAO_DO_RESULTADO = ("executed_at", "invocation_id", "same_invocation_as_manifest", "run_id")
 
 

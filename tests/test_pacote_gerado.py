@@ -455,7 +455,8 @@ def test_nenhuma_execucao_fica_fora_da_normalizacao(gerado) -> None:
     execucao = {c for c in chaves(gerado) if c[-1].endswith(("generated_at", "invocation_id")) or c[-1] in
                 ("executed_at", "run_id", "same_invocation_as_manifest", "tree_dirty_at_generation")}
     conhecidos = {tuple(c) for c in pacote.EXECUCAO_DO_PACOTE}
-    resto = {c for c in execucao if c not in conhecidos and not (c[0] in ("tests", "checks") and c[2] == "result")}
+    coberto = lambda c: any(c[:len(k)] == k for k in conhecidos)                         # noqa: E731
+    resto = {c for c in execucao if not coberto(c) and not (c[0] in ("tests", "checks") and c[2] == "result")}
     assert resto == set()
     assert ("lineage", "manifest_generated_at") in execucao
 
@@ -493,3 +494,46 @@ def test_o_pacote_vazio_ou_recortado_nao_e_publicavel() -> None:
     assert pacote.faltas_no_pytest(cheio, casos) is None
     assert "vazio" in pacote.faltas_no_pytest({"checks": {}}, casos)
     assert "faltam" in pacote.faltas_no_pytest({"checks": {casos[0]: {}}}, casos)
+
+
+# ── A procedência do armazém (ADR-0054) ─────────────────────────────────────────
+
+def _manifest_de(invocacao: str) -> dict:
+    return {"metadata": {"invocation_id": invocacao}}
+
+
+def test_o_pacote_so_diz_verified_quando_a_execucao_verificada_e_a_do_manifest() -> None:
+    import datetime as dt
+
+    linha = {"status": "verified", "reason": None, "invocation_id": "inv-1", "built_from_commit": "a" * 40,
+             "built_at": dt.datetime(2026, 11, 15, 1, 0, tzinfo=dt.timezone(dt.timedelta(hours=-3))), "sequence": 7}
+    verificado = pacote.procedencia_do_armazem(_manifest_de("inv-1"), lambda: linha)
+    assert verificado == {"status": "verified", "reason": None, "built_by_invocation_id": "inv-1",
+                          "built_from_commit": "a" * 40, "built_at": "2026-11-15T04:00:00Z"}
+    assert pacote.procedencia_do_armazem(_manifest_de("inv-2"), lambda: linha)["reason"] == "other_execution"
+    parcial = dict(linha, status="not_verified", reason="partial_execution")
+    assert pacote.procedencia_do_armazem(_manifest_de("inv-1"), lambda: parcial)["reason"] == "partial_execution"
+    sem_banco = pacote.procedencia_do_armazem(_manifest_de("inv-1"), lambda: None)
+    assert sem_banco == {"status": "not_verified", "reason": "no_connection", "built_by_invocation_id": None,
+                         "built_from_commit": None, "built_at": None}
+
+
+def test_sem_conexao_o_texto_do_erro_nao_entra_no_pacote(monkeypatch) -> None:
+    monkeypatch.setenv("WAREHOUSE_DB_PASSWORD", "x")
+    monkeypatch.setenv("WAREHOUSE_DB_HOST", "127.0.0.1")
+    monkeypatch.setenv("WAREHOUSE_DB_PORT", "1")                # nada escuta aqui
+    assert pacote.procedencia_do_armazem(_manifest_de("inv-1"))["reason"] == "no_connection"
+
+
+def test_o_esquema_so_aceita_verified_com_a_execucao_inteira(gerado) -> None:
+    base = _minimo(gerado)
+    base["provenance"]["warehouse"] = {"status": "verified", "reason": None, "built_by_invocation_id": "inv-1",
+                                       "built_from_commit": "a" * 40, "built_at": "2026-11-15T04:00:00Z"}
+    assert not [e for e in pacote.validar(base) if "warehouse" in e or "None is not" in e or "is not of type" in e]
+    for campo in ("built_by_invocation_id", "built_from_commit", "built_at"):
+        incompleto = _minimo(base)
+        incompleto["provenance"]["warehouse"][campo] = None
+        assert pacote.validar(incompleto), campo
+    sem_motivo = _minimo(base)
+    sem_motivo["provenance"]["warehouse"].update(status="not_verified", reason=None)
+    assert pacote.validar(sem_motivo)

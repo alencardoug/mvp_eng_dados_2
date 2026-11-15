@@ -579,8 +579,10 @@ explícito do custodiante.
    `verified | not_verified`. A leitura usa a conexão do `.env`: o `catalog` e a 5ª etapa do `check`
    passam a carregá-lo (RVL5-1-05); sem conexão, `not_verified` com motivo "sem conexão", e nunca texto de
    erro do banco no pacote. O `check-offline` não chama o leitor. É a única leitura do banco que o pacote
-   faz, e o contrato a declara. A comparação do `--check` tira `built_by_invocation_id`,
-   `built_from_commit` e `built_at` e compara `status` e `reason`.
+   faz, e o contrato a declara. A comparação do `--check` tira o `warehouse` **inteiro** — desvio da
+   primeira redação, que comparava `status` e `reason`, achado na implementação: o pacote é gerado antes do
+   próprio *commit*, com a árvore suja, e um `make check` num *checkout* limpo o veria `verified`; a
+   procedência é do ambiente, como o instante da execução.
 7. **Os testes:** a migração do zero e sobre o armazém existente; a regra de leitura com linhas montadas
    (cada motivo, a linha aberta, a abandonada, a sobreposição, a ordem por `sequence`); a macro em
    integração — um `make dbt-build` completo (verificado), um `--select` e um `dbt retry` depois de uma falha
@@ -604,6 +606,16 @@ revisão do desenho achou a quarta (RVL5-1-06), e o Owner a incluiu em 15/11/202
 (conferido), nenhuma view; os derivados — o pacote (`relations`, `lineage`, o identificador do teste),
 o dicionário e a linhagem — saem da regeneração. A linha `prevista` em Consumidores §5 sai num *commit*
 antes do que renomeia, e vira `feita` com o *build*.
+
+**Implementado em 15/11/2026** (a Q6 em `5fcda58`, `4f10bca`; a L5 em `b56b2bc` e no *commit* seguinte):
+exercitado no armazém de trabalho um `make dbt-build` integral (`full_build` medido, aprovado, insumos
+confirmados; `dirty_tree` enquanto a mudança não estava versionada), um `--select` (`partial_execution`) e um
+`dbt test` (sem linha). Num armazém efêmero, a regra de leitura inteira, o registro da sincronização do
+Airbyte e a restauração da memória com um arquivo que traz o log (concluída, log e ordem preservados; com o
+filtro da lista desligado, o log é substituído). **Não exercitados:** o teste da fato envolto no registro
+(exige `make test FATO=1`, que o Owner autoriza); o `dbt retry` depois de uma falha e o *hook* de acesso
+falhando antes do fecho, num `build` de verdade (a cobertura e a ordem dos *hooks* estão provadas por
+construção e pelo log); a restauração no armazém de trabalho (`RESTAURAR=1`).
 
 ### Bloco 5 — domínios e métricas (F7, F9)
 

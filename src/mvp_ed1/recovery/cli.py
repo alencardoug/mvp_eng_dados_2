@@ -69,6 +69,9 @@ def _pg_dump(servico: str, usuario: str, banco: str, destino: pathlib.Path, sche
     comando = ["docker", "exec", _conteineres(servico), "pg_dump", "-Fc", "-U", usuario, "-d", banco]
     for schema in schemas:
         comando += ["-n", schema]
+    for relacao in pacote.FORA_DA_MEMORIA:
+        if relacao.split(".")[0] in schemas:
+            comando += ["--exclude-table", relacao]
     with destino.open("wb") as arquivo:
         processo = subprocess.run(comando, stdout=arquivo, stderr=subprocess.PIPE)
     if processo.returncode != 0:
@@ -160,12 +163,12 @@ def _montar(pasta: pathlib.Path) -> None:
                 "contagens": {
                     "source_db": leitura.contagens(origem, ["oltp"]),
                     "legacy_db": leitura.contagens(legado, ["legacy"]),
-                    "warehouse_db": leitura.contagens(armazem, list(pacote.SCHEMAS_DE_MEMORIA)),
+                    "warehouse_db": _da_memoria(leitura.contagens(armazem, list(pacote.SCHEMAS_DE_MEMORIA))),
                 },
                 "tamanhos": {
                     "source_db": leitura.tamanhos(origem, ["oltp"]),
                     "legacy_db": leitura.tamanhos(legado, ["legacy"]),
-                    "warehouse_db": leitura.tamanhos(armazem, list(pacote.SCHEMAS_DE_MEMORIA)),
+                    "warehouse_db": _da_memoria(leitura.tamanhos(armazem, list(pacote.SCHEMAS_DE_MEMORIA))),
                 },
                 "oraculo_scd": leitura.oraculo_scd(armazem),
                 "oraculo_capturas": leitura.oraculo_das_capturas(armazem),
@@ -310,7 +313,7 @@ def _conferir_contra_o_banco(manifesto: pacote.Manifesto) -> list[str]:
         problemas += _comparar(
             "contagens em warehouse_db",
             dados["contagens"]["warehouse_db"],
-            leitura.contagens(armazem, list(pacote.SCHEMAS_DE_MEMORIA)),
+            _da_memoria(leitura.contagens(armazem, list(pacote.SCHEMAS_DE_MEMORIA))),
         )
         problemas += _comparar(
             "alembic",
@@ -517,6 +520,28 @@ def _aplicar_rebase(armazem, planos: dict[str, dict[int, int]], recusas: list[st
 
 
 # ── restore-dumps (passo 4) ─────────────────────────────────────────────────
+def _da_memoria(medido: dict[str, int]) -> dict[str, int]:
+    """O medido sem o que fica fora da memória (`pacote.FORA_DA_MEMORIA`): o log cresce a cada execução."""
+    return {relacao: n for relacao, n in medido.items() if relacao not in pacote.FORA_DA_MEMORIA}
+
+
+def _sem_o_log(lista: str) -> str:
+    """A lista do arquivo (`pg_restore -l`) sem o que a restauração não pode tocar (ADR-0054, RVL5-6-01):
+    a entrada do schema `governance` — o `--clean` o descartaria, e ele guarda o log, que fica — e qualquer
+    entrada do log ou da procedência, inclusive de um arquivo antigo que ainda os traga dentro."""
+    saida = []
+    for linha in lista.splitlines():
+        campos = linha.split()
+        if not linha.startswith(";") and len(campos) >= 6 and campos[3] == "SCHEMA" and campos[5] == "governance":
+            continue
+        nomes = [r.split(".")[1] for r in pacote.FORA_DA_MEMORIA]
+        # A identidade do log é a sequência `dbt_invocations_sequence_seq`: o nome **começa** pelo da tabela.
+        if not linha.startswith(";") and any(c == n or c.startswith(n + "_") for c in campos for n in nomes):
+            continue
+        saida.append(linha)
+    return "\n".join(saida) + "\n"
+
+
 def _pg_restore(servico: str, usuario: str, banco: str, dump: pathlib.Path) -> None:
     """`--clean --if-exists --single-transaction`: o destino pode estar **povoado** — a linha 9 do B5
     — ou recém-criado por `make up` — o recuo antes de o ambiente estar pronto (RVB5-01).
@@ -530,11 +555,21 @@ def _pg_restore(servico: str, usuario: str, banco: str, dump: pathlib.Path) -> N
     dump inteiro: o destino fica **como estava**, e o diagnóstico sai por
     inteiro, não só a última linha.
     """
+    conteiner = _conteineres(servico)
+    lista: list[str] = []
+    if servico == "warehouse_db":
+        # A lista de restauração, dentro do contêiner, sem o schema `governance` nem o log (`_sem_o_log`).
+        with dump.open("rb") as arquivo:
+            toc = subprocess.run(["docker", "exec", "-i", conteiner, "pg_restore", "-l"],
+                                 stdin=arquivo, capture_output=True, check=True).stdout.decode()
+        subprocess.run(["docker", "exec", "-i", conteiner, "sh", "-c", "cat > /tmp/mvp_lista_da_memoria"],
+                       input=_sem_o_log(toc).encode(), check=True)
+        lista = ["-L", "/tmp/mvp_lista_da_memoria"]
     with dump.open("rb") as arquivo:
         processo = subprocess.run(
             [
-                "docker", "exec", "-i", _conteineres(servico),
-                "pg_restore", "--clean", "--if-exists", "--no-owner", "--single-transaction",
+                "docker", "exec", "-i", conteiner,
+                "pg_restore", "--clean", "--if-exists", "--no-owner", "--single-transaction", *lista,
                 "-U", usuario, "-d", banco,
             ],
             stdin=arquivo, capture_output=True,
@@ -557,13 +592,22 @@ def comando_restore_dumps(args: argparse.Namespace) -> int:
     # `GRANT`s do dump da memória desfaziam a restauração dele inteira (RVB5-01, medido num destino
     # novo em 25/09/2026). Antes de tudo, e não antes do armazém: sem eles, nada é tocado.
     governance.garantir_papeis(_motor(db.WAREHOUSE))
+    # O log de execução antes da memória (ADR-0054, RVL5-6-01): num destino novo, ele precisa existir
+    # para a restauração se registrar; num povoado, `garantir` não toca nada. O `--clean` do dump repõe
+    # o resto de `governance` (e o `_versions` dele); o log fica, porque não está no dump.
+    armazem = _motor(db.WAREHOUSE)
+    governance.garantir(armazem)
     for servico, usuario, banco, nome in (
         ("source_db", "SOURCE_DB_USER", "SOURCE_DB_NAME", "source_db.dump"),
         ("legacy_db", "LEGACY_DB_USER", "LEGACY_DB_NAME", "legacy_db.dump"),
-        ("warehouse_db", "WAREHOUSE_DB_USER", "WAREHOUSE_DB_NAME", "warehouse_memoria.dump"),
     ):
         print(f"[recovery] restaurando {nome}, numa transação só")
         _pg_restore(servico, _env(usuario), _env(banco), pasta / nome)
+    # A memória do armazém é escrita fora do dbt: registrada antes do `pg_restore` e fechada depois. A
+    # linha sobrevive ao restore, porque o log não está no dump; interrompida, fica aberta e bloqueia.
+    with governance.registrar_mutacao(armazem, "recovery_restore"):
+        print("[recovery] restaurando warehouse_memoria.dump, numa transação só")
+        _pg_restore("warehouse_db", _env("WAREHOUSE_DB_USER"), _env("WAREHOUSE_DB_NAME"), pasta / "warehouse_memoria.dump")
     return 0
 
 

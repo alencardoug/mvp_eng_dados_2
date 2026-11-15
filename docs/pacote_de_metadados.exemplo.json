@@ -250,7 +250,10 @@
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {
+      "built_at": null,
       "built_by_invocation_id": null,
+      "built_from_commit": null,
+      "reason": "no_execution",
       "status": "not_verified"
     }
   },

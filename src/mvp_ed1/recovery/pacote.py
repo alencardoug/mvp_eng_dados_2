@@ -42,6 +42,12 @@ from typing import Any
 #: Os schemas do armazém que são memória. O resto do armazém se reconstrói.
 SCHEMAS_DE_MEMORIA = ("raw_legacy", "governance", "snapshots", "quarantine")
 
+#: O que fica **fora** da memória, dentro dos schemas dela: o log de execução e a procedência (ADR-0054,
+#: RVL5-5-01). O log é o que registra a própria restauração; restaurá-lo devolveria um histórico antigo,
+#: cuja última linha poderia ser verificada, e apagaria a linha `recovery_restore`. Ele não entra no
+#: `pg_dump`, não sai do `pg_restore` e não conta nas contagens do manifesto.
+FORA_DA_MEMORIA = ("governance.dbt_invocations", "governance.warehouse_provenance")
+
 #: Arquivos de trabalho, fora do Git, que os oráculos usam — por **padrão**, e
 #: não por nome fixo. `data/legacy/` guarda o manifesto corrente e os de
 #: gerações anteriores (`manifesto-<hash>.json`), e nomear só um deixaria os

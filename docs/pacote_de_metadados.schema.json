@@ -197,21 +197,116 @@
           }
         },
         "warehouse": {
-          "description": "Qual execução construiu o armazém (L5). Na versão 1, sempre not_verified e null: o valor verified só entra com o desenho do Bloco 4, e muda o esquema.",
+          "description": "A procedência do armazém no momento da geração (L5, ADR-0054), lida da view governance.warehouse_provenance: verified só quando a última execução registrada é um build integral, aprovado, de commit conhecido e limpo, com os insumos confirmados, sem nada aberto nem sobreposto, **e** é a execução que produziu o manifest deste pacote. Os campos novos de 15/11/2026 não mudam o formato (regra 3).",
           "type": "object",
           "additionalProperties": false,
           "required": [
             "status",
-            "built_by_invocation_id"
+            "reason",
+            "built_by_invocation_id",
+            "built_from_commit",
+            "built_at"
           ],
           "properties": {
             "status": {
-              "const": "not_verified"
+              "enum": [
+                "verified",
+                "not_verified"
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "enum": [
+                    "no_connection",
+                    "other_execution",
+                    "no_execution",
+                    "open_execution",
+                    "abandoned_execution",
+                    "failed_execution",
+                    "partial_execution",
+                    "unknown_commit",
+                    "dirty_tree",
+                    "inputs_not_confirmed",
+                    "overlapping_execution"
+                  ]
+                }
+              ]
             },
             "built_by_invocation_id": {
-              "type": "null"
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "built_from_commit": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                }
+              ]
+            },
+            "built_at": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/instante"
+                }
+              ]
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "verified"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "reason": {
+                    "type": "null"
+                  },
+                  "built_by_invocation_id": {
+                    "type": "string"
+                  },
+                  "built_from_commit": {
+                    "type": "string"
+                  },
+                  "built_at": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "not_verified"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          ]
         },
         "link_base": {
           "description": "Diretório do repositório contra o qual se resolvem os links relativos dos textos.",
