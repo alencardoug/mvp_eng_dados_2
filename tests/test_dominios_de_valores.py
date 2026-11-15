@@ -375,3 +375,85 @@ def test_not_null_a_mao_desligado_nao_vale_e_e_recusado(com_derivado: bool) -> N
         vd.patch_value_domains(texto, {"fact_x": {"order_status": _pedido("order_status", ESTADOS)}})
     with pytest.raises(RuntimeError, match="desligado"):
         vd.verify(CAMINHO, texto, {"fact_x": {"order_status": _pedido("order_status", ESTADOS)}})
+
+
+# ── A revisão da implementação, rodada 3 (RVB5A-3-01) ────────────────────────────
+
+ANCORA = """version: 2
+models:
+  - name: fact_x
+    columns:
+      - name: code
+        meta:
+          sensitivity: public
+        data_tests:
+          - not_null:
+              config: &manual_config
+                enabled: true
+      - name: order_status
+        meta:
+          sensitivity: public
+          value_domain: order_status
+        data_tests:
+          - not_null:
+              config: *manual_config
+"""
+
+
+def _com_ancora() -> dict:
+    return {"fact_x": {"order_status": _pedido("order_status", ESTADOS)}}
+
+
+def test_a_configuracao_a_mao_compartilhada_por_ancora_e_preservada() -> None:
+    """RVB5A-3-01: a âncora vive fora dos `data_tests` da coluna; o escritor lê o documento inteiro, preserva o
+    manual, não acrescenta o `not_null` derivado e é idempotente; a remoção também lê o documento inteiro."""
+    uma = vd.patch_value_domains(ANCORA, _com_ancora())
+    assert "config: *manual_config" in uma
+    testes = _colunas(uma)["order_status"]["data_tests"]
+    assert {"not_null": {"config": {"enabled": True}}} in testes
+    assert not any(vd._marcado(t, "not_null") for t in testes)
+    assert sum(1 for t in testes if vd._marcado(t, "accepted_values")) == 1
+    assert vd.patch_value_domains(uma, _com_ancora()) == uma
+    vd.verify(CAMINHO, uma, _com_ancora())
+    sem = vd.patch_value_domains(uma, {}, {"fact_x": ["order_status"]})
+    assert _colunas(sem)["order_status"]["data_tests"] == [{"not_null": {"config": {"enabled": True}}}]
+    vd.verify(CAMINHO, sem, {}, {"fact_x": ["order_status"]})
+
+
+def test_a_ancora_desligada_continua_recusada() -> None:
+    """RVB5A-2-02 pela âncora: o `enabled: false` herdado de outra coluna também não vale como `not_null`."""
+    texto = ANCORA.replace("enabled: true", "enabled: false")
+    with pytest.raises(ValueError, match="desligado"):
+        vd.patch_value_domains(texto, _com_ancora())
+
+
+def test_a_ancora_passa_pelo_main_nos_dois_modos(tmp_path, monkeypatch) -> None:
+    """RVB5A-3-01 pelo comando: com o catálogo, o `main` escreve e o `--check` confere, sem `ComposerError`."""
+    import json
+    from mvp_ed1.models import sensitivity as s
+    dbt = tmp_path / "dbt"
+    (dbt / "models" / "analytics").mkdir(parents=True)
+    (dbt / "target").mkdir()
+    monkeypatch.setattr(s, "ROOT", tmp_path)
+    monkeypatch.setattr(s, "DBT", dbt)
+    monkeypatch.setattr(s, "MANIFEST", dbt / "target" / "manifest.json")
+    monkeypatch.setattr(s, "CACHE", tmp_path / "derivation.pickle")
+    sql = "select 'x' as code, 'paid' as order_status\n"
+    no = {"unique_id": "model.mvp_ed1.fact_x", "resource_type": "model", "name": "fact_x", "schema": "analytics",
+          "database": "wh", "original_file_path": "models/analytics/fact_x.sql", "depends_on": {"nodes": []},
+          "columns": {}, "compiled_code": sql, "raw_code": sql}
+    (dbt / "models" / "analytics" / "fact_x.sql").write_text(sql, encoding="utf-8")
+    s.MANIFEST.write_text(json.dumps({"metadata": {"project_name": "mvp_ed1"}, "sources": {},
+                                      "nodes": {no["unique_id"]: no}}), encoding="utf-8")
+    catalogo = tmp_path / vd.CATALOG_RELATIVE
+    catalogo.parent.mkdir(parents=True)
+    catalogo.write_text("domains:\n  order_status:\n    description: Estado do pedido.\n    values:\n"
+                        + "".join(f'      "{v}":\n        meaning: "{m}"\n        source: teste\n' for v, m in ESTADOS.items()),
+                        encoding="utf-8")
+    yml = dbt / "models" / "analytics" / "_analytics__models.yml"
+    yml.write_text(ANCORA, encoding="utf-8")
+    assert s.main([]) == 0
+    escrito = yml.read_text(encoding="utf-8")
+    assert "config: *manual_config" in escrito and "accepted_values" in escrito
+    assert s.main(["--check"]) == 0
+    assert s.main([]) == 0 and yml.read_text(encoding="utf-8") == escrito
