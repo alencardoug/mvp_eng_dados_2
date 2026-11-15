@@ -57,7 +57,10 @@ models:
             "web": "Loja online."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: sales_channel_type
           - accepted_values:
               arguments:
                 values: ["app", "store", "web"]
@@ -326,7 +329,10 @@ models:
             "Sul": "Região Sul."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ibge_region
           - accepted_values:
               arguments:
                 values: ["Centro-Oeste", "Desconhecido", "Nordeste", "Norte", "Sudeste", "Sul"]
@@ -416,7 +422,10 @@ models:
             "web": "Loja online."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: sales_channel_type
           - accepted_values:
               arguments:
                 values: ["app", "store", "web"]
@@ -499,7 +508,10 @@ models:
             "web": "Loja online."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: sales_channel_type
           - accepted_values:
               arguments:
                 values: ["app", "store", "web"]
@@ -679,7 +691,10 @@ models:
             "Sul": "Região Sul."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ibge_region
           - accepted_values:
               arguments:
                 values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
@@ -759,7 +774,10 @@ models:
             "wallet": "Carteira digital."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: payment_method_type
           - accepted_values:
               arguments:
                 values: ["boleto", "credit_card", "debit_card", "pix", "voucher", "wallet"]
@@ -849,7 +867,10 @@ models:
             "Sem motivo registrado": "A origem não informou o motivo. Só a view da P10 o escreve, no lugar do nulo; a fato guarda o nulo."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: refund_reason
           - accepted_values:
               arguments:
                 values: ["Arrependimento em até 7 dias", "Cancelamento a pedido do cliente", "Divergência de item", "Entrega não realizada", "Produto com defeito", "Sem motivo registrado"]
@@ -911,7 +932,10 @@ models:
             "Sul": "Região Sul."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ibge_region
           - accepted_values:
               arguments:
                 values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
@@ -1053,7 +1077,10 @@ models:
         description: '{{ doc("promised_lead_time") }}'
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: carrier_service_level
           - accepted_values:
               arguments:
                 values: ["express", "same_day", "standard"]
@@ -1082,7 +1109,10 @@ models:
             "Sul": "Região Sul."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ibge_region
           - accepted_values:
               arguments:
                 values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
@@ -1177,7 +1207,10 @@ models:
             "Sul": "Região Sul."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ibge_region
           - accepted_values:
               arguments:
                 values: ["Centro-Oeste", "Desconhecido", "Nordeste", "Norte", "Sudeste", "Sul"]
@@ -1202,7 +1235,10 @@ models:
         description: Modalidade da remessa que **fechou** o ciclo.
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: carrier_service_level
           - accepted_values:
               arguments:
                 values: ["express", "same_day", "standard"]
@@ -1303,7 +1339,10 @@ models:
             "web": "Loja online."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: sales_channel_type
           - accepted_values:
               arguments:
                 values: ["app", "store", "unknown", "web"]
@@ -1331,7 +1370,10 @@ models:
             "Pós-venda": "Reúne a categoria Devolução (`return`)."
         data_type: text
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: support_category_group
           - accepted_values:
               arguments:
                 values: ["Cadastro", "Catálogo", "Financeiro", "Geral", "Logística", "Pós-venda"]

@@ -63,14 +63,14 @@ def _aplicar(texto: str = YML) -> str:
 def test_o_codigo_com_zero_a_esquerda_continua_texto() -> None:
     cols = _colunas(_aplicar())
     assert cols["gateway_response_code"]["meta"]["values"] == CODIGOS
-    av = next(t for t in cols["gateway_response_code"]["data_tests"] if isinstance(t, dict))
+    av = next(t for t in cols["gateway_response_code"]["data_tests"] if vd._marcado(t, "accepted_values"))
     assert av["accepted_values"]["arguments"]["values"] == ["00", "05"]
 
 
 def test_o_nulo_fica_fora_do_mapa_e_decide_o_not_null() -> None:
     cols = _colunas(_aplicar())
     assert "not_null" in cols["order_status"]["data_tests"]
-    assert "not_null" in cols["gateway_response_code"]["data_tests"]            # sem `null_meaning`: ganha
+    assert any(vd._marcado(t, "not_null") for t in cols["gateway_response_code"]["data_tests"])  # sem `null_meaning`: ganha, marcado
     assert "not_null" not in (cols["from_status"].get("data_tests") or [])      # com `null_meaning`: não
     assert None not in cols["from_status"]["meta"]["values"] and "None" not in cols["from_status"]["meta"]["values"]
 
@@ -279,3 +279,69 @@ def test_o_catalogo_recusa_regra_e_excecao_sem_motivo(tmp_path) -> None:
         vd.load_catalog(tmp_path / "d.yml", base.replace(', reason: "N."', ""))
     with pytest.raises(ValueError, match="sem motivo"):
         vd.load_catalog(tmp_path / "d.yml", base.replace('"Livre."', '""'))
+
+
+# ── A revisão da implementação, rodada 1 (RVB5A-1-01 a 03) ───────────────────────
+
+def test_o_not_null_derivado_tem_a_marca_e_o_a_mao_nao() -> None:
+    cols = _colunas(_aplicar())
+    assert "not_null" in cols["order_status"]["data_tests"]                     # o à mão continua texto solto
+    derivados = [t for t in cols["gateway_response_code"]["data_tests"] if vd._marcado(t, "not_null")]
+    assert derivados == [{"not_null": {"config": {"meta": {"value_domain": "gateway_response_code"}}}}]
+
+
+def test_a_remocao_leva_o_not_null_derivado_e_fica_o_a_mao() -> None:
+    sem = vd.patch_value_domains(_aplicar(), {}, {"fact_x": ["order_status", "gateway_response_code"]})
+    cols = _colunas(sem)
+    assert cols["order_status"]["data_tests"] == ["not_null"]
+    assert "data_tests" not in cols["gateway_response_code"]                    # sem item, sem a chave
+    vd.verify(CAMINHO, sem, {}, {"fact_x": ["order_status", "gateway_response_code"]})
+
+
+def test_a_remocao_na_coluna_que_admite_nulo_nao_deixa_data_tests_vazio() -> None:
+    """RVB5A-1-01: o único teste era o `accepted_values` derivado; a chave sai junto, e a segunda passada não muda nada."""
+    sem = vd.patch_value_domains(_aplicar(), {}, {"fact_x": ["from_status"]})
+    assert "data_tests" not in _colunas(sem)["from_status"]
+    assert vd.patch_value_domains(sem, {}, {"fact_x": ["from_status"]}) == sem
+    vd.verify(CAMINHO, sem, {}, {"fact_x": ["from_status"]})
+
+
+def test_o_verify_recusa_data_tests_nulo() -> None:
+    quebrado = YML.replace('null_meaning: "O primeiro evento do pedido não tem estado anterior."',
+                           'null_meaning: "O primeiro evento do pedido não tem estado anterior."\n        data_tests:', 1)
+    with pytest.raises(RuntimeError, match="não é uma lista|sem lista"):
+        vd.verify(CAMINHO, quebrado, {"fact_x": {"from_status": _pedido("order_status", ESTADOS, not_null=False)}})
+
+
+def test_acrescentar_null_meaning_tira_o_not_null_derivado_sem_recusar() -> None:
+    """RVB5A-1-02: o derivado sai sozinho; só o `not_null` à mão contra `null_meaning` é recusado."""
+    uma = _aplicar()
+    outra = vd.patch_value_domains(uma, {"fact_x": {"gateway_response_code": _pedido("gateway_response_code", CODIGOS, not_null=False)}})
+    testes = _colunas(outra)["gateway_response_code"]["data_tests"]
+    assert not any(vd._marcado(t, "not_null") for t in testes) and "not_null" not in testes
+    vd.verify(CAMINHO, outra, {"fact_x": {"gateway_response_code": _pedido("gateway_response_code", CODIGOS, not_null=False)}})
+
+
+def test_o_catalogo_ausente_com_ligacao_no_disco_recusa(tmp_path, monkeypatch, capsys) -> None:
+    """RVB5A-1-03: sem `dominios.yml`, só o projeto sem domínio nenhum passa; com ligação, o `main` recusa."""
+    import json
+    from mvp_ed1.models import sensitivity as s
+    dbt = tmp_path / "dbt"
+    (dbt / "models" / "analytics").mkdir(parents=True)
+    (dbt / "target").mkdir()
+    monkeypatch.setattr(s, "ROOT", tmp_path)
+    monkeypatch.setattr(s, "DBT", dbt)
+    monkeypatch.setattr(s, "MANIFEST", dbt / "target" / "manifest.json")
+    monkeypatch.setattr(s, "CACHE", tmp_path / "derivation.pickle")
+    no = {"unique_id": "model.mvp_ed1.fact_x", "resource_type": "model", "name": "fact_x", "schema": "analytics",
+          "database": "wh", "original_file_path": "models/analytics/fact_x.sql", "depends_on": {"nodes": []},
+          "columns": {}, "compiled_code": "select 'paid' as order_status", "raw_code": "select 'paid' as order_status\n"}
+    (dbt / "models" / "analytics" / "fact_x.sql").write_text(no["raw_code"], encoding="utf-8")
+    s.MANIFEST.write_text(json.dumps({"metadata": {"project_name": "mvp_ed1"}, "sources": {},
+                                      "nodes": {no["unique_id"]: no}}), encoding="utf-8")
+    yml = dbt / "models" / "analytics" / "_analytics__models.yml"
+    yml.write_text("version: 2\nmodels:\n  - name: fact_x\n    columns:\n      - name: order_status\n        meta:\n"
+                   "          sensitivity: public\n          value_domain: order_status\n", encoding="utf-8")
+    for argv in ([], ["--check"]):
+        assert s.main(argv) == 1
+        assert "ausente" in capsys.readouterr().err

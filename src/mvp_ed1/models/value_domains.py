@@ -238,11 +238,25 @@ def orphan_domains(catalogo: dict, ligacoes: list[Link]) -> list[str]:
     return sorted(n for n, d in catalogo["domains"].items() if n not in usados and not (d or {}).get("reserved"))
 
 
-def _marcado(teste) -> bool:
-    if not isinstance(teste, dict) or "accepted_values" not in teste:
+def _marcado(teste, tipo: str | None = None) -> bool:
+    """O teste que o escritor deriva: `accepted_values` ou `not_null` com `config.meta.value_domain` (RVB5A-1-02)."""
+    if not isinstance(teste, dict) or len(teste) != 1:
         return False
-    corpo = teste["accepted_values"] or {}
-    return "value_domain" in ((corpo.get("config") or {}).get("meta") or {})
+    (chave, corpo), = teste.items()
+    if chave not in ("accepted_values", "not_null") or (tipo is not None and chave != tipo):
+        return False
+    return "value_domain" in (((corpo or {}).get("config") or {}).get("meta") or {})
+
+
+def _not_null_a_mao(testes) -> bool:
+    """O `not_null` escrito à mão: o texto solto, ou o bloco sem a marca do derivado."""
+    return any(t == "not_null" or (isinstance(t, dict) and "not_null" in t and not _marcado(t)) for t in testes)
+
+
+def has_derived(disco: dict) -> bool:
+    """Se algum `.yml` à mão de `analytics` ou `consumption` tem derivado dos domínios de valores."""
+    return any("values" in (c.get("meta") or {}) or any(_marcado(t) for t in c.get("data_tests") or [])
+               for e in disco.values() if _camada(e.path) is not None and e.kind == "hand" for c in e.columns.values())
 
 
 # ── O escritor ────────────────────────────────────────────────────────────────────
@@ -337,9 +351,11 @@ def patch_value_domains(texto: str, entradas: dict[str, dict[str, dict]], remoco
             recuo_item = sensitivity._indent(linhas[itens[0][0]]) if itens else recuo + 4
             aceitos = [(a, b) for a, b in itens if _e_teste(linhas[a], "accepted_values")]
             nulos = [(a, b) for a, b in itens if _e_teste(linhas[a], "not_null")]
+            nulos_derivados = [(a, b) for a, b in nulos if "value_domain:" in "\n".join(linhas[a:b])]
+            nulos_a_mao = [x for x in nulos if x not in nulos_derivados]
             if len(aceitos) > 1:
                 raise ValueError(f"`{modelo}.{coluna}` tem {len(aceitos)} `accepted_values`")
-            if nulos and not pedido["not_null"]:
+            if nulos_a_mao and not pedido["not_null"]:
                 raise ValueError(f"`{modelo}.{coluna}`: `not_null` à mão, mas a ligação declara `null_meaning`")
             bloco_av = [
                 " " * recuo_item + "- accepted_values:",
@@ -349,16 +365,29 @@ def patch_value_domains(texto: str, entradas: dict[str, dict[str, dict]], remoco
                 " " * (recuo_item + 6) + "meta:",
                 " " * (recuo_item + 8) + f"value_domain: {pedido['domain']}",
             ]
+            bloco_nn = [
+                " " * recuo_item + "- not_null:",
+                " " * (recuo_item + 4) + "config:",
+                " " * (recuo_item + 6) + "meta:",
+                " " * (recuo_item + 8) + f"value_domain: {pedido['domain']}",
+            ]
+            # De baixo para cima: o not_null derivado (substituído, removido ou deixado ao à mão) e o accepted_values.
+            trocas = []
             if aceitos:
-                a, b = aceitos[0]
-                linhas[a:_recuar(linhas, a, b)] = bloco_av
-            else:
+                trocas.append((aceitos[0], bloco_av))
+            for item in nulos_derivados:
+                trocas.append((item, bloco_nn if pedido["not_null"] and not nulos_a_mao and item == nulos_derivados[0] else []))
+            for (a, b), novo in sorted(trocas, key=lambda x: x[0][0], reverse=True):
+                linhas[a:_recuar(linhas, a, b)] = novo
+            if not aceitos:
+                ini, fim, recuo = _item_da_coluna(linhas, modelo, coluna)
+                idx_t, fim_t = _subchave(linhas, ini + 1, fim, recuo + 2, "data_tests")
                 ponto = _recuar(linhas, idx_t, fim_t)
                 linhas[ponto:ponto] = bloco_av
-            if pedido["not_null"] and not nulos:
+            if pedido["not_null"] and not nulos_a_mao and not nulos_derivados:
                 ini, fim, recuo = _item_da_coluna(linhas, modelo, coluna)
                 idx_t, _ = _subchave(linhas, ini + 1, fim, recuo + 2, "data_tests")
-                linhas.insert(idx_t + 1, " " * recuo_item + "- not_null")
+                linhas[idx_t + 1:idx_t + 1] = bloco_nn
     for modelo, colunas in (remocoes or {}).items():
         for coluna in colunas:
             ini, fim, recuo = _item_da_coluna(linhas, modelo, coluna)
@@ -371,8 +400,14 @@ def patch_value_domains(texto: str, entradas: dict[str, dict[str, dict]], remoco
             idx_t, fim_t = _subchave(linhas, ini + 1, fim, recuo + 2, "data_tests")
             if idx_t is not None:
                 for a, b in reversed(_itens_da_lista(linhas, idx_t, fim_t)):
-                    if _e_teste(linhas[a], "accepted_values") and "value_domain:" in "\n".join(linhas[a:b]):
+                    if (_e_teste(linhas[a], "accepted_values") or _e_teste(linhas[a], "not_null")) \
+                            and "value_domain:" in "\n".join(linhas[a:b]):
                         del linhas[a:_recuar(linhas, a, b)]
+                # A lista que perdeu o último item leva a chave junto: `data_tests:` vazio é nulo, e o dbt recusa (RVB5A-1-01).
+                ini, fim, recuo = _item_da_coluna(linhas, modelo, coluna)
+                idx_t, fim_t = _subchave(linhas, ini + 1, fim, recuo + 2, "data_tests")
+                if idx_t is not None and not _itens_da_lista(linhas, idx_t, fim_t):
+                    del linhas[idx_t]
     return "\n".join(linhas)
 
 
@@ -385,17 +420,23 @@ def verify(caminho: pathlib.Path, conteudo: str, entradas: dict[str, dict[str, d
         cols = {c["name"]: c for c in (por_nome.get(modelo) or {}).get("columns", [])}
         for coluna, pedido in colunas.items():
             c = cols.get(coluna) or {}
+            if "data_tests" in c and not isinstance(c["data_tests"], list):
+                raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}`: `data_tests` não é uma lista")
             if (c.get("meta") or {}).get("values") != pedido["values"]:
                 raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}` não ficou com o `meta.values` do catálogo")
             testes = c.get("data_tests") or []
-            av = [t for t in testes if _marcado(t)]
+            av = [t for t in testes if _marcado(t, "accepted_values")]
             if len(av) != 1 or (av[0]["accepted_values"].get("arguments") or {}).get("values") != pedido["accepted"]:
                 raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}` não ficou com o `accepted_values` do catálogo")
-            if pedido["not_null"] != ("not_null" in testes):
+            derivados = sum(1 for t in testes if _marcado(t, "not_null"))
+            a_mao = _not_null_a_mao(testes)
+            if pedido["not_null"] != (a_mao or derivados == 1) or derivados > (0 if a_mao else 1) or (a_mao and derivados):
                 raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}`: `not_null` diverge da ligação")
     for modelo, colunas in (remocoes or {}).items():
         cols = {c["name"]: c for c in (por_nome.get(modelo) or {}).get("columns", [])}
         for coluna in colunas:
             c = cols.get(coluna) or {}
+            if "data_tests" in c and (not isinstance(c["data_tests"], list) or not c["data_tests"]):
+                raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}`: `data_tests` sem lista depois da remoção")
             if "values" in (c.get("meta") or {}) or any(_marcado(t) for t in c.get("data_tests") or []):
                 raise RuntimeError(f"{caminho.name}: `{modelo}.{coluna}` ainda tem o derivado de uma ligação que saiu")

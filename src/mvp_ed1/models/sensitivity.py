@@ -1130,12 +1130,17 @@ def main(argv: list[str] | None = None) -> int:
         # catálogo é o da raiz do projeto de agora; sem ele (um projeto de teste) não há o que derivar — no
         # repositório ele existe, e `tests/test_dominios_de_valores.py` o confere.
         caminho_catalogo = ROOT / value_domains.CATALOG_RELATIVE
+        ligacoes = value_domains.links(disco)
         if caminho_catalogo.exists():
             catalogo = value_domains.load_catalog(caminho_catalogo)
-            ligacoes = value_domains.links(disco)
             valores = value_domains.derive(catalogo, ligacoes, disco)
             if orfaos := value_domains.orphan_domains(catalogo, ligacoes):
                 raise ValueError(f"domínio sem coluna ligada e sem `reserved`: {', '.join(orfaos)}")
+        elif ligacoes or value_domains.has_derived(disco):
+            # Sem catálogo só passa o projeto que não tem domínio nenhum; com ligação ou derivado no disco,
+            # o catálogo sumiu (RVB5A-1-03).
+            raise ValueError(f"{value_domains.CATALOG_RELATIVE} ausente, mas há {len(ligacoes)} ligação(ões) "
+                             "ou derivado dos domínios de valores nos `.yml`")
         else:
             valores = value_domains.Derived()
         arquivos = render_files(plano, textos, dominios, valores)

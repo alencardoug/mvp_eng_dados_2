@@ -68,7 +68,10 @@ models:
             "October": "Outubro."
             "September": "Setembro."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: month_name
           - accepted_values:
               arguments:
                 values: ["April", "August", "December", "February", "January", "July", "June", "March", "May", "November", "October", "September"]
@@ -101,7 +104,10 @@ models:
             "Tuesday": "Terça-feira."
             "Wednesday": "Quarta-feira."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: day_of_week
           - accepted_values:
               arguments:
                 values: ["Friday", "Monday", "Saturday", "Sunday", "Thursday", "Tuesday", "Wednesday"]
@@ -177,7 +183,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -261,7 +270,10 @@ models:
             "inactive": "Cliente sem relacionamento ativo, por iniciativa própria ou por falta de uso; o cadastro continua."
             "pending": "Cadastro iniciado e ainda não concluído ou confirmado."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: customer_status
           - accepted_values:
               arguments:
                 values: ["active", "blocked", "inactive", "pending"]
@@ -349,7 +361,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -417,7 +432,10 @@ models:
             "discontinued": "Produto retirado de linha; não é mais vendido, mas o histórico continua."
             "draft": "Produto em preparação, ainda não publicado para venda."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: product_status
           - accepted_values:
               arguments:
                 values: ["active", "discontinued", "draft"]
@@ -521,7 +539,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -570,7 +591,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -621,7 +645,10 @@ models:
             "unknown": "Membro desconhecido — Canal desconhecido — o chamado que não nasceu de um pedido não tem canal. Não é de origem nenhuma."
             "web": "Loja online."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: sales_channel_type
           - accepted_values:
               arguments:
                 values: ["app", "store", "unknown", "web"]
@@ -639,7 +666,10 @@ models:
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
             "unknown": "Membro desconhecido — Canal desconhecido — o chamado que não nasceu de um pedido não tem canal. Não é de origem nenhuma."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail", "unknown"]
@@ -820,7 +850,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -864,7 +897,10 @@ models:
             "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
             "shipped": "Pedido despachado do armazém. É pedido realizado."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: order_status
           - accepted_values:
               arguments:
                 values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
@@ -1021,7 +1057,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -1117,7 +1156,10 @@ models:
             "voucher": "Vale-compra."
             "wallet": "Carteira digital."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: payment_method_type
           - accepted_values:
               arguments:
                 values: ["boleto", "credit_card", "debit_card", "pix", "voucher", "wallet"]
@@ -1134,7 +1176,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -1211,7 +1256,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -1284,7 +1332,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -1336,7 +1387,10 @@ models:
             "Sudeste": "Região Sudeste."
             "Sul": "Região Sul."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ibge_region
           - accepted_values:
               arguments:
                 values: ["Centro-Oeste", "Nordeste", "Norte", "Sudeste", "Sul"]
@@ -1422,7 +1476,10 @@ models:
             "refund": "Devolução ao cliente de valor já capturado."
             "void": "Desfazimento de uma autorização que não foi capturada (pedido cancelado depois de pago)."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: payment_transaction_type
           - accepted_values:
               arguments:
                 values: ["authorization", "capture", "refund", "void"]
@@ -1440,7 +1497,10 @@ models:
             "pending": "A operação aguarda resposta; ainda não foi aceita nem recusada."
             "succeeded": "A operação foi aceita."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: payment_transaction_result
           - accepted_values:
               arguments:
                 values: ["failed", "pending", "succeeded"]
@@ -1457,7 +1517,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -1516,7 +1579,10 @@ models:
             "GW-OK": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
             "GW-TIMEOUT": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: gateway_response_code
           - accepted_values:
               arguments:
                 values: ["00", "05", "51", "57", "91", "GW-OK", "GW-TIMEOUT"]
@@ -1619,7 +1685,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -1710,7 +1779,10 @@ models:
             "rejected": "Reembolso recusado; o valor não volta."
             "requested": "Reembolso pedido, ainda não decidido."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: refund_status
           - accepted_values:
               arguments:
                 values: ["completed", "rejected", "requested"]
@@ -1798,7 +1870,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -1847,7 +1922,10 @@ models:
             "placed": "Ordem enviada ao fornecedor, sem recebimento concluído."
             "received": "Toda a quantidade pedida chegou em recebimento concluído."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: purchase_order_status
           - accepted_values:
               arguments:
                 values: ["cancelled", "draft", "partially_received", "placed", "received"]
@@ -2011,7 +2089,10 @@ models:
             "transfer_in": "Entrada por transferência entre armazéns (quantidade positiva); sempre em par com um `transfer_out`, pelo mesmo `correlation_id`."
             "transfer_out": "Saída por transferência entre armazéns (quantidade negativa); sempre em par com um `transfer_in`, pelo mesmo `correlation_id`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: inventory_movement_type
           - accepted_values:
               arguments:
                 values: ["adjustment_in", "adjustment_out", "customer_return", "purchase_receipt", "sale_dispatch", "supplier_return", "transfer_in", "transfer_out"]
@@ -2028,7 +2109,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -2053,7 +2137,10 @@ models:
             "sale": "Expedição de venda."
             "transfer": "Transferência entre armazéns."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: inventory_source_type
           - accepted_values:
               arguments:
                 values: ["adjustment", "purchase", "return", "sale", "transfer"]
@@ -2190,7 +2277,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -2363,7 +2453,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -2419,7 +2512,10 @@ models:
             "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
             "shipped": "Pedido despachado do armazém. É pedido realizado."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: order_status
           - accepted_values:
               arguments:
                 values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
@@ -2644,7 +2740,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -2695,7 +2794,10 @@ models:
             "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
             "shipped": "Pedido despachado do armazém. É pedido realizado."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: order_status
           - accepted_values:
               arguments:
                 values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
@@ -2913,7 +3015,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -2982,7 +3087,10 @@ models:
             "returned": "Pedido devolvido dentro do prazo de arrependimento, depois de entregue. Conta como pedido realizado; a devolução é outro fato."
             "shipped": "Pedido despachado do armazém. É pedido realizado."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: order_status
           - accepted_values:
               arguments:
                 values: ["cancelled", "delivered", "paid", "pending", "picking", "returned", "shipped"]
@@ -3074,7 +3182,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -3182,7 +3293,10 @@ models:
             "Logística": "Reúne a categoria Entrega (`delivery`)."
             "Pós-venda": "Reúne a categoria Devolução (`return`)."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: support_category_group
           - accepted_values:
               arguments:
                 values: ["Cadastro", "Catálogo", "Financeiro", "Geral", "Logística", "Pós-venda"]
@@ -3251,7 +3365,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -3325,7 +3442,10 @@ models:
             "reactivation": "Trazer de volta clientes inativos."
             "retention": "Manter os clientes atuais comprando."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: campaign_objective
           - accepted_values:
               arguments:
                 values: ["acquisition", "clearance", "reactivation", "retention"]
@@ -3423,7 +3543,10 @@ models:
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
             "unknown": "Membro desconhecido — Agente desconhecido — o evento cujo autor é o cliente, e o chamado que ainda não tem dono. Não é de origem nenhuma."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail", "unknown"]
@@ -3599,7 +3722,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -3631,7 +3757,10 @@ models:
             "fixed": "Desconto de valor fixo; o `discount_value` é em moeda."
             "percentage": "Desconto percentual; o `discount_value` é a porcentagem."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: discount_type
           - accepted_values:
               arguments:
                 values: ["fixed", "percentage"]
@@ -3650,7 +3779,10 @@ models:
             "reactivation": "Trazer de volta clientes inativos."
             "retention": "Manter os clientes atuais comprando."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: campaign_objective
           - accepted_values:
               arguments:
                 values: ["acquisition", "clearance", "reactivation", "retention"]
@@ -3832,7 +3964,10 @@ models:
             "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
             "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
           - accepted_values:
               arguments:
                 values: ["legacy", "retail"]
@@ -3868,7 +4003,10 @@ models:
             "product": "Produto — defeito, divergência ou dúvida sobre o item."
             "return": "Devolução — pedido de devolução, troca ou arrependimento."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: support_ticket_category
           - accepted_values:
               arguments:
                 values: ["account", "delivery", "other", "payment", "product", "return"]
@@ -3887,7 +4025,10 @@ models:
             "normal": "Prioridade normal."
             "urgent": "Prioridade urgente, a mais alta."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ticket_priority
           - accepted_values:
               arguments:
                 values: ["high", "low", "normal", "urgent"]
@@ -3907,7 +4048,10 @@ models:
             "resolved": "Chamado resolvido, ainda não fechado."
             "waiting_customer": "Chamado aguardando resposta do cliente."
         data_tests:
-          - not_null
+          - not_null:
+              config:
+                meta:
+                  value_domain: ticket_status
           - accepted_values:
               arguments:
                 values: ["closed", "in_progress", "open", "resolved", "waiting_customer"]

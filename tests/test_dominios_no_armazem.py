@@ -100,7 +100,12 @@ def test_a_linha_do_membro_desconhecido_tem_os_sentinelas_declarados(engine, cat
                 divergencias.append(f"{dimensao}: {len(linha)} linha(s) do membro desconhecido")
                 continue
             linha = linha[0]
-            esperadas = {c for c, v in linha.items() if (isinstance(v, str) and not c.endswith("_key"))
+            # O inventário é pelo tipo físico, não pelo valor da linha: a coluna de texto nula no membro também
+            # tem de estar declarada (RVB5A-1-04).
+            tipos = dict(conexao.execute(text(
+                "select column_name, data_type from information_schema.columns "
+                "where table_schema = 'analytics' and table_name = :t"), {"t": dimensao}).all())
+            esperadas = {c for c, tipo in tipos.items() if (tipo in vd.TEXT_TYPES and not c.endswith("_key"))
                          or c.endswith("_natural_key")}
             if esperadas != set(membro["columns"]):
                 divergencias.append(f"{dimensao}: colunas de texto da linha {sorted(esperadas)}, declaradas {sorted(membro['columns'])}")
