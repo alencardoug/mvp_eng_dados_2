@@ -749,7 +749,9 @@ ADR do formato sai depois das sondas do mecanismo (item 13), como na L5.
    medidas (por declaração ou por referência).
 9. **Quem é dono do quê** (RVB5-1-05). O `metricas.yml` é o dono da fórmula, do filtro, da data e do grão.
    Para o texto curto do BigQuery (F4), que é o começo do bloco `docs` até a marca, não mudar de sentido, a
-   regra operacional de cada conceito passa a ser um **trecho gerado** dentro do bloco, antes da marca,
+   regra operacional de cada conceito passa a ser um **trecho gerado** dentro do bloco, **depois** da marca
+   (Q30: antes dela, o curto estoura o limite de 1.024), com as medidas que a seção `concepts:` liga ao
+   conceito (Q31),
    escrito pelo `make catalog` a partir do YAML — o mecanismo dos trechos gerados do Dicionário — e o
    `make check` falha com o trecho atrasado. A prosa à mão fica com o porquê. O mesmo vale para o "como se
    conta" das Perguntas de Negócio: a regra vira trecho gerado, o porquê fica. O README do glossário ganha
@@ -1132,6 +1134,17 @@ desmentidos: F24 a F26.
 | **Q27** | Da rodada 1 da revisão do Bloco 5R (RVB5R-1-04): quando o código das correções e as guardas que dependem do dado novo entram no `main` | **Tudo no fim, num ramo**: o código, as invariantes *offline* e as guardas do dado novo são desenhados e medidos juntos, logo antes do ciclo, e entram no `main` com ele; o `main` e o `make check` ficam como estão até lá. Revê o "código antes do ciclo" que o plano dizia. Era a recomendada | O código e as invariantes antes, no `main`, e só as guardas no ramo |
 | **Q28** | Da mesma revisão (RVB5R-1-01): a reserva de estoque, que sorteia o SKU sem olhar o carrinho ou o pedido dela | **Entra na fila (F27)**: a reserva passa a ser de um SKU do carrinho ou do pedido dela. Era a recomendada | Só tirar o `draft` da reserva; deixar fora desta fase, nas Pendências |
 | **Q29** | Se as correções do gerador pedem ADR | **Não**: são correções de realismo dentro do ADR-0005, como as da v1.1.0; as regras vão à Geração §5, as invariantes ao Modelo de Dados §4, e as escolhas do Owner (a forma da V4, o mapa do F22) ficam neste §6. Era a recomendada | Um ADR da regeneração do Bloco 5R |
+
+### Rodada 8 — os trechos gerados da entrega 4 da Parte B: respondida em 15/11/2026
+
+Medido antes de perguntar (protótipo fora do repositório): o texto curto dos conceitos tem de 430 a 1.000
+caracteres; a regra gerada do `metricas.yml`, de 140 a 560, mais uns 85 dos marcadores.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q30** | Item 9: onde fica a regra gerada de cada conceito, se antes da marca ela estoura o limite de 1.024 do BigQuery (a receita líquida passaria de 1.400) e a regra do YAML é a da view, não a definição no grão da fato | **Dentro do bloco, depois da marca**: chega ao dbt docs e à descrição no pacote, com a guarda de trecho atrasado; o texto curto do BigQuery fica o de hoje, à mão. Revê o "antes da marca" do item 9. Era a recomendada | Antes da marca, tirando do curto o cálculo e o filtro à mão; fora do bloco, só no `.md` |
+| **Q31** | Como se declara que medidas e métricas cada conceito cobre | **Uma seção `concepts:` no `metricas.yml`**: arquivo do conceito → medidas e métricas. Os 7 conceitos de dimensão ou de view por referência ficam só com a prosa. Era a recomendada | `concepts:` em cada medida e métrica |
+| **Q32** | Onde o "como se conta" das Perguntas de Negócio vira trecho gerado | **Em toda pergunta montada** (10 views): a regra gerada abaixo da tabela — a data, os filtros e a combinação; o parágrafo à mão fica com o porquê; as 6 por referência dizem que são conferidas por referência. Era a recomendada | Só nas que já têm o parágrafo (P10, P15) |
 
 ## 7. Definição de pronto aplicada
 
