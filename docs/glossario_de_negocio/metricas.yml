@@ -1,0 +1,784 @@
+# As métricas das views de `consumption`, declaradas uma vez (ADR-0055; Bloco 5, Parte B, do
+# PLANO_base_dos_consumidores.md).
+#
+# É declaração: o Owner a revisa inteira (CLAUDE.md §5). O montador fixo (src/mvp_ed1/models/metrics.py)
+# monta o SQL de cada view **só** a partir daqui, e o teste o compara com a view auditada no Bloco 1b,
+# linha a linha. Nenhuma regra de negócio vive no Python: o que não cabe nesta forma aponta para a
+# referência do Bloco 1b (`reference:`).
+#
+# Cinco seções, cada uma citada pelo nome pelas seguintes:
+#   sources    a relação base de `analytics` com um apelido, as junções e a data que define o período
+#              (a coluna de data da fato que se liga a `dim_date`, sempre com o apelido `d`)
+#   filters    predicado SQL sobre os apelidos de uma fonte, com o rótulo e o conceito do glossário
+#   measures   um agregado sobre uma fonte, com os filtros dela, a aditividade e — na contagem distinta —
+#              a identidade contada
+#   metrics    a razão ou a diferença de medidas ou de outras métricas: a escala, o arredondamento e o
+#              que vale com o denominador zero
+#   views      o grão (coluna da view → expressão sobre os apelidos), as fontes com o grão de agregação de
+#              cada uma, a combinação entre elas e o papel de cada coluna, na ordem da view
+
+sources:
+
+  sales_items:
+    relation: analytics.fact_sales_order_item
+    alias: f
+    date: {column: date_key, label: a data do pedido}
+    joins:
+      - {relation: analytics.dim_sales_channel, alias: ch, using: [sales_channel_key]}
+      - {relation: analytics.dim_category, alias: cat, using: [category_key]}
+      - {relation: analytics.dim_customer, alias: c, using: [customer_key]}
+      - {relation: analytics.dim_geography, alias: g, using: [geography_key]}
+
+  cart_events:
+    relation: analytics.fact_cart_event
+    alias: f
+    date: {column: cart_created_date_key, label: a criação do carrinho}
+    joins:
+      - {relation: analytics.dim_sales_channel, alias: ch, using: [sales_channel_key]}
+
+  sale_dispatches:
+    relation: analytics.fact_inventory_movement
+    alias: m
+    date: {column: date_key, label: a data do movimento}
+    joins:
+      - {relation: analytics.dim_product, alias: p, using: [product_key]}
+      # A origem entra na ligação com a categoria: sem ela cada SKU encontra também a categoria homônima
+      # da outra origem, e o custo se multiplica.
+      - {relation: analytics.dim_category, alias: cat, match: [[cat.source_system, p.source_system], [cat.category_natural_key, p.product_category_id]]}
+
+  refunds:
+    relation: analytics.fact_refund
+    alias: f
+    date: {column: date_key, label: a data do reembolso}
+    joins:
+      - {relation: analytics.dim_payment_method, alias: pm, using: [payment_method_key]}
+
+  payment_transactions:
+    relation: analytics.fact_payment_transaction
+    alias: t
+    date: {column: date_key, label: a data da transação}
+    joins:
+      - {relation: analytics.dim_payment_method, alias: pm, using: [payment_method_key]}
+
+  shipments:
+    relation: analytics.fact_shipment
+    alias: f
+    date: {column: delivered_date_key, label: a data da entrega}
+    joins:
+      - {relation: analytics.dim_carrier, alias: c, using: [carrier_key]}
+      - {relation: analytics.dim_warehouse, alias: w, using: [warehouse_key]}
+      - {relation: analytics.dim_geography, alias: g, using: [geography_key]}
+
+  ticket_events:
+    relation: analytics.fact_support_ticket_event
+    alias: f
+    date: {column: date_key, label: a abertura do chamado}
+    joins:
+      - {relation: analytics.dim_sales_channel, alias: ch, using: [sales_channel_key]}
+      - {relation: analytics.dim_support_category, alias: cat, using: [support_category_key]}
+
+  order_events:
+    relation: analytics.fact_order_status_event
+    alias: f
+    date: {column: date_key, label: a criação do pedido}
+    joins:
+      - {relation: analytics.dim_sales_channel, alias: ch, using: [sales_channel_key]}
+
+filters:
+
+  realised_order:
+    source: sales_items
+    predicate: f.is_realised
+    label: Só pedido realizado — pago, em separação, enviado, entregue ou devolvido.
+    concept: receita_liquida.md
+
+  sale_dispatch:
+    source: sale_dispatches
+    predicate: m.is_sale
+    label: Só a saída por venda expedida.
+    concept: custo_do_produto_vendido.md
+
+  delivered_shipment:
+    source: shipments
+    predicate: f.is_delivered
+    label: Só a remessa entregue (ADR-0053, D66).
+    concept: entrega_no_prazo.md
+
+  closed_cycle_order:
+    source: shipments
+    predicate: f.is_order_cycle_closed and f.is_cycle_closing_shipment
+    label: Só o pedido de ciclo fechado, na remessa que fechou o ciclo.
+    concept: ciclo_de_entrega.md
+
+  ticket_creation:
+    source: ticket_events
+    predicate: f.is_ticket_creation
+    label: Um chamado é contado uma vez, pelo evento de abertura.
+    concept: perguntas_de_negocio.md
+
+  realised_order_creation:
+    source: order_events
+    predicate: f.is_order_creation and f.is_realised
+    label: O pedido realizado, pelo evento de criação; inclusive o de itens rejeitados em cascata (F21).
+    concept: receita_liquida.md
+
+measures:
+
+  order_count:
+    source: sales_items
+    aggregate: count_distinct
+    identity: [f.source_system, f.order_id]
+    filters: [realised_order]
+    additivity: non_additive
+  unit_count:
+    source: sales_items
+    aggregate: sum
+    expression: f.quantity
+    filters: [realised_order]
+    additivity: additive
+  gross_revenue_amount:
+    source: sales_items
+    aggregate: sum
+    expression: f.gross_revenue_amount
+    filters: [realised_order]
+    additivity: additive
+  discount_amount:
+    source: sales_items
+    aggregate: sum
+    expression: f.discount_amount
+    filters: [realised_order]
+    additivity: additive
+  net_revenue_amount:
+    source: sales_items
+    aggregate: sum
+    expression: f.net_revenue_amount
+    filters: [realised_order]
+    additivity: additive
+  customer_version_count:
+    source: sales_items
+    aggregate: count_distinct
+    identity: [f.customer_key]
+    filters: [realised_order]
+    additivity: non_additive
+
+  cart_count:
+    source: cart_events
+    aggregate: sum
+    expression: f.cart_count
+    additivity: additive
+  closed_cart_count:
+    source: cart_events
+    aggregate: sum
+    expression: f.closed_cart_count
+    additivity: additive
+  converted_cart_count:
+    source: cart_events
+    aggregate: sum
+    expression: f.converted_cart_count
+    additivity: additive
+  abandoned_cart_count:
+    source: cart_events
+    aggregate: sum
+    expression: f.abandoned_cart_count
+    additivity: additive
+  cart_value_amount:
+    source: cart_events
+    aggregate: sum
+    expression: f.cart_value_amount
+    additivity: additive
+  abandoned_value_amount:
+    source: cart_events
+    aggregate: sum
+    expression: f.abandoned_value_amount
+    additivity: additive
+
+  cost_of_goods_sold:
+    source: sale_dispatches
+    aggregate: sum
+    expression: m.cogs_amount
+    filters: [sale_dispatch]
+    additivity: additive
+  dispatched_unit_count:
+    source: sale_dispatches
+    aggregate: sum
+    expression: m.quantity_out
+    filters: [sale_dispatch]
+    additivity: additive
+
+  refund_count:
+    source: refunds
+    aggregate: sum
+    expression: f.refund_count
+    additivity: additive
+  refunded_amount:
+    source: refunds
+    aggregate: sum
+    expression: f.completed_refund_amount
+    additivity: additive
+
+  captured_amount:
+    source: payment_transactions
+    aggregate: sum
+    expression: t.captured_amount
+    additivity: additive
+
+  delivered_count:
+    source: shipments
+    aggregate: count
+    filters: [delivered_shipment]
+    additivity: additive
+  on_time_count:
+    source: shipments
+    aggregate: count_where
+    where: f.is_on_time
+    filters: [delivered_shipment]
+    additivity: additive
+  late_count:
+    source: shipments
+    aggregate: count_where
+    where: not f.is_on_time
+    filters: [delivered_shipment]
+    additivity: additive
+  split_order_shipment_count:
+    source: shipments
+    aggregate: count_where
+    where: f.is_split_order
+    filters: [delivered_shipment]
+    additivity: additive
+  avg_delay_days_when_late:
+    source: shipments
+    aggregate: avg
+    expression: f.delivery_delay_days
+    where: not f.is_on_time
+    round: 4
+    filters: [delivered_shipment]
+    additivity: non_additive
+  avg_transit_days:
+    source: shipments
+    aggregate: avg
+    expression: f.transit_days
+    round: 4
+    filters: [delivered_shipment]
+    additivity: non_additive
+  failed_attempt_count:
+    source: shipments
+    aggregate: sum
+    expression: f.failed_attempt_count
+    cast: numeric
+    filters: [delivered_shipment]
+    additivity: additive
+
+  closed_cycle_order_count:
+    source: shipments
+    aggregate: count
+    filters: [closed_cycle_order]
+    additivity: additive
+  closed_cycle_split_order_count:
+    source: shipments
+    aggregate: count_where
+    where: f.is_split_order
+    filters: [closed_cycle_order]
+    additivity: additive
+  closed_cycle_shipment_count:
+    source: shipments
+    aggregate: sum
+    expression: f.order_shipment_count
+    cast: numeric
+    filters: [closed_cycle_order]
+    additivity: additive
+  avg_order_to_delivery_days:
+    source: shipments
+    aggregate: avg
+    expression: f.order_to_delivery_days
+    round: 4
+    filters: [closed_cycle_order]
+    additivity: non_additive
+  median_order_to_delivery_days:
+    source: shipments
+    aggregate: median
+    expression: f.order_to_delivery_days
+    cast: numeric
+    round: 4
+    filters: [closed_cycle_order]
+    additivity: non_additive
+  max_order_to_delivery_days:
+    source: shipments
+    aggregate: max
+    expression: f.order_to_delivery_days
+    round: 4
+    filters: [closed_cycle_order]
+    additivity: non_additive
+
+  ticket_count:
+    source: ticket_events
+    aggregate: count
+    filters: [ticket_creation]
+    additivity: additive
+  high_priority_ticket_count:
+    source: ticket_events
+    aggregate: count_where
+    where: f.ticket_priority in ('high', 'urgent')
+    filters: [ticket_creation]
+    additivity: additive
+  reopened_ticket_count:
+    source: ticket_events
+    aggregate: count_where
+    where: f.was_reopened
+    filters: [ticket_creation]
+    additivity: additive
+  solved_first_time_count:
+    source: ticket_events
+    aggregate: count_where
+    where: f.is_solved_first_time
+    filters: [ticket_creation]
+    additivity: additive
+  avg_hours_to_resolution:
+    source: ticket_events
+    aggregate: avg
+    expression: f.hours_to_resolution
+    round: 2
+    filters: [ticket_creation]
+    additivity: non_additive
+  channel_order_count:
+    source: order_events
+    aggregate: count_distinct
+    identity: [f.source_system, f.order_id]
+    cast: numeric
+    filters: [realised_order_creation]
+    additivity: non_additive
+
+metrics:
+
+  average_order_value:
+    kind: ratio
+    numerator: net_revenue_amount
+    denominator: order_count
+    round: 2
+    zero_denominator: "null"
+  discount_share_pct:
+    kind: ratio
+    numerator: discount_amount
+    denominator: gross_revenue_amount
+    scale: 100
+    round: 2
+    zero_denominator: "null"
+  cart_conversion_rate_pct:
+    kind: ratio
+    numerator: converted_cart_count
+    denominator: closed_cart_count
+    scale: 100
+    round: 2
+    zero_denominator: "null"
+  gross_profit_amount:
+    kind: difference
+    minuend: net_revenue_amount
+    subtrahend: cost_of_goods_sold
+  gross_margin_pct:
+    kind: ratio
+    numerator: gross_profit_amount
+    denominator: net_revenue_amount
+    scale: 100
+    round: 2
+    zero_denominator: "null"
+  on_time_rate:
+    kind: ratio
+    numerator: on_time_count
+    denominator: delivered_count
+    round: 4
+    zero_denominator: "null"
+  tickets_per_hundred_orders:
+    kind: ratio
+    numerator: ticket_count
+    denominator: channel_order_count
+    scale: 100
+    round: 4
+    zero_denominator: "null"
+  refund_rate_pct:
+    kind: ratio
+    numerator: refunded_amount
+    denominator: captured_amount
+    scale: 100
+    round: 2
+    zero_denominator: "null"
+
+views:
+
+  monthly_revenue_by_channel_and_category:
+    question: P01
+    grain:
+      year_month: d.year_month
+      year_number: d.year_number
+      month_number: d.month_number
+      sales_channel_name: ch.sales_channel_name
+      channel_type: ch.channel_type
+      root_category_name: cat.root_category_name
+      category_name: cat.category_name
+    sources:
+      - {source: sales_items}
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      sales_channel_name: grain
+      channel_type: grain
+      root_category_name: grain
+      category_name: grain
+      order_count: measure
+      unit_count: measure
+      gross_revenue_amount: measure
+      discount_amount: measure
+      net_revenue_amount: measure
+
+  average_order_value_by_channel_and_segment:
+    question: P02
+    grain:
+      year_month: d.year_month
+      year_number: d.year_number
+      month_number: d.month_number
+      sales_channel_name: ch.sales_channel_name
+      customer_segment_name: c.customer_segment_name
+    sources:
+      - {source: sales_items}
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      sales_channel_name: grain
+      customer_segment_name: grain
+      order_count: measure
+      net_revenue_amount: measure
+      average_order_value: metric
+
+  revenue_by_delivery_region:
+    question: P05
+    grain:
+      year_number: d.year_number
+      quarter_number: d.quarter_number
+      year_quarter: "d.year_number || '-T' || d.quarter_number"
+      region: g.region
+      state_code: g.state_code
+      state_name: g.state_name
+      sales_channel_name: ch.sales_channel_name
+    sources:
+      - {source: sales_items}
+    columns:
+      year_number: grain
+      quarter_number: grain
+      year_quarter: grain
+      region: grain
+      state_code: grain
+      state_name: grain
+      sales_channel_name: grain
+      order_count: measure
+      customer_version_count: measure
+      unit_count: measure
+      net_revenue_amount: measure
+
+  discount_share_by_channel:
+    question: P06
+    grain:
+      year_month: d.year_month
+      year_number: d.year_number
+      month_number: d.month_number
+      sales_channel_name: ch.sales_channel_name
+      channel_type: ch.channel_type
+      root_category_name: cat.root_category_name
+    sources:
+      - {source: sales_items}
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      sales_channel_name: grain
+      channel_type: grain
+      root_category_name: grain
+      order_count: measure
+      gross_revenue_amount: measure
+      discount_amount: measure
+      net_revenue_amount: measure
+      discount_share_pct: metric
+
+  cart_conversion_rate_by_channel:
+    question: P07
+    grain:
+      year_month: d.year_month
+      year_number: d.year_number
+      month_number: d.month_number
+      sales_channel_name: ch.sales_channel_name
+      channel_type: ch.channel_type
+    sources:
+      - {source: cart_events}
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      sales_channel_name: grain
+      channel_type: grain
+      cart_count: measure
+      closed_cart_count: measure
+      converted_cart_count: measure
+      abandoned_cart_count: measure
+      cart_conversion_rate_pct: metric
+      cart_value_amount: measure
+      abandoned_value_amount: measure
+
+  gross_margin_by_category:
+    question: P08
+    grain:
+      year_month: d.year_month
+      year_number: d.year_number
+      month_number: d.month_number
+      root_category_name: cat.root_category_name
+      category_name: cat.category_name
+    sources:
+      - {source: sales_items, measures: [net_revenue_amount, unit_count]}
+      - {source: sale_dispatches, measures: [cost_of_goods_sold, dispatched_unit_count]}
+    # Drill across (ADR-0030): cada fato agregada no próprio grão até mês e categoria, e só então as duas
+    # se combinam; o mês com um lado só aparece, com zero no lado ausente.
+    combine: {type: full, keys: [year_month, category_name], missing: 0}
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      root_category_name: grain
+      category_name: grain
+      net_revenue_amount: measure
+      cost_of_goods_sold: measure
+      gross_profit_amount: metric
+      gross_margin_pct: metric
+      unit_count: measure
+      dispatched_unit_count: measure
+
+  refund_rate_by_reason:
+    question: P10
+    grain:
+      year_month: d.year_month
+      year_number: d.year_number
+      month_number: d.month_number
+      payment_method_name: pm.payment_method_name
+      refund_reason: "coalesce(f.refund_reason, 'Sem motivo registrado')"
+    sources:
+      - {source: refunds, measures: [refund_count, refunded_amount]}
+      # O denominador é o capturado do mês e do meio do reembolso: a fonte não tem o motivo, e o valor dela
+      # se repete em cada motivo do mesmo mês e meio.
+      - {source: payment_transactions, measures: [captured_amount], grain: [year_month, payment_method_name]}
+    combine: {type: left, keys: [year_month, payment_method_name], missing: 0}
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      payment_method_name: grain
+      refund_reason: grain
+      refund_count: measure
+      refunded_amount: measure
+      captured_amount: measure
+      refund_rate_pct: metric
+
+  on_time_delivery_rate_by_carrier:
+    question: P13
+    grain:
+      year_number: d.year_number
+      month_number: d.month_number
+      year_month: d.year_month
+      carrier_name: c.carrier_name
+      service_level: c.service_level
+      warehouse_name: w.warehouse_name
+      warehouse_region: w.warehouse_region
+    sources:
+      - {source: shipments}
+    columns:
+      year_number: grain
+      month_number: grain
+      year_month: grain
+      carrier_name: grain
+      service_level: grain
+      warehouse_name: grain
+      warehouse_region: grain
+      delivered_count: measure
+      on_time_count: measure
+      late_count: measure
+      split_order_shipment_count: measure
+      on_time_rate: metric
+      avg_delay_days_when_late: measure
+      avg_transit_days: measure
+      failed_attempt_count: measure
+
+  order_to_delivery_time_by_region:
+    question: P14
+    grain:
+      year_number: d.year_number
+      month_number: d.month_number
+      year_month: d.year_month
+      region: g.region
+      state_code: g.state_code
+      service_level: c.service_level
+      carrier_name: c.carrier_name
+    sources:
+      - {source: shipments}
+    columns:
+      year_number: grain
+      month_number: grain
+      year_month: grain
+      region: grain
+      state_code: grain
+      service_level: grain
+      carrier_name: grain
+      order_count: {measure: closed_cycle_order_count}
+      split_order_count: {measure: closed_cycle_split_order_count}
+      shipment_count: {measure: closed_cycle_shipment_count}
+      avg_order_to_delivery_days: measure
+      median_order_to_delivery_days: measure
+      max_order_to_delivery_days: measure
+
+  support_tickets_per_hundred_orders:
+    question: P15
+    grain:
+      year_number: d.year_number
+      month_number: d.month_number
+      year_month: d.year_month
+      sales_channel_name: ch.sales_channel_name
+      channel_type: ch.channel_type
+      support_category_name: cat.support_category_name
+      support_category_group: cat.support_category_group
+    sources:
+      - {source: ticket_events}
+      # O denominador são os pedidos do mês e do canal, pelo nome (F1): a fonte não tem a categoria do
+      # chamado, e o valor se repete em cada categoria do mesmo mês e canal.
+      - {source: order_events, grain: [year_month, sales_channel_name]}
+    # O mês e o canal sem pedido ficam com o denominador nulo, e a taxa também: `missing` não declarado.
+    combine: {type: left, keys: [year_month, sales_channel_name]}
+    columns:
+      year_number: grain
+      month_number: grain
+      year_month: grain
+      sales_channel_name: grain
+      channel_type: grain
+      support_category_name: grain
+      support_category_group: grain
+      ticket_count: measure
+      high_priority_ticket_count: measure
+      reopened_ticket_count: measure
+      solved_first_time_count: measure
+      channel_order_count: measure
+      tickets_per_hundred_orders: metric
+      avg_hours_to_resolution: measure
+
+  top_skus_by_revenue:
+    question: P03
+    reference:
+      test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
+      query: tests/auditoria/top_skus_by_revenue.sql
+      reason: O ranking e o corte — `rank()` sobre a receita dentro da categoria, e a participação na receita da categoria — não cabem no montador.
+    columns:
+      revenue_rank: reference
+      product_natural_key: identity
+      sku: identity
+      product_name: grain
+      category_name: grain
+      root_category_name: grain
+      brand_name: grain
+      is_deleted: grain
+      unit_count: reference
+      net_revenue_amount: reference
+      category_net_revenue_amount: reference
+      category_revenue_share_pct: reference
+
+  new_and_repeat_customers_by_month:
+    question: P04
+    reference:
+      test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
+      query: tests/auditoria/new_and_repeat_customers_by_month.sql
+      reason: A estreia e a recompra saem de uma janela sobre a ordem dos pedidos realizados de cada cliente (F18), que o montador não faz.
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      sales_channel_name: grain
+      customer_segment_name: grain
+      new_customer_count: reference
+      returning_customer_count: reference
+      repeat_purchase_rate_pct: reference
+
+  payment_approval_rate_by_method:
+    question: P09
+    reference:
+      test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
+      query: tests/auditoria/payment_approval_rate_by_method.sql
+      reason: O capturado é atribuído à primeira autorização aprovada do pagamento (D67), por uma janela; as tentativas e a aprovação vêm da mesma leitura.
+    columns:
+      year_month: grain
+      year_number: grain
+      month_number: grain
+      payment_method_name: grain
+      method_type: grain
+      installments: identity
+      is_instalment_plan: grain
+      authorization_attempt_count: reference
+      approved_authorization_count: reference
+      approval_rate_pct: reference
+      authorized_amount: reference
+      captured_amount: reference
+
+  inventory_turnover_by_sku_and_warehouse:
+    question: P11
+    reference:
+      test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
+      query: tests/auditoria/inventory_turnover_by_sku_and_warehouse.sql
+      reason: O giro é pelo estoque médio do trimestre (ADR-0052), reconstruído dia a dia a partir do livro; o montador agrega, não reconstrói saldo.
+    columns:
+      year_number: grain
+      quarter_number: grain
+      year_quarter: grain
+      sku: identity
+      product_name: grain
+      category_name: grain
+      warehouse_name: grain
+      warehouse_region: grain
+      quantity_out: reference
+      cost_of_goods_sold: reference
+      avg_quantity_on_hand: reference
+      avg_inventory_value_amount: reference
+      inventory_turnover: reference
+
+  skus_below_reorder_point:
+    question: P12
+    reference:
+      test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
+      query: tests/auditoria/skus_below_reorder_point.sql
+      reason: O saldo de agora é o do lote mais os deltas do caminho quente, e a demanda diária e a cobertura saem de janelas sobre o livro; nada disso é agregado de uma fonte.
+    columns:
+      warehouse_name: grain
+      warehouse_region: grain
+      sku: identity
+      product_name: grain
+      category_name: grain
+      brand_name: grain
+      quantity_on_hand: reference
+      quantity_reserved: reference
+      quantity_available: reference
+      quantity_from_batch: reference
+      quantity_from_stream: reference
+      stream_movement_count: reference
+      reorder_point: reference
+      is_stockout: reference
+      daily_demand_units: reference
+      days_of_cover: reference
+      last_movement_at: reference
+
+  repeat_purchase_rate_after_support:
+    question: P16
+    reference:
+      test: tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia
+      query: tests/auditoria/repeat_purchase_rate_after_support.sql
+      reason: O pedido seguinte de cada cliente, dentro da janela, sai de uma janela sobre os pedidos realizados; o montador não ordena pedidos.
+    columns:
+      year_number: grain
+      month_number: grain
+      year_month: grain
+      sales_channel_name: grain
+      has_support_ticket: grain
+      support_category_name: grain
+      order_count: reference
+      repeat_order_count: reference
+      repeat_purchase_rate: reference
+      avg_days_to_next_order: reference

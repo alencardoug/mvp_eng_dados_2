@@ -38,6 +38,12 @@ colunas que a implementam.
 - O significado de cada **valor** de uma coluna (o estado do pedido, o tipo do movimento) não vive nos
   `.md`: vive no catálogo [`dominios.yml`](dominios.yml), declarado uma vez, de onde o `make catalog` o
   deriva nas colunas ([Governança §5.1](../governanca_de_dados.md#51-padrão-de-metadados)).
+- A **regra operacional** de cada métrica — a fonte, a data do período, o filtro, o grão, a fórmula, a escala e
+  o arredondamento — vive no catálogo [`metricas.yml`](metricas.yml), declarada uma vez
+  ([ADR-0055](../adr/0055-dominios-e-metricas-declarados-uma-vez.md)). Um montador fixo
+  (`models/metrics.py`) monta dele o SQL de cada view, e `tests/test_metricas_no_armazem.py` o compara com a
+  view auditada, linha a linha; a view que não cabe na forma aponta para a referência do Bloco 1b. Os `.md`
+  ficam com o porquê.
 
 ### 2.1 Formato
 

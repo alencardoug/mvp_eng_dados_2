@@ -1,0 +1,300 @@
+"""O montador fixo das métricas (ADR-0055; Bloco 5, Parte B, do plano da base dos consumidores).
+
+Monta o SQL de cada view **só** a partir de `docs/glossario_de_negocio/metricas.yml`, para o teste o comparar
+com a view auditada, linha a linha. A forma é uma só, e o ADR a descreve:
+
+1. para cada fonte da view: ``select <grão da fonte>, <medidas> from <fonte> <junções> where <filtros>
+   group by <grão da fonte>`` — a data liga a fato a `dim_date` (`d`), e só entram as junções que a view
+   usa, com as de que elas dependem;
+2. as fontes combinadas pela regra declarada (`full` ou `left`, pelas colunas de `keys`), com o valor de
+   `missing` no lado ausente; a fonte de grão mais curto se repete em cada linha do grão mais longo;
+3. as métricas por cima, sobre os nomes das medidas: a razão (`cast(<escala> as numeric) * num /
+   nullif(den, 0)`, arredondada) e a diferença.
+
+Nenhuma regra de negócio vive aqui: o filtro, a data, o grão, a fórmula, a escala e o arredondamento são da
+declaração. O que não cabe nesta forma não se monta: a coluna aponta para a referência do Bloco 1b.
+"""
+
+from __future__ import annotations
+
+import pathlib
+import re
+
+import yaml
+
+from mvp_ed1.models import sensitivity
+
+CATALOG_RELATIVE = pathlib.Path("docs") / "glossario_de_negocio" / "metricas.yml"
+CATALOG = sensitivity.ROOT / CATALOG_RELATIVE
+ROLES = ("grain", "identity", "measure", "metric", "reference")
+AGGREGATES = ("sum", "count", "count_distinct", "count_where", "avg", "max", "median")
+
+
+def load_catalog(caminho: pathlib.Path = CATALOG, conteudo: str | None = None) -> dict:
+    """O catálogo, lido estrito (chave repetida é erro) e conferido nas referências entre as seções."""
+    texto = caminho.read_text(encoding="utf-8") if conteudo is None else conteudo
+    # O carregador estrito do catálogo dos `.yml` (chave repetida é erro), sem a leitura de `sources` do dbt.
+    doc = yaml.load(texto, Loader=sensitivity._SemChaveRepetida) or {}
+    for secao in ("sources", "filters", "measures", "metrics", "views"):
+        if not isinstance(doc.get(secao), dict):
+            raise ValueError(f"{caminho}: sem `{secao}`")
+    # `on:` no YAML 1.1 é o booleano `True`: a junção e a combinação usam `match` e `keys`.
+    for nome, fonte in doc["sources"].items():
+        if any(True in j for j in fonte.get("joins") or []):
+            raise ValueError(f"{caminho}: fonte `{nome}`: `on` vira booleano no YAML — escreva `match`")
+    for nome, view in doc["views"].items():
+        if True in (view.get("combine") or {}):
+            raise ValueError(f"{caminho}: view `{nome}`: `on` vira booleano no YAML — escreva `keys`")
+    for nome, filtro in doc["filters"].items():
+        if filtro.get("source") not in doc["sources"]:
+            raise ValueError(f"{caminho}: filtro `{nome}` cita a fonte `{filtro.get('source')}`, que não existe")
+        if not filtro.get("predicate") or not filtro.get("label"):
+            raise ValueError(f"{caminho}: filtro `{nome}` sem `predicate` e `label`")
+    for nome, medida in doc["measures"].items():
+        if medida.get("source") not in doc["sources"]:
+            raise ValueError(f"{caminho}: medida `{nome}` cita a fonte `{medida.get('source')}`, que não existe")
+        if medida.get("aggregate") not in AGGREGATES:
+            raise ValueError(f"{caminho}: medida `{nome}`: `aggregate` é um de {AGGREGATES}")
+        if medida["aggregate"] == "count_distinct" and not medida.get("identity"):
+            raise ValueError(f"{caminho}: medida `{nome}`: contagem distinta sem `identity`")
+        if medida["aggregate"] in ("sum", "avg", "max", "median") and not medida.get("expression"):
+            raise ValueError(f"{caminho}: medida `{nome}`: `{medida['aggregate']}` sem `expression`")
+        if medida["aggregate"] == "count_where" and not medida.get("where"):
+            raise ValueError(f"{caminho}: medida `{nome}`: contagem condicional sem `where`")
+        if medida.get("cast") not in (None, "numeric"):
+            raise ValueError(f"{caminho}: medida `{nome}`: `cast` só é `numeric`")
+        if medida.get("additivity") not in ("additive", "semi_additive", "non_additive"):
+            raise ValueError(f"{caminho}: medida `{nome}` sem `additivity`")
+        for f in medida.get("filters") or []:
+            if f not in doc["filters"] or doc["filters"][f]["source"] != medida["source"]:
+                raise ValueError(f"{caminho}: medida `{nome}`: o filtro `{f}` não é da fonte dela")
+    for nome, metrica in doc["metrics"].items():
+        partes = {"ratio": ("numerator", "denominator"), "difference": ("minuend", "subtrahend")}.get(metrica.get("kind"))
+        if partes is None:
+            raise ValueError(f"{caminho}: métrica `{nome}`: `kind` é `ratio` ou `difference`")
+        for parte in partes:
+            if metrica.get(parte) not in doc["measures"] and metrica.get(parte) not in doc["metrics"]:
+                raise ValueError(f"{caminho}: métrica `{nome}`: `{parte}` não é medida nem métrica")
+        if metrica["kind"] == "ratio" and metrica.get("zero_denominator") != "null":
+            raise ValueError(f"{caminho}: métrica `{nome}`: o denominador zero dá nulo (`zero_denominator: \"null\"`)")
+    for nome, view in doc["views"].items():
+        _conferir_view(caminho, doc, nome, view)
+    return doc
+
+
+def _conferir_view(caminho, doc, nome, view) -> None:
+    if "reference" in view:
+        _conferir_referencia(caminho, nome, view)
+        return
+    fontes = view.get("sources") or []
+    if not fontes or not view.get("grain") or not view.get("columns"):
+        raise ValueError(f"{caminho}: view `{nome}` sem `grain`, `sources` ou `columns`")
+    for f in fontes:
+        if f["source"] not in doc["sources"]:
+            raise ValueError(f"{caminho}: view `{nome}` cita a fonte `{f['source']}`, que não existe")
+        if fora := sorted(set(f.get("grain") or []) - set(view["grain"])):
+            raise ValueError(f"{caminho}: view `{nome}`: o grão da fonte `{f['source']}` tem {fora}, fora do grão da view")
+    if len(fontes) > 1:
+        combina = view.get("combine") or {}
+        if combina.get("type") not in ("full", "left") or not combina.get("keys"):
+            raise ValueError(f"{caminho}: view `{nome}` com duas fontes e sem `combine` (`full` ou `left`, `keys`)")
+        if len(fontes) != 2:
+            raise ValueError(f"{caminho}: view `{nome}`: o montador combina duas fontes")
+    for coluna, papel in view["columns"].items():
+        papel_nome, alvo = role(coluna, papel)
+        if papel_nome not in ROLES:
+            raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: papel `{papel_nome}` não é um de {ROLES}")
+        if papel_nome == "grain" and coluna not in view["grain"]:
+            raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: grão sem expressão em `grain`")
+        if papel_nome == "measure" and alvo not in doc["measures"]:
+            raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: medida `{alvo}` não declarada")
+        if papel_nome == "metric" and alvo not in doc["metrics"]:
+            raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: métrica `{alvo}` não declarada")
+    if faltam := sorted(set(view["grain"]) - set(view["columns"])):
+        raise ValueError(f"{caminho}: view `{nome}`: grão {faltam} sem coluna")
+    if "reference" in {role(c, p)[0] for c, p in view["columns"].items()}:
+        raise ValueError(f"{caminho}: view `{nome}`: coluna `reference` numa view montada — a view inteira aponta para a referência")
+
+
+def _conferir_referencia(caminho, nome, view) -> None:
+    """A view que não cabe na forma: o teste e a consulta do Bloco 1b que a conferem, com o motivo."""
+    ref = view["reference"]
+    if not isinstance(ref, dict) or not ref.get("test") or not ref.get("query") or not ref.get("reason"):
+        raise ValueError(f"{caminho}: view `{nome}`: `reference` com `test`, `query` e `reason`")
+    if not view.get("columns"):
+        raise ValueError(f"{caminho}: view `{nome}` sem `columns`")
+    for coluna, papel in view["columns"].items():
+        if role(coluna, papel)[0] not in ("grain", "identity", "reference"):
+            raise ValueError(f"{caminho}: view `{nome}`, coluna `{coluna}`: numa view por referência, o papel é `grain`, `identity` ou `reference`")
+    if view.get("sources") or view.get("grain"):
+        raise ValueError(f"{caminho}: view `{nome}`: `reference` não se monta — tire `sources` e `grain`")
+
+
+def role(coluna: str, papel) -> tuple[str, str]:
+    """(papel, nome declarado): `measure` é a medida do mesmo nome; `{measure: x}`, a medida `x`."""
+    if isinstance(papel, str):
+        return papel, coluna
+    (nome, alvo), = papel.items()
+    return nome, alvo
+
+
+# ── A montagem ──────────────────────────────────────────────────────────────────────
+
+_APELIDO = re.compile(r"\b([a-z_][a-z0-9_]*)\.[a-z_]")
+
+
+def _apelidos(texto: str) -> set[str]:
+    return set(_APELIDO.findall(texto))
+
+
+def _medidas_da_fonte(doc: dict, view: dict, fonte: dict) -> list[str]:
+    """As medidas que a fonte agrega nesta view: as declaradas nela, ou todas as da view desta fonte."""
+    if fonte.get("measures"):
+        return list(fonte["measures"])
+    usadas = _medidas_usadas(doc, view)
+    return [m for m in usadas if doc["measures"][m]["source"] == fonte["source"]]
+
+
+def _medidas_usadas(doc: dict, view: dict) -> list[str]:
+    saida: list[str] = []
+
+    def visitar(nome: str) -> None:
+        if nome in doc["measures"]:
+            if nome not in saida:
+                saida.append(nome)
+            return
+        metrica = doc["metrics"][nome]
+        for parte in ("numerator", "denominator", "minuend", "subtrahend"):
+            if parte in metrica:
+                visitar(metrica[parte])
+
+    for coluna, papel in view["columns"].items():
+        papel_nome, alvo = role(coluna, papel)
+        if papel_nome in ("measure", "metric"):
+            visitar(alvo)
+    return saida
+
+
+def _agregado(medida: dict) -> str:
+    """O agregado da medida: a função, a condição da própria medida (`where`), o `cast` e o `round`, nesta ordem."""
+    tipo = medida["aggregate"]
+    if tipo == "count_distinct":
+        identidade = medida["identity"]
+        sql = f"count(distinct ({', '.join(identidade)}))" if len(identidade) > 1 else f"count(distinct {identidade[0]})"
+    elif tipo in ("count", "count_where"):
+        sql = "count(*)"
+    elif tipo == "median":
+        sql = f"percentile_cont(0.5) within group (order by {medida['expression']})"
+    else:
+        sql = f"{tipo}({medida['expression']})"
+    if medida.get("where"):
+        sql = f"{sql} filter (where {medida['where']})"
+    if medida.get("cast"):
+        sql = f"cast({sql} as {medida['cast']})"
+    if medida.get("round") is not None:
+        sql = f"round({sql}, {medida['round']})"
+    return sql
+
+
+def _cte_da_fonte(doc: dict, view: dict, fonte: dict) -> tuple[str, list[str], list[str]]:
+    """(SQL, grão, medidas) da agregação de uma fonte no grão dela."""
+    declarada = doc["sources"][fonte["source"]]
+    grao = list(fonte.get("grain") or view["grain"])
+    medidas = _medidas_da_fonte(doc, view, fonte)
+    filtros = []
+    for m in medidas:
+        for f in doc["measures"][m].get("filters") or []:
+            if f not in filtros:
+                filtros.append(f)
+    # Medidas da mesma fonte com filtros diferentes não cabem num `where` só: fora da forma.
+    conjuntos = {tuple(doc["measures"][m].get("filters") or []) for m in medidas}
+    if len(conjuntos) > 1:
+        raise ValueError(f"fonte `{fonte['source']}`: as medidas têm filtros diferentes ({sorted(conjuntos)})")
+    selecao = [f"{view['grain'][g]} as {g}" for g in grao] + [f"{_agregado(doc['measures'][m])} as {m}" for m in medidas]
+    usados = set().union(*(_apelidos(view["grain"][g]) for g in grao),
+                         *(_apelidos(_agregado(doc["measures"][m])) for m in medidas),
+                         *(_apelidos(doc["filters"][f]["predicate"]) for f in filtros))
+    juncoes = declarada.get("joins") or []
+    incluir: set[str] = set()
+    pendentes = [j for j in juncoes if j["alias"] in usados]
+    while pendentes:
+        j = pendentes.pop()
+        if j["alias"] in incluir:
+            continue
+        incluir.add(j["alias"])
+        for par in j.get("match") or []:
+            for apelido in _apelidos(" ".join(par)):
+                pendentes += [k for k in juncoes if k["alias"] == apelido and k["alias"] not in incluir]
+    base = declarada["alias"]
+    linhas = [f"select {', '.join(selecao)}", f"from {declarada['relation']} {base}"]
+    if "d" in usados:
+        linhas.append(f"join analytics.dim_date d on d.date_key = {base}.{declarada['date']['column']}")
+    for j in juncoes:  # na ordem declarada
+        if j["alias"] not in incluir:
+            continue
+        if j.get("using"):
+            linhas.append(f"join {j['relation']} {j['alias']} using ({', '.join(j['using'])})")
+        else:
+            linhas.append(f"join {j['relation']} {j['alias']} on " + " and ".join(f"{a} = {b}" for a, b in j["match"]))
+    if filtros:
+        linhas.append("where " + " and ".join(f"({doc['filters'][f]['predicate']})" for f in filtros))
+    linhas.append("group by " + ", ".join(str(i + 1) for i in range(len(grao))))
+    return "\n".join(linhas), grao, medidas
+
+
+def _expressao(doc: dict, nome: str) -> str:
+    """A expressão de uma medida ou métrica sobre as colunas da combinação."""
+    if nome in doc["measures"]:
+        return nome
+    m = doc["metrics"][nome]
+    if m["kind"] == "difference":
+        return f"({_expressao(doc, m['minuend'])} - {_expressao(doc, m['subtrahend'])})"
+    escala = m.get("scale")
+    numerador = _expressao(doc, m["numerator"])
+    corpo = f"cast({float(escala)} as numeric) * {numerador}" if escala is not None else f"cast({numerador} as numeric)"
+    corpo = f"{corpo} / nullif({_expressao(doc, m['denominator'])}, 0)"
+    return f"round({corpo}, {m['round']})" if m.get("round") is not None else corpo
+
+
+def assemble(doc: dict, nome_da_view: str) -> str:
+    """O SQL da view, montado só da declaração; as colunas saem na ordem e com os nomes da view."""
+    view = doc["views"][nome_da_view]
+    if "reference" in view:
+        raise ValueError(f"`{nome_da_view}` é conferida por referência ({view['reference']['query']}), não se monta")
+    ctes, partes = [], []
+    for i, fonte in enumerate(view["sources"]):
+        sql, grao, medidas = _cte_da_fonte(doc, view, fonte)
+        ctes.append(f"s{i} as (\n{sql}\n)")
+        partes.append((f"s{i}", grao, medidas))
+    if len(partes) == 1:
+        apelido, grao, medidas = partes[0]
+        combinacao = f"select * from {apelido}"
+    else:
+        combina = view["combine"]
+        (a, grao_a, med_a), (b, grao_b, med_b) = partes
+        tipo = "full outer join" if combina["type"] == "full" else "left join"
+        falta = combina.get("missing")
+        colunas = []
+        for g in view["grain"]:
+            if combina["type"] == "full" and g in grao_a and g in grao_b:
+                colunas.append(f"coalesce({a}.{g}, {b}.{g}) as {g}")
+            else:
+                colunas.append(f"{a if g in grao_a else b}.{g} as {g}")
+        for apelido, medidas in ((a, med_a), (b, med_b)):
+            for m in medidas:
+                colunas.append(f"coalesce({apelido}.{m}, {falta}) as {m}" if falta is not None else f"{apelido}.{m} as {m}")
+        juncao = " and ".join(f"{b}.{c} = {a}.{c}" for c in combina["keys"])
+        combinacao = f"select {', '.join(colunas)}\nfrom {a}\n{tipo} {b} on {juncao}"
+    ctes.append(f"combinada as (\n{combinacao}\n)")
+    final = []
+    for coluna, papel in view["columns"].items():
+        papel_nome, alvo = role(coluna, papel)
+        if papel_nome == "grain":
+            final.append(coluna)
+        elif papel_nome == "measure":
+            final.append(f"{alvo} as {coluna}")
+        elif papel_nome == "metric":
+            final.append(f"{_expressao(doc, alvo)} as {coluna}")
+        else:
+            raise ValueError(f"`{nome_da_view}.{coluna}`: papel `{papel}` não se monta")
+    return "with " + ",\n".join(ctes) + f"\nselect {', '.join(final)}\nfrom combinada"
