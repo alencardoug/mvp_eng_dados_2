@@ -50,6 +50,9 @@ def test_referencias_quebradas_sao_recusadas(tmp_path) -> None:
         ("    filters: [realised_order]\n    additivity: non_additive", "    filters: [sale_dispatch]\n    additivity: non_additive", "não é da fonte"),
         ("    numerator: converted_cart_count", "    numerator: nao_existe", "não é medida nem métrica"),
         ("      cart_count: measure", "      cart_count: medida", "papel"),
+        ("  ticket_medio.md: [average_order_value]", "  ticket_medio.md: [ticket_medio]", "não é medida nem métrica"),
+        ("  ticket_medio.md: [average_order_value]", "  ticket_inventado.md: [average_order_value]", "não existe no glossário"),
+        ("  ticket_medio.md: [average_order_value]", "  ticket_medio.md: []", "sem medidas"),
     ]
     for de, para, erro in casos:
         assert texto.count(de) >= 1, de
@@ -145,3 +148,51 @@ def test_as_colunas_publicadas_casam_com_as_medidas_das_perguntas() -> None:
         for medida in q["measures"]:
             esperadas[f"{q['view']}.{medida['column']}"] = [medida["additivity"]]
     assert por_coluna == esperadas
+
+
+# ── Os trechos de regra (entrega 4; Q30 a Q32) ───────────────────────────────────
+
+MARCA = "<!-- bigquery: fim do texto curto -->"
+
+
+def test_a_regra_do_conceito_fica_no_bloco_depois_da_marca() -> None:
+    """Q30: o trecho gerado está dentro de um bloco `docs`, depois da marca do texto curto — o que vai ao
+    BigQuery (a parte antes da marca) não o leva."""
+    import re
+    from mvp_ed1.models import export
+    for arquivo in DOC["concepts"]:
+        texto = (metrics.CATALOG.parent / arquivo).read_text(encoding="utf-8")
+        assert texto.count(export.INICIO) == 1, arquivo
+        blocos = [m for m in re.finditer(r"\{% docs \w+ %\}(.*?)\{% enddocs %\}", texto, re.S) if export.INICIO in m.group(1)]
+        assert len(blocos) == 1, arquivo
+        corpo = blocos[0].group(1)
+        assert MARCA in corpo and corpo.index(MARCA) < corpo.index(export.INICIO), arquivo
+
+
+def test_a_regra_do_conceito_cita_cada_medida_e_cada_parte() -> None:
+    """A regra do conceito traz as medidas e métricas declaradas e as partes de cada métrica, uma vez cada."""
+    for arquivo, nomes in DOC["concepts"].items():
+        regra = metrics.concept_rule(DOC, arquivo)
+        citadas = [linha.split("`")[1] for linha in regra.splitlines() if linha.startswith("- ")]
+        assert len(citadas) == len(set(citadas)) and set(nomes) <= set(citadas), arquivo
+        for n in citadas:
+            for parte in ("numerator", "denominator", "minuend", "subtrahend"):
+                if (DOC["metrics"].get(n) or {}).get(parte):
+                    assert citadas.index(DOC["metrics"][n][parte]) < citadas.index(n), (arquivo, n)
+
+
+def test_a_regra_da_pergunta_cita_as_colunas_e_os_filtros_da_view() -> None:
+    """Q32: na view montada, toda medida e métrica tem linha, e todo filtro das medidas aparece pelo rótulo;
+    a view por referência diz o teste e a consulta que a conferem."""
+    for nome, view in DOC["views"].items():
+        regra = metrics.question_rule(DOC, nome)
+        if "reference" in view:
+            assert view["reference"]["test"] in regra and view["reference"]["query"] in regra, nome
+            continue
+        for coluna, papel in view["columns"].items():
+            papel_nome, alvo = metrics.role(coluna, papel)
+            if papel_nome in ("measure", "metric"):
+                assert f"- `{coluna if papel_nome == 'measure' else alvo}`" in regra, (nome, coluna)
+            if papel_nome == "measure":
+                for f in DOC["measures"][alvo].get("filters") or []:
+                    assert DOC["filters"][f]["label"] in regra, (nome, f)

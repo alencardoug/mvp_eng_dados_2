@@ -6,7 +6,7 @@
 # linha a linha. Nenhuma regra de negócio vive no Python: o que não cabe nesta forma aponta para a
 # referência do Bloco 1b (`reference:`).
 #
-# Cinco seções, cada uma citada pelo nome pelas seguintes:
+# Seis seções, cada uma citada pelo nome pelas seguintes:
 #   sources    a relação base de `analytics` com um apelido, as junções e a data que define o período
 #              (a coluna de data da fato que se liga a `dim_date`, sempre com o apelido `d`)
 #   filters    predicado SQL sobre os apelidos de uma fonte, com o rótulo e o conceito do glossário
@@ -16,6 +16,9 @@
 #              que vale com o denominador zero
 #   views      o grão (coluna da view → expressão sobre os apelidos), as fontes com o grão de agregação de
 #              cada uma, a combinação entre elas e o papel de cada coluna, na ordem da view
+#   concepts   o arquivo do conceito do glossário → as medidas e métricas que ele explica (Q31); a regra
+#              delas vira trecho gerado no bloco do conceito, depois da marca do texto curto (Q30). O
+#              conceito de dimensão ou de view por referência não está aqui: fica só com a prosa
 
 sources:
 
@@ -403,6 +406,16 @@ metrics:
     scale: 100
     round: 2
     zero_denominator: "null"
+
+concepts:
+  receita_liquida.md: [gross_revenue_amount, discount_amount, net_revenue_amount]
+  ticket_medio.md: [average_order_value]
+  lucro_bruto.md: [gross_profit_amount, gross_margin_pct]
+  custo_do_produto_vendido.md: [cost_of_goods_sold]
+  taxa_de_conversao.md: [cart_conversion_rate_pct]
+  carrinho_abandonado.md: [abandoned_cart_count, abandoned_value_amount]
+  entrega_no_prazo.md: [on_time_rate, late_count, avg_delay_days_when_late]
+  ciclo_de_entrega.md: [avg_order_to_delivery_days, median_order_to_delivery_days, max_order_to_delivery_days]
 
 views:
 

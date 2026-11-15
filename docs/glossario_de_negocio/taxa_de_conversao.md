@@ -22,4 +22,12 @@ taxa de dezembro poderia passar de 100%.
 Carrinhos ainda **abertos e dentro do prazo** ficam fora do denominador: o desfecho deles ainda não
 existe, e incluí-los faria a taxa dos meses recentes cair sozinha com o passar dos dias.
 
+<!-- gerado a partir dos modelos; não editar à mão -->
+**Como as views o contam** (gerado de `docs/glossario_de_negocio/metricas.yml`; a definição e o porquê ficam no texto acima):
+
+- `converted_cart_count`: soma de `f.converted_cart_count`, em `analytics.fact_cart_event`, pela criação do carrinho. Aditiva.
+- `closed_cart_count`: soma de `f.closed_cart_count`, em `analytics.fact_cart_event`, pela criação do carrinho. Aditiva.
+- `cart_conversion_rate_pct` = 100 × `converted_cart_count` ÷ `closed_cart_count`, arredondada a 2 casas; nula com o denominador zero. Não aditiva.
+<!-- fim do trecho gerado -->
+
 {% enddocs %}

@@ -43,7 +43,16 @@ colunas que a implementam.
   ([ADR-0055](../adr/0055-dominios-e-metricas-declarados-uma-vez.md)). Um montador fixo
   (`models/metrics.py`) monta dele o SQL de cada view, e `tests/test_metricas_no_armazem.py` o compara com a
   view auditada, linha a linha; a view que não cabe na forma aponta para a referência do Bloco 1b. Os `.md`
-  ficam com o porquê.
+  ficam com a definição e o porquê.
+- Dessa declaração, o `make catalog` escreve **trechos gerados**, entre os marcadores do Dicionário, que não se
+  editam à mão e que o `make check` acusa quando atrasam:
+  - em cada conceito que a seção `concepts:` do `metricas.yml` lista, a regra das medidas e métricas dele,
+    **dentro** do bloco, **depois** da marca `bigquery: fim do texto curto` (Q30). O texto curto, que vai ao
+    BigQuery, continua sendo a prosa à mão antes da marca; o conceito sem a marca a recebe no fim da prosa.
+    O conceito de dimensão ou de view por referência não está na seção e fica só com a prosa;
+  - em cada pergunta das [Perguntas de Negócio](perguntas_de_negocio.md), a tabela Fatos · Medidas ·
+    Dimensões · View e, abaixo dela, como a view se monta ou a referência que a confere (Q32). O texto da
+    pergunta, que é o requisito, e o porquê ficam à mão, fora do trecho.
 
 ### 2.1 Formato
 

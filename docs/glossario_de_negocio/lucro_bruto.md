@@ -23,4 +23,15 @@ lado a lado exatamente por isso.
 combinados por *drill across* na granularidade comum — nunca por *join* linha a
 linha. É o que torna a comparação legítima.
 
+<!-- bigquery: fim do texto curto -->
+
+<!-- gerado a partir dos modelos; não editar à mão -->
+**Como as views o contam** (gerado de `docs/glossario_de_negocio/metricas.yml`; a definição e o porquê ficam no texto acima):
+
+- `net_revenue_amount`: soma de `f.net_revenue_amount`, em `analytics.fact_sales_order_item`, pela data do pedido. Só pedido realizado — pago, em separação, enviado, entregue ou devolvido. Aditiva.
+- `cost_of_goods_sold`: soma de `m.cogs_amount`, em `analytics.fact_inventory_movement`, pela data do movimento. Só a saída por venda expedida. Aditiva.
+- `gross_profit_amount` = `net_revenue_amount` − `cost_of_goods_sold`. Aditiva.
+- `gross_margin_pct` = 100 × `gross_profit_amount` ÷ `net_revenue_amount`, arredondada a 2 casas; nula com o denominador zero. Não aditiva.
+<!-- fim do trecho gerado -->
+
 {% enddocs %}

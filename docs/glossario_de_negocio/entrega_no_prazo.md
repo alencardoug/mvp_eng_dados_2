@@ -38,6 +38,16 @@ coluna é medir contra o último `update`.
 **Por que a devolvida conta.** Ela registra `delivered` e depois `returned`: a
 devolução não desfaz a entrega, é fato posterior, contado à parte.
 
+<!-- gerado a partir dos modelos; não editar à mão -->
+**Como as views o contam** (gerado de `docs/glossario_de_negocio/metricas.yml`; a definição e o porquê ficam no texto acima):
+
+- `on_time_count`: contagem das linhas com `f.is_on_time`, em `analytics.fact_shipment`, pela data da entrega. Só a remessa entregue (ADR-0053, D66). Aditiva.
+- `delivered_count`: contagem das linhas, em `analytics.fact_shipment`, pela data da entrega. Só a remessa entregue (ADR-0053, D66). Aditiva.
+- `on_time_rate` = `on_time_count` ÷ `delivered_count`, arredondada a 4 casas; nula com o denominador zero. Não aditiva.
+- `late_count`: contagem das linhas com `not f.is_on_time`, em `analytics.fact_shipment`, pela data da entrega. Só a remessa entregue (ADR-0053, D66). Aditiva.
+- `avg_delay_days_when_late`: média de `f.delivery_delay_days`, só onde `not f.is_on_time`, arredondada a 4 casas, em `analytics.fact_shipment`, pela data da entrega. Só a remessa entregue (ADR-0053, D66). Não aditiva.
+<!-- fim do trecho gerado -->
+
 {% enddocs %}
 
 {% docs promised_lead_time %}

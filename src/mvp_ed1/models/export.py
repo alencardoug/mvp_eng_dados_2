@@ -244,12 +244,29 @@ def _tabela_da_pergunta(indice: int):
     return gerar
 
 
+def _regra_do_conceito(arquivo: str):
+    def gerar() -> str:
+        from mvp_ed1.models import metrics
+        return metrics.concept_rule(metrics.load_catalog(), arquivo)
+    gerar.__name__ = f"regra_do_conceito_{arquivo.removesuffix('.md')}"
+    return gerar
+
+
+def _conceitos() -> list[str]:
+    """Os arquivos da seção `concepts:` do `metricas.yml` (Q31), na ordem dela: um trecho em cada (Q30)."""
+    import yaml
+    caminho = ROOT / "docs/glossario_de_negocio/metricas.yml"
+    return list((yaml.safe_load(caminho.read_text(encoding="utf-8")) or {}).get("concepts") or {})
+
+
 TRECHOS = (
     (DICIONARIO, 0, dicionario_markdown),
     (MODELO, 0, inventario_markdown),
     (MODELO, 1, diagrama_markdown),
-    # As 16 perguntas, na ordem P01 a P16 do documento: a ocorrência n é a pergunta n + 1.
+    # As 16 perguntas, na ordem P01 a P16 do documento: a ocorrência n é a pergunta n + 1 — a tabela e a regra.
     *((PERGUNTAS, i, _tabela_da_pergunta(i)) for i in range(16)),
+    # A regra de cada conceito, dentro do bloco `docs`, depois da marca do texto curto (Q30).
+    *((PERGUNTAS.parent / arquivo, 0, _regra_do_conceito(arquivo)) for arquivo in _conceitos()),
 )
 
 

@@ -25,4 +25,10 @@ registrado quando a mercadoria saiu, e nada que aconteça depois o move.
 **Devolução ao fornecedor e transferência não entram.** As duas são saídas de
 estoque e nenhuma é venda; somá-las inflaria o CMV com movimentação interna.
 
+<!-- gerado a partir dos modelos; não editar à mão -->
+**Como as views o contam** (gerado de `docs/glossario_de_negocio/metricas.yml`; a definição e o porquê ficam no texto acima):
+
+- `cost_of_goods_sold`: soma de `m.cogs_amount`, em `analytics.fact_inventory_movement`, pela data do movimento. Só a saída por venda expedida. Aditiva.
+<!-- fim do trecho gerado -->
+
 {% enddocs %}

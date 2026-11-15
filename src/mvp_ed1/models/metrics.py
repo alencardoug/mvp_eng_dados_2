@@ -79,6 +79,17 @@ def load_catalog(caminho: pathlib.Path = CATALOG, conteudo: str | None = None) -
             raise ValueError(f"{caminho}: métrica `{nome}`: o denominador zero dá nulo (`zero_denominator: \"null\"`)")
     for nome, view in doc["views"].items():
         _conferir_view(caminho, doc, nome, view)
+    # O conceito do glossário e as medidas e métricas que ele explica (Q31): a regra vira trecho gerado no `.md`.
+    if not isinstance(doc.get("concepts"), dict) or not doc["concepts"]:
+        raise ValueError(f"{caminho}: sem `concepts`")
+    for arquivo, nomes in doc["concepts"].items():
+        if not (CATALOG.parent / arquivo).is_file():
+            raise ValueError(f"{caminho}: conceito `{arquivo}`, que não existe no glossário")
+        if not isinstance(nomes, list) or not nomes:
+            raise ValueError(f"{caminho}: conceito `{arquivo}` sem medidas nem métricas")
+        for n in nomes:
+            if n not in doc["measures"] and n not in doc["metrics"]:
+                raise ValueError(f"{caminho}: conceito `{arquivo}` cita `{n}`, que não é medida nem métrica")
     return doc
 
 
@@ -342,10 +353,135 @@ def question_table(doc: dict, nome_da_view: str) -> str:
 
 
 def question_tables(doc: dict | None = None) -> list[str]:
-    """As 16 tabelas, na ordem das perguntas (P01 a P16)."""
+    """Os 16 trechos das perguntas, na ordem P01 a P16: a tabela e, abaixo dela, a regra (Q32)."""
     doc = load_catalog() if doc is None else doc
     por_pergunta = {v["question"]: n for n, v in doc["views"].items()}
-    return [question_table(doc, por_pergunta[f"P{i:02d}"]) for i in range(1, 17)]
+    return [f"{question_table(doc, n)}\n\n{question_rule(doc, n)}"
+            for n in (por_pergunta[f"P{i:02d}"] for i in range(1, 17))]
+
+
+# ── Os trechos de regra (entrega 4; Q30 a Q32) ────────────────────────────────────
+#
+# A regra sai da declaração como texto; nenhuma regra nova nasce aqui. O texto curto do BigQuery não
+# muda: no conceito, o trecho fica depois da marca (Q30).
+
+FONTE = "`docs/glossario_de_negocio/metricas.yml`"
+_ROTULO_FRASE = {"additive": "Aditiva", "semi_additive": "Semiaditiva", "non_additive": "Não aditiva"}
+_FUNCAO = {"sum": "soma de", "avg": "média de", "max": "máximo de", "median": "mediana de"}
+
+
+def _pela(rotulo: str) -> str:
+    """'a data do pedido' → 'pela data do pedido'."""
+    artigo, _, resto = rotulo.partition(" ")
+    return {"a": "pela", "o": "pelo"}.get(artigo, "por " + artigo) + " " + resto
+
+
+def _rotulos(doc: dict, filtros: list[str]) -> str:
+    return " ".join(doc["filters"][f]["label"] for f in filtros)
+
+
+def _conta(m: dict) -> str:
+    """O agregado da medida em texto: a função, a condição própria (`where`) e o arredondamento."""
+    tipo = m["aggregate"]
+    if tipo == "count_distinct":
+        partes = [f"`{x}`" for x in m["identity"]]
+        conta = f"contagem distinta de {partes[0]}" if len(partes) == 1 else f"contagem distinta de ({', '.join(partes)})"
+    elif tipo == "count":
+        conta = "contagem das linhas"
+    elif tipo == "count_where":
+        conta = f"contagem das linhas com `{m['where']}`"
+    else:
+        conta = f"{_FUNCAO[tipo]} `{m['expression']}`"
+    if m.get("where") and tipo != "count_where":
+        conta += f", só onde `{m['where']}`"
+    if m.get("round") is not None:
+        conta += f", arredondada a {m['round']} casas"
+    return conta
+
+
+def _frase_da_medida(doc: dict, nome: str) -> str:
+    m = doc["measures"][nome]
+    fonte = doc["sources"][m["source"]]
+    frase = f"`{nome}`: {_conta(m)}, em `{fonte['relation']}`, {_pela(fonte['date']['label'])}."
+    if m.get("filters"):
+        frase += " " + _rotulos(doc, m["filters"])
+    return f"{frase} {_ROTULO_FRASE[m['additivity']]}."
+
+
+def _frase_da_metrica(doc: dict, nome: str) -> str:
+    m = doc["metrics"][nome]
+    if m["kind"] == "difference":
+        return f"`{nome}` = `{m['minuend']}` − `{m['subtrahend']}`. {_ROTULO_FRASE[_aditividade_da_metrica(doc, nome)]}."
+    escala = f"{m['scale']} × " if m.get("scale") else ""
+    casas = f", arredondada a {m['round']} casas" if m.get("round") is not None else ""
+    return f"`{nome}` = {escala}`{m['numerator']}` ÷ `{m['denominator']}`{casas}; nula com o denominador zero. Não aditiva."
+
+
+def _com_as_partes(doc: dict, nomes: list[str]) -> list[str]:
+    """Os nomes com as partes de cada métrica antes dela, sem repetir."""
+    saida: list[str] = []
+
+    def visitar(nome: str) -> None:
+        if nome in saida:
+            return
+        for parte in ("numerator", "denominator", "minuend", "subtrahend"):
+            if (doc["metrics"].get(nome) or {}).get(parte):
+                visitar(doc["metrics"][nome][parte])
+        saida.append(nome)
+
+    for n in nomes:
+        visitar(n)
+    return saida
+
+
+def concept_rule(doc: dict, arquivo: str) -> str:
+    """A regra das medidas e métricas que a seção `concepts:` liga ao conceito (Q31), uma por linha."""
+    linhas = [f"**Como as views o contam** (gerado de {FONTE}; a definição e o porquê ficam no texto acima):", ""]
+    for nome in _com_as_partes(doc, doc["concepts"][arquivo]):
+        linhas.append("- " + (_frase_da_metrica(doc, nome) if nome in doc["metrics"] else _frase_da_medida(doc, nome)))
+    return "\n".join(linhas)
+
+
+def question_rule(doc: dict, nome_da_view: str) -> str:
+    """Como a view se monta, em texto (Q32): cada fonte com a data e os filtros, a combinação e as métricas."""
+    view = doc["views"][nome_da_view]
+    if "reference" in view:
+        ref = view["reference"]
+        return (f"**Conferida por referência** (gerado de {FONTE}): `{ref['test']}`, contra `{ref['query']}`. "
+                f"{ref['reason']}")
+    linhas = [f"**Como se monta** (gerado de {FONTE}):", ""]
+    for fonte in view["sources"]:
+        declarada = doc["sources"][fonte["source"]]
+        filtros: list[str] = []
+        for m in _medidas_da_fonte(doc, view, fonte):
+            filtros += [f for f in doc["measures"][m].get("filters") or [] if f not in filtros]
+        frase = f"- `{declarada['relation']}`, {_pela(declarada['date']['label'])}."
+        frase += " " + (_rotulos(doc, filtros) if filtros else "Sem filtro.")
+        # A junção composta muda o número (a categoria do CMV pelo produto e pela origem, P08): ela aparece; a
+        # junção pela chave substituta, não. Só a que a montagem desta view usa.
+        sql = _cte_da_fonte(doc, view, fonte)[0]
+        for j in declarada.get("joins") or []:
+            if j.get("match") and f"join {j['relation']} {j['alias']} on " in sql:
+                frase += (f" Liga `{j['relation']}` por "
+                          + " e ".join(f"`{x} = {y}`" for x, y in j["match"]) + ".")
+        if fonte.get("grain"):
+            frase += (" Agregada só por " + ", ".join(f"`{g}`" for g in fonte["grain"])
+                      + ": o valor se repete em cada linha do grão da view que casa com ela.")
+        linhas.append(frase)
+    if combina := view.get("combine"):
+        chaves = " e ".join(f"`{k}`" for k in combina["keys"])
+        ausente = "nulo" if combina.get("missing") is None else f"`{combina['missing']}`"
+        if combina["type"] == "full":
+            linhas.append(f"- As duas fontes se combinam por {chaves}: a linha de um lado só aparece, com {ausente} no lado ausente.")
+        else:
+            linhas.append(f"- As duas fontes se combinam por {chaves}: toda linha da primeira fica; sem par, a segunda fica com {ausente}.")
+    for coluna, papel in view["columns"].items():
+        papel_nome, alvo = role(coluna, papel)
+        if papel_nome == "measure":
+            linhas.append(f"- `{coluna}`: {_conta(doc['measures'][alvo])}.")
+        elif papel_nome == "metric":
+            linhas.append("- " + _frase_da_metrica(doc, alvo))
+    return "\n".join(linhas)
 
 
 # ── O que o pacote publica (Bloco 5, item 10) ───────────────────────────────────────

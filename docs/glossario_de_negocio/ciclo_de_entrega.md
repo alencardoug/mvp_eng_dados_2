@@ -36,4 +36,12 @@ pedidos (ADR-0033). Um pedido com uma remessa entregue e outra extraviada aparec
 lá e não aparece aqui — as duas medidas nem sempre contam a mesma população, e
 somá-las ou dividi-las uma pela outra produz número sem significado.
 
+<!-- gerado a partir dos modelos; não editar à mão -->
+**Como as views o contam** (gerado de `docs/glossario_de_negocio/metricas.yml`; a definição e o porquê ficam no texto acima):
+
+- `avg_order_to_delivery_days`: média de `f.order_to_delivery_days`, arredondada a 4 casas, em `analytics.fact_shipment`, pela data da entrega. Só o pedido de ciclo fechado, na remessa que fechou o ciclo. Não aditiva.
+- `median_order_to_delivery_days`: mediana de `f.order_to_delivery_days`, arredondada a 4 casas, em `analytics.fact_shipment`, pela data da entrega. Só o pedido de ciclo fechado, na remessa que fechou o ciclo. Não aditiva.
+- `max_order_to_delivery_days`: máximo de `f.order_to_delivery_days`, arredondada a 4 casas, em `analytics.fact_shipment`, pela data da entrega. Só o pedido de ciclo fechado, na remessa que fechou o ciclo. Não aditiva.
+<!-- fim do trecho gerado -->
+
 {% enddocs %}

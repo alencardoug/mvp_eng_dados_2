@@ -28,4 +28,12 @@ foi comprado.
 O valor efetivamente cobrado do cliente não se perde: `order_total_amount` viaja na fato como
 dimensão degenerada, e é ele que reconcilia com o financeiro.
 
+<!-- gerado a partir dos modelos; não editar à mão -->
+**Como as views o contam** (gerado de `docs/glossario_de_negocio/metricas.yml`; a definição e o porquê ficam no texto acima):
+
+- `gross_revenue_amount`: soma de `f.gross_revenue_amount`, em `analytics.fact_sales_order_item`, pela data do pedido. Só pedido realizado — pago, em separação, enviado, entregue ou devolvido. Aditiva.
+- `discount_amount`: soma de `f.discount_amount`, em `analytics.fact_sales_order_item`, pela data do pedido. Só pedido realizado — pago, em separação, enviado, entregue ou devolvido. Aditiva.
+- `net_revenue_amount`: soma de `f.net_revenue_amount`, em `analytics.fact_sales_order_item`, pela data do pedido. Só pedido realizado — pago, em separação, enviado, entregue ou devolvido. Aditiva.
+<!-- fim do trecho gerado -->
+
 {% enddocs %}
