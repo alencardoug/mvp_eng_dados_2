@@ -143,9 +143,7 @@ O `RESET=1` se prova no ciclo do Bloco 5R, que já o roda (Q37); até lá é pen
   - a PK sai pelo contrato do dbt-bigquery, que a escreve `NOT ENFORCED`;
   - as FKs saem pelas mesmas macros, por despacho de adaptador (`alter table … add constraint … not
     enforced`, a existência por `INFORMATION_SCHEMA.TABLE_CONSTRAINTS`);
-  - o escopo vale para o log do BigQuery pelo mesmo `governance`, mas **o índice não**: o BigQuery não impõe
-    unicidade, e a admissão atômica lá precisa de outro meio (uma instrução condicional numa transação de
-    várias instruções, por exemplo). Não está desenhado nesta fase: fica para a reabertura do GCP;
+  - o escopo e o índice valem para o log do BigQuery pelo mesmo `governance`;
   - nada disso foi exercitado no GCP nesta fase (L9), nem o efeito no Gemini e no Knowledge Catalog.
 - **Documentos a atualizar** (com a implementação):
   - [Qualidade de Dados](../qualidade_de_dados.md): o contrato e as *constraints* em `analytics`, ao lado
@@ -157,3 +155,16 @@ O `RESET=1` se prova no ciclo do Bloco 5R, que já o roda (Q37); até lá é pen
     sobreposta;
   - [Consumidores](../consumidores.md) §5: a `prevista` do `data_type` antes, e a `feita` depois;
   - o [plano da base dos consumidores](../../PLANO_base_dos_consumidores.md), onde está o desenho.
+
+## Retificação de 16/11/2026
+
+O texto acima é o aceito em 16/11/2026 e não foi alterado. Uma afirmação dele está errada, e fica
+corrigida aqui, por decisão do Owner na revisão da implementação (RVB6I-1-06):
+
+- em **Paridade com o GCP**, "o escopo e o índice valem para o log do BigQuery pelo mesmo `governance`"
+  vale só para o escopo. **O índice não vale**: o BigQuery não impõe unicidade, e a admissão atômica lá
+  precisa de outro meio (uma instrução condicional numa transação de várias instruções, por exemplo). Não
+  está desenhado nesta fase: fica para a reabertura do GCP. No BigQuery a migração cria só a coluna.
+
+Entre `5361c7b` e esta retificação o texto aceito esteve editado no lugar; o histórico do Git guarda as
+duas formas.

@@ -1174,15 +1174,15 @@ das chaves e do log antes e depois de cada prova (`estado.py`), os *logs* dos *b
 
 | Prova | O que se fez | O que se mediu |
 |---|---|---|
-| 1. Instalação inicial | o primeiro `make dbt-build` com o contrato, sobre o armazém de hoje (sem nenhuma *constraint*) | 59 instaladas: a PK da `fact_inventory_movement`, que já existia sem ela, e as 58 FKs; 26 PKs pelo contrato; tudo validado; `PASS=1073`; populações iguais |
+| 1. Instalação inicial | o primeiro `make dbt-build` com o contrato, sobre o armazém de hoje (sem nenhuma *constraint*) | 59 instaladas pela macro: a PK da `fact_inventory_movement`, que já existia sem ela, e as 58 FKs; as outras 25 PKs nasceram com as tabelas, pelo contrato; 26 PKs e 58 FKs ao todo, validadas; `PASS=1073`; populações iguais |
 | 2. Segunda execução | outro `make dbt-build` (a incremental pelo `merge`) | 58 FKs retiradas e 58 instaladas; a PK da incremental ficou |
 | 3. Só uma dimensão | `make dbt-build DBT_ARGS="-s dim_product"` | as 58 FKs de volta, inclusive das fatos fora da seleção; **4 views de `consumption` caíram pelo `cascade`** — o comportamento que já estava documentado em Execução Local, de antes do Bloco 6; o *build* completo as repõe |
 | Retry sem modelo de `analytics` | `dbt retry` do teste que falhou na prova 3 | escopo `analytics` gravado; as 58 FKs retiradas e reinstaladas, por cautela |
 | 4. Duas sobrepostas | um `build -s dim_date` durante um `make dbt-build` | a segunda recusada na abertura (`duplicate key … ux_dbt_invocations_open_scope`), todos os nós pulados, nenhuma FK reinstalada no meio da primeira (só as 26 PKs durante); a primeira terminou verde com as 58. Observação: os *hooks* do fim da recusada rodam — o de acesso inclusive, idempotente |
 | 6. Interrompida | `make dbt-build` morto por SIGTERM no meio | as FKs de fora e a linha `started`; a execução seguinte recusada pelo índice; depois do abandono pelo custodiante, o *build* reinstalou as 58 |
-| Custo | o *hook* de instalação em cada *build* completo | 1,6 a 1,9 s para as 58 FKs (e a PK, na primeira); a retirada, 0,02 s |
+| Custo | o tempo que o dbt imprime para cada *hook*, nos quatro *builds* completos com *log* guardado (`p1`, `p2`, `p4_primeira`, `p6_recuperacao`) | a instalação, de 1,27 a 1,90 s para as 58 FKs (e a PK, na primeira); a retirada das 58, de 0,35 a 0,40 s (`p2`, `p4_primeira`, `p6_interrompida`), e 0,02 a 0,04 s quando não havia FK a retirar |
 
-Nenhum *deadlock* nos seis *builds* completos. **Não provado no armazém real:** o retry que reconstrói uma
+Nenhum *deadlock* nos quatro *builds* completos com *log* guardado, nem nos da sequência de verificação antes do *commit* (sem *log* guardado). **Não provado no armazém real:** o retry que reconstrói uma
 dimensão (só na sonda); o órfão (só na sonda; induzi-lo aqui exigiria mudar dimensão); o `RESET=1` (Q37, no
 Bloco 5R); o BigQuery (L9).
 

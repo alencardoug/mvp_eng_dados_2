@@ -154,11 +154,23 @@
 {%- endmacro %}
 
 {% macro bigquery__instalar_chaves(chaves) -%}
-    {#- Não exercitado nesta fase (L9). A PK já sai pelo contrato, `NOT ENFORCED`; aqui só as FKs que faltam. -#}
+    {#- Não exercitado nesta fase (L9). O mesmo ciclo do PostgreSQL, `NOT ENFORCED`: a PK declarada que falta
+        (a incremental que já existia: o contrato só a escreve ao criar a tabela) e cada FK, só entre relações
+        que existem. A existência da FK se confere pelo nome: a retirada do começo já tirou todas, e a
+        definição inteira no BigQuery pediria `KEY_COLUMN_USAGE` e `CONSTRAINT_COLUMN_USAGE`. -#}
     {%- set base = target.project ~ '.' ~ chaves.esquema -%}
-    {%- set existentes = run_query("select constraint_name from `" ~ base ~ "`.INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-        where constraint_type = 'FOREIGN KEY'").columns[0].values() -%}
-    {%- for fk in chaves.fks if fk.nome not in existentes -%}
+    {%- set tabelas = run_query("select table_name from `" ~ base ~ "`.INFORMATION_SCHEMA.TABLES").columns[0].values() -%}
+    {%- set restricoes = run_query("select table_name, constraint_name, constraint_type from `" ~ base
+        ~ "`.INFORMATION_SCHEMA.TABLE_CONSTRAINTS where constraint_type in ('PRIMARY KEY', 'FOREIGN KEY')") -%}
+    {%- set com_pk = [] -%}
+    {%- set fks = [] -%}
+    {%- for r in restricoes.rows -%}
+        {%- if r[2] == 'PRIMARY KEY' -%}{%- do com_pk.append(r[0]) -%}{%- else -%}{%- do fks.append(r[1]) -%}{%- endif -%}
+    {%- endfor -%}
+    {%- for pk in chaves.pks if pk.tabela in tabelas and pk.tabela not in com_pk -%}
+        {%- do run_query("alter table `" ~ base ~ "." ~ pk.tabela ~ "` add primary key (" ~ pk.coluna ~ ") not enforced") -%}
+    {%- endfor -%}
+    {%- for fk in chaves.fks if fk.tabela in tabelas and fk.pai in tabelas and fk.nome not in fks -%}
         {%- do run_query("alter table `" ~ base ~ "." ~ fk.tabela ~ "` add constraint `" ~ fk.nome ~ "` foreign key ("
                          ~ fk.coluna ~ ") references `" ~ base ~ "." ~ fk.pai ~ "` (" ~ fk.coluna_pai ~ ") not enforced") -%}
     {%- endfor -%}

@@ -318,6 +318,7 @@ COLUNAS_DO_LOG: tuple[tuple[str, str], ...] = (
     ("status", "`started`, `success`, `failed` ou `abandoned`."),
     ("result_counts", "Quantos nós em cada estado do dbt (`success`, `pass`, `warn`, `error`, `fail`…)."),
     ("job_id", "O job do Airbyte, na sincronização registrada (`airbyte_sync`)."),
+    ("exclusive_scope", "O escopo que admite uma invocação de cada vez (ADR-0056): `analytics` na invocação do dbt que reconstrói `analytics` — ou no `dbt retry`, que não diz o que reconstrói —; nulo nas demais. Um índice parcial recusa a segunda abertura com o escopo enquanto há uma aberta."),
 )
 
 #: A *view* da procedência (ADR-0054), coluna a coluna.

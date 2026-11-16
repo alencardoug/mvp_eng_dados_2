@@ -2766,10 +2766,7 @@ sources:
             meta:
               sensitivity: internal
           - name: exclusive_scope
-            description: >
-              O escopo que admite uma invocação de cada vez (ADR-0056): `analytics` na invocação do dbt que
-              reconstrói `analytics` — ou no `dbt retry`, que não diz o que reconstrói —; nulo nas demais. Um
-              índice parcial recusa a segunda abertura com o escopo enquanto há uma aberta.
+            description: "O escopo que admite uma invocação de cada vez (ADR-0056): `analytics` na invocação do dbt que reconstrói `analytics` — ou no `dbt retry`, que não diz o que reconstrói —; nulo nas demais. Um índice parcial recusa a segunda abertura com o escopo enquanto há uma aberta."
             meta:
               sensitivity: internal
       - name: warehouse_provenance

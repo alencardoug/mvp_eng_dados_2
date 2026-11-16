@@ -116,6 +116,53 @@ def test_o_tipo_por_alvo_e_o_nome_que_o_bigquery_aceita() -> None:
         assert dt.postgres_name(dt.yml_value(tipo)) == tipo
 
 
+#: Toda PK e FK de `analytics`: a tabela, as colunas, o schema e a tabela apontada, as colunas apontadas.
+_CHAVES_SQL = """
+    select k.contype, r.relname,
+           (select array_agg(a.attname order by x.ord) from unnest(k.conkey) with ordinality x(num, ord)
+              join pg_attribute a on a.attrelid = k.conrelid and a.attnum = x.num),
+           coalesce(pn.nspname, ''), coalesce(p.relname, ''),
+           (select array_agg(b.attname order by y.ord) from unnest(k.confkey) with ordinality y(num, ord)
+              join pg_attribute b on b.attrelid = k.confrelid and b.attnum = y.num),
+           k.convalidated
+    from pg_constraint k
+    join pg_class r on r.oid = k.conrelid
+    left join pg_class p on p.oid = k.confrelid
+    left join pg_namespace pn on pn.oid = p.relnamespace
+    where k.connamespace = 'analytics'::regnamespace and k.contype in ('p', 'f')
+"""
+
+
+def _desvios_das_chaves(linhas, manifest: dict) -> list[str]:
+    """O que o armazém tem de diferente do declarado: por lista ordenada, não por conjunto — a FK duplicada
+    conta —, e com o schema da tabela apontada (RVB6I-1-03)."""
+    desvios = [f"não validada: {tuple(l)}" for l in linhas if not l[6]]
+    pks = sorted((l[1], tuple(l[2])) for l in linhas if l[0] == "p")
+    fks = sorted((l[1], tuple(l[2]), l[3], l[4], tuple(l[5])) for l in linhas if l[0] == "f")
+    esperadas_pk = sorted((n, (c[0],)) for n, c in declared_pks(manifest).items())
+    esperadas_fk = sorted((t, (c,), "analytics", p, (cp,)) for t, c, p, cp in declared_fks(manifest))
+    if pks != esperadas_pk:
+        desvios.append(f"PKs: a mais {[x for x in pks if x not in esperadas_pk]}, a menos {[x for x in esperadas_pk if x not in pks]}, repetidas {len(pks) - len(set(pks))}")
+    if fks != esperadas_fk:
+        desvios.append(f"FKs: a mais {[x for x in fks if x not in esperadas_fk]}, a menos {[x for x in esperadas_fk if x not in fks]}, repetidas {len(fks) - len(set(fks))}")
+    return desvios
+
+
+def test_a_guarda_das_chaves_aponta_a_duplicata_o_outro_schema_e_a_falta() -> None:
+    """Contraprova da guarda do armazém, sem banco (RVB6I-1-03): partindo das linhas que o declarado daria, uma
+    FK repetida, uma FK apontando para a tabela homônima de outro schema, uma FK a menos e uma não validada
+    são apontadas; as linhas exatas, não."""
+    manifest = _manifest()
+    exatas = [("p", n, [c[0]], "", "", None, True) for n, c in declared_pks(manifest).items()]
+    exatas += [("f", t, [c], "analytics", p, [cp], True) for t, c, p, cp in sorted(declared_fks(manifest))]
+    assert _desvios_das_chaves(exatas, manifest) == []
+    uma = next(l for l in exatas if l[0] == "f")
+    assert _desvios_das_chaves(exatas + [uma], manifest) != []
+    assert _desvios_das_chaves([l if l is not uma else (*l[:3], "outro_schema", *l[4:]) for l in exatas], manifest) != []
+    assert _desvios_das_chaves([l for l in exatas if l is not uma], manifest) != []
+    assert _desvios_das_chaves([l if l is not uma else (*l[:6], False) for l in exatas], manifest) != []
+
+
 # ── No armazém ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
@@ -136,24 +183,8 @@ def test_o_armazem_tem_exatamente_as_chaves_declaradas_e_validadas(engine) -> No
     """Pela definição, nunca pelo nome: o nome da PK do dbt oscila (`__dbt_tmp_pkey`, `…pkey1`)."""
     manifest = _manifest()
     with engine.connect() as c:
-        linhas = c.execute(text("""
-            select k.contype, r.relname, a.attname, coalesce(p.relname, ''), coalesce(b.attname, ''), k.convalidated
-            from pg_constraint k
-            join pg_class r on r.oid = k.conrelid
-            join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
-            left join pg_class p on p.oid = k.confrelid
-            left join pg_attribute b on b.attrelid = k.confrelid and b.attnum = k.confkey[1]
-            where k.connamespace = 'analytics'::regnamespace and k.contype in ('p', 'f')
-              and cardinality(k.conkey) = 1
-        """)).all()
-        compostas = c.execute(text("""select count(*) from pg_constraint where connamespace = 'analytics'::regnamespace
-                                      and contype in ('p', 'f') and cardinality(conkey) <> 1""")).scalar()
-    assert compostas == 0
-    assert [l for l in linhas if not l[5]] == []
-    pks = {(l[1], l[2]) for l in linhas if l[0] == "p"}
-    fks = {(l[1], l[2], l[3], l[4]) for l in linhas if l[0] == "f"}
-    assert pks == {(n, c[0]) for n, c in declared_pks(manifest).items()}
-    assert fks == declared_fks(manifest)
+        linhas = c.execute(text(_CHAVES_SQL)).all()
+    assert _desvios_das_chaves(linhas, manifest) == []
 
 
 @pytest.mark.integracao
