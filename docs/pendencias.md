@@ -12,9 +12,9 @@
 |---|---|
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
-| Verificações e trabalho adiados | 4 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026) |
+| Verificações e trabalho adiados | 5 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026) |
 | Decisões pendentes | 3 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2` e a D66 na fase da base dos consumidores (§2) |
-| Última revisão | 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Última revisão | 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -280,9 +280,29 @@ Corrigir é mudar o gerador (repor por recebimento com antecedência, ou dimensi
 pela demanda) e **regenerar as duas origens**, que é destrutivo e refaz todos os números conferidos.
 Decidido em 14/11/2026 (Q8): fica para depois da fase da base dos consumidores. **Revisto em 15/11/2026**
 (Q26 do [plano](../PLANO_base_dos_consumidores.md)): entra na regeneração do Bloco 5R, no fim desta fase,
-junto do F24 a F26 e do F22; a forma da correção é escolha sua, com a medida das duas.
+junto do F24 a F26 e do F22; a forma da correção é escolha sua, com a medida das duas. **Escolhida em
+16/11/2026** (Q42): o estoque de abertura dimensionado pela demanda, com folga de 50%
+(`folga_da_abertura`, em `geracao.yml`). No ramo `bloco-5r`, medido em memória no varejo: nenhuma
+correção-relâmpago, nenhuma linha de giro indefinido na P11 simulada; a invariante 20 do
+[Modelo de Dados §4](modelo_de_dados.md#4-invariantes-de-negócio) a guarda. No armazém, só depois do
+ciclo; a V4 fecha com a medida dele.
 
 *Efeito de não decidir:* o giro indefinido nesses pares, declarado na view e no glossário.
+
+### V5 — o giro de estoque muito baixo do dado sintético (registrada em 16/11/2026)
+
+**Pergunta:** quando redimensionar o estoque à venda? A P11 simulada em memória para a V4, em 16/11/2026,
+mostra giro mediano de cerca de 0,01 por trimestre, em qualquer das formas medidas: o estoque — abertura
+de 10 a 400 unidades por par, compras de 40 a 500 — é muito maior que a venda, de 1 a 3 unidades por
+item. O giro é definido e coerente com o livro; não é realista para varejo. A medida é da simulação, no
+varejo; **a do armazém está pendente**, e se faz depois do ciclo do Bloco 5R.
+
+Corrigir é mudar declaração em várias tabelas (`geracao.yml`: abertura, compras, as referências que
+delas dependem), com a sua revisão integral, e regerar as duas origens. Decidido em 16/11/2026 (Q47 do
+[plano](../PLANO_base_dos_consumidores.md)): fica fora deste ciclo, que já leva oito correções.
+
+*Efeito de não decidir:* a P11 responde com um giro que nenhuma operação real teria; a ordem entre os
+pares continua informativa, o nível não.
 
 ## 1.1 Decididas e implementadas
 

@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -353,7 +353,11 @@ inventário.
   ele não tem significado de negócio neste dado e que o resultado está em `transaction_result`; nenhum
   número muda. **Revisto em 15/11/2026** (Q26): a correção do gerador entra na regeneração do Bloco 5R, no
   fim da fase; o código passa a seguir o resultado, e o significado de cada código vira proposta para o
-  aceite do Owner. Até o ciclo, o domínio declara o que a Q17 decidiu.
+  aceite do Owner. Até o ciclo, o domínio declara o que a Q17 decidiu. **No ramo `bloco-5r` (16/11/2026):** o mapa aceito
+  (Q41) está em `generator/geracao.yml` — `succeeded` → `00`, `pending` → `GW-OK`, `failed` → um dos cinco
+  motivos de recusa, por peso —, guardado pela invariante 19 do Modelo de Dados §4. No varejo, as 7.102
+  transações seguem o mapa: 3.381 autorizações e todas as capturas, estornos e reembolsos com `00`, 74
+  pendentes com `GW-OK`, 212 recusadas entre `51`, `05`, `57`, `91` e `GW-TIMEOUT`. Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
 
 ### F23 — As tabelas das Perguntas de Negócio divergem das views · **Gravidade: média**
 
@@ -381,7 +385,11 @@ inventário.
   filtra a venda pelo estado conclui que a empresa vende a quem não pode comprar.
 - **Aqui**, pela decisão do Owner (Q21 e Q23 do plano da base dos consumidores): corrigir o gerador e
   regerar as duas origens, no Bloco 5R — uma regeneração só, no fim da fase (Q25); os números das views
-  mudam.
+  mudam. **No ramo `bloco-5r` (16/11/2026):** os candidatos de carrinho e de pedido passam a ser escolhidos pelo instante do
+  evento, e a variante inativa segue a regra do `discontinued` (Q39); invariante 15. No varejo, nenhum
+  pedido nem carrinho identificado de `pending` ou `blocked`, nenhum item de `draft`, e nenhuma venda de
+  `inactive`, de `discontinued` ou de variante inativa dentro da janela; os 25 produtos `discontinued`
+  continuam com venda antiga, e 193 dos 210 clientes `inactive`, com pedido antigo. Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
 
 ### F25 — A remessa extraviada aparece em pedido entregue · **Gravidade: média**
 
@@ -396,7 +404,9 @@ inventário.
 - **Efeito:** o pedido diz que chegou e nenhuma remessa dele chegou; a pontualidade e o ciclo de entrega
   (P13, P14) contam um pedido cuja entrega não existe.
 - **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
-  (Q25).
+  (Q25). **No ramo `bloco-5r` (16/11/2026):** o extravio sai das remessas em trânsito, com o volume mantido (Q43) — 0,4% de
+  todas as despachadas; invariante 16. No varejo, 14 remessas `lost`, todas em pedido `shipped` (antes, 13,
+  todas em pedido `delivered`). Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
 
 ### F26 — O chamado é reaberto sem ter sido resolvido · **Gravidade: baixa**
 
@@ -409,7 +419,9 @@ inventário.
   que reabrir; e o `resolved` não se distingue do `closed` pelo dado, embora o significado diga que ainda
   não foi fechado.
 - **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
-  (Q25).
+  (Q25). **No ramo `bloco-5r` (16/11/2026):** os eventos obrigatórios entram antes dos opcionais, e o `closed_at` fica só no
+  `closed`; invariante 17. No varejo, os 11 chamados reabertos têm o `resolved` antes do `reopened`, nenhum
+  `resolved` ou `closed` fica sem o evento de resolução, e os 94 `resolved` têm `closed_at` nulo. Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
 
 ### F27 — A reserva de estoque não é de um item do carrinho nem do pedido · **Gravidade: baixa**
 
@@ -426,7 +438,10 @@ inventário.
   reservado no filtro de reposição, no `is_stockout` e nos dias de cobertura. A tabela das reservas não
   vira fato em `analytics` (revisão do Bloco 5R, RVB5R-2-01 e 02).
 - **Aqui**, pela decisão do Owner (Q28 do plano da base dos consumidores): a reserva passa a ser de um SKU
-  do carrinho ou do pedido dela, no Bloco 5R, no fim da fase.
+  do carrinho ou do pedido dela, no Bloco 5R, no fim da fase. **No ramo `bloco-5r` (16/11/2026):** a reserva nasce de um item, com
+  o SKU e a quantidade dele (Q40), no máximo uma por item; invariante 18. No varejo, as 4.200 reservas são
+  de um item da própria origem — 3.310 de carrinho e 890 de pedido, 79% e 21%: a divisão declarada de 60%
+  é intenção, e os itens de pedido em aberto não comportam mais (Q45). Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
 
 ### F28 — A contagem de pedidos da P06 se diz aditiva e se repete entre categorias · **Gravidade: baixa**
 
@@ -440,6 +455,35 @@ inventário.
 - **Aqui:** a descrição passa a "Não aditiva entre categorias", como a da P01, e o grão certo; e a aditividade
   de cada coluna das views passa a ser declarada no `metricas.yml` e conferida contra o começo da descrição
   (Bloco 5, Parte B, a tabela gerada das perguntas). Muda o texto, não o valor nem o esquema.
+
+### F29 — A autorização pendente some quando os pedidos em aberto são poucos · **Gravidade: baixa**
+
+- **Evidência** (medida em memória em 16/11/2026, ao conferir a cobertura da invariante 19 no perfil de que
+  o legado parte — fator 0,05, semente do catálogo de falhas): o perfil tem 3 pedidos em aberto, e os 3
+  pagamentos deles saíam `authorized`; nenhuma transação com resultado `pending`, e já era assim antes do
+  Bloco 5R. A causa: `_desfecho` (`generator/domains/pagamentos.py`) sorteia meio a meio entre `pending` e
+  `authorized`, sem garantir os dois.
+- **Efeito:** um valor de enumeração cuja presença depende da semente, contra a cobertura em qualquer
+  fator do ADR-0014; e, com o mapa do F22, o `GW-OK` não apareceria no legado.
+- **Aqui**, pela decisão do Owner (Q46 do plano da base dos consumidores): entra na fila do Bloco 5R. No
+  ramo `bloco-5r` (16/11/2026), o gerador garante os dois desfechos em qualquer fator e semente — o sorteio
+  só cede quando os pedidos em aberto que restam são tantos quantos os desfechos que faltam —, e a
+  invariante 19 exige os três resultados em todo perfil. No perfil do legado muda uma linha (uma
+  autorização passa de aprovada a pendente); no varejo, nenhuma.
+
+### F30 — A limpeza do legado trata a validade da reserva como fato consumado · **Gravidade: média**
+
+- **Evidência** (16/11/2026, na sequência de testes do ramo do Bloco 5R): `DATE_FUTURE` — data posterior
+  ao corte em campo de fato já ocorrido — vale para `stock_reservations.expires_at`, que é prazo: a reserva
+  ativa no corte vence até 48 h depois dele. Em memória, o perfil de que o legado parte tem 4 reservas
+  vencendo depois do corte com o gerador do ramo, e a limpeza rejeitava 3 delas sem que nenhuma falha
+  tivesse sido injetada; com o gerador de antes, nenhuma — acaso da semente, porque o varejo tem 33.
+- **Efeito:** reserva íntegra iria para a quarentena por um defeito que não tem, e o saldo reservado do
+  legado perderia as reservas mais recentes.
+- **Aqui**, pela decisão do Owner (Q48 do plano da base dos consumidores): a coluna entra nas `promessas`
+  do catálogo de falhas (`legacy/catalogo.yml`, versão 10), como `carts.expires_at`; os modelos de limpeza
+  são regenerados dele. O armazém de hoje foi tratado pela versão 9 e não tinha o caso; o tratamento novo
+  chega com o ciclo do Bloco 5R.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 

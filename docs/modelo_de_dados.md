@@ -721,6 +721,26 @@ são a definição de "dado coerente" neste projeto.
 13. Toda remessa contém ao menos um item.
 14. Nenhum produto é vendido antes do lançamento: `launched_at` é nulo — lançamento
     desconhecido — ou anterior ou igual ao `placed_at` de todo pedido que contém o produto.
+15. O estado do cadastro é respeitado no tempo: cliente `pending` ou `blocked` não tem pedido nem
+    carrinho identificado, e produto `draft` não está em item de pedido nem de carrinho; cliente
+    `inactive`, produto `discontinued` e variante com `is_active` falso só têm venda anterior à
+    janela que precede o fim do período.
+16. Remessa `lost` é de pedido `shipped`: o extravio não convive com o pedido entregue.
+17. O livro do chamado acompanha o estado dele: todo chamado `resolved` ou `closed` tem o evento
+    `resolved`; todo `reopened` vem depois de um `resolved`, e o chamado reaberto está
+    `in_progress`; `closed_at` é preenchido exatamente no `closed`.
+18. Toda reserva de estoque é de um item do carrinho ou do pedido a que pertence — o mesmo SKU, a
+    mesma quantidade, no máximo uma reserva por item —, num armazém que movimentou o SKU. É uma
+    relação a mais: a invariante 8 trata do saldo, não da origem.
+19. O código de retorno do adquirente segue o resultado da transação: a aprovada, a pendente e a
+    recusada têm conjuntos de códigos que não se cruzam.
+20. Nenhuma saída de estoque é coberta por ajuste criado para ela: o saldo do par armazém × SKU
+    nunca fica negativo, e o lastro que faltaria vem do estoque de abertura, um por par, no começo
+    do período.
+
+As janelas da invariante 15, os códigos da 19 e a folga da abertura da 20 são parâmetros de
+[`geracao.yml`](../src/mvp_ed1/generator/geracao.yml); as regras de geração que as produzem estão
+na [Geração de Dados §5](geracao_de_dados.md#5-realismo-e-coerência).
 
 ---
 

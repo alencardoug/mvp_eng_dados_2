@@ -222,6 +222,12 @@ Um número foi corrigido pela geração real, como esta seção previa: `payment
 dos pedidos chegam a capturado; 1,43 transações por pagamento era aritmeticamente incompatível com
 a distribuição de estados declarada em `orders`.
 
+Dois parâmetros são probabilidade ou intenção, e o efetivo é consequência: `remessa_dividida`, que
+depende dos pedidos elegíveis, e `origem_carrinho`, a parte das reservas que nasce de carrinho — cada
+item é reservado no máximo uma vez, e o que não cabe nos itens de pedido em aberto vai para os
+carrinhos. Medido em memória em 16/11/2026, no fator `dev`, com as correções do Bloco 5R: das 4.200
+reservas, 3.310 de carrinho e 890 de pedido — 79% e 21%, contra os 60% e 40% declarados.
+
 #### Parâmetros que ainda não existem
 
 Estes pertencem a etapas seguintes e **não** estão na configuração do gerador da origem principal:
@@ -260,6 +266,32 @@ sazonalidade.
 
 Todas as [invariantes de negócio](modelo_de_dados.md#4-invariantes-de-negócio) valem para os dados
 gerados: elas são simultaneamente regra de geração e critério de teste.
+
+**O que a venda respeita, e de onde vem o lastro** (Bloco 5R do
+[plano da base dos consumidores](../PLANO_base_dos_consumidores.md); invariantes 15 a 20). O estado
+do cadastro existe antes das vendas e não é derivado delas: é a venda que o respeita.
+
+- **Quem compra e o que se vende.** Os candidatos de cada carrinho e de cada pedido são escolhidos
+  pelo instante do evento: `pending`, `blocked` e `draft` nunca entram; o cliente `inactive`, o
+  produto `discontinued` e a variante inativa só entram antes da janela deles, contada para trás do
+  fim do período. Há candidato elegível em todo fator, sem tirar nenhum estado do cadastro.
+- **O extravio** sai das remessas em trânsito, de pedido `shipped`. A taxa declarada é fração de
+  todas as remessas despachadas; entre as que estão a caminho a fatia é bem maior, porque num
+  retrato a remessa perdida fica parada onde se perdeu.
+- **O livro do chamado.** Os eventos obrigatórios do estado — a resolução, e a reabertura depois
+  dela — entram antes dos opcionais no orçamento de eventos do chamado.
+- **A reserva** nasce de um item de carrinho ou de pedido em aberto, com o SKU e a quantidade dele.
+  A divisão declarada entre as duas origens é intenção: o que não cabe nos itens de pedido em
+  aberto vai para os carrinhos, e o total de reservas se mantém.
+- **O código do adquirente** é escolhido pelo resultado da transação; só o motivo da recusa é
+  sorteado, pelos pesos declarados.
+- **O estoque de abertura** do par armazém × SKU é dimensionado pela demanda: o par que teria uma
+  saída sem lastro abre o período com a maior falta acumulada dele, mais a folga declarada. Nenhum
+  ajuste é criado para cobrir uma saída.
+- **A cobertura que não depende da semente.** Onde um valor de enumeração nasce de sorteio sobre
+  poucas linhas — a reabertura do chamado, o extravio, a autorização pendente e a aprovada sem
+  captura, os motivos de recusa —, o gerador o garante por construção, como o
+  [piso de cobertura](#41-o-piso-de-cobertura) pede.
 
 **O que já vale e o que ainda não.** Depois da Etapa 4, a lista acima está implementada com uma
 exceção declarada: o **histórico de atributos para dimensões SCD** ainda não é gerado. Ele nasce na

@@ -66,7 +66,7 @@ O que o `pytest` cobre é o que o banco **não** consegue dizer:
 | Configuração | A declaração do gerador confere com os modelos: tabela ausente, coluna inexistente, peso que esquece um valor de enumeração, piso sem motivo |
 | Determinismo | A mesma `seed` com a mesma `as_of_date` produz o mesmo conjunto, comparado por impressão digital; sementes diferentes produzem conjuntos diferentes |
 | Cobertura | As 40 tabelas populadas, todo valor de enumeração presente, proporção dentro da tolerância declarada — e o mesmo em um fator vinte vezes menor, que é o que prova que a garantia é do piso e não do volume |
-| Invariantes | As do [Modelo de Dados §4](modelo_de_dados.md#4-invariantes-de-negócio), sobre o conjunto em memória: as que atravessam linhas passariam pela carga sem serem notadas; as invariantes 13 e 14 também são conferidas no fator reduzido |
+| Invariantes | As do [Modelo de Dados §4](modelo_de_dados.md#4-invariantes-de-negócio), sobre o conjunto em memória: as que atravessam linhas passariam pela carga sem serem notadas; as invariantes 13 e 14 também são conferidas no fator reduzido, e as 15 a 20, com a cobertura não vazia e as contraprovas, também no perfil de que o legado parte |
 | Privacidade | Nenhum e-mail fora de `example.com`, nenhum documento com aparência de válido ([Geração §7](geracao_de_dados.md#7-privacidade-dos-dados-sintéticos)) |
 
 A suíte roda em `make test`. Os testes de integração exigem banco; o que substitui a carga exige
