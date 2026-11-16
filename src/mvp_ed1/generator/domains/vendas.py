@@ -41,6 +41,58 @@ _MOTIVOS = {
     "returned": "Devolução dentro do prazo de arrependimento",
 }
 
+#: Até quando um item entra no carrinho depois da abertura, em horas.
+_JANELA_DE_ITENS_H = 24
+
+
+class Elegiveis:
+    """Quem pode comprar e o que pode ser vendido em cada instante.
+
+    O estado do cliente, o do produto e o `is_active` da variante são o
+    cadastro **de hoje**, sorteados antes das vendas; a venda os respeita no
+    tempo (Geração de Dados §5, invariante 15 do Modelo de Dados §4):
+
+    * cliente `pending` ou `blocked` não compra nunca; o `inactive` só compra
+      antes da janela que precede o fim do período;
+    * produto `draft` não vende nunca; o `discontinued` e a variante inativa só
+      vendem antes da janela deles.
+
+    As duas listas de cada lado são montadas uma vez: o instante só escolhe
+    qual delas vale. Sem candidato que valha sempre, a geração para — a
+    alternativa seria a que este código tinha, completar com quem não podia.
+    """
+
+    def __init__(self, motor: Motor, dados: Dataset) -> None:
+        processo = motor.config.tabelas["orders"].processo
+        self.corte_de_cliente = motor.fim - dt.timedelta(
+            days=processo["cliente_inativo_sem_compra_dias"]
+        )
+        self.corte_de_variante = motor.fim - dt.timedelta(
+            days=processo["variante_fora_de_venda_sem_venda_dias"]
+        )
+        clientes = dados["customers"]
+        self._clientes_sempre = [c for c in clientes if c["status"] == "active"]
+        self._clientes_antes = [c for c in clientes if c["status"] in ("active", "inactive")]
+
+        estado = {linha["id"]: linha["status"] for linha in dados["products"]}
+        variantes = dados["product_variants"]
+        self._variantes_sempre = [
+            v for v in variantes if estado[v["product_id"]] == "active" and v["is_active"]
+        ]
+        self._variantes_antes = [v for v in variantes if estado[v["product_id"]] != "draft"]
+        if not self._clientes_sempre:
+            raise ValueError("nenhum cliente `active`: não há quem possa comprar no período inteiro")
+        if not self._variantes_sempre:
+            raise ValueError(
+                "nenhuma variante ativa de produto `active`: não há o que vender no período inteiro"
+            )
+
+    def clientes(self, momento: dt.datetime) -> list[dict]:
+        return self._clientes_antes if momento < self.corte_de_cliente else self._clientes_sempre
+
+    def variantes(self, momento: dt.datetime) -> list[dict]:
+        return self._variantes_antes if momento < self.corte_de_variante else self._variantes_sempre
+
 
 def canais(motor: Motor, dados: Dataset) -> None:
     n = motor.linhas("sales_channels")
@@ -50,7 +102,7 @@ def canais(motor: Motor, dados: Dataset) -> None:
 # ── Carrinhos ────────────────────────────────────────────────────────────────
 def carrinhos(motor: Motor, dados: Dataset) -> None:
     canais_linhas = dados["sales_channels"]
-    clientes = dados["customers"]
+    elegiveis = Elegiveis(motor, dados)
     fonte = motor.fonte("carts")
     processo = motor.config.tabelas["carts"].processo
     validade = dt.timedelta(days=processo["validade_dias"])
@@ -80,26 +132,38 @@ def carrinhos(motor: Motor, dados: Dataset) -> None:
             aberto_em = motor.relogio.uniforme(fonte, motor.fim - validade)
         else:
             aberto_em = motor.relogio.sazonal(fonte)
-        cliente = None if estado != "converted" and fonte.chance(processo["sessao_anonima"]) else fonte.escolha(clientes)
+        convertido_em = (
+            motor.relogio.depois(aberto_em, fonte, 0.05, 48) if estado == "converted" else None
+        )
+        # O cliente vale no último instante em que o carrinho compra: a
+        # conversão, quando há, e a abertura nos demais.
+        ultimo = convertido_em or aberto_em
+        cliente = (
+            None
+            if estado != "converted" and fonte.chance(processo["sessao_anonima"])
+            else fonte.escolha(elegiveis.clientes(ultimo))
+        )
         esqueletos.append(
             {
                 "customer_id": cliente["id"] if cliente else None,
                 "sales_channel_id": fonte.escolha(canais_linhas)["id"],
                 "status": estado,
                 "expires_at": aberto_em + validade,
-                "converted_at": (
-                    motor.relogio.depois(aberto_em, fonte, 0.05, 48) if estado == "converted" else None
-                ),
+                "converted_at": convertido_em,
                 "created_at": aberto_em,
                 "deleted_at": None,
+                # E a variante, no último instante em que o carrinho recebe um
+                # item ou vira pedido — o que vier depois.
+                "__ultimo": max(ultimo, aberto_em + dt.timedelta(hours=_JANELA_DE_ITENS_H)),
             }
         )
     carrinhos_linhas = dados.guardar("carts", motor.preencher("carts", esqueletos))
-    _itens_de_carrinho(motor, dados, carrinhos_linhas)
+    _itens_de_carrinho(motor, dados, carrinhos_linhas, elegiveis)
 
 
-def _itens_de_carrinho(motor: Motor, dados: Dataset, carrinhos_linhas: list[dict]) -> None:
-    variantes = [v for v in dados["product_variants"] if v["is_active"]] or dados["product_variants"]
+def _itens_de_carrinho(
+    motor: Motor, dados: Dataset, carrinhos_linhas: list[dict], elegiveis: Elegiveis
+) -> None:
     fonte = motor.fonte("cart_items")
     processo = motor.config.tabelas["cart_items"].processo
     minimo, maximo = processo["itens_por_carrinho"]
@@ -112,10 +176,10 @@ def _itens_de_carrinho(motor: Motor, dados: Dataset, carrinhos_linhas: list[dict
     esqueletos: list[dict] = []
     for carrinho, quantidade in zip(carrinhos_linhas, por_carrinho):
         limite = min(carrinho["expires_at"], motor.fim)
-        escolhidas = fonte.amostra(variantes, quantidade)
+        escolhidas = fonte.amostra(elegiveis.variantes(carrinho["__ultimo"]), quantidade)
         for variante in escolhidas:
             adicionado = min(
-                motor.relogio.depois(carrinho["created_at"], fonte, 0, 24), limite
+                motor.relogio.depois(carrinho["created_at"], fonte, 0, _JANELA_DE_ITENS_H), limite
             )
             esqueletos.append(
                 {
@@ -138,9 +202,8 @@ def _itens_de_carrinho(motor: Motor, dados: Dataset, carrinhos_linhas: list[dict
 def pedidos(motor: Motor, dados: Dataset) -> None:
     fonte = motor.fonte("orders")
     processo = motor.config.tabelas["orders"].processo
-    clientes = dados["customers"]
+    elegiveis = Elegiveis(motor, dados)
     canais_linhas = dados["sales_channels"]
-    variantes = dados["product_variants"]
 
     convertidos = [c for c in dados["carts"] if c["status"] == "converted"]
     total = motor.linhas("orders")
@@ -168,12 +231,16 @@ def pedidos(motor: Motor, dados: Dataset) -> None:
             candidatas = [item["__variante"] for item in carrinho.get("__itens", [])]
         else:
             feito_em = motor.relogio.sazonal(fonte)
-            cliente_id = fonte.escolha(clientes)["id"]
+            cliente_id = fonte.escolha(elegiveis.clientes(feito_em))["id"]
             canal_id = fonte.escolha(canais_linhas)["id"]
             candidatas = []
 
         if len(candidatas) < tamanhos[indice]:
-            candidatas = candidatas + fonte_itens.amostra(variantes, tamanhos[indice])
+            # O complemento segue a mesma regra do carrinho, no instante do
+            # pedido: completar com qualquer variante era a porta do `draft`.
+            candidatas = candidatas + fonte_itens.amostra(
+                elegiveis.variantes(feito_em), tamanhos[indice]
+            )
         # SKUs distintos: `uq_order_items_pedido_variante` recusa repetição.
         unicas: dict[int, dict] = {}
         for variante in candidatas:

@@ -7,9 +7,9 @@ livro é percorrido em ordem de acontecimento, e só então o saldo existe.
 
 Duas coisas que essa ordem garante e que sorteio nenhum garantiria:
 
-* o saldo **nunca fica negativo** — quando a expedição não tem lastro, entra um
-  ajuste de entrada antes dela, que é exatamente o que uma operação real faz ao
-  descobrir divergência de inventário;
+* o saldo **nunca fica negativo** — o par que teria saída sem lastro abre o
+  período com o estoque que a demanda dele pede, e não com um ajuste de entrada
+  inventado no minuto anterior à saída;
 * `aggregate_version` é sequencial e sem lacuna dentro de cada par armazém/SKU,
   que é o que a `UNIQUE (warehouse_id, product_variant_id, aggregate_version)`
   do modelo exige e o que o consumidor do streaming vai usar para ordenar.
@@ -18,6 +18,7 @@ Duas coisas que essa ordem garante e que sorteio nenhum garantiria:
 from __future__ import annotations
 
 import datetime as dt
+import math
 from decimal import Decimal
 
 from mvp_ed1.generator.dataset import Dataset
@@ -28,6 +29,10 @@ _MOTIVOS_DE_AJUSTE = (
     "Inventário cíclico", "Avaria em armazém", "Divergência de conferência",
     "Perda por validade", "Correção de lançamento",
 )
+
+#: A carga inicial de estoque do par: uma só, no começo do período.
+_ABERTURA = "ESTOQUE-INICIAL"
+_METADADOS_DA_ABERTURA = {"motivo": "Carga inicial de estoque", "origem": "abertura"}
 
 
 def armazens(motor: Motor, dados: Dataset) -> None:
@@ -43,7 +48,7 @@ def livro(motor: Motor, dados: Dataset) -> None:
     livro bater com ele.
     """
     movimentos = _montar(motor, dados)
-    movimentos = _ordenar_e_versionar(motor, movimentos)
+    movimentos = _ordenar_e_versionar(motor, dados, movimentos)
     dados.guardar("inventory_movements", motor.preencher("inventory_movements", movimentos))
     reservas = _reservas(motor, dados, movimentos)
     _saldos(motor, dados, movimentos, reservas)
@@ -118,10 +123,10 @@ def _estoque_inicial(motor, fonte, processo, armazens_ids, variantes) -> list[di
     escolhidos = sorted(fonte.amostra(range(len(pares)), quantos))
     return [
         _evento(
-            "adjustment_in", "adjustment", "ESTOQUE-INICIAL",
+            "adjustment_in", "adjustment", _ABERTURA,
             pares[i][0], pares[i][1], fonte.inteiro(10, 400), motor.inicio,
             custo=pares[i][2]["__custo"],
-            metadados={"motivo": "Carga inicial de estoque", "origem": "abertura"},
+            metadados=dict(_METADADOS_DA_ABERTURA),
         )
         for i in escolhidos
     ]
@@ -250,12 +255,12 @@ def _ajustes(motor, fonte, armazens_ids, variantes, quantos: int) -> list[dict]:
     return movimentos
 
 
-# ── Ordenação, correção e versionamento ──────────────────────────────────────
-def _ordenar_e_versionar(motor: Motor, movimentos: list[dict]) -> list[dict]:
+# ── Ordenação, lastro e versionamento ───────────────────────────────────────
+def _ordenar_e_versionar(motor: Motor, dados: Dataset, movimentos: list[dict]) -> list[dict]:
     fonte = motor.fonte("inventory_movements")
-    atraso_min, atraso_max = motor.config.tabelas["inventory_movements"].processo[
-        "atraso_de_registro_segundos"
-    ]
+    processo = motor.config.tabelas["inventory_movements"].processo
+    atraso_min, atraso_max = processo["atraso_de_registro_segundos"]
+    custos = {linha["id"]: linha["__custo"] for linha in dados["product_variants"]}
 
     por_agregado: dict[tuple[int, int], list[dict]] = {}
     for movimento in movimentos:
@@ -265,26 +270,13 @@ def _ordenar_e_versionar(motor: Motor, movimentos: list[dict]) -> list[dict]:
     final: list[dict] = []
     for chave in sorted(por_agregado):
         eventos = sorted(por_agregado[chave], key=lambda m: m["occurred_at"])
-        saldo = 0
-        versionados: list[dict] = []
-        for evento in eventos:
-            if saldo + evento["quantity_delta"] < 0:
-                # Sem lastro para a saída: entra a correção de inventário que a
-                # operação real faria, um minuto antes, e o livro segue íntegro.
-                falta = -(saldo + evento["quantity_delta"])
-                correcao = _evento(
-                    "adjustment_in", "adjustment", "AJU-CONFERENCIA",
-                    chave[0], chave[1], falta,
-                    evento["occurred_at"] - dt.timedelta(minutes=1),
-                    custo=evento["unit_cost"],
-                    metadados={"motivo": "Divergência de conferência", "corrige": evento["source_id"]},
-                )
-                versionados.append(correcao)
-                saldo += falta
-            versionados.append(evento)
-            saldo += evento["quantity_delta"]
+        _dar_lastro(motor, chave, eventos, custos[chave[1]], processo["folga_da_abertura"])
 
-        for versao, evento in enumerate(versionados, start=1):
+        saldo = 0
+        for versao, evento in enumerate(eventos, start=1):
+            saldo += evento["quantity_delta"]
+            if saldo < 0:
+                raise ValueError(f"estoque: saldo negativo no par {chave}, versão {versao}")
             evento["aggregate_version"] = versao
             evento["movement_id"] = fonte.uuid()
             evento["causation_id"] = fonte.uuid()
@@ -299,43 +291,101 @@ def _ordenar_e_versionar(motor: Motor, movimentos: list[dict]) -> list[dict]:
     return final
 
 
+def _dar_lastro(
+    motor: Motor, chave: tuple[int, int], eventos: list[dict], custo: Decimal, folga: float
+) -> None:
+    """Abertura dimensionada pela demanda — invariante 20 do Modelo de Dados §4.
+
+    A venda escolhe o armazém sem olhar o estoque, e três em cada dez pares não
+    têm carga inicial: sem isto, a saída encontraria o par vazio. O que faltaria
+    ao longo do período entra na abertura dele, com a folga declarada; o par que
+    não tinha abertura ganha uma. Não há mais ajuste de entrada criado para
+    cobrir a saída no minuto anterior, que fazia o estoque aparecer do nada e
+    deixava o giro do trimestre indefinido.
+    """
+    saldo = falta = 0
+    for evento in eventos:
+        saldo += evento["quantity_delta"]
+        falta = max(falta, -saldo)
+    if not falta:
+        return
+    reforco = math.ceil(falta * (1 + folga))
+    abertura = next((e for e in eventos if e["source_id"] == _ABERTURA), None)
+    if abertura is not None:
+        abertura["quantity_delta"] += reforco
+        return
+    eventos.insert(
+        0,
+        _evento(
+            "adjustment_in", "adjustment", _ABERTURA, chave[0], chave[1], reforco, motor.inicio,
+            custo=custo, metadados=dict(_METADADOS_DA_ABERTURA),
+        ),
+    )
+
+
 # ── Reservas e saldo ─────────────────────────────────────────────────────────
 def _reservas(motor: Motor, dados: Dataset, movimentos: list[dict]) -> list[dict]:
-    """Reserva pendurada em um carrinho **ou** em um pedido, nunca nos dois.
+    """Reserva de um item do carrinho **ou** do pedido a que ela pertence.
 
-    A `CHECK num_nonnulls(cart_id, order_id) = 1` do modelo é a tradução da
-    invariante 8: reserva órfã é saldo travado que ninguém libera.
+    Invariante 18 do Modelo de Dados §4: a reserva é do SKU e da quantidade de
+    um item da própria origem, e cada item é reservado no máximo uma vez —
+    sortear o par armazém/SKU à parte travava saldo de um produto que o cliente
+    nem tinha posto no carrinho. O armazém sai dos que têm movimento daquele
+    SKU: reserva onde nunca houve estoque não ocupa saldo nenhum.
+
+    A `CHECK num_nonnulls(cart_id, order_id) = 1` do modelo garante a origem
+    única. `origem_carrinho` é intenção: os itens de pedido em aberto são
+    poucos, e o que não couber neles vai para os carrinhos, para o total da
+    tabela se manter.
     """
     fonte = motor.fonte("stock_reservations")
     processo = motor.config.tabelas["stock_reservations"].processo
     validade = dt.timedelta(hours=processo["validade_horas"])
-    pares = sorted({(m["warehouse_id"], m["product_variant_id"]) for m in movimentos})
+    armazens_do_sku: dict[int, list[int]] = {}
+    for armazem, variante in sorted({(m["warehouse_id"], m["product_variant_id"]) for m in movimentos}):
+        armazens_do_sku.setdefault(variante, []).append(armazem)
 
-    carrinhos = [c for c in dados["carts"] if c["status"] != "converted"]
-    pedidos = [p for p in dados["orders"] if p["status"] in ("pending", "paid", "picking")]
+    itens_do_pedido: dict[int, list[dict]] = {}
+    for item in dados["order_items"]:
+        itens_do_pedido.setdefault(item["order_id"], []).append(item)
+    de_carrinho = [
+        (carrinho, item)
+        for carrinho in dados["carts"]
+        if carrinho["status"] != "converted"
+        for item in carrinho.get("__itens", [])
+        if item["product_variant_id"] in armazens_do_sku
+    ]
+    de_pedido = [
+        (pedido, item)
+        for pedido in dados["orders"]
+        if pedido["status"] in ("pending", "paid", "picking")
+        for item in itens_do_pedido.get(pedido["id"], [])
+        if item["product_variant_id"] in armazens_do_sku
+    ]
     estados_de_carrinho = {"open": "active", "abandoned": "released", "expired": "expired"}
 
+    total = motor.linhas("stock_reservations")
+    pretendidas = sum(fonte.chance(processo["origem_carrinho"]) for _ in range(total))
+    quantas_de_pedido = min(total - pretendidas, len(de_pedido))
+    quantas_de_carrinho = min(total - quantas_de_pedido, len(de_carrinho))
+    escolhidas = [("cart", par) for par in fonte.amostra(de_carrinho, quantas_de_carrinho)]
+    escolhidas += [("order", par) for par in fonte.amostra(de_pedido, quantas_de_pedido)]
+    fonte.rng.shuffle(escolhidas)
+
     esqueletos: list[dict] = []
-    for indice in range(motor.linhas("stock_reservations")):
-        armazem, variante = pares[fonte.inteiro(0, len(pares) - 1)]
-        de_carrinho = fonte.chance(processo["origem_carrinho"]) and carrinhos
-        if de_carrinho:
-            carrinho = fonte.escolha(carrinhos)
-            criada, estado = carrinho["created_at"], estados_de_carrinho[carrinho["status"]]
-            cart_id, order_id = carrinho["id"], None
-        elif pedidos:
-            pedido = fonte.escolha(pedidos)
-            criada, estado = pedido["placed_at"], "consumed" if pedido["status"] != "pending" else "active"
-            cart_id, order_id = None, pedido["id"]
+    for tipo, (origem, item) in escolhidas:
+        if tipo == "cart":
+            criada, estado = origem["created_at"], estados_de_carrinho[origem["status"]]
         else:
-            continue
+            criada = origem["placed_at"]
+            estado = "consumed" if origem["status"] != "pending" else "active"
         esqueletos.append(
             {
-                "warehouse_id": armazem,
-                "product_variant_id": variante,
-                "cart_id": cart_id,
-                "order_id": order_id,
-                "quantity": fonte.inteiro(1, 5),
+                "warehouse_id": fonte.escolha(armazens_do_sku[item["product_variant_id"]]),
+                "product_variant_id": item["product_variant_id"],
+                "cart_id": origem["id"] if tipo == "cart" else None,
+                "order_id": origem["id"] if tipo == "order" else None,
+                "quantity": item["quantity"],
                 "status": estado,
                 "expires_at": criada + validade,
                 "released_at": None if estado == "active" else min(criada + validade, motor.fim),

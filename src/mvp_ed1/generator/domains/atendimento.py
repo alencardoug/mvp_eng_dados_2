@@ -20,6 +20,10 @@ _CATEGORIAS = ("delivery", "payment", "product", "return", "account", "other")
 _ESTADOS = ("open", "in_progress", "waiting_customer", "resolved", "closed")
 _ENCERRADOS = ("resolved", "closed")
 
+#: Da abertura ao fim do atendimento que resolve, e da resolução à reabertura, em horas.
+_RESOLUCAO_H = (2, 400)
+_REABERTURA_H = (1, 240)
+
 
 def agentes(motor: Motor, dados: Dataset) -> None:
     n = motor.linhas("support_agents")
@@ -62,8 +66,10 @@ def chamados(motor: Motor, dados: Dataset) -> None:
                 "category": categoria,
                 "status": estado,
                 "opened_at": aberto,
+                # Só o `closed` tem data de fechamento (Q24): a resolução do
+                # `resolved` é o evento `resolved` do livro, não esta coluna.
                 "closed_at": (
-                    motor.relogio.depois(aberto, fonte, 2, 400) if estado in _ENCERRADOS else None
+                    motor.relogio.depois(aberto, fonte, *_RESOLUCAO_H) if estado == "closed" else None
                 ),
                 "deleted_at": None,
             }
@@ -126,43 +132,75 @@ def _fatos(motor: Motor, dados: Dataset) -> list[dict]:
 
 
 def _eventos(motor: Motor, dados: Dataset, chamados_linhas: list[dict]) -> None:
+    """O livro de cada chamado, coerente com o estado em que ele parou.
+
+    Invariante 17 do Modelo de Dados §4: todo chamado `resolved` ou `closed`
+    tem o evento `resolved`, e todo `reopened` vem depois de um. Por isso os
+    eventos **obrigatórios** entram primeiro e os opcionais ocupam o que sobra
+    do orçamento — cortar a lista pronta no tamanho sorteado tirava justamente
+    a resolução dos chamados de dois eventos.
+    """
     fonte = motor.fonte("ticket_events")
     por_chamado = repartir(
         motor.linhas("ticket_events"), len(chamados_linhas), fonte, minimo=2, maximo=9
     )
 
-    # O primeiro chamado em andamento é sempre reaberto: sem isso `reopened`
-    # depende de 25% de 14% dos chamados e desaparece em fator pequeno.
+    # O primeiro chamado em andamento que couber é sempre reaberto: sem isso
+    # `reopened` depende de 25% de 14% dos chamados e desaparece em fator pequeno.
     reabertura_pendente = True
 
     esqueletos: list[dict] = []
     for chamado, quantidade in zip(chamados_linhas, por_chamado):
+        aberto = chamado["opened_at"]
         tipos = ["created"]
         if chamado["assigned_agent_id"]:
             tipos.append("assigned")
-        while len(tipos) < quantidade - 1:
-            tipos.append("message" if fonte.chance(0.7) else "status_changed")
-        if chamado["status"] in _ENCERRADOS:
-            tipos.append("resolved")
-        elif chamado["status"] == "in_progress" and (reabertura_pendente or fonte.chance(0.25)):
-            tipos.append("reopened")
-            reabertura_pendente = False
-        tipos = tipos[:max(quantidade, 1)]
 
-        fim = chamado["closed_at"] or motor.fim
-        passo = max((fim - chamado["opened_at"]) / max(len(tipos), 1), dt.timedelta(minutes=15))
-        momento = chamado["opened_at"]
+        # Até quando vai o atendimento que termina em resolução. O chamado
+        # fechado tem a data dele; o resolvido e o reaberto sorteiam a sua na
+        # mesma faixa — usar o fim do período levaria a resolução a meses da
+        # abertura. O que continua aberto se espalha até o fim, como antes.
+        reaberto = False
+        if chamado["status"] == "closed":
+            horizonte = chamado["closed_at"]
+        elif chamado["status"] == "resolved":
+            horizonte = motor.relogio.depois(aberto, fonte, *_RESOLUCAO_H)
+        elif chamado["status"] == "in_progress" and (reabertura_pendente or fonte.chance(0.25)):
+            horizonte = motor.relogio.depois(aberto, fonte, *_RESOLUCAO_H)
+            # Reabrir pede tempo depois da resolução: sem ele o chamado segue
+            # em andamento sem as duas, e a reabertura garantida fica para o próximo.
+            reaberto = horizonte < motor.fim
+            if reaberto:
+                reabertura_pendente = False
+            else:
+                horizonte = motor.fim
+        else:
+            horizonte = motor.fim
+
+        finais = ["resolved"] if chamado["status"] in _ENCERRADOS or reaberto else []
+        opcionais = quantidade - len(tipos) - len(finais) - (1 if reaberto else 0)
+        for _ in range(max(opcionais, 0)):
+            tipos.append("message" if fonte.chance(0.7) else "status_changed")
+        tipos += finais
+
+        passo = max((horizonte - aberto) / len(tipos), dt.timedelta(minutes=15))
+        momento = aberto
         for tipo in tipos:
-            esqueletos.append(
-                {
-                    "ticket_id": chamado["id"],
-                    "agent_id": (
-                        chamado["assigned_agent_id"] if tipo != "created" and fonte.chance(0.8) else None
-                    ),
-                    "event_type": tipo,
-                    "occurred_at": momento,
-                    "created_at": momento,
-                }
-            )
+            esqueletos.append(_evento(chamado, tipo, momento, fonte))
+            ultimo = momento
             momento = min(momento + passo, motor.fim)
+        if reaberto:
+            esqueletos.append(
+                _evento(chamado, "reopened", motor.relogio.depois(ultimo, fonte, *_REABERTURA_H), fonte)
+            )
     dados.guardar("ticket_events", motor.preencher("ticket_events", esqueletos))
+
+
+def _evento(chamado: dict, tipo: str, momento: dt.datetime, fonte) -> dict:
+    return {
+        "ticket_id": chamado["id"],
+        "agent_id": chamado["assigned_agent_id"] if tipo != "created" and fonte.chance(0.8) else None,
+        "event_type": tipo,
+        "occurred_at": momento,
+        "created_at": momento,
+    }

@@ -17,7 +17,7 @@ from decimal import Decimal
 
 from mvp_ed1.generator.dataset import Dataset
 from mvp_ed1.generator.engine import Motor
-from mvp_ed1.generator.rng import dinheiro
+from mvp_ed1.generator.rng import cobrir, dinheiro
 
 #: Meios em que parcelamento não existe.
 _A_VISTA = ("pix", "boleto", "debit_card")
@@ -38,6 +38,14 @@ def fluxo(motor: Motor, dados: Dataset) -> None:
     transacoes: list[dict] = []
     reembolsos: list[dict] = []
 
+    # Os dois desfechos do pedido em aberto aparecem em qualquer fator e
+    # semente (F29): sorteados meio a meio, um deles some quando os pedidos em
+    # aberto são poucos — o perfil do legado não tinha autorização `pending`.
+    em_aberto = {
+        "restam": sum(1 for pedido in dados["orders"] if _em_aberto(pedido)),
+        "faltam": ["pending", "authorized"],
+    }
+
     for pedido in dados["orders"]:
         caminho = pedido["__caminho"]
         momentos = pedido["__momentos"]
@@ -55,7 +63,9 @@ def fluxo(motor: Motor, dados: Dataset) -> None:
                 _transacao(recusada, "authorization", "failed", valor, momentos["pending"], fonte)
             )
 
-        estado, autorizado_em, capturado_em = _desfecho(pedido, caminho, momentos, fonte)
+        estado, autorizado_em, capturado_em = _desfecho(
+            pedido, caminho, momentos, fonte, em_aberto
+        )
         pagamento = _pagamento(pedido, metodo, valor, parcelas, estado, autorizado_em, capturado_em)
         pagamentos.append(pagamento)
 
@@ -97,6 +107,7 @@ def fluxo(motor: Motor, dados: Dataset) -> None:
             _reembolsar(motor, fonte, pedido, captura, capturado, transacoes, reembolsos)
 
     dados.guardar("payments", motor.preencher("payments", pagamentos))
+    _codigos_de_retorno(motor, transacoes)
     for transacao in transacoes:
         transacao["payment_id"] = transacao.pop("__pagamento")["id"]
     dados.guardar("payment_transactions", motor.preencher("payment_transactions", transacoes))
@@ -105,8 +116,20 @@ def fluxo(motor: Motor, dados: Dataset) -> None:
     dados.guardar("refunds", motor.preencher("refunds", reembolsos))
 
 
-def _desfecho(pedido: dict, caminho: tuple[str, ...], momentos: dict, fonte):
-    """Estado do pagamento e as duas datas que a `CHECK` do modelo relaciona."""
+def _em_aberto(pedido: dict) -> bool:
+    """Pedido que ainda não foi pago nem encerrado: o pagamento dele está em curso."""
+    return "paid" not in pedido["__caminho"] and pedido["status"] not in ("returned", "cancelled")
+
+
+def _desfecho(pedido: dict, caminho: tuple[str, ...], momentos: dict, fonte, em_aberto: dict):
+    """Estado do pagamento e as duas datas que a `CHECK` do modelo relaciona.
+
+    `em_aberto` leva a cobertura garantida dos pedidos em aberto: quantos ainda
+    restam e que desfechos ainda não saíram. O sorteio é o de sempre; só quando
+    os pedidos que restam são tantos quantos os desfechos que faltam é que o
+    sorteado cede o lugar ao que falta — como a reabertura garantida do
+    atendimento, sem mexer na proporção em volume que valha medir.
+    """
     final = pedido["status"]
     if final == "returned":
         return "refunded", momentos["pending"], momentos["paid"]
@@ -116,7 +139,14 @@ def _desfecho(pedido: dict, caminho: tuple[str, ...], momentos: dict, fonte):
         if "paid" in caminho:
             return "cancelled", momentos["pending"], None
         return ("cancelled" if fonte.chance(0.5) else "failed"), momentos["pending"], None
-    return ("pending" if fonte.chance(0.5) else "authorized"), momentos["pending"], None
+    estado = "pending" if fonte.chance(0.5) else "authorized"
+    faltam = em_aberto["faltam"]
+    if estado not in faltam and faltam and em_aberto["restam"] <= len(faltam):
+        estado = faltam[0]
+    if estado in faltam:
+        faltam.remove(estado)
+    em_aberto["restam"] -= 1
+    return estado, momentos["pending"], None
 
 
 def _pagamento(pedido, metodo, valor, parcelas, estado, autorizado_em, capturado_em) -> dict:
@@ -143,6 +173,25 @@ def _transacao(pagamento, tipo, resultado, valor, momento, fonte) -> dict:
         "occurred_at": momento,
         "created_at": momento,
     }
+
+
+def _codigos_de_retorno(motor: Motor, transacoes: list[dict]) -> None:
+    """O código do adquirente segue o resultado — invariante 19 do Modelo de Dados §4.
+
+    A aprovada e a pendente têm um código só; a recusada sorteia o motivo pelos
+    pesos declarados, com a cobertura garantida quando há recusas que bastem:
+    em fator pequeno, um motivo de peso 10 sumiria do dado.
+    """
+    mapa = motor.config.tabelas["payment_transactions"].processo["codigo_de_retorno"]
+    fonte = motor.fonte("payment_transactions")
+    motivos = {str(codigo): peso for codigo, peso in mapa["failed"].items()}
+    recusadas = [t for t in transacoes if t["result"] == "failed"]
+    sorteados = cobrir([fonte.ponderada(motivos) for _ in recusadas], sorted(motivos))
+    for transacao, codigo in zip(recusadas, sorteados):
+        transacao["gateway_response_code"] = codigo
+    for transacao in transacoes:
+        if transacao["result"] != "failed":
+            transacao["gateway_response_code"] = str(mapa[transacao["result"]])
 
 
 def _reembolsar(motor, fonte, pedido, captura, capturado, transacoes, reembolsos) -> None:

@@ -369,6 +369,15 @@ tabelas:
       frete_gratis: 0.22
       aliquota_de_imposto: 0.12
       desconto_de_item: 0.18
+      # Quem compra e o que se vende (F24; Q21, Q23 e Q39 do plano da base dos
+      # consumidores). O estado do cadastro é o de hoje, e a venda o respeita no
+      # tempo: o cliente `inactive` só tem carrinho e pedido antes dos dias
+      # abaixo, contados para trás do fim do período — a janela do cliente
+      # ativo do glossário —, e o produto `discontinued` e a variante inativa
+      # só vendem antes dos deles. `pending`, `blocked` e `draft` não têm
+      # janela: não compram nem vendem nunca. Valem para `carts` também.
+      cliente_inativo_sem_compra_dias: 180
+      variante_fora_de_venda_sem_venda_dias: 90
       # Distribuição do estado final. Todo estado do modelo precisa aparecer;
       # os pesos decidem quanto de cada um, não se ele existe.
       estado_final:
@@ -426,9 +435,22 @@ tabelas:
     referencia: 71500
     origem: processo
     nota: Autorização, captura, estorno e reembolso; invariante 3 — captura nunca excede o autorizado.
+    processo:
+      # O código de retorno segue o resultado da transação (F22; Q26 e Q41 do
+      # plano da base dos consumidores) — antes era sorteado sem olhar para ele,
+      # e o `51` aparecia em autorização aprovada. A aprovada leva sempre `00`;
+      # a pendente, `GW-OK`: o gateway aceitou a requisição e a resposta do
+      # adquirente ainda não chegou. A recusada sorteia o motivo pelos pesos:
+      # `51` saldo insuficiente, `05` não autorizada (genérica), `57` transação
+      # não permitida, `91` emissor indisponível, `GW-TIMEOUT` sem resposta do
+      # adquirente no prazo. O significado de cada código vive no catálogo dos
+      # domínios (`docs/glossario_de_negocio/dominios.yml`).
+      codigo_de_retorno:
+        succeeded: "00"
+        pending: "GW-OK"
+        failed: {"51": 40, "05": 30, "57": 10, "91": 10, "GW-TIMEOUT": 10}
     colunas:
       transaction_code: {sequencia: "TRX-{n:08d}"}
-      gateway_response_code: {valores: ["00", "05", "51", "57", "91", "GW-OK", "GW-TIMEOUT"]}
 
   refunds:
     referencia: 1400
@@ -471,6 +493,12 @@ tabelas:
       # itens recebidos não conseguem estocar 2.500 pares distintos. Abaixo de
       # 1 porque recebimento, transferência e ajuste também abrem pares novos.
       cobertura_de_saldo: 0.70
+      # O par que tem saída sem lastro abre o período com estoque: a maior
+      # falta acumulada dele, mais esta folga (V4 das Pendências; Q26 e Q42 do
+      # plano da base dos consumidores). Substitui o ajuste de entrada que o
+      # gerador criava um minuto antes de cada saída descoberta. Com folga
+      # zero, o par zera no fim do dia e o giro do trimestre fica indefinido.
+      folga_da_abertura: 0.5
       # Movimentos que não vêm de compra nem de venda, em fração do total.
       transferencias: 0.05
       ajustes: 0.05
@@ -484,6 +512,10 @@ tabelas:
     origem: processo
     processo:
       validade_horas: 48
+      # Intenção, não medida: cada item é reservado no máximo uma vez (F27), e
+      # os itens de pedido em aberto são poucos. O que não cabe neles vai para
+      # os carrinhos, e o total de reservas se mantém (Q45 do plano da base dos
+      # consumidores).
       origem_carrinho: 0.6
     colunas:
       reservation_code: {sequencia: "RSV-{n:08d}"}
@@ -511,6 +543,9 @@ tabelas:
       remessa_dividida: 0.22
       prazo_prometido_dias: {standard: [4, 9], express: [2, 4], same_day: [0, 1]}
       atraso_na_entrega: 0.14
+      # Fração de todas as remessas despachadas. As extraviadas saem das que
+      # estão a caminho, as de pedido `shipped` (F25; Q22 e Q43 do plano da base
+      # dos consumidores): entre elas a fatia é bem maior que esta.
       extravio: 0.004
     colunas:
       shipment_code: {sequencia: "SHP-{n:08d}"}

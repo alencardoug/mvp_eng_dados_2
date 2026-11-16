@@ -24,6 +24,9 @@ _ESTADO_POR_PEDIDO = {
     "returned": ("returned",),
 }
 
+#: Remessa a caminho: a única que pode se extraviar.
+_EM_TRANSITO = ("dispatched", "in_transit")
+
 #: Remessa que saiu do armazém — é o que baixa estoque.
 DESPACHADAS = ("dispatched", "in_transit", "delivered", "returned", "lost")
 
@@ -62,8 +65,6 @@ def remessas(motor: Motor, dados: Dataset) -> None:
 
         for batch in batches:
             estado = fonte.escolha(estados)
-            if estado == "delivered" and fonte.chance(processo["extravio"]):
-                estado = "lost"
             remessa = _remessa(
                 motor, fonte, pedido, transportadora, armazem, estado, frete_por_lote, processo
             )
@@ -84,24 +85,27 @@ def remessas(motor: Motor, dados: Dataset) -> None:
                     }
                 )
 
-    _garantir_extravio(remessas_linhas)
+    _extraviar(remessas_linhas, fonte, processo["extravio"])
     dados.guardar("shipments", motor.preencher("shipments", remessas_linhas))
     dados.guardar("shipment_items", motor.preencher("shipment_items", itens_de_remessa))
     _eventos(motor, dados, remessas_linhas)
 
 
-def _garantir_extravio(remessas_linhas: list[dict]) -> None:
-    """`lost` é 0,4% das remessas: em fator pequeno, some.
+def _extraviar(remessas_linhas: list[dict], fonte, taxa: float) -> None:
+    """O extravio é da remessa que saiu e não chegou — invariante 16 do Modelo de Dados §4.
 
-    A remessa extraviada vira `lost` a partir de uma que estava em trânsito —
-    não de uma entregue, que seria contradição com o estado do pedido.
+    A taxa é sobre **todas** as remessas despachadas, e as extraviadas saem das
+    que estão a caminho, as de pedido `shipped`: `lost` em pedido `delivered`
+    contradiz o estado do pedido. A remessa perdida não anda mais, e por isso se
+    acumula entre as "em trânsito" — é esperado que seja uma fatia alta delas.
+
+    Ao menos uma, em qualquer fator: 0,4% de poucas remessas arredonda para zero.
     """
-    if any(remessa["status"] == "lost" for remessa in remessas_linhas):
-        return
-    for remessa in remessas_linhas:
-        if remessa["status"] in ("dispatched", "in_transit"):
-            remessa["status"] = "lost"
-            return
+    a_caminho = [remessa for remessa in remessas_linhas if remessa["status"] in _EM_TRANSITO]
+    despachadas = sum(1 for remessa in remessas_linhas if remessa["status"] in DESPACHADAS)
+    quantas = min(max(round(despachadas * taxa), 1), len(a_caminho))
+    for remessa in fonte.amostra(a_caminho, quantas):
+        remessa["status"] = "lost"
 
 
 def _remessa(motor, fonte, pedido, transportadora, armazem, estado, frete, processo) -> dict:

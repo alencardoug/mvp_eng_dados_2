@@ -82,6 +82,13 @@ def produtos(motor: Motor, dados: Dataset) -> None:
     fonte_v = motor.fonte("product_variants")
     total = motor.linhas("product_variants")
     por_produto = repartir(total, len(produtos_linhas), fonte_v, minimo=1, maximo=5)
+    # Em fator muito pequeno há menos variantes do que produtos, e a única pode
+    # cair num produto `draft`: aí não haveria o que vender (invariante 15). O
+    # primeiro produto `active` troca de lugar com o primeiro que levou variante.
+    ativos = [i for i, produto in enumerate(produtos_linhas) if produto["status"] == "active"]
+    if ativos and not any(por_produto[i] for i in ativos):
+        com_variante = next(i for i, quantidade in enumerate(por_produto) if quantidade)
+        por_produto[ativos[0]], por_produto[com_variante] = por_produto[com_variante], 0
 
     variantes: list[dict] = []
     for produto, quantidade in zip(produtos_linhas, por_produto):
@@ -97,6 +104,12 @@ def produtos(motor: Motor, dados: Dataset) -> None:
                     "__custo": preco(valor / Decimal(str(fonte_v.rng.uniform(margem_min, margem_max)))),
                 }
             )
+    # E ao menos uma variante que vale no período inteiro: com 6% de inativas, o
+    # sorteio deixaria o catálogo de uma variante só sem nenhuma à venda.
+    estado = {produto["id"]: produto["status"] for produto in produtos_linhas}
+    do_ativo = [v for v in variantes if estado[v["product_id"]] == "active"]
+    if do_ativo and not any(v["is_active"] for v in do_ativo):
+        do_ativo[0]["is_active"] = True
     dados.guardar("product_variants", motor.preencher("product_variants", variantes))
 
 
