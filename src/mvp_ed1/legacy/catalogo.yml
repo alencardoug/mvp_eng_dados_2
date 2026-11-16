@@ -67,12 +67,19 @@
 # mesmo linha a linha; a leitura literal foi decidida pelo Owner em 15/09/2026,
 # como na 8.
 #
+# A 10 acrescenta `stock_reservations.expires_at` às `promessas`: a validade da
+# reserva é prazo, e a reserva ativa no corte vence até 48 h depois dele. Sem
+# a dispensa, `DATE_FUTURE` rejeitava reserva íntegra — o lote de antes não
+# tinha nenhuma vencendo depois do corte, por acaso da semente, e o do Bloco 5R
+# tem (F30; Q48 do plano da base dos consumidores, 16/11/2026). O injetor deixa
+# de plantar `DATE_FUTURE` nessa coluna, e a limpeza, de procurá-lo ali.
+#
 # **Quando avançar:** sempre que o tratamento passar a produzir resultado
 # diferente — regra nova, conversão alterada, coluna nova na classificação —
 # ou sempre que a impressão digital mover. É a pergunta que
 # `legacy_versao_do_tratamento_e_univoca` faz em voz alta quando alguém
 # esquece: sob uma versão, um tratamento.
-versao: 9
+versao: 10
 
 # ── Geração desta origem ──────────────────────────────────────────────────────
 # Semente **própria**, distinta da origem principal (Origem Legada §3.2): as
@@ -116,6 +123,9 @@ nulos_disfarcados: ["NULL", "null", "N/A", "-", "#N/D", "   "]
 # exceção precisa de nome.
 promessas:
   - carts.expires_at
+  # A validade da reserva é prazo, como a do carrinho: a reserva ativa no corte
+  # vence até 48 h depois dele (F30; Q48 do plano da base dos consumidores).
+  - stock_reservations.expires_at
   - shipments.estimated_delivery_at
   - purchase_orders.expected_at
   - campaigns.valid_to

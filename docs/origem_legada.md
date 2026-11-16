@@ -195,7 +195,7 @@ otimização: sem elas, o tratamento rejeitava **1.508 registros perfeitos** —
 
 | Lista | Por que existe |
 |---|---|
-| `promessas` | `carts.expires_at` é uma data futura por natureza; `DATE_FUTURE` ali condenaria 127 carrinhos corretos |
+| `promessas` | `carts.expires_at` é uma data futura por natureza; `DATE_FUTURE` ali condenaria 127 carrinhos corretos. A validade da reserva (`stock_reservations.expires_at`) é o mesmo caso, e entrou na versão 10 do catálogo |
 | `quantidades_com_sinal` | `quantity_delta` é assinado — saída de estoque é negativa —, e o sinal ali não é defeito. Eram 388 movimentos |
 | `colunas_estreitadas` | O sistema antigo apertou **alguns** campos livres, não todos. `currency` sempre teve três caracteres, e truncá-la produzia 987 rejeições de valores certos |
 | `dominios_fechados` | Tabela que guarda **valores**, não coisas, não recebe injeção. O sorteio é uniforme, e acertar uma das três linhas de `sales_channels` cascateava para 3.564 carrinhos — 64% de toda a cascata vinha daí |

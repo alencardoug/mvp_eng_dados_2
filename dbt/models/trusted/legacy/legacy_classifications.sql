@@ -256,10 +256,10 @@ summaries as (
     group by f.source_system, f.snapshot_id, f.source_table, f.legacy_row_id
 )
 select r.source_system, r.snapshot_id, r.snapshot_at, r.source_table, r.legacy_row_id,
-    cast(9 as int64) as catalog_version,
+    cast(10 as int64) as catalog_version,
     -- A impressão digital do tratamento é a do texto PostgreSQL (D34): esta versão
     -- é a mesma regra noutro dialeto, provada igual pelo oráculo semântico.
-    "607e6288f4f57e39" as treatment_fingerprint,
+    "54dc3de09c27b47d" as treatment_fingerprint,
     r.original_payload, r.cleaned_payload,
     case when s.has_rejection then 'rejected'
          when s.has_correction then 'corrected' else 'accepted' end as classification,
@@ -487,11 +487,11 @@ summaries as (
     group by f.source_system, f.snapshot_id, f.source_table, f.legacy_row_id
 )
 select r.source_system, r.snapshot_id, r.snapshot_at, r.source_table, r.legacy_row_id,
-    9::integer as catalog_version,
+    10::integer as catalog_version,
     -- Impressão digital do tratamento (D34): a versão é o rótulo humano, esta
     -- é a identidade do que ele de fato produz. É por ela que a quarentena
     -- recusa substituir uma auditoria sob a mesma versão.
-    '607e6288f4f57e39'::text as treatment_fingerprint,
+    '54dc3de09c27b47d'::text as treatment_fingerprint,
     r.original_payload, r.cleaned_payload,
     case when s.has_rejection then 'rejected'
          when s.has_correction then 'corrected' else 'accepted' end::text as classification,

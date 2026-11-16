@@ -235,36 +235,6 @@ WITH captura AS (
       END
       THEN c.`expires_at`
       WHEN CASE
-        WHEN REGEXP_CONTAINS(c.`expires_at`, '^[0-9]{4}-[0-9]{2}-[0-9]{2}')
-        AND (
-          CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64) BETWEEN 1 AND 9999
-          AND CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) BETWEEN 1 AND 12
-          AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) BETWEEN 1 AND 31
-          AND NOT (
-            CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) IN (4, 6, 9, 11)
-            AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) > 30
-          )
-          AND NOT (
-            CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) = 2
-            AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) > 29
-          )
-          AND NOT (
-            CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) = 2
-            AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) = 29
-            AND NOT (
-              MOD(CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64), 4) = 0
-              AND (
-                MOD(CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64), 100) <> 0
-                OR MOD(CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64), 400) = 0
-              )
-            )
-          )
-        )
-        THEN CAST(LEFT(c.`expires_at`, 10) AS DATE) > CAST('{{ var("as_of_date") }}' AS DATE)
-        ELSE FALSE
-      END
-      THEN c.`expires_at`
-      WHEN CASE
         WHEN REGEXP_CONTAINS(c.`expires_at`, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$')
         THEN (
           CAST(SUBSTRING(c.`expires_at`, 7, 4) AS INT64) BETWEEN 1 AND 9999
@@ -1403,36 +1373,6 @@ SELECT
           ELSE FALSE
         END
         THEN 'DATE_IMPOSSIBLE'
-        WHEN CASE
-          WHEN REGEXP_CONTAINS(l.`expires_at`, '^[0-9]{4}-[0-9]{2}-[0-9]{2}')
-          AND (
-            CAST(SUBSTRING(l.`expires_at`, 1, 4) AS INT64) BETWEEN 1 AND 9999
-            AND CAST(SUBSTRING(l.`expires_at`, 6, 2) AS INT64) BETWEEN 1 AND 12
-            AND CAST(SUBSTRING(l.`expires_at`, 9, 2) AS INT64) BETWEEN 1 AND 31
-            AND NOT (
-              CAST(SUBSTRING(l.`expires_at`, 6, 2) AS INT64) IN (4, 6, 9, 11)
-              AND CAST(SUBSTRING(l.`expires_at`, 9, 2) AS INT64) > 30
-            )
-            AND NOT (
-              CAST(SUBSTRING(l.`expires_at`, 6, 2) AS INT64) = 2
-              AND CAST(SUBSTRING(l.`expires_at`, 9, 2) AS INT64) > 29
-            )
-            AND NOT (
-              CAST(SUBSTRING(l.`expires_at`, 6, 2) AS INT64) = 2
-              AND CAST(SUBSTRING(l.`expires_at`, 9, 2) AS INT64) = 29
-              AND NOT (
-                MOD(CAST(SUBSTRING(l.`expires_at`, 1, 4) AS INT64), 4) = 0
-                AND (
-                  MOD(CAST(SUBSTRING(l.`expires_at`, 1, 4) AS INT64), 100) <> 0
-                  OR MOD(CAST(SUBSTRING(l.`expires_at`, 1, 4) AS INT64), 400) = 0
-                )
-              )
-            )
-          )
-          THEN CAST(LEFT(l.`expires_at`, 10) AS DATE) > CAST('{{ var("as_of_date") }}' AS DATE)
-          ELSE FALSE
-        END
-        THEN 'DATE_FUTURE'
         WHEN NOT (
           REGEXP_CONTAINS(l.`expires_at`, '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
           OR REGEXP_CONTAINS(l.`expires_at`, '^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}$')
@@ -1542,36 +1482,6 @@ SELECT
           ELSE FALSE
         END
         THEN 'DATE_IMPOSSIBLE'
-        WHEN CASE
-          WHEN REGEXP_CONTAINS(c.`expires_at`, '^[0-9]{4}-[0-9]{2}-[0-9]{2}')
-          AND (
-            CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64) BETWEEN 1 AND 9999
-            AND CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) BETWEEN 1 AND 12
-            AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) BETWEEN 1 AND 31
-            AND NOT (
-              CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) IN (4, 6, 9, 11)
-              AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) > 30
-            )
-            AND NOT (
-              CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) = 2
-              AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) > 29
-            )
-            AND NOT (
-              CAST(SUBSTRING(c.`expires_at`, 6, 2) AS INT64) = 2
-              AND CAST(SUBSTRING(c.`expires_at`, 9, 2) AS INT64) = 29
-              AND NOT (
-                MOD(CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64), 4) = 0
-                AND (
-                  MOD(CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64), 100) <> 0
-                  OR MOD(CAST(SUBSTRING(c.`expires_at`, 1, 4) AS INT64), 400) = 0
-                )
-              )
-            )
-          )
-          THEN CAST(LEFT(c.`expires_at`, 10) AS DATE) > CAST('{{ var("as_of_date") }}' AS DATE)
-          ELSE FALSE
-        END
-        THEN 'DATE_FUTURE'
         WHEN CASE
           WHEN REGEXP_CONTAINS(c.`expires_at`, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$')
           THEN (
@@ -3112,7 +3022,6 @@ limpo as {{ 'materialized ' if target.type == 'postgres' else '' }}(
         case
             when btrim(c."expires_at") = '' or btrim(c."expires_at") in ('NULL', 'null', 'N/A', '-', '#N/D', '   ') then null
             when case when c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$'   then not ((substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) and (substring(c."expires_at" from '[ T]([0-9]{2}):[0-9]{2}')::int between 0 and 23 and substring(c."expires_at" from '[ T][0-9]{2}:([0-9]{2})')::int between 0 and 59 and coalesce(substring(c."expires_at" from '[ T][0-9]{2}:[0-9]{2}:([0-9]{2})'), '00')::int between 0 and 59) and (coalesce(substring(c."expires_at" from '[+-]([0-9]{2})(:?[0-9]{2})?$'), '00')::int between 0 and 15 and coalesce(substring(c."expires_at" from '[+-][0-9]{2}:?([0-9]{2})$'), '00')::int between 0 and 59)) when c."expires_at" ~ '^[0-9]{4}[-.][0-9]{2}[-.][0-9]{2}$'   then not (substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) when c."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'   then not (substring(c."expires_at" from 7 for 4)::int between 1 and 9999 and substring(c."expires_at" from 4 for 2)::int between 1 and 12 and substring(c."expires_at" from 1 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 4 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 1 for 2)::int > 30) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int > 29) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int = 29 and not (substring(c."expires_at" from 7 for 4)::int % 4 = 0 and (substring(c."expires_at" from 7 for 4)::int % 100 <> 0 or substring(c."expires_at" from 7 for 4)::int % 400 = 0)))) when c."expires_at" ~ '^[0-9]{2}/[0-9]{4}$' then true else false end then c."expires_at"
-            when case when c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' and (substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) then left(c."expires_at", 10)::date > date '{{ var("as_of_date") }}' else false end then c."expires_at"
             when case when c."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'   then (substring(c."expires_at" from 7 for 4)::int between 1 and 9999 and substring(c."expires_at" from 4 for 2)::int between 1 and 12 and substring(c."expires_at" from 1 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 4 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 1 for 2)::int > 30) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int > 29) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int = 29 and not (substring(c."expires_at" from 7 for 4)::int % 4 = 0 and (substring(c."expires_at" from 7 for 4)::int % 100 <> 0 or substring(c."expires_at" from 7 for 4)::int % 400 = 0)))) when c."expires_at" ~ '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$'   then (substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) else false end then case when c."expires_at" ~ '^[0-9]{2}/' then to_date(c."expires_at", 'DD/MM/YYYY')::text else to_date(c."expires_at", 'YYYY.MM.DD')::text end
             when c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$' and c."expires_at" !~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' and (substring(c."expires_at" from '[ T]([0-9]{2}):[0-9]{2}')::int between 0 and 23 and substring(c."expires_at" from '[ T][0-9]{2}:([0-9]{2})')::int between 0 and 59 and coalesce(substring(c."expires_at" from '[ T][0-9]{2}:[0-9]{2}:([0-9]{2})'), '00')::int between 0 and 59) then (c."expires_at"::timestamp at time zone 'America/Sao_Paulo')::text
             when not (c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' or c."expires_at" ~ '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$' or c."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$' or c."expires_at" ~ '^[0-9]{2}/[0-9]{4}$' or c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$') then c."expires_at"
@@ -3207,11 +3116,9 @@ select
         end,
             'expires_at', case
             when case when l."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$'   then not ((substring(l."expires_at" from 1 for 4)::int between 1 and 9999 and substring(l."expires_at" from 6 for 2)::int between 1 and 12 and substring(l."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(l."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(l."expires_at" from 9 for 2)::int > 30) and not (substring(l."expires_at" from 6 for 2)::int = 2 and substring(l."expires_at" from 9 for 2)::int > 29) and not (substring(l."expires_at" from 6 for 2)::int = 2 and substring(l."expires_at" from 9 for 2)::int = 29 and not (substring(l."expires_at" from 1 for 4)::int % 4 = 0 and (substring(l."expires_at" from 1 for 4)::int % 100 <> 0 or substring(l."expires_at" from 1 for 4)::int % 400 = 0)))) and (substring(l."expires_at" from '[ T]([0-9]{2}):[0-9]{2}')::int between 0 and 23 and substring(l."expires_at" from '[ T][0-9]{2}:([0-9]{2})')::int between 0 and 59 and coalesce(substring(l."expires_at" from '[ T][0-9]{2}:[0-9]{2}:([0-9]{2})'), '00')::int between 0 and 59) and (coalesce(substring(l."expires_at" from '[+-]([0-9]{2})(:?[0-9]{2})?$'), '00')::int between 0 and 15 and coalesce(substring(l."expires_at" from '[+-][0-9]{2}:?([0-9]{2})$'), '00')::int between 0 and 59)) when l."expires_at" ~ '^[0-9]{4}[-.][0-9]{2}[-.][0-9]{2}$'   then not (substring(l."expires_at" from 1 for 4)::int between 1 and 9999 and substring(l."expires_at" from 6 for 2)::int between 1 and 12 and substring(l."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(l."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(l."expires_at" from 9 for 2)::int > 30) and not (substring(l."expires_at" from 6 for 2)::int = 2 and substring(l."expires_at" from 9 for 2)::int > 29) and not (substring(l."expires_at" from 6 for 2)::int = 2 and substring(l."expires_at" from 9 for 2)::int = 29 and not (substring(l."expires_at" from 1 for 4)::int % 4 = 0 and (substring(l."expires_at" from 1 for 4)::int % 100 <> 0 or substring(l."expires_at" from 1 for 4)::int % 400 = 0)))) when l."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'   then not (substring(l."expires_at" from 7 for 4)::int between 1 and 9999 and substring(l."expires_at" from 4 for 2)::int between 1 and 12 and substring(l."expires_at" from 1 for 2)::int between 1 and 31 and not (substring(l."expires_at" from 4 for 2)::int in (4, 6, 9, 11) and substring(l."expires_at" from 1 for 2)::int > 30) and not (substring(l."expires_at" from 4 for 2)::int = 2 and substring(l."expires_at" from 1 for 2)::int > 29) and not (substring(l."expires_at" from 4 for 2)::int = 2 and substring(l."expires_at" from 1 for 2)::int = 29 and not (substring(l."expires_at" from 7 for 4)::int % 4 = 0 and (substring(l."expires_at" from 7 for 4)::int % 100 <> 0 or substring(l."expires_at" from 7 for 4)::int % 400 = 0)))) when l."expires_at" ~ '^[0-9]{2}/[0-9]{4}$' then true else false end then 'DATE_IMPOSSIBLE'
-            when case when l."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' and (substring(l."expires_at" from 1 for 4)::int between 1 and 9999 and substring(l."expires_at" from 6 for 2)::int between 1 and 12 and substring(l."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(l."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(l."expires_at" from 9 for 2)::int > 30) and not (substring(l."expires_at" from 6 for 2)::int = 2 and substring(l."expires_at" from 9 for 2)::int > 29) and not (substring(l."expires_at" from 6 for 2)::int = 2 and substring(l."expires_at" from 9 for 2)::int = 29 and not (substring(l."expires_at" from 1 for 4)::int % 4 = 0 and (substring(l."expires_at" from 1 for 4)::int % 100 <> 0 or substring(l."expires_at" from 1 for 4)::int % 400 = 0)))) then left(l."expires_at", 10)::date > date '{{ var("as_of_date") }}' else false end then 'DATE_FUTURE'
             when not (l."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' or l."expires_at" ~ '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$' or l."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$' or l."expires_at" ~ '^[0-9]{2}/[0-9]{4}$' or l."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$') then 'DATE_UNPARSEABLE'
             when btrim(c."expires_at") = '' or btrim(c."expires_at") in ('NULL', 'null', 'N/A', '-', '#N/D', '   ') then 'NULL_DISGUISED'
             when case when c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$'   then not ((substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) and (substring(c."expires_at" from '[ T]([0-9]{2}):[0-9]{2}')::int between 0 and 23 and substring(c."expires_at" from '[ T][0-9]{2}:([0-9]{2})')::int between 0 and 59 and coalesce(substring(c."expires_at" from '[ T][0-9]{2}:[0-9]{2}:([0-9]{2})'), '00')::int between 0 and 59) and (coalesce(substring(c."expires_at" from '[+-]([0-9]{2})(:?[0-9]{2})?$'), '00')::int between 0 and 15 and coalesce(substring(c."expires_at" from '[+-][0-9]{2}:?([0-9]{2})$'), '00')::int between 0 and 59)) when c."expires_at" ~ '^[0-9]{4}[-.][0-9]{2}[-.][0-9]{2}$'   then not (substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) when c."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'   then not (substring(c."expires_at" from 7 for 4)::int between 1 and 9999 and substring(c."expires_at" from 4 for 2)::int between 1 and 12 and substring(c."expires_at" from 1 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 4 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 1 for 2)::int > 30) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int > 29) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int = 29 and not (substring(c."expires_at" from 7 for 4)::int % 4 = 0 and (substring(c."expires_at" from 7 for 4)::int % 100 <> 0 or substring(c."expires_at" from 7 for 4)::int % 400 = 0)))) when c."expires_at" ~ '^[0-9]{2}/[0-9]{4}$' then true else false end then 'DATE_IMPOSSIBLE'
-            when case when c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' and (substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) then left(c."expires_at", 10)::date > date '{{ var("as_of_date") }}' else false end then 'DATE_FUTURE'
             when case when c."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'   then (substring(c."expires_at" from 7 for 4)::int between 1 and 9999 and substring(c."expires_at" from 4 for 2)::int between 1 and 12 and substring(c."expires_at" from 1 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 4 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 1 for 2)::int > 30) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int > 29) and not (substring(c."expires_at" from 4 for 2)::int = 2 and substring(c."expires_at" from 1 for 2)::int = 29 and not (substring(c."expires_at" from 7 for 4)::int % 4 = 0 and (substring(c."expires_at" from 7 for 4)::int % 100 <> 0 or substring(c."expires_at" from 7 for 4)::int % 400 = 0)))) when c."expires_at" ~ '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$'   then (substring(c."expires_at" from 1 for 4)::int between 1 and 9999 and substring(c."expires_at" from 6 for 2)::int between 1 and 12 and substring(c."expires_at" from 9 for 2)::int between 1 and 31 and not (substring(c."expires_at" from 6 for 2)::int in (4, 6, 9, 11) and substring(c."expires_at" from 9 for 2)::int > 30) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int > 29) and not (substring(c."expires_at" from 6 for 2)::int = 2 and substring(c."expires_at" from 9 for 2)::int = 29 and not (substring(c."expires_at" from 1 for 4)::int % 4 = 0 and (substring(c."expires_at" from 1 for 4)::int % 100 <> 0 or substring(c."expires_at" from 1 for 4)::int % 400 = 0)))) else false end then 'DATE_FORMAT_KNOWN'
             when c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$' and c."expires_at" !~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' and (substring(c."expires_at" from '[ T]([0-9]{2}):[0-9]{2}')::int between 0 and 23 and substring(c."expires_at" from '[ T][0-9]{2}:([0-9]{2})')::int between 0 and 59 and coalesce(substring(c."expires_at" from '[ T][0-9]{2}:[0-9]{2}:([0-9]{2})'), '00')::int between 0 and 59) then 'DATE_TZ_MISSING'
             when not (c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' or c."expires_at" ~ '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$' or c."expires_at" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$' or c."expires_at" ~ '^[0-9]{2}/[0-9]{4}$' or c."expires_at" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}(:?[0-9]{2})?)?$') then 'DATE_UNPARSEABLE'
