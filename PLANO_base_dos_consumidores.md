@@ -1192,14 +1192,11 @@ restauração só das origens: `restore-dumps` restaura os três *dumps* juntos,
 perderia os eventos do produtor que o *dump* guarda. O corte da A3 é conferido (A4, A5), não restaurado: a
 primeira restauração dele seria a primeira prova desse caminho — limite declarado, como no roteiro.
 
-**O que fica com o Owner, antes do primeiro comando:**
-
-1. o aceite das 58 chaves removidas e das 2 reaparições do legado (H2);
-2. a época 2 do livro retido encerrada com as duas diferenças declaradas (a fatia do catálogo 9 da captura
-   67 sem registro; as migrações `0003` e `0004`), ou outra prova antes de abrir a época 3;
-3. o cursor do produtor: recomeçar do zero neste checkout ou trazer o do `mvp_eng_dados_1`;
-4. como as guardas entram no Git (a proposta acima);
-5. as duas autorizações do roteiro — a regeneração (P5) e a janela de restauração (G6).
+**O que ficou com o Owner, e o que ele decidiu** (§6, rodada 13, 16/11/2026): as 58 remoções e as 2
+reaparições aceitas (Q50); a época 2 encerrada com as duas diferenças declaradas (Q51); o produtor recomeça do
+zero, sem cursor trazido (Q52); as guardas fora da árvore até a D2, no disco antes da D3, commitadas na F0
+(Q53). **Continuam com ele, no momento de cada uma:** a autorização da regeneração (P5), a da janela de
+restauração (G6) e a confirmação antes de cada comando destrutivo.
 
 **O que muda para quem consome.** Todas as 16 views mudam de valor: a correção do F24 muda quem compra e o que
 se vende, e daí todo o resto. Antes de regerar, um aviso fora do Git aos dois consumidores (`bi-como-codigo` e
@@ -1624,6 +1621,19 @@ e a execução parou, como a Q44 mandava. Em memória, no perfil de que o legado
 |---|---|---|---|
 | **Q48** | A limpeza do legado acusa `DATE_FUTURE` em `stock_reservations.expires_at` de 3 reservas íntegras: a reserva ativa vence até 48 h depois do corte, e a coluna não está nas `promessas` do `legacy/catalogo.yml`, onde já está `carts.expires_at`. Como resolver? | **Declarar como promessa**: `stock_reservations.expires_at` entra nas `promessas`; validade de reserva é prazo, não fato consumado. A versão do catálogo sobe, e entra na fila como F30. Mudança de tratamento do legado dentro do desenho do ADR-0022. Era a recomendada | O gerador não passar do corte (a reserva ativa ficaria com validade menor que a declarada); aceitar a rejeição (reserva íntegra na quarentena, com o oráculo esperando o `DATE_FUTURE` sem injeção) |
 | **Q49** | A promessa da Q48 muda 2 modelos dbt do legado (`stg_legacy__stock_reservations`, `legacy_classifications`), e o `make catalog` recusa com o *manifest* atrasado; sem ele o pacote não fecha e o `check-offline` não fica verde. Roda-se o `make dbt-build` no armazém de hoje? | **O `make dbt-build` normal, sem `RESET`**: reclassifica a captura atual do legado sob a versão 10 do catálogo — o lote de hoje não tem reserva vencendo depois do corte, e o resultado linha a linha é o mesmo; a quarentena ganha as linhas da versão nova ao lado das antigas (ADR-0037). A procedência do armazém fica `not_verified` até o *build* do ciclo, porque a árvore estava suja. Rodado em 16/11/2026: 1.073 testes do dbt e 1.707 do `pytest` passando, `check-offline` verde. Era a recomendada | Commitar com o vermelho declarado; nenhum *commit* até o ciclo |
+
+### Rodada 13 — antes do primeiro comando do ciclo do Bloco 5R: respondida em 16/11/2026
+
+Medido antes de perguntar: a adaptação do ciclo (Bloco 5R), revisão 2, depois da rodada 1 da revisão dela (§9,
+rodada 54). O Owner escolheu a recomendada nas quatro. As duas autorizações do roteiro — a regeneração e a
+janela de restauração — não estão aqui: são dadas no momento, no diário do ciclo.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q50** | A regeneração muda chaves do legado: 58 deixam de existir (57 movimentos de estoque, 1 item de remessa) e entram em `trusted.legacy_removed_records`; 2 que estão na memória de exclusão (`inventory_balances` 145 e 146) reaparecem e saem dela. A memória vai de 11 a 67 chaves. Aceita? | **Aceitas as 58 remoções e as 2 reaparições**: consequência das correções da fila. O relatório da comparação (`20261116T174927Z_comparacao_ea41fe4.json`, SHA-256 `f7c5f730…aafdf52`) vai à T3 como `REMOCOES_ACEITAS=` e `REAPARICOES_ACEITAS=`. Era a recomendada | Ver as chaves uma a uma antes de decidir; não aceitar, e mudar o gerador para preservar as chaves |
+| **Q51** | A T3 falha hoje em dois pontos — a fatia do catálogo 9 da captura 67 sem registro (faltou o registro do tratamento antes do `dbt-build` da Q49; o tardio não existe; as fatias do 9 e do 10 são iguais linha a linha, 2.855 e 2.855) e as migrações `0003` e `0004` de `governance` fora da linha de base da época 2. Como encerrar a época 2? | **Encerrada com as duas diferenças declaradas**: o relatório da T3 e a comparação das fatias (`bloco5r/t3_epoca2_antes_do_ciclo.txt`, `fatias_captura67_v9_v10.txt`) vão ao diário com o SHA-256; a época 2 fica guardada sem edição; a linha de base da época 3 incorpora o estado de agora. A lacuna fica escrita como lacuna. Era a recomendada | Recomputar o tratamento 9 num banco efêmero, como prova independente de conteúdo; mudar a T3 para aceitar migrações novas e fatias antigas da captura corrente |
+| **Q52** | O cursor do produtor não existe neste checkout; o último está no `mvp_eng_dados_1` arquivado (9.791 emitidos). De onde o produtor parte na fase E? | **Do zero**: sem arquivo, deslocamento 0 com a semente de sempre; a ausência é o estado de partida, registrada na A1 e guardada pelo pacote. Nada é copiado do repositório arquivado. Revê a S3 do roteiro (o cursor mantido) para este ciclo. Era a recomendada | Trazer o cursor do `mvp_eng_dados_1`, com origem e SHA-256, antes do corte de recuo |
+| **Q53** | As seis guardas do armazém só ficam verdes depois da D3, o corte de recuo e o pacote final pedem a árvore limpa, e o *commit* só sai com `check-offline` verde. Como elas entram no Git? | **Fora da árvore até o *build* novo**: no *stash* e na cópia de `bloco5r/guardas_novos/` até a D2; no disco antes da D3; commitadas na F0, com o primeiro `check-offline` verde sobre o dado novo. Entre a D3 e a F0 a árvore fica suja, e nenhum pacote é embalado nesse trecho. Era a recomendada | *Commit* antes do ciclo, com o vermelho declarado; só depois do ciclo, sem rodar dentro dele |
 
 ## 7. Definição de pronto aplicada
 
