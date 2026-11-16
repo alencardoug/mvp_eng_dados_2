@@ -49,9 +49,12 @@ da calibração e só dela; a conferência depois de uma carga cobre tudo.
 é a mesma conferência para a origem que tem `data/source/geracao.json` e recebeu
 eventos do produtor depois dele — o estado desde a v1.1.0, em que o corte do
 pacote aprovado já inclui eventos do produtor e deixa de ser a fronteira da
-geração. O livro é lido até a contagem de movimentos da própria medida, e o que
-prova a procedência é o registro: semente, `as_of`, fator e total de linhas
-dele precisam ser os da medida.
+geração. O livro é lido até a contagem de movimentos da própria medida, e o
+corte só é aceito se o registro for compatível com ela: semente, `as_of`, fator
+e total de linhas iguais. Isso escolhe o corte, não prova a procedência — outra
+geração com os mesmos quatro campos passaria aqui, e é nos *digests* das
+tabelas que o oráculo a pega. O que a calibração afirma é a igualdade de
+conteúdo no subconjunto que ela lê.
 
 **As colunas que o banco gera** não entram no *digest* — a carga não as
 escreve — e são conferidas à parte, pela declaração do modelo: a identidade
@@ -513,8 +516,10 @@ def compare_tables(
 def generation_cut(medida: Mapping[str, Any], registro: Mapping[str, Any]) -> int:
     """O fim da geração no livro, quando o registro da carga é o da medida.
 
-    Recusa se o registro descreve outra geração: aí a contagem de movimentos da
-    medida não diz onde a geração desta origem termina.
+    Recusa se o registro é incompatível com a medida nos parâmetros ou no total
+    de linhas: aí a contagem de movimentos dela não diz onde a geração desta
+    origem termina. Compatível não é idêntico — a identidade se confere pelos
+    *digests*, no oráculo.
     """
     parametros = medida["oltp"]["parameters"]
     linhas = sum(tabela["rows"] for tabela in medida["oltp"]["tables"].values())

@@ -928,8 +928,10 @@ proporção em `geracao.yml` é declaração, e passa pela revisão do Owner (CL
    semente (o varejo tem 33); o do ramo tem 4, e 3 reservas íntegras eram rejeitadas
    (`test_b_a_limpeza_compilada_concorda_com_o_oraculo`, na sequência da Q44). A correção é do declarativo: a
    coluna entra nas `promessas` do `legacy/catalogo.yml`, a versão do catálogo vai a 10, e os modelos de
-   limpeza são regenerados (`make legacy-models`). **O armazém de hoje foi tratado pela versão 9**: o
-   tratamento novo só chega a ele com o ciclo, que refaz a captura do legado.
+   limpeza são regenerados (`make legacy-models`). O armazém de hoje tinha sido tratado pela versão 9; o
+   `make dbt-build` de 16/11/2026 (Q49) retratou a captura corrente, a 67, sob a 10, com o mesmo resultado
+   linha a linha — e deixou a fatia da versão 9 sem registro no livro retido (a adaptação do ciclo, "A
+   continuidade da época 2"). O lote novo só chega com o ciclo.
 
 **O que fica fora, e a interação** (Q26). O diário da janela do GCP (Pendências V3, item 3,
 `gcp/mutacoes_da_janela.yml`) não entra: ele só roda no Cloud SQL. As ocorrências aptas que ele escolhe saem do
@@ -986,39 +988,83 @@ recuo, e revisada por outro agente. Ela cobre, no mínimo:
 - **o pacote de recuperação** (fase G) refeito, porque o de hoje guarda o dado que deixa de existir;
 - **nada no GCP** (Q14).
 
-#### A adaptação do ciclo (16/11/2026, para a revisão e para o Owner)
+#### A adaptação do ciclo (16/11/2026, revisão 2, para a revisão e para o Owner)
 
-O roteiro da v1.1.0 continua dono das linhas A1 a G11; aqui só o que muda nelas. Tudo abaixo foi medido em
-16/11/2026, sem efeito (leituras e geração em memória); as saídas estão em
-`data/medicoes/base_consumidores/bloco5r/` e em `data/medicoes/v1_1_0/`, fora do Git. **Nada destrutivo
-rodou.** O diário do ciclo é `data/medicoes/diario_bloco5r.md`, e as saídas de cada linha,
-`data/medicoes/bloco5r_ciclo/<linha>_a<tentativa>_<nome>`.
+O roteiro da v1.1.0 continua dono das linhas A1 a G11, do §5 (parar e recomeçar) e do §6 (a volta); aqui só o
+que muda neles. Tudo abaixo foi medido em 16/11/2026, sem efeito (leituras e geração em memória); as saídas
+estão em `data/medicoes/base_consumidores/bloco5r/` e em `data/medicoes/v1_1_0/`, fora do Git. **Nada
+destrutivo rodou.** O diário do ciclo é `data/medicoes/diario_bloco5r.md`, e as saídas de cada linha,
+`data/medicoes/bloco5r_ciclo/<linha>_a<tentativa>_<nome>`. A revisão 2 responde à rodada 1 da revisão
+(`codex2_bloco5r_ciclo_r1.md`, RVB5RC-1-01 a 12; §9): o ciclo **não começa** com as decisões do fim desta
+seção em aberto.
 
 **Parâmetros** (S1). Os mesmos da carga de hoje: semente `20260904`, `as_of` `2026-09-01`, fator `dev`; no
 legado, semente `20260906`, fator `0.05` e **catálogo na versão 10** (F30) — a única diferença de parâmetro.
 `PRE` é `f9f74e2`, o pai do primeiro *commit* do ramo; `MAINT` é a ponta do `bloco-5r` com a árvore limpa.
-Nenhuma migração, `pyproject.toml` nem `uv.lock` muda entre os dois: um `.venv` serve aos dois.
+Nenhuma migração das origens, `pyproject.toml` nem `uv.lock` muda entre os dois: um `.venv` serve aos dois.
+
+**As substituições que valem no roteiro inteiro** (RVB5RC-1-03) — inclusive nos ramos de falha, onde o texto
+de lá ainda nomeia os pacotes e os caminhos da v1.1.0:
+
+| No roteiro | Neste ciclo |
+|---|---|
+| O *checkout* `mvp_eng_dados_1` | Este *checkout*. `ENG_DADOS_DIR=$PWD` exportado: o `ro.sh` das sondas, que fica no `bi-como-codigo` e não é copiado, aponta por padrão para o arquivado |
+| `git switch main` (A6) | `git switch bloco-5r`; o oráculo é `HEAD` = `MAINT`. O `main` (`828f7de`) não é o código do ciclo |
+| `~/mvp_ed1-recovery-pre-v1.1.0` — o corte de recuo (A3, §6) | `~/mvp_ed1-recovery-pre-bloco5r`, embalado sob `PRE` |
+| `~/mvp_ed1-recovery-v1.1.0` — a segunda cópia do candidato (G5, §5.4) | `~/mvp_ed1-recovery-bloco5r`. No reparo de uma promoção que falha (§5.4), é **esta** a cópia que volta — nunca uma histórica |
+| O aprovado e a segunda cópia que a P7 confere | `data/recovery/aprovado` (corte de 04/11/2026, `6d93d72`) e `~/mvp_ed1-recovery-v1.1.0` |
+| O último recurso do §6 (o aprovado de setembro) | O aprovado de hoje, o da v1.1.0 |
+| As retenções da G10 | As três históricas (`…-20260925T123221Z`, `…-pre-v1.1.0`, `…-v1.1.0`), intocadas, mais o corte de recuo deste ciclo |
+| Os números citados (13 e 15 tarefas, `PASS=905`, 683, captura 55, 13.700) | História da v1.1.0, não expectativa: cada um é medido e registrado neste ciclo |
 
 **O estado de partida, medido** (o que a A1 registra):
 
 | O quê | Medido | O que muda no roteiro |
 |---|---|---|
-| `data/source/geracao.json` | Existe: carga de 04/11/2026, semente `20260904`, corte `2026-09-01`, fator `dev`, 252.987 linhas, *commit* `61b9f4a` | A A1 espera o arquivo **presente** e o guarda como está; a B3 o reescreve, e o registro de antes vai ao diário com o SHA-256 |
-| `oltp.inventory_movements` | 18.125 linhas, `event_sequence` até 18.125: 13.725 da geração e 4.400 do produtor | A calibração do H1 corta o livro no fim da geração, não no `max_event_sequence` do pacote aprovado (15.925) |
+| `data/source/geracao.json` | Existe: carga de 04/11/2026, semente `20260904`, corte `2026-09-01`, fator `dev`, 252.987 linhas, *commit* `61b9f4a` (do `mvp_eng_dados_1`; não é objeto deste repositório) | A A1 espera o arquivo **presente** e o guarda como está; a B3 o reescreve, e o registro de antes vai ao diário com o SHA-256 |
+| `oltp.inventory_movements` | 18.125 linhas, `event_sequence` até 18.125 | A calibração do H1 corta o livro em 13.725, o fim da geração da medida, e não no `max_event_sequence` do pacote aprovado (15.925) |
 | `raw.inventory_movements_stream` | 18.125 linhas | A B2 o esvazia |
-| Lote do legado | `060c3fc9…`, catálogo 9, 0 mutações abertas no diário do manifesto | O H2 compara com o estado real, que hoje é o próprio lote |
-| Capturas do legado | 19 `complete`, a selecionada é a 67; livro retido na época 2 (`epoch_0002_20261104T143228Z`) | A A8 abre a época 3 (`make ledger-baseline`); as capturas do ciclo ficam acima da 67 |
-| Cursor do produtor | **Ausente neste checkout** (`.stream/` não existe); o último está no `mvp_eng_dados_1`, arquivado: `stream_seed` `20260904`, 9.791 emitidos acumulados, 11/11/2026 | Decisão do Owner (abaixo): sem cursor, o produtor recomeça do zero com a mesma semente |
-| Pacote aprovado | `data/recovery/aprovado`, corte de 04/11/2026, *commit* `6d93d72` (do `mvp_eng_dados_1`) | O corte de antes do ciclo (A3) é um pacote novo, em `~/mvp_ed1-recovery-pre-bloco5r`; os três de antes (`…-20260925T123221Z`, `…-pre-v1.1.0`, `…-v1.1.0`) não são tocados |
-| Ambiente | Bancos e Airflow de pé, Airbyte e *streaming* pausados; janela parada | A G11 devolve este estado |
+| Lote do legado | `060c3fc9…`, 0 mutações abertas ou encerradas no diário do manifesto | O H2 compara com o estado real, que hoje é o próprio lote |
+| Capturas do legado | 19 tentativas, 18 certificadas nas 40 tabelas (a 34 é `incomplete` numa); a selecionada é a 67 | As capturas do ciclo ficam acima da 67 |
+| Livro retido | Época 2 (`epoch_0002_20261104T143228Z`): a linha de base e o registro da tentativa do *job* 67; nenhum registro de tratamento | **A T3 falha hoje** — ver "A continuidade da época 2", abaixo |
+| Quarentena da captura 67 | Duas fatias: catálogo 9 (2.855 linhas) e catálogo 10 (2.855 linhas), a segunda do `make dbt-build` de 16/11/2026 (Q49) | Idem |
+| Cursor do produtor | **Ausente neste checkout** (`.stream/` não existe); o último está no `mvp_eng_dados_1`, arquivado: `stream_seed` `20260904`, 9.791 emitidos acumulados, 11/11/2026 | Decisão do Owner; a ausência é um estado, que o pacote registra e a restauração devolve |
+| Ambiente | Bancos e Airflow de pé, Airbyte e *streaming* pausados; janela parada | A G11 devolve este estado. A A8 precisa do Airbyte de pé |
+
+**A continuidade da época 2** (RVB5RC-1-01; medido: `make memory-oracle`, só leitura,
+`bloco5r/t3_epoca2_antes_do_ciclo.txt`). A T3 sobre o estado de hoje **falha**, com dois problemas e só eles:
+
+1. *"quarentena: fatia `["legacy",67,9,"607e6288…"]` que nem a linha de base nem um tratamento explica"*. A
+   captura 67 foi tratada sob o catálogo 9 depois da linha de base, sem registro T4 do tratamento; enquanto
+   era o tratamento corrente, a T3 a aceitava. O `make dbt-build` da Q49 a retratou sob o catálogo 10, e a
+   fatia do 9 ficou sem explicação. **Faltou um `make ledger-treatment` antes daquele *build*** — a regra do
+   roteiro (um registro depois de cada linha que constrói a quarentena) não foi aplicada fora do ciclo, e a
+   Q49 foi perguntada sem esse efeito na mesa. O registro tardio não existe: a ferramenta registra o
+   tratamento corrente, e fabricar o anterior não é opção. O que se mediu no lugar: as duas fatias da captura
+   67 comparadas linha a linha, tirando só a identidade do tratamento (`catalog_version`,
+   `treatment_fingerprint`) — 2.855 e 2.855, **nenhuma linha só numa delas**. A fatia do catálogo 9 é, no
+   conteúdo, a que a T3 aceita hoje sob o 10;
+2. *"`governance._versions` mudou"*: a linha de base tem `0001` e `0002`; o armazém tem também
+   `0003_dbt_invocations` (ADR-0054) e `0004_escopo_exclusivo` (ADR-0056), migrações decididas e aplicadas
+   nesta fase.
+
+Abrir a época 3 na A8 incorpora esse estado à linha de base nova, e é o que encerra a época 2. **Se ela se
+encerra com essas duas diferenças declaradas, é decisão do Owner** (abaixo): o relatório da T3 de hoje e a
+comparação das duas fatias vão ao diário com o SHA-256, a época 2 fica guardada como está, e nada nela é
+editado. A descrição do F30 neste plano e em Achados ("o tratamento novo só chega com o ciclo") vale para o
+lote novo; a captura 67 já foi retratada sob o 10 pela Q49.
 
 **H1 — o que muda de conteúdo, medido em memória** (`h1_antes_f9f74e2.json`, do gerador de `PRE` numa árvore
 de trabalho à parte; `h1_depois_ramo.json`, do ramo):
 
-- a calibração passa: as duas origens de hoje **são** a geração de `PRE` — 39 tabelas do varejo iguais e
-  `inventory_balances` excluída, com o livro lido até 13.725; as 40 do legado iguais. Pede a ferramenta nova
-  `make source-oracle CALIBRACAO=geracao`, que corta o livro no fim da geração da medida e exige que
-  `data/source/geracao.json` seja o registro dela (no ramo, com teste);
+- a calibração passa — `make source-oracle CALIBRACAO=geracao`, ferramenta nova do ramo: 39 tabelas do
+  varejo iguais à geração de `PRE`, com o livro lido até 13.725 e sem buraco nesse prefixo, e as 40 do legado
+  iguais. **O que ela prova e o que não prova** (RVB5RC-1-10): prova que o conteúdo de hoje, nesse
+  subconjunto, é o da medida; `inventory_balances` (2.927 linhas na origem, 2.914 na medida) e os 4.400
+  movimentos seguintes, do produtor, ficam de fora, sem conferência. A ferramenta escolhe o corte pelos
+  parâmetros e pelo total de linhas do registro da geração — não pela identidade dela: uma medida de outra
+  geração com os mesmos quatro campos passaria na escolha do corte, e seria pega pelos *digests* das tabelas.
+  Não é prova da procedência histórica da origem;
 - no varejo mudam 18 das 40 tabelas; o total vai de 252.987 a 252.498 linhas. Mudam de contagem
   `inventory_movements` (13.725 → 12.711), `inventory_balances` (2.914 → 2.926), `shipments` (3.595 → 3.644),
   `shipment_items` (7.305 → 7.417), `delivery_events` (17.340 → 17.597) e `ticket_events` (1.723 → 1.818); as
@@ -1026,8 +1072,8 @@ de trabalho à parte; `h1_depois_ramo.json`, do ramo):
 - no legado mudam 21 das 40; o lote vai de `060c3fc9…` a `b7164a09…`.
 
 **H2 — as chaves do legado que mudam** (`make generation-compare … MANIFESTO_ANTES=data/legacy/manifesto.json`;
-`data/medicoes/v1_1_0/20261116T174927Z_comparacao_ea41fe4.json`). O esperado na v1.1.0 era nenhuma; aqui
-mudam em seis tabelas:
+o relatório é `data/medicoes/v1_1_0/20261116T174927Z_comparacao_ea41fe4.json`, SHA-256 `f7c5f730…aafdf52`,
+**congelado antes da B4**, que troca o manifesto corrente):
 
 | Tabela | Removidas | Acrescentadas | Mantidas |
 |---|---|---|---|
@@ -1038,65 +1084,122 @@ mudam em seis tabelas:
 | `inventory_balances` | 0 | 3 | 144 |
 | `shipments` | 0 | 1 | 189 |
 
-As 58 removidas entram em `trusted.legacy_removed_records` para sempre, como remoção que o sistema legado
-nunca fez — a memória de exclusão persiste por construção. **O aceite é do Owner** (como a N54 da v1.1.0), e
-vai à T3 como `REMOCOES_ACEITAS=`; sem ele o ciclo não começa.
+As 58 removidas entram em `trusted.legacy_removed_records` como remoção que o sistema legado nunca fez, e lá
+ficam enquanto a chave não reaparecer (ADR-0045). **E duas das 20 acrescentadas são reaparições**
+(RVB5RC-1-02): `inventory_balances` 145 e 146 estão entre as 11 chaves da memória de exclusão da linha de
+base da época 2, e voltam a existir. A memória esperada depois do ciclo tem 11 − 2 + 58 = **67 chaves**
+(calculado dos arquivos; a medida é a da D4). **O aceite das 58 remoções e das 2 reaparições é do Owner**, e
+o mesmo relatório vai à T3 nos dois argumentos: `REMOCOES_ACEITAS=` e `REAPARICOES_ACEITAS=`.
 
 **As linhas que mudam:**
 
-- **A3 a A6** — o corte de antes do ciclo, sob `PRE`: `RECOVERY_DIR=$HOME/mvp_ed1-recovery-pre-bloco5r`. É o
-  ponto de recuo de tudo o que vem depois (§6 do roteiro); a volta roda o código de `PRE`.
+- **A3 a A6** — o corte de antes do ciclo, sob `PRE`, com as substituições acima. A árvore precisa estar
+  limpa também de arquivo não rastreado (`recovery-pack` lê `git status --porcelain` inteiro): as guardas
+  ainda não estão nela (ver "As guardas").
 - **A7** — `make seed-data DRY_RUN=1`, `make legacy-plan` e a T1 de novo, sob `MAINT`: as contagens e os
   *digests* de `h1_depois_ramo.json`. Diferença para a medida: para, o ramo mudou depois dela.
-- **A8** — `make ledger-baseline` abre a época 3.
-- **B1 a B5** — como no roteiro. O oráculo da B5 é `make source-oracle MEDIDA=<a medida da A7>`, sem
-  calibração: depois da carga, todas as tabelas, e `event_sequence` de 1 a 12.711.
-- **C4, E10** — os quatro zeros, com `linhas_lote` = `linhas_fluxo` = a contagem da origem (12.711 na C4).
-- **D2** — a captura do legado é a primeira sob o catálogo 10.
-- **D3** — `make dbt-build RESET=1` é também **a prova da Q37** (Bloco 6): além dos oráculos do roteiro, as
-  26 PKs e as 58 FKs de `analytics` instaladas ao fim, pela guarda de `tests/test_chaves.py`, e a linha do
-  log de execução fechada com o escopo `analytics`. **E as seis guardas do ramo** (`invariante_15` a `20`)
-  entre os testes que passam: é a primeira execução delas sobre o dado novo. Guarda vermelha aqui para o
-  ciclo — a correção não chegou ao armazém, ou a exceção do legado não é a que a guarda prevê —, e a
-  explicação se confere no lote novo, uma a uma, antes de qualquer ajuste na guarda.
-- **D4, F6** — a T3 com `REMOCOES_ACEITAS=` do H2 aceito e `REAPARICOES_ACEITAS=` da comparação sobre o estado
-  real.
-- **D5** — as sondas do H5 da v1.1.0 (M3, M7 a M9) repetidas, porque valem para qualquer geração, e as
-  medidas da fila repetidas no armazém: `bloco5_significados_contra_o_dado_20261115.txt` e
-  `bloco5r_f27_reservas_20261115.txt`, com zero no que a fila corrigiu.
-- **E1 a E11** — o produtor exercitado com `LIMITE=2200`, como na v1.1.0; a E1 registra o cursor que a
-  decisão abaixo deixar.
-- **F1** — `make check` no lugar das "quatro etapas": hoje são cinco, com o pacote de metadados.
-- **F3** — a DAG tem hoje as tarefas da v1.1.0 mais o que as Etapas seguintes acrescentaram; o oráculo é
-  "todas `success`, cada uma na primeira tentativa", pela contagem que `make dag-status` der, registrada.
-- **F4** — substituída pela sequência de publicação: `make catalog-derivados` → `make dbt-build` →
-  `make catalog` → `make test` → `make catalog` → `make check-offline`; então o *commit* (as guardas, os
-  derivados, o pacote), a árvore limpa, **um `make dbt-build` do *commit* limpo** para a procedência
-  `verified`, e o pacote de metadados embalado. É aqui que o `dominios.yml` troca a declaração do
-  `gateway_response_code` pelo significado aceito na Q41, junto com o dado.
-- **G3 a G9** — o pacote de recuperação refeito sobre o dado novo; a segunda cópia em
-  `~/mvp_ed1-recovery-bloco5r`. A restauração (G7) abre a época seguinte do livro, e pede a segunda
-  autorização do Owner.
-- **Depois do ciclo, fora do roteiro:** a auditoria das 16 views e as conferências de população
-  (`tests/auditoria/`), `tests/test_janela_legado.py`, a remedição das ligações da Parte A uma a uma, as 16
-  linhas `feita` de Consumidores §5, a medida do giro da V5.
+- **A8** — antes dela, `make airbyte-up` e a espera pela API (RVB5RC-1-04): `ledger-baseline` lê os *jobs* da
+  conexão do legado, e o Airbyte está pausado. É a troca guardada, sem `FORCE=1`; Airbyte e Airflow convivem.
+  Então a T3 de hoje guardada (a continuidade, acima) e `make ledger-baseline`, que abre a época 3.
+- **B1 a B5** — como no roteiro. O oráculo da B5 é `make source-oracle MEDIDA=<a medida da A7>`, **sem
+  calibração**: todas as tabelas, e `event_sequence` de 1 a 12.711.
+- **C4, E10** — os quatro zeros, com `linhas_lote` = `linhas_fluxo` = a contagem da origem (12.711 na C4);
+  o `K0` é o corte, não a contagem.
+- **D2** — a primeira captura do lote novo; o catálogo 10 já tratou a captura 67 (Q49), e o registro do
+  tratamento distingue os dois.
+- **Antes da D3** — as guardas entram na árvore (ver "As guardas").
+- **D3** — `make dbt-build RESET=1` é também **a prova da Q37** (Bloco 6). Além dos oráculos do roteiro,
+  guardados com o `invocation_id` da execução: o descarte dos *snapshots* e o `--full-refresh` no log; as
+  quatro dimensões SCD refeitas e a fato incremental com a população da origem (`fato_reconcilia_com_a_condutora`,
+  `incremental_confere_com_a_reconstrucao_completa`); a linha do log de execução fechada, com o escopo
+  `analytics`; e, **logo depois, numa linha própria**, as chaves físicas — `.venv/bin/pytest
+  tests/test_chaves.py`, sem pulo —, porque o `dbt-build` não roda o `pytest` (RVB5RC-1-09): 26 PKs e 58 FKs
+  instaladas. FK instalada não prova população, e por isso as reconciliações ficam. As seis guardas do ramo
+  rodam aqui pela primeira vez sobre o dado novo.
+- **D3 que falha** (RVB5RC-1-09; o §5 do roteiro não conhece o Bloco 6). O histórico SCD já foi descartado, e
+  nada o traz de volta: guarda vermelha não desfaz a D3, só para o ciclo. Primeiro o registro T4 do
+  tratamento, se a quarentena foi construída, e o `run_results.json` guardado. Depois, conforme o que parou:
+  (a) **teste de dados reprovado** — a invocação fecha como `failed`; a causa se confere no lote novo, uma a
+  uma (a correção não chegou ao armazém, ou a exceção do legado não é a que a guarda prevê), corrige-se por
+  código versionado e roda-se `make dbt-build` **sem** `RESET`; (b) **falha na instalação das FKs, num
+  *hook*, ou interrupção** — fica uma linha `started` com `exclusive_scope = 'analytics'`, e nenhum outro
+  *build* de `analytics` é admitido: o caminho é o da
+  [Execução Local §6](docs/execucao_local.md#6-solução-de-problemas) — diagnóstico só de leitura, confirmar
+  que o escritor terminou, `make governance-abandonar INVOCACAO=…` pelo custodiante, corrigir, `make dbt-build`
+  sem `RESET`. A linha aberta **sobrevive à restauração do pacote**: o log de execução fica fora do *dump* da
+  memória, e voltar pelo §6 não dispensa o abandono. Refazer a D3 com `RESET=1` de novo só por decisão do
+  Owner; depois de uma restauração, `RESET` sobre o SCD restaurado continua proibido.
+- **D4, F6** — a T3 com o relatório do H2 aceito nos dois argumentos.
+- **D5** — as sondas do H5 da v1.1.0 (M3, M7 a M9) repetidas, pelo `ro.sh` com `ENG_DADOS_DIR` deste
+  checkout, e as medidas da fila repetidas no armazém (`bloco5_significados_contra_o_dado_20261115.txt`,
+  `bloco5r_f27_reservas_20261115.txt`), com zero no que a fila corrigiu.
+- **E1 e E11** — duas mudanças. **A sonda da P13** (RVB5RC-1-05): a `q14_p13_reconciliation.sql` da v1.1.0
+  exige a igualdade com as remessas da fato de itens, e a P13 lê hoje a fato de remessas (D66, ADR-0053) — a
+  diferença ali não é defeito. O oráculo de população passa a ser o contrato de hoje: o teste
+  `p13_conta_toda_remessa_entregue`, do dbt, e a referência da P13 na auditoria das views
+  (`tests/auditoria/on_time_delivery_rate_by_carrier.sql`, por `tests/test_auditoria_das_views.py`), verdes
+  antes e depois do produtor; ficam a igualdade do *digest* e das linhas da view entre a E1 e a E11, e as
+  conferências de identidade, classificação e quarentena dos itens da sonda antiga. **O cursor**
+  (RVB5RC-1-12): a E1 registra o estado que a decisão do Owner deixar — sem arquivo, a ausência e `O = 0`,
+  pela regra do produtor, sem copiar nada; com o cursor trazido, a origem, o SHA-256 e `O = 9.791`. Trazê-lo
+  muda a subsemente do que se emite, e não prova nada sobre os eventos antigos; a prova da E4 é por diferença
+  (`O + N`, `C0 + N`) nos dois casos. A escolha se faz **antes da A3**, para o corte guardar o estado de
+  partida escolhido; o arquivo que some durante uma emissão continua sendo parada (§5.3), nunca recomeço.
+- **E4** — `LIMITE=2200`; o emitido é 2.200 ou 2.201, medido.
+- **F0, nova, antes da F1** (RVB5RC-1-06) — a publicação. O `make check` da F1 confere o pacote de metadados,
+  e as guardas e o `dominios.yml` mudam os insumos dele: a F1 pararia no pacote antes de chegar à linha que o
+  atualiza. Na ordem: a troca da declaração do `gateway_response_code` em `dominios.yml` pelo significado
+  aceito na Q41; `make catalog-derivados` → `make dbt-build` → **registro T4 do tratamento** →
+  `make catalog` → `make test` → `make catalog` → `make check-offline`; o *commit* (as guardas, os derivados,
+  o pacote); a árvore limpa.
+- **F1** — `make check`, completo e sem dispensa, e o registro T4 do tratamento depois dele. São cinco
+  etapas hoje, com o pacote.
+- **F3** — a DAG declara hoje 16 tarefas (com `convergir_policy_tags`, inócua no alvo local): todas
+  `success`, cada uma na primeira tentativa, com a identidade da captura J2 e as provas dos portões do
+  roteiro; a contagem observada se confere com esse inventário.
+- **F4** — o fecho da publicação (RVB5RC-1-11): `git status --short` vazio; **um `make dbt-build` do *commit*
+  limpo**, com o registro T4 do tratamento depois dele; a procedência `verified` lida de
+  `governance.warehouse_provenance` com o `invocation_id`; `make catalog` e `git status --short` de novo — o
+  pacote versionado não muda com instantes e invocações (`pacote.normalizado()`), e mudança substantiva aqui
+  para o ciclo, porque quer dizer que o *commit* não continha o que o *build* publicou.
+- **G1 a G11** — o pacote de recuperação refeito sobre o dado novo, com as substituições acima. A restauração
+  (G7) abre a época seguinte do livro, e pede a segunda autorização do Owner.
+- **Depois do ciclo, fora do roteiro**, cada passo fechando o que ele mesmo mudar: a auditoria das 16 views e
+  as conferências de população; `tests/test_janela_legado.py`; a remedição das ligações da Parte A uma a uma
+  — o que ela mudar em `not_observed` ou `impossible` nos YAMLs é insumo do dbt e do pacote, e pede a
+  sequência da F0 inteira e um *build* do *commit* limpo de novo —; a medida do giro da V5; e **por último**
+  as 16 linhas `feita` de Consumidores §5, num *commit* posterior ao *build* limpo que elas citam.
+
+**As guardas** (RVB5RC-1-07). Antes de entrar, a 15 e a 18 ganham a etiqueta `fronteira`: leem `staging` e
+`trusted` (a 18, também a quarentena), e sem ela seriam selecionadas na tarefa `dbt_staging` da DAG, antes
+de os pais existirem — o `test_teste_que_atravessa_tarefas_da_dag_nunca_roda_antes_de_um_pai` as recusa
+(passou em 16/11 só porque o *manifest* ainda não as tinha). A 17 e a 20 seguem a invariante 8
+(`legado_reconciliacao`). O grafo compilado se confere por esse teste na F0. **Como elas entram no Git é
+decisão do Owner**; a proposta, que guarda as duas regras — *commit* só com `check-offline` verde, e árvore
+limpa na A3 e na G3: ficam fora da árvore, no *stash* e na cópia de `bloco5r/guardas_novos/`, até a D2;
+entram no disco antes da D3; são commitadas na F0, com o primeiro `check-offline` verde sobre o dado novo.
 
 **Os comandos destrutivos, na ordem, cada um com a confirmação do Owner imediatamente antes:**
 `make stream-down FORCE=1` (B1), `make stream-reset-sink FORCE=1` (B2), `make seed-data FORCE=1` (B3),
 `make seed-legacy FORCE=1` (B4), `make dbt-build RESET=1` (D3), `RESTAURAR=1 make recovery-restore` (G7) e
 `make recovery-promote` (G8). Cada receita é conferida lendo o texto do `Makefile`, nunca com `make -n`.
-A troca de ambientes pesados é a dos alvos guardados; recusa por memória para e vai ao Owner.
+A troca de ambientes pesados é a dos alvos guardados; recusa por memória para e vai ao Owner. Nada no GCP.
 
-**Os pontos de recuo.** Até a A8, nada foi destruído. Da B1 à C4, a memória do armazém está intacta: a volta
-é recarregar as origens de `PRE` pelo pacote da A3. Da D3 em diante o histórico SCD é outro, e a volta é a
-restauração do pacote da A3 sob o código de `PRE` (§6 do roteiro), com uma época nova do livro.
+**Os pontos de recuo** (RVB5RC-1-08). Até a A8, nada foi destruído. **Da B1 em diante há um só caminho de
+volta: o §6 do roteiro inteiro** — a restauração do pacote da A3 sob o código de `PRE`, que devolve as duas
+origens **e** a memória do armazém, com uma época nova do livro e a autorização do Owner. Não existe
+restauração só das origens: `restore-dumps` restaura os três *dumps* juntos, e regerar com o gerador de `PRE`
+perderia os eventos do produtor que o *dump* guarda. O corte da A3 é conferido (A4, A5), não restaurado: a
+primeira restauração dele seria a primeira prova desse caminho — limite declarado, como no roteiro.
 
 **O que fica com o Owner, antes do primeiro comando:**
 
-1. o aceite das 58 chaves removidas do legado (H2);
-2. o cursor do produtor: trazer o do `mvp_eng_dados_1` (9.791 emitidos) ou recomeçar do zero neste checkout;
-3. como as guardas entram no Git: a A3 e a G3 pedem a árvore limpa, e as guardas só ficam verdes depois da D3;
-4. as duas autorizações do roteiro — a regeneração (P5) e a janela de restauração (G6).
+1. o aceite das 58 chaves removidas e das 2 reaparições do legado (H2);
+2. a época 2 do livro retido encerrada com as duas diferenças declaradas (a fatia do catálogo 9 da captura
+   67 sem registro; as migrações `0003` e `0004`), ou outra prova antes de abrir a época 3;
+3. o cursor do produtor: recomeçar do zero neste checkout ou trazer o do `mvp_eng_dados_1`;
+4. como as guardas entram no Git (a proposta acima);
+5. as duas autorizações do roteiro — a regeneração (P5) e a janela de restauração (G6).
 
 **O que muda para quem consome.** Todas as 16 views mudam de valor: a correção do F24 muda quem compra e o que
 se vende, e daí todo o resto. Antes de regerar, um aviso fora do Git aos dois consumidores (`bi-como-codigo` e
@@ -1903,3 +2006,26 @@ ciclo das FKs, o escopo no log e as guardas).
 **A revisão da implementação do Bloco 6 está fechada.** Fica declarado como não provado: o retry que
 reconstrói uma dimensão e o órfão, no armazém real; o `RESET=1`, que se prova no ciclo do Bloco 5R (Q37); o
 BigQuery (L9). Isso não é o aceite do declarativo, que é do Owner.
+
+### Rodada 54 — Codex conta 2, sobre a adaptação do ciclo do Bloco 5R em `d8a7229` (16/11/2026)
+
+Relatório em `codex2_bloco5r_ciclo_r1.md`: **9 bloqueantes e 3 ajustes** (RVB5RC-1-01 a 12); os números do H1
+e do H2 conferem com as medidas. Nenhuma linha do ciclo tinha rodado. Respondidos na revisão 2 da adaptação:
+
+| Achado | O que mudou |
+|---|---|
+| 01 — a continuidade da época 2 antes de trocar de época | Medido: a T3 falha hoje, em dois pontos — a fatia do catálogo 9 da captura 67, sem registro depois do *build* da Q49, e as migrações `0003` e `0004`. As duas fatias da captura 67 comparadas linha a linha: iguais. Vai ao Owner |
+| 02 — duas das acrescentadas são reaparições | `inventory_balances` 145 e 146: o aceite cobre as 58 remoções e as 2 reaparições, o mesmo relatório nos dois argumentos da T3, congelado antes da B4; "para sempre" corrigido |
+| 03 — substituições incompletas | Tabela das substituições que valem no roteiro inteiro: A6, P7, §5.4, §6, G10, `ENG_DADOS_DIR`, os números históricos |
+| 04 — a A8 pede o Airbyte de pé | `make airbyte-up` antes dela |
+| 05 — a sonda antiga da P13 | Trocada pelo contrato de hoje (D66): o teste do dbt e a referência da auditoria |
+| 06 — o `make check` antes do pacote atualizado | Linha F0, a publicação, antes da F1 |
+| 07 — as guardas 15 e 18 atravessam tarefas da DAG | Etiqueta `fronteira` nas duas, antes de entrarem; a DAG tem 16 tarefas |
+| 08 — o recuo só das origens não existe | Da B1 em diante, um só caminho: o §6 inteiro |
+| 09 — a parada com o Bloco 6 | "D3 que falha": a linha `started` exclusiva, o abandono pelo custodiante, sem novo `RESET`; `tests/test_chaves.py` numa linha própria |
+| 10 — o alcance da calibração | A alegação restrita ao subconjunto calibrado; o corte se escolhe por parâmetros e total, não pela identidade da geração |
+| 11 — o fecho da publicação | Registro T4 depois de cada *build*; a F4 como fecho; as linhas `feita` por último |
+| 12 — a ausência do cursor é um estado | A E1 registra a ausência e `O = 0`, ou o cursor trazido com origem e SHA-256; a escolha antes da A3 |
+
+E o "19 `complete`" do estado de partida era 18 capturas certificadas nas 40 tabelas, de 19 tentativas (a 34
+é `incomplete`). A rodada 2 segue para a mesma conta.

@@ -482,8 +482,8 @@ inventário.
   legado perderia as reservas mais recentes.
 - **Aqui**, pela decisão do Owner (Q48 do plano da base dos consumidores): a coluna entra nas `promessas`
   do catálogo de falhas (`legacy/catalogo.yml`, versão 10), como `carts.expires_at`; os modelos de limpeza
-  são regenerados dele. O armazém de hoje foi tratado pela versão 9 e não tinha o caso; o tratamento novo
-  chega com o ciclo do Bloco 5R.
+  são regenerados dele. O lote de hoje não tem o caso: o `make dbt-build` de 16/11/2026 retratou a captura
+  corrente sob a versão 10 com o mesmo resultado linha a linha; o lote novo chega com o ciclo do Bloco 5R.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
