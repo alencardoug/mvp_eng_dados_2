@@ -143,7 +143,9 @@ O `RESET=1` se prova no ciclo do Bloco 5R, que já o roda (Q37); até lá é pen
   - a PK sai pelo contrato do dbt-bigquery, que a escreve `NOT ENFORCED`;
   - as FKs saem pelas mesmas macros, por despacho de adaptador (`alter table … add constraint … not
     enforced`, a existência por `INFORMATION_SCHEMA.TABLE_CONSTRAINTS`);
-  - o escopo e o índice valem para o log do BigQuery pelo mesmo `governance`;
+  - o escopo vale para o log do BigQuery pelo mesmo `governance`, mas **o índice não**: o BigQuery não impõe
+    unicidade, e a admissão atômica lá precisa de outro meio (uma instrução condicional numa transação de
+    várias instruções, por exemplo). Não está desenhado nesta fase: fica para a reabertura do GCP;
   - nada disso foi exercitado no GCP nesta fase (L9), nem o efeito no Gemini e no Knowledge Catalog.
 - **Documentos a atualizar** (com a implementação):
   - [Qualidade de Dados](../qualidade_de_dados.md): o contrato e as *constraints* em `analytics`, ao lado
