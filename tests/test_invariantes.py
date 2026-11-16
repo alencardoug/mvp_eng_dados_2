@@ -455,6 +455,119 @@ def test_20_stock_is_backed_from_the_opening(request, config, profile) -> None:
     )
 
 
+# ── As garantias em fator pequeno (revisão da implementação, RVB5RI-1-01 a 03) ──
+#
+# Os três perfis acima não chegam perto do piso das tabelas, e era ali que a
+# cobertura dependia da semente: um pedido em aberto só, o orçamento de eventos
+# menor que os obrigatórios, a reserva sem item para todos os estados.
+
+SMALL_FACTOR = 0.001
+
+
+@pytest.mark.parametrize("seed", range(1, 9))
+def test_guarantees_hold_near_the_floor(config, seed) -> None:
+    """No fator 0,001, em qualquer das sementes: os dois desfechos do pagamento em aberto, o
+    orçamento de eventos exato com os seis tipos, e as reservas no alvo com os quatro estados."""
+    from mvp_ed1.generator import pipeline
+    from mvp_ed1.generator.engine import Motor
+
+    motor = Motor(config, seed=seed, fator=SMALL_FACTOR)
+    data = pipeline.gerar(motor)
+
+    assert {"pending", "authorized"} <= {row["status"] for row in data["payments"]}
+    assert {row["result"] for row in data["payment_transactions"]} >= {"succeeded", "pending"}
+
+    assert len(data["ticket_events"]) == motor.linhas("ticket_events")
+    assert {row["event_type"] for row in data["ticket_events"]} == {
+        "created", "assigned", "message", "status_changed", "resolved", "reopened"
+    }
+
+    assert len(data["stock_reservations"]) == motor.linhas("stock_reservations")
+    assert {row["status"] for row in data["stock_reservations"]} == {
+        "active", "released", "expired", "consumed"
+    }
+
+    assert violations_15_registry_respected_in_time(data, config) == []
+    assert violations_16_only_in_transit_shipment_is_lost(data) == []
+    assert violations_17_ticket_book_matches_status(data) == []
+    assert violations_18_reservation_belongs_to_an_item(data) == []
+    assert violations_19_gateway_code_follows_result(data, config) == []
+    assert violations_20_stock_is_backed_from_the_opening(data, config) == []
+
+
+def test_two_open_orders_are_guaranteed_without_losing_a_status() -> None:
+    """F29: o pagamento em aberto tem dois desfechos, e por isso dois pedidos terminam `pending`."""
+    from mvp_ed1.generator.domains.vendas import _garantir_em_aberto
+
+    statuses = ["pending", "paid", "picking", "shipped", "delivered", "returned", "cancelled"]
+    floor = statuses + ["delivered"]
+    _garantir_em_aberto(floor)
+    assert floor.count("pending") == 2 and set(floor) == set(statuses)
+
+    none_open = ["delivered"] * 5 + ["paid"]
+    _garantir_em_aberto(none_open)
+    assert none_open.count("pending") == 2 and "paid" in none_open and "delivered" in none_open
+
+    # Sem estado que sobre, nada cede: a cobertura dos estados vem antes.
+    exact = list(statuses)
+    _garantir_em_aberto(exact)
+    assert exact == statuses
+
+    enough = ["pending", "pending", "delivered"]
+    _garantir_em_aberto(enough)
+    assert enough == ["pending", "pending", "delivered"]
+
+
+def test_open_order_outcomes_cover_both_from_two_orders_on(config) -> None:
+    """F29: com dois pedidos em aberto ou mais, os dois desfechos saem, e o sorteio é o mesmo
+    de antes da garantia — ela só troca o resultado, nunca consome um número a mais."""
+    import random
+
+    from mvp_ed1.generator.domains.pagamentos import _desfecho
+
+    class Source:
+        def __init__(self, seed):
+            self.rng = random.Random(seed)
+
+        def chance(self, p):
+            return self.rng.random() < p
+
+    order = {"status": "pending"}
+    moments = {"pending": "t0"}
+    for seed in range(40):
+        for open_orders in (2, 3, 7):
+            source, plain = Source(seed), Source(seed)
+            guarantee = {"restam": open_orders, "faltam": ["pending", "authorized"]}
+            outcomes = [_desfecho(order, ("pending",), moments, source, guarantee)[0] for _ in range(open_orders)]
+            assert set(outcomes) == {"pending", "authorized"}
+            for _ in range(open_orders):
+                plain.chance(0.5)
+            assert source.rng.random() == plain.rng.random()
+
+
+def test_reservations_never_repeat_an_item_when_items_are_scarce(config) -> None:
+    """F27, o limite declarado: no piso absoluto há menos itens elegíveis que o piso da tabela,
+    e ela sai com uma reserva por item elegível — o piso cede, a invariante 18 não."""
+    from mvp_ed1.generator import pipeline
+    from mvp_ed1.generator.engine import Motor
+
+    motor = Motor(config, seed=1, fator=0.000001)
+    data = pipeline.gerar(motor)
+    moved = {row["product_variant_id"] for row in data["inventory_movements"]}
+    cart = {row["id"]: row["status"] for row in data["carts"]}
+    order = {row["id"]: row["status"] for row in data["orders"]}
+    eligible = sum(
+        1 for row in data["cart_items"]
+        if cart[row["cart_id"]] != "converted" and row["product_variant_id"] in moved
+    ) + sum(
+        1 for row in data["order_items"]
+        if order[row["order_id"]] in ("pending", "paid", "picking") and row["product_variant_id"] in moved
+    )
+    assert eligible < motor.linhas("stock_reservations")  # o caso existe: senão o teste é vazio
+    assert len(data["stock_reservations"]) == eligible
+    assert violations_18_reservation_belongs_to_an_item(data) == []
+
+
 def _tampered(data, table: str, row_id, key: str = "id", **changes):
     """O conjunto com uma linha trocada — os demais objetos são os mesmos, intocados."""
     tables = {name: data[name] for name in data}

@@ -368,17 +368,21 @@ def _reservas(motor: Motor, dados: Dataset, movimentos: list[dict]) -> list[dict
     pretendidas = sum(fonte.chance(processo["origem_carrinho"]) for _ in range(total))
     quantas_de_pedido = min(total - pretendidas, len(de_pedido))
     quantas_de_carrinho = min(total - quantas_de_pedido, len(de_carrinho))
+    # E a volta: o que não coube nos carrinhos vai para os pedidos que sobraram.
+    # Sem ela a tabela saía menor que o piso tendo item elegível para reservar.
+    quantas_de_pedido = min(total - quantas_de_carrinho, len(de_pedido))
     escolhidas = [("cart", par) for par in fonte.amostra(de_carrinho, quantas_de_carrinho)]
     escolhidas += [("order", par) for par in fonte.amostra(de_pedido, quantas_de_pedido)]
+    _cobrir_estados(escolhidas, de_carrinho, de_pedido, estados_de_carrinho)
     fonte.rng.shuffle(escolhidas)
 
     esqueletos: list[dict] = []
     for tipo, (origem, item) in escolhidas:
         if tipo == "cart":
-            criada, estado = origem["created_at"], estados_de_carrinho[origem["status"]]
+            criada, estado = origem["created_at"], _estado_da_reserva(tipo, origem, estados_de_carrinho)
         else:
             criada = origem["placed_at"]
-            estado = "consumed" if origem["status"] != "pending" else "active"
+            estado = _estado_da_reserva(tipo, origem, estados_de_carrinho)
         esqueletos.append(
             {
                 "warehouse_id": fonte.escolha(armazens_do_sku[item["product_variant_id"]]),
@@ -394,6 +398,44 @@ def _reservas(motor: Motor, dados: Dataset, movimentos: list[dict]) -> list[dict
             }
         )
     return dados.guardar("stock_reservations", motor.preencher("stock_reservations", esqueletos))
+
+
+def _estado_da_reserva(tipo: str, origem: dict, estados_de_carrinho: dict[str, str]) -> str:
+    """O estado que a reserva herda da origem dela: do carrinho, ou do pedido em aberto."""
+    if tipo == "cart":
+        return estados_de_carrinho[origem["status"]]
+    return "consumed" if origem["status"] != "pending" else "active"
+
+
+def _cobrir_estados(escolhidas, de_carrinho, de_pedido, estados_de_carrinho) -> None:
+    """Todo estado de reserva que algum item elegível produz aparece na amostra.
+
+    O estado vem da origem, e a amostra simples o deixa ao acaso: no piso de
+    quatro reservas, `expired` sumia na maioria das sementes. O estado que
+    falta entra com um item ainda não reservado — nunca o mesmo item duas
+    vezes, que a invariante 18 proíbe —, no lugar de um do estado que sobra.
+    """
+    def estado(par):
+        return _estado_da_reserva(par[0], par[1][0], estados_de_carrinho)
+
+    disponiveis = [("cart", par) for par in de_carrinho] + [("order", par) for par in de_pedido]
+    usados = {id(par[1][1]) for par in escolhidas}
+    for alvo in ("active", "released", "expired", "consumed"):
+        presentes = [estado(par) for par in escolhidas]
+        if alvo in presentes:
+            continue
+        candidato = next(
+            (par for par in disponiveis if estado(par) == alvo and id(par[1][1]) not in usados), None
+        )
+        if candidato is None:
+            continue
+        sobra = max(sorted(set(presentes)), key=presentes.count, default=None)
+        if sobra is None or presentes.count(sobra) < 2:
+            continue
+        posicao = presentes.index(sobra)
+        usados.discard(id(escolhidas[posicao][1][1]))
+        usados.add(id(candidato[1][1]))
+        escolhidas[posicao] = candidato
 
 
 def _saldos(motor: Motor, dados: Dataset, movimentos: list[dict], reservas: list[dict]) -> None:

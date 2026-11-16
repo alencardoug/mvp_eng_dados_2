@@ -420,7 +420,7 @@ inventário.
   não foi fechado.
 - **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
   (Q25). **No ramo `bloco-5r` (16/11/2026):** os eventos obrigatórios entram antes dos opcionais, e o `closed_at` fica só no
-  `closed`; invariante 17. No varejo, os 11 chamados reabertos têm o `resolved` antes do `reopened`, nenhum
+  `closed`; invariante 17. No varejo, os 15 chamados reabertos têm o `resolved` antes do `reopened`, nenhum
   `resolved` ou `closed` fica sem o evento de resolução, e os 94 `resolved` têm `closed_at` nulo. Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
 
 ### F27 — A reserva de estoque não é de um item do carrinho nem do pedido · **Gravidade: baixa**
@@ -440,8 +440,8 @@ inventário.
 - **Aqui**, pela decisão do Owner (Q28 do plano da base dos consumidores): a reserva passa a ser de um SKU
   do carrinho ou do pedido dela, no Bloco 5R, no fim da fase. **No ramo `bloco-5r` (16/11/2026):** a reserva nasce de um item, com
   o SKU e a quantidade dele (Q40), no máximo uma por item; invariante 18. No varejo, as 4.200 reservas são
-  de um item da própria origem — 3.310 de carrinho e 890 de pedido, 79% e 21%: a divisão declarada de 60%
-  é intenção, e os itens de pedido em aberto não comportam mais (Q45). Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
+  de um item da própria origem; a divisão efetiva entre carrinho e pedido, que não é a declarada (Q45),
+  está medida na [Geração de Dados §4.3](geracao_de_dados.md#43-onde-os-números-vivem). Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
 
 ### F28 — A contagem de pedidos da P06 se diz aditiva e se repete entre categorias · **Gravidade: baixa**
 
@@ -467,8 +467,9 @@ inventário.
   fator do ADR-0014; e, com o mapa do F22, o `GW-OK` não apareceria no legado.
 - **Aqui**, pela decisão do Owner (Q46 do plano da base dos consumidores): entra na fila do Bloco 5R. No
   ramo `bloco-5r` (16/11/2026), o gerador garante os dois desfechos em qualquer fator e semente — o sorteio
-  só cede quando os pedidos em aberto que restam são tantos quantos os desfechos que faltam —, e a
-  invariante 19 exige os três resultados em todo perfil. No perfil do legado muda uma linha (uma
+  só cede quando os pedidos em aberto que restam são tantos quantos os desfechos que faltam, e `orders`
+  tem piso de oito linhas, com dois pedidos em aberto garantidos (Q54) —, e a invariante 19 exige os três
+  resultados em todo perfil. No perfil do legado muda uma linha (uma
   autorização passa de aprovada a pendente); no varejo, nenhuma.
 
 ### F30 — A limpeza do legado trata a validade da reserva como fato consumado · **Gravidade: média**

@@ -361,6 +361,8 @@ tabelas:
   orders:
     referencia: 35000
     momento: placed_at
+    min_rows: 8
+    motivo: Os sete estados do pedido e mais um pedido em aberto. O pagamento do pedido em aberto tem dois desfechos, `pending` e `authorized`, e com um pedido só um deles some do dado (F29).
     origem: processo
     processo:
       # Pedidos sem carrinho: venda direta em loja física.
@@ -512,6 +514,10 @@ tabelas:
     origem: processo
     processo:
       validade_horas: 48
+      # O piso da tabela cede a essa regra: cada item é reservado no máximo
+      # uma vez, e no piso absoluto das tabelas há menos itens elegíveis que
+      # reservas pedidas. A tabela sai então com uma reserva por item elegível.
+      # A contagem e os quatro estados valem do fator 0,001 para cima (Q56).
       # Intenção, não medida: cada item é reservado no máximo uma vez (F27), e
       # os itens de pedido em aberto são poucos. O que não cabe neles vai para
       # os carrinhos, e o total de reservas se mantém (Q45 do plano da base dos
@@ -621,6 +627,8 @@ tabelas:
 
   ticket_events:
     referencia: 18000
+    min_rows: 20
+    motivo: Os chamados do piso já pedem até 18 eventos pelo estado em que pararam — criação, atribuição, resolução e a reabertura garantida (invariante 17) —, e sobram dois para `message` e `status_changed` aparecerem.
     origem: processo
     colunas:
       message: {provedor: mensagem_de_chamado, nulo: 0.35}

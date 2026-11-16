@@ -171,6 +171,12 @@ Duas garantias de construção sustentam isso, e nenhuma delas depende de sorte:
   `order_status_history.from_status` nunca vale `cancelled` nem `returned`, porque não existe
   transição saindo de um estado terminal. A dispensa está no YAML, com o motivo, e é revisada.
 
+**Um piso cede a uma invariante, e está declarado.** A reserva de estoque nasce de um item de carrinho ou
+de pedido e nunca repete item (invariante 18). No piso absoluto das tabelas há menos itens elegíveis do
+que as quatro reservas que a enumeração pediria, e `stock_reservations` sai então com uma reserva por
+item elegível. A contagem no alvo e os quatro estados valem do fator 0,001 para cima — medido em 20
+sementes, e cobrado por teste em oito.
+
 **Piso e fator interagem, e isso precisa ser dito.** Em fator 1, o piso domina em várias tabelas
 pequenas, e a proporção efetiva entre elas deixa de ser a proporção declarada. Isso é intencional —
 cobertura vence realismo de proporção quando os dois competem —, mas significa que

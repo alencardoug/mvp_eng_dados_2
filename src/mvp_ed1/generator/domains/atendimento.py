@@ -12,7 +12,7 @@ import datetime as dt
 
 from mvp_ed1.generator.dataset import Dataset
 from mvp_ed1.generator.engine import Motor
-from mvp_ed1.generator.rng import repartir
+from mvp_ed1.generator.rng import cobrir, repartir
 
 #: Categorias na ordem em que o modelo as aceita; as primeiras linhas levam uma
 #: cada, e o resto é decidido pelo fato que originou o chamado.
@@ -23,6 +23,10 @@ _ENCERRADOS = ("resolved", "closed")
 #: Da abertura ao fim do atendimento que resolve, e da resolução à reabertura, em horas.
 _RESOLUCAO_H = (2, 400)
 _REABERTURA_H = (1, 240)
+
+#: Teto de mensagens e mudanças de estado por chamado, além dos eventos que o
+#: estado dele exige.
+_OPCIONAIS_MAXIMO = 5
 
 
 def agentes(motor: Motor, dados: Dataset) -> None:
@@ -136,25 +140,24 @@ def _eventos(motor: Motor, dados: Dataset, chamados_linhas: list[dict]) -> None:
 
     Invariante 17 do Modelo de Dados §4: todo chamado `resolved` ou `closed`
     tem o evento `resolved`, e todo `reopened` vem depois de um. Por isso os
-    eventos **obrigatórios** entram primeiro e os opcionais ocupam o que sobra
-    do orçamento — cortar a lista pronta no tamanho sorteado tirava justamente
-    a resolução dos chamados de dois eventos.
+    eventos **obrigatórios** de todos os chamados são levantados primeiro, e só
+    o que sobra do orçamento da tabela é repartido em opcionais — cortar a
+    lista pronta no tamanho sorteado tirava justamente a resolução dos chamados
+    de dois eventos, e repartir o orçamento antes de conhecer os obrigatórios
+    o estourava: no piso, 16 eventos para 6 pedidos, e nenhum opcional.
     """
     fonte = motor.fonte("ticket_events")
-    por_chamado = repartir(
-        motor.linhas("ticket_events"), len(chamados_linhas), fonte, minimo=2, maximo=9
-    )
 
     # O primeiro chamado em andamento que couber é sempre reaberto: sem isso
     # `reopened` depende de 25% de 14% dos chamados e desaparece em fator pequeno.
     reabertura_pendente = True
 
-    esqueletos: list[dict] = []
-    for chamado, quantidade in zip(chamados_linhas, por_chamado):
+    planos: list[tuple[dict, list[str], list[str], bool, dt.datetime]] = []
+    for chamado in chamados_linhas:
         aberto = chamado["opened_at"]
-        tipos = ["created"]
+        iniciais = ["created"]
         if chamado["assigned_agent_id"]:
-            tipos.append("assigned")
+            iniciais.append("assigned")
 
         # Até quando vai o atendimento que termina em resolução. O chamado
         # fechado tem a data dele; o resolvido e o reaberto sorteiam a sua na
@@ -178,11 +181,23 @@ def _eventos(motor: Motor, dados: Dataset, chamados_linhas: list[dict]) -> None:
             horizonte = motor.fim
 
         finais = ["resolved"] if chamado["status"] in _ENCERRADOS or reaberto else []
-        opcionais = quantidade - len(tipos) - len(finais) - (1 if reaberto else 0)
-        for _ in range(max(opcionais, 0)):
-            tipos.append("message" if fonte.chance(0.7) else "status_changed")
-        tipos += finais
+        planos.append((chamado, iniciais, finais, reaberto, horizonte))
 
+    # O que sobra do orçamento, depois dos obrigatórios, vira mensagem e mudança
+    # de estado. Os dois tipos aparecem sempre que há lugar para os dois: é o
+    # que o piso de `ticket_events` em `geracao.yml` garante.
+    obrigatorios = sum(len(i) + len(f) + (1 if r else 0) for _, i, f, r, _ in planos)
+    sobra = max(motor.linhas("ticket_events") - obrigatorios, 0)
+    por_chamado = repartir(sobra, len(planos), fonte, minimo=0, maximo=_OPCIONAIS_MAXIMO)
+    opcionais = cobrir(
+        ["message" if fonte.chance(0.7) else "status_changed" for _ in range(sum(por_chamado))],
+        ("message", "status_changed"),
+    )
+
+    esqueletos: list[dict] = []
+    for (chamado, iniciais, finais, reaberto, horizonte), quantos in zip(planos, por_chamado):
+        aberto = chamado["opened_at"]
+        tipos = iniciais + [opcionais.pop() for _ in range(quantos)] + finais
         passo = max((horizonte - aberto) / len(tipos), dt.timedelta(minutes=15))
         momento = aberto
         for tipo in tipos:

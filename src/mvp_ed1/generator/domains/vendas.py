@@ -161,6 +161,31 @@ def carrinhos(motor: Motor, dados: Dataset) -> None:
     _itens_de_carrinho(motor, dados, carrinhos_linhas, elegiveis)
 
 
+#: Quantos pedidos precisam terminar em aberto: um para cada desfecho do
+#: pagamento em curso — `pending` e `authorized` (F29).
+_EM_ABERTO_MINIMO = 2
+
+
+def _garantir_em_aberto(finais: list[str]) -> None:
+    """Ao menos dois pedidos `pending`, sem tirar nenhum estado da amostra.
+
+    O pagamento do pedido em aberto tem dois desfechos, e com um pedido só um
+    deles some do dado em qualquer semente: a cobertura de `pagamentos` reparte
+    desfechos entre os pedidos que existem, não os cria. O que cede é o estado
+    mais frequente, e só enquanto ele sobra — por isso `orders` tem piso de
+    oito linhas, uma a mais que os sete estados.
+    """
+    while finais.count("pending") < _EM_ABERTO_MINIMO:
+        frequencias: dict[str, int] = {}
+        for estado in finais:
+            if estado != "pending":
+                frequencias[estado] = frequencias.get(estado, 0) + 1
+        sobra = max(sorted(frequencias), key=lambda estado: frequencias[estado], default=None)
+        if sobra is None or frequencias[sobra] < 2:
+            return
+        finais[finais.index(sobra)] = "pending"
+
+
 def _itens_de_carrinho(
     motor: Motor, dados: Dataset, carrinhos_linhas: list[dict], elegiveis: Elegiveis
 ) -> None:
@@ -221,6 +246,7 @@ def pedidos(motor: Motor, dados: Dataset) -> None:
         [fonte.ponderada(processo["estado_final"]) for _ in range(total)],
         tuple(processo["estado_final"]),
     )
+    _garantir_em_aberto(finais)
 
     for indice in range(total):
         carrinho = convertidos[indice] if indice < len(convertidos) else None
