@@ -45,6 +45,14 @@ calibração exclui só o que o produtor move: `inventory_balances` inteira, e d
 aprovado, que a contagem de movimentos da T1 precisa igualar. As exclusões são
 da calibração e só dela; a conferência depois de uma carga cobre tudo.
 
+**A calibração pela geração registrada** (`oracle --calibration-at-generation`)
+é a mesma conferência para a origem que tem `data/source/geracao.json` e recebeu
+eventos do produtor depois dele — o estado desde a v1.1.0, em que o corte do
+pacote aprovado já inclui eventos do produtor e deixa de ser a fronteira da
+geração. O livro é lido até a contagem de movimentos da própria medida, e o que
+prova a procedência é o registro: semente, `as_of`, fator e total de linhas
+dele precisam ser os da medida.
+
 **As colunas que o banco gera** não entram no *digest* — a carga não as
 escreve — e são conferidas à parte, pela declaração do modelo: a identidade
 `always` (`event_sequence`) vai de 1 à contagem, sem buraco nem repetição, como
@@ -79,6 +87,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 #: Onde ficam as medidas da v1.1.0 (runbook, H1). Fora do Git, como `data/`.
 MEASUREMENTS = ROOT / "data" / "medicoes" / "v1_1_0"
 LEGACY_MANIFEST = ROOT / "data" / "legacy" / "manifesto.json"
+GENERATION_RECORD = ROOT / "data" / "source" / "geracao.json"
 APPROVED_MANIFEST = ROOT / "data" / "recovery" / "aprovado" / "manifesto.json"
 
 #: A forma deste arquivo de medida. Sobe quando um campo muda de sentido.
@@ -501,6 +510,22 @@ def compare_tables(
     return result
 
 
+def generation_cut(medida: Mapping[str, Any], registro: Mapping[str, Any]) -> int:
+    """O fim da geração no livro, quando o registro da carga é o da medida.
+
+    Recusa se o registro descreve outra geração: aí a contagem de movimentos da
+    medida não diz onde a geração desta origem termina.
+    """
+    parametros = medida["oltp"]["parameters"]
+    linhas = sum(tabela["rows"] for tabela in medida["oltp"]["tables"].values())
+    esperado = {"semente": parametros["seed"], "as_of": parametros["as_of"],
+                "fator": parametros["scale"], "linhas": linhas}
+    encontrado = {chave: registro.get(chave) for chave in esperado}
+    if encontrado != esperado:
+        raise Refused(f"o registro da geração ({encontrado}) não é o da medida ({esperado})")
+    return medida["oltp"]["tables"][LEDGER]["rows"]
+
+
 def oracle(
     medida: Mapping[str, Any],
     *,
@@ -638,6 +663,9 @@ def _arguments() -> argparse.ArgumentParser:
     oraculo.add_argument("measure")
     oraculo.add_argument("--calibration", action="store_true",
                          help="exclui o que o produtor move, até o max_event_sequence do manifesto aprovado")
+    oraculo.add_argument("--calibration-at-generation", action="store_true",
+                         help="como --calibration, com o livro lido até o fim da geração da medida; "
+                              "exige que data/source/geracao.json seja o registro dela")
     oraculo.add_argument("--approved-manifest", type=pathlib.Path, default=None)
     oraculo.add_argument("--out", type=pathlib.Path, default=None)
     return parser
@@ -670,6 +698,17 @@ def main(argv: list[str] | None = None) -> int:
             raiz = os.environ.get("RECOVERY_DIR")
             approved = pathlib.Path(raiz) / "aprovado" / "manifesto.json" if raiz else APPROVED_MANIFEST
         calibration_up_to = int(_load(str(approved))["max_event_sequence"])
+    if args.calibration_at_generation:
+        if args.calibration:
+            print("RECUSADO: escolha uma calibração — pelo pacote aprovado ou pela geração", file=sys.stderr)
+            return 2
+        try:
+            if not GENERATION_RECORD.is_file():
+                raise Refused(f"{GENERATION_RECORD} não existe: sem registro, não há geração a calibrar")
+            calibration_up_to = generation_cut(_load(args.measure), _load(str(GENERATION_RECORD)))
+        except Refused as erro:
+            print(f"RECUSADO: {erro}", file=sys.stderr)
+            return 2
     from mvp_ed1 import registros
 
     # O manifesto do lote que está **neste** legado: o local, ou o da carga de outras origens.

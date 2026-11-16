@@ -381,7 +381,8 @@ memory-oracle: require-env require-venv ## T3: a memória do legado contra o liv
 source-oracle: require-env require-venv ## T2: as duas origens, em sessão somente leitura, contra uma medida; MEDIDA=, CALIBRACAO=1
 	@test -n '$(MEDIDA)' || { echo 'ERRO: use make source-oracle MEDIDA=<medida da geração>'; exit 1; }
 	@set -a; . ./.env; set +a; RECOVERY_DIR="$(RECOVERY_DIR)" \
-		.venv/bin/python -m mvp_ed1.recovery.sources oracle '$(MEDIDA)' $(if $(filter 1,$(CALIBRACAO)),--calibration)
+		.venv/bin/python -m mvp_ed1.recovery.sources oracle '$(MEDIDA)' $(if $(filter 1,$(CALIBRACAO)),--calibration) \
+		$(if $(filter geracao,$(CALIBRACAO)),--calibration-at-generation)
 
 size-report: require-env require-venv ## Tamanho por banco, tabela e índice — observação, não limite
 	@$(GERADOR) size-report

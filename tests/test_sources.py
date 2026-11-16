@@ -253,6 +253,20 @@ def test_o_oraculo_acusa_conteudo_diferente_com_a_mesma_contagem(monkeypatch) ->
     assert not relatorio["ok"] and relatorio["different"] == ["oltp.brands"]
 
 
+def test_o_corte_pela_geracao_exige_o_registro_da_propria_medida() -> None:
+    """A calibração pela geração lê o livro até a contagem da medida, e só com o registro dela."""
+    medida = _medida()
+    parametros = medida["oltp"]["parameters"]
+    registro = {
+        "semente": parametros["seed"], "as_of": parametros["as_of"], "fator": parametros["scale"],
+        "linhas": sum(tabela["rows"] for tabela in medida["oltp"]["tables"].values()),
+    }
+    assert sources.generation_cut(medida, registro) == medida["oltp"]["tables"][sources.LEDGER]["rows"]
+    for chave, outro in (("semente", -1), ("as_of", "1999-01-01"), ("fator", "outro"), ("linhas", -1)):
+        with pytest.raises(sources.Refused, match="não é o da medida"):
+            sources.generation_cut(medida, {**registro, chave: outro})
+
+
 def test_o_oraculo_acusa_o_legado_diferente(monkeypatch) -> None:
     medida = _medida()
     lido = copy.deepcopy(medida["legacy"]["tables"])
