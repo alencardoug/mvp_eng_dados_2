@@ -247,6 +247,7 @@ do item 9.
    Claude in Chrome, na sua sessão — por serviço, consumo bruto, créditos e líquido, captura 19 —, e
    você confirma. O desmonte provou os recursos removidos, o faturamento desligado e a exclusão
    pedida, não custo residual zero ([§58](registro_fase_gcp.md#58-o-desmonte-sete-horas-e-meia-depois-do-limite-13112026-0033--0136)). O número entra na [Capacidade §2.14](capacidade_e_recuperacao.md#214-a-estimativa-da-janela-da-etapa-13--07112026).
+   **Feito em 16/11/2026:** R$ 294,33 + R$ 6,92 bruto, líquido R$ 0,00 ([Registro §61](registro_fase_gcp.md#61-o-custo-real-lido-no-faturamento-16112026)).
 10. **A procedência do armazém no BigQuery** (acrescentado em 15/11/2026, da revisão da L5,
     RVL5I-1-06): a [ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md) declara a
     paridade, mas no código só existe o DDL da tabela `governance.dbt_invocations` em

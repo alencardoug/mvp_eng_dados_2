@@ -138,5 +138,6 @@ aqui como `prevista` antes do *commit* que a faz.
 Etapa 13 foi destruído em 13/11/2026 e é evidência **datada e congelada**: as declarações
 (`terraform/`, o mapa de paridade) e o [Registro da fase GCP](registro_fase_gcp.md) estão aqui; as
 evidências coletadas antes do desmonte estão fora do Git, no `mvp_eng_dados_1` (L10, Bloco 4). O custo
-real da fase entra em 16/11/2026 no `mvp_eng_dados_1`, como a D92 prevê, e **também aqui**, no mesmo
-dia, para que os portais o leiam deste repositório.
+real da fase, lido em 16/11/2026, está no `mvp_eng_dados_1`, como a D92 prevê, e **também aqui**, para
+que os portais o leiam deste repositório: [Capacidade §2.14](capacidade_e_recuperacao.md#214-a-estimativa-da-janela-da-etapa-13--07112026)
+(R$ 294,33 bruto no `mvp-ed1-gcp`, R$ 6,92 no `mvp-ed1-estudo`, líquido R$ 0,00).
