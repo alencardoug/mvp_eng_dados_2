@@ -1156,7 +1156,7 @@ o mesmo relatório vai à T3 nos dois argumentos: `REMOCOES_ACEITAS=` e `REAPARI
 - **F0, nova, antes da F1** (RVB5RC-1-06) — a publicação. O `make check` da F1 confere o pacote de metadados,
   e as guardas e o `dominios.yml` mudam os insumos dele: a F1 pararia no pacote antes de chegar à linha que o
   atualiza. Na ordem: a troca da declaração do `gateway_response_code` em `dominios.yml` pelo significado
-  aceito na Q41; `make catalog-derivados` → `make dbt-build` → **registro T4 do tratamento** →
+  aceito na Q41; as quatro mudanças da rodada 15 (Q57 a Q60), aplicadas do *patch* revisado; `make catalog-derivados` → `make dbt-build` → **registro T4 do tratamento** →
   `make catalog` → `make test` → `make catalog` → `make check-offline`; o *commit* (as guardas, os derivados,
   o pacote); a árvore limpa.
 - **F1** — `make check`, completo e sem dispensa, e o registro T4 do tratamento depois dele. São cinco
@@ -1656,6 +1656,22 @@ Owner escolheu a recomendada nas três. Os dois pisos são declaração (`geraca
 | **Q54** | A garantia do F29 (Q46) não vale com um só pedido em aberto: no fator 0,001 o piso de `orders` é 7, um por estado, e um dos dois desfechos some. Como garantir? | **`orders` com `min_rows: 8`** — os sete estados e mais um pedido em aberto —, e ao menos dois pedidos `pending` garantidos pelo gerador. Nos fatores 0,001, 0,01 e 0,05, em 20 sementes, os dois desfechos aparecem sempre; no `dev` nada muda. Era a recomendada | Nenhum piso novo, e a garantia declarada só a partir de dois pedidos em aberto |
 | **Q55** | No piso (6 chamados), os eventos obrigatórios pelo estado já somam até 18, e o alvo de `ticket_events` era 6: saíam 16 eventos e nenhum `message` nem `status_changed`; no `dev`, 1.818 para um alvo de 1.800. Como fechar o orçamento? | **`ticket_events` com `min_rows: 20`** — até 18 obrigatórios no piso e 2 para os dois tipos opcionais —, e os obrigatórios de todos os chamados levantados antes de repartir o que sobra. A tabela sai exatamente no alvo (1.800 no `dev`), com os seis tipos em 20 sementes. Um chamado pode ter só o `created`; antes o mínimo era 2. Era a recomendada | Só o orçamento exato, sem piso: no piso a tabela excederia o alvo e os opcionais faltariam |
 | **Q56** | Com a reserva nascendo de um item (F27), a tabela pode sair menor que o piso de 4 e sem os quatro estados. O código foi corrigido (o que não cabe numa origem volta para a outra; o estado que falta entra no lugar do que sobra), e de 0,001 para cima 20 sementes passam; mas no piso absoluto o dado inteiro tem 1 item de carrinho e 1 de pedido, e não há 4 itens a reservar sem repetir. O que fazer com o limite? | **Declarar o limite**: a reserva nunca repete item (invariante 18), e o piso de `stock_reservations` cede ao número de itens elegíveis. Escrito no `geracao.yml` e na Geração de Dados §4.1, com teste: contagem e estados a partir do fator 0,001, e no piso absoluto uma reserva por item elegível. Nenhum piso novo em outras tabelas. Era a recomendada | Pisos em `cart_items` e `order_items`; voltar a permitir repetir item no piso |
+
+### Rodada 15 — os quatro pontos deixados em aberto na Parte B do Bloco 5: respondida em 16/11/2026
+
+Levados ao Owner em 15/11/2026, ao fim da revisão da Parte B, sem decisão até aqui. Medido antes de perguntar,
+no pacote de `dcb7a0e` e nos textos do glossário. O Owner escolheu a recomendada nas quatro.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q57** | O `zero_denominator` das métricas tem dois "nulos": o texto `"null"` (7 razões: a métrica dá nulo com o denominador zero) e o JSON `null` (37 métricas: não se aplica). Quem lê o JSON sem o esquema confunde os dois | **O valor textual passa a `"returns_null"`**; o JSON `null` continua sendo "não se aplica". Mudam `metricas.yml`, o leitor, o esquema e o exemplo. É mudança de esquema do pacote: a linha `prevista` em Consumidores §5 entra antes, e o aviso sai com o do ciclo. Era a recomendada | Um booleano `null_when_zero_denominator`; manter como está |
+| **Q58** | O conceito "entrega no prazo" cobre `on_time_rate`, `late_count` e `avg_delay_days_when_late`, mas o texto não define "atrasada" nem o atraso em dias | **Um parágrafo no conceito**, depois da marca do texto curto: atrasada é a remessa entregue cuja chegada passou da promessa — o complemento do "no prazo" entre as entregues; a em trânsito não está atrasada —, e o atraso em dias é contado da promessa à chegada, só nas atrasadas. Mudança de texto; o texto do BigQuery não muda. Era a recomendada | Um conceito próprio, `atraso_na_entrega.md`; tirar as duas de `concepts:` |
+| **Q59** | A descrição da taxa de conversão no BigQuery encolheu de 1.000 para 427 caracteres quando a regra gerada (Q30) fez o texto inteiro passar do limite de 1.024, e perdeu três regras: não é aditiva; o carrinho conta no mês de criação; o carrinho aberto e dentro do prazo fica fora do denominador | **Uma frase a mais no texto curto**, antes da marca, com as três regras; o porquê de cada uma continua depois da marca. Uma guarda confere que as três estão no curto. Mudança de texto. Era a recomendada | Aceitar a perda; encurtar o porquê até o texto inteiro caber de novo |
+| **Q60** | "Só pedido realizado conta" está escrita à mão no texto curto de `receita_liquida.md` (a que vai ao BigQuery, a do F5) e gerada do filtro `realised_order`, depois da marca; nada garante que continuem iguais | **As duas ficam, com uma guarda**: os estados que a frase à mão cita têm de ser os do rótulo do filtro declarado e os que `trusted.orders.is_realised` aceita. Nada muda no texto publicado. Era a recomendada | Gerar a frase também no texto curto, revendo a Q30; manter sem guarda |
+
+**Onde entram.** As quatro mudam insumos do dbt (`metricas.yml` e os `.md` do glossário), e publicá-las pede um
+`make dbt-build`. Para não reconstruir o armazém fora do ciclo, a implementação é escrita e revisada agora,
+guardada fora da árvore como as guardas (Q53), e entra na F0 do ciclo, junto com a troca do `dominios.yml`.
 
 ## 7. Definição de pronto aplicada
 
