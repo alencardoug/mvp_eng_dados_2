@@ -1719,3 +1719,17 @@ sondas, em `bloco6_sonda/` — tudo em `data/medicoes/base_consumidores/`, fora 
 
 **A revisão do desenho do Bloco 6 está fechada.** Faltam as respostas do Owner à rodada 10 (Q34 a Q38) e,
 depois delas, o ADR do Bloco 6 e a implementação, com as provas do item 9.
+
+### Rodadas 52 e 53 — Codex conta 2, sobre a implementação do Bloco 6 (16/11/2026)
+
+Relatórios em `codex2_bloco6_impl_r1.md` e `r2.md`; objeto inicial `d4297ed` (o contrato, os tipos e as PKs, o
+ciclo das FKs, o escopo no log e as guardas).
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 52 | `e1ac94f`, `cb8ab4b` | 1 bloqueante, 5 ajustes (RVB6I-1-01 a 06) | `exclusive_scope` entra na declaração que gera a fonte; o despacho do BigQuery instala a PK que falta e só age entre tabelas que existem; a guarda das chaves conta a FK repetida e lê o schema da apontada; os tempos e as contagens da entrega, pelos *logs*; a linha `feita` em Consumidores §5; o ADR-0056 volta ao texto aceito, com a retificação da paridade no fim (decisão do Owner) |
+| 53 | — | nenhum | — |
+
+**A revisão da implementação do Bloco 6 está fechada.** Fica declarado como não provado: o retry que
+reconstrói uma dimensão e o órfão, no armazém real; o `RESET=1`, que se prova no ciclo do Bloco 5R (Q37); o
+BigQuery (L9). Isso não é o aceite do declarativo, que é do Owner.
