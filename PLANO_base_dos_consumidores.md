@@ -921,7 +921,8 @@ proporção em `geracao.yml` é declaração, e passa pela revisão do Owner (CL
    e com poucos pedidos em aberto um dos dois some — o perfil do legado (fator 0,05, semente própria) tem 3, e
    os 3 saíam `authorized`: nenhuma transação `pending`, e por isso nenhum `GW-OK` do F22. A correção garante
    os dois desfechos em qualquer fator e semente, como a reabertura garantida do F26, e a invariante do F22
-   passa a exigir os três resultados em todo perfil.
+   passa a exigir os três resultados em todo perfil. A garantia pede dois pedidos em aberto, e o piso de
+   `orders` era de sete, um por estado: passa a oito, com dois `pending` garantidos (Q54; RVB5RI-1-01).
 8. **F30 — a validade da reserva tratada como fato consumado** (Q48; achado novo, pela regra de entrada): a
    limpeza do legado aplica `DATE_FUTURE` a `stock_reservations.expires_at`, que é prazo — a reserva ativa no
    corte vence até 48 h depois dele. O lote de hoje não tem nenhuma vencendo depois do corte, por acaso da
@@ -996,7 +997,8 @@ estão em `data/medicoes/base_consumidores/bloco5r/` e em `data/medicoes/v1_1_0/
 destrutivo rodou.** O diário do ciclo é `data/medicoes/diario_bloco5r.md`, e as saídas de cada linha,
 `data/medicoes/bloco5r_ciclo/<linha>_a<tentativa>_<nome>`. A revisão 2 responde à rodada 1 da revisão
 (`codex2_bloco5r_ciclo_r1.md`, RVB5RC-1-01 a 12; §9): o ciclo **não começa** com as decisões do fim desta
-seção em aberto.
+seção em aberto. As medidas do H1 e do H2 abaixo são as de depois da rodada 1 da revisão da implementação
+(§6, rodada 14): `h1_depois_ramo_r2.json`.
 
 **Parâmetros** (S1). Os mesmos da carga de hoje: semente `20260904`, `as_of` `2026-09-01`, fator `dev`; no
 legado, semente `20260906`, fator `0.05` e **catálogo na versão 10** (F30) — a única diferença de parâmetro.
@@ -1055,7 +1057,7 @@ editado. A descrição do F30 neste plano e em Achados ("o tratamento novo só c
 lote novo; a captura 67 já foi retratada sob o 10 pela Q49.
 
 **H1 — o que muda de conteúdo, medido em memória** (`h1_antes_f9f74e2.json`, do gerador de `PRE` numa árvore
-de trabalho à parte; `h1_depois_ramo.json`, do ramo):
+de trabalho à parte; `h1_depois_ramo_r2.json`, do ramo):
 
 - a calibração passa — `make source-oracle CALIBRACAO=geracao`, ferramenta nova do ramo: 39 tabelas do
   varejo iguais à geração de `PRE`, com o livro lido até 13.725 e sem buraco nesse prefixo, e as 40 do legado
@@ -1065,15 +1067,17 @@ de trabalho à parte; `h1_depois_ramo.json`, do ramo):
   parâmetros e pelo total de linhas do registro da geração — não pela identidade dela: uma medida de outra
   geração com os mesmos quatro campos passaria na escolha do corte, e seria pega pelos *digests* das tabelas.
   Não é prova da procedência histórica da origem;
-- no varejo mudam 18 das 40 tabelas; o total vai de 252.987 a 252.498 linhas. Mudam de contagem
+- no varejo mudam 18 das 40 tabelas; o total vai de 252.987 a 252.480 linhas. Mudam de contagem
   `inventory_movements` (13.725 → 12.711), `inventory_balances` (2.914 → 2.926), `shipments` (3.595 → 3.644),
-  `shipment_items` (7.305 → 7.417), `delivery_events` (17.340 → 17.597) e `ticket_events` (1.723 → 1.818); as
+  `shipment_items` (7.305 → 7.417), `delivery_events` (17.340 → 17.597) e `ticket_events` (1.723 → 1.800); as
   outras 12 mudam só de conteúdo;
-- no legado mudam 21 das 40; o lote vai de `060c3fc9…` a `b7164a09…`.
+- no legado mudam 21 das 40; o lote vai de `060c3fc9…` a `9ecb9fe1…`.
 
 **H2 — as chaves do legado que mudam** (`make generation-compare … MANIFESTO_ANTES=data/legacy/manifesto.json`;
-o relatório é `data/medicoes/v1_1_0/20261116T174927Z_comparacao_ea41fe4.json`, SHA-256 `f7c5f730…aafdf52`,
-**congelado antes da B4**, que troca o manifesto corrente):
+o relatório é `data/medicoes/v1_1_0/20261116T205540Z_comparacao_5884178.json`, SHA-256 `246ab63a…5e9500`,
+**congelado antes da B4**, que troca o manifesto corrente; as chaves removidas e acrescentadas são, uma a
+uma, as do relatório que a Q50 aceitou, `…174927Z_comparacao_ea41fe4.json` — conferido —, e é o relatório
+novo que vai à T3, porque o lote é outro):
 
 | Tabela | Removidas | Acrescentadas | Mantidas |
 |---|---|---|---|
@@ -1097,7 +1101,7 @@ o mesmo relatório vai à T3 nos dois argumentos: `REMOCOES_ACEITAS=` e `REAPARI
   limpa também de arquivo não rastreado (`recovery-pack` lê `git status --porcelain` inteiro): as guardas
   ainda não estão nela (ver "As guardas").
 - **A7** — `make seed-data DRY_RUN=1`, `make legacy-plan` e a T1 de novo, sob `MAINT`: as contagens e os
-  *digests* de `h1_depois_ramo.json`. Diferença para a medida: para, o ramo mudou depois dela.
+  *digests* da medida do H1 do ramo. Diferença para a medida: para, o ramo mudou depois dela.
 - **A8** — antes dela, `make airbyte-up` e a espera pela API (RVB5RC-1-04): `ledger-baseline` lê os *jobs* da
   conexão do legado, e o Airbyte está pausado. É a troca guardada, sem `FORCE=1`; Airbyte e Airflow convivem.
   Então a T3 de hoje guardada (a continuidade, acima) e `make ledger-baseline`, que abre a época 3.
@@ -1112,9 +1116,12 @@ o mesmo relatório vai à T3 nos dois argumentos: `REMOCOES_ACEITAS=` e `REAPARI
   guardados com o `invocation_id` da execução: o descarte dos *snapshots* e o `--full-refresh` no log; as
   quatro dimensões SCD refeitas e a fato incremental com a população da origem (`fato_reconcilia_com_a_condutora`,
   `incremental_confere_com_a_reconstrucao_completa`); a linha do log de execução fechada, com o escopo
-  `analytics`; e, **logo depois, numa linha própria**, as chaves físicas — `.venv/bin/pytest
-  tests/test_chaves.py`, sem pulo —, porque o `dbt-build` não roda o `pytest` (RVB5RC-1-09): 26 PKs e 58 FKs
-  instaladas. FK instalada não prova população, e por isso as reconciliações ficam. As seis guardas do ramo
+  `analytics`; e, **logo depois, numa linha própria**, as chaves físicas, porque o `dbt-build` não roda o `pytest`
+  (RVB5RC-1-09): `( set -a; . ./.env; set +a; .venv/bin/pytest -rs tests/test_chaves.py )` — num subshell
+  com a configuração carregada, como as receitas fazem, porque o módulo tem a própria conexão e sem as
+  variáveis do armazém falha antes de conferir (RVB5RC-2-02) —, sem recorte por `-m` ou `-k`: **os oito
+  casos passando e nenhum pulado**. Seis conferem a declaração em memória e dois leem o armazém; só esses
+  dois provam as 26 PKs e as 58 FKs instaladas, e um pulo neles não vale como prova. FK instalada não prova população, e por isso as reconciliações ficam. As seis guardas do ramo
   rodam aqui pela primeira vez sobre o dado novo.
 - **D3 que falha** (RVB5RC-1-09; o §5 do roteiro não conhece o Bloco 6). O histórico SCD já foi descartado, e
   nada o traz de volta: guarda vermelha não desfaz a D3, só para o ciclo. Primeiro o registro T4 do
@@ -1159,9 +1166,12 @@ o mesmo relatório vai à T3 nos dois argumentos: `REMOCOES_ACEITAS=` e `REAPARI
   roteiro; a contagem observada se confere com esse inventário.
 - **F4** — o fecho da publicação (RVB5RC-1-11): `git status --short` vazio; **um `make dbt-build` do *commit*
   limpo**, com o registro T4 do tratamento depois dele; a procedência `verified` lida de
-  `governance.warehouse_provenance` com o `invocation_id`; `make catalog` e `git status --short` de novo — o
-  pacote versionado não muda com instantes e invocações (`pacote.normalizado()`), e mudança substantiva aqui
-  para o ciclo, porque quer dizer que o *commit* não continha o que o *build* publicou.
+  `governance.warehouse_provenance` com o `invocation_id`; `make catalog`, que **reescreve** o pacote
+  versionado com os instantes e a invocação do *build* novo (RVB5RC-2-01: quem ignora esses campos é a
+  conferência, não o escritor); então `.venv/bin/python -m mvp_ed1.models.pacote --check`, a comparação
+  substantiva — diferença nela para o ciclo, porque quer dizer que o *commit* não continha o que o *build*
+  publicou. O que sobra é o *diff* de execução do pacote: vai num *commit* próprio na G1, com o SHA do
+  *build* conferido na mensagem, e **não** pede outro *build* — o pacote não é insumo de si mesmo nem do dbt.
 - **G1 a G11** — o pacote de recuperação refeito sobre o dado novo, com as substituições acima. A restauração
   (G7) abre a época seguinte do livro, e pede a segunda autorização do Owner.
 - **Depois do ciclo, fora do roteiro**, cada passo fechando o que ele mesmo mudar: a auditoria das 16 views e
@@ -1635,6 +1645,18 @@ janela de restauração — não estão aqui: são dadas no momento, no diário 
 | **Q52** | O cursor do produtor não existe neste checkout; o último está no `mvp_eng_dados_1` arquivado (9.791 emitidos). De onde o produtor parte na fase E? | **Do zero**: sem arquivo, deslocamento 0 com a semente de sempre; a ausência é o estado de partida, registrada na A1 e guardada pelo pacote. Nada é copiado do repositório arquivado. Revê a S3 do roteiro (o cursor mantido) para este ciclo. Era a recomendada | Trazer o cursor do `mvp_eng_dados_1`, com origem e SHA-256, antes do corte de recuo |
 | **Q53** | As seis guardas do armazém só ficam verdes depois da D3, o corte de recuo e o pacote final pedem a árvore limpa, e o *commit* só sai com `check-offline` verde. Como elas entram no Git? | **Fora da árvore até o *build* novo**: no *stash* e na cópia de `bloco5r/guardas_novos/` até a D2; no disco antes da D3; commitadas na F0, com o primeiro `check-offline` verde sobre o dado novo. Entre a D3 e a F0 a árvore fica suja, e nenhum pacote é embalado nesse trecho. Era a recomendada | *Commit* antes do ciclo, com o vermelho declarado; só depois do ciclo, sem rodar dentro dele |
 
+### Rodada 14 — da revisão da implementação do Bloco 5R: respondida em 16/11/2026
+
+Medido antes de perguntar, em memória, em 20 sementes por fator: os três bloqueantes da rodada 1 da revisão
+da implementação (`codex1_bloco5r_impl_r1.md`, RVB5RI-1-01 a 03) reproduzidos, e as correções medidas. O
+Owner escolheu a recomendada nas três. Os dois pisos são declaração (`geracao.yml`), para a revisão integral.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q54** | A garantia do F29 (Q46) não vale com um só pedido em aberto: no fator 0,001 o piso de `orders` é 7, um por estado, e um dos dois desfechos some. Como garantir? | **`orders` com `min_rows: 8`** — os sete estados e mais um pedido em aberto —, e ao menos dois pedidos `pending` garantidos pelo gerador. Nos fatores 0,001, 0,01 e 0,05, em 20 sementes, os dois desfechos aparecem sempre; no `dev` nada muda. Era a recomendada | Nenhum piso novo, e a garantia declarada só a partir de dois pedidos em aberto |
+| **Q55** | No piso (6 chamados), os eventos obrigatórios pelo estado já somam até 18, e o alvo de `ticket_events` era 6: saíam 16 eventos e nenhum `message` nem `status_changed`; no `dev`, 1.818 para um alvo de 1.800. Como fechar o orçamento? | **`ticket_events` com `min_rows: 20`** — até 18 obrigatórios no piso e 2 para os dois tipos opcionais —, e os obrigatórios de todos os chamados levantados antes de repartir o que sobra. A tabela sai exatamente no alvo (1.800 no `dev`), com os seis tipos em 20 sementes. Um chamado pode ter só o `created`; antes o mínimo era 2. Era a recomendada | Só o orçamento exato, sem piso: no piso a tabela excederia o alvo e os opcionais faltariam |
+| **Q56** | Com a reserva nascendo de um item (F27), a tabela pode sair menor que o piso de 4 e sem os quatro estados. O código foi corrigido (o que não cabe numa origem volta para a outra; o estado que falta entra no lugar do que sobra), e de 0,001 para cima 20 sementes passam; mas no piso absoluto o dado inteiro tem 1 item de carrinho e 1 de pedido, e não há 4 itens a reservar sem repetir. O que fazer com o limite? | **Declarar o limite**: a reserva nunca repete item (invariante 18), e o piso de `stock_reservations` cede ao número de itens elegíveis. Escrito no `geracao.yml` e na Geração de Dados §4.1, com teste: contagem e estados a partir do fator 0,001, e no piso absoluto uma reserva por item elegível. Nenhum piso novo em outras tabelas. Era a recomendada | Pisos em `cart_items` e `order_items`; voltar a permitir repetir item no piso |
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
@@ -2039,3 +2061,33 @@ e do H2 conferem com as medidas. Nenhuma linha do ciclo tinha rodado. Respondido
 
 E o "19 `complete`" do estado de partida era 18 capturas certificadas nas 40 tabelas, de 19 tentativas (a 34
 é `incomplete`). A rodada 2 segue para a mesma conta.
+
+### Rodada 55 — Codex conta 2, sobre `149a76d` (16/11/2026)
+
+Relatório em `codex2_bloco5r_ciclo_r2.md`: **nenhum bloqueante**; das doze respostas, dez resolvem e duas
+resolvem em parte, com dois ajustes (RVB5RC-2-01 e 02), aplicados: a F4 dizia que o `make catalog` não muda
+o pacote versionado quando só mudam campos de execução — ele o reescreve, e o *diff* de execução vai num
+*commit* próprio na G1, sem outro *build*; e a chamada de `tests/test_chaves.py` depois da D3 ganhou o
+ambiente carregado e o critério "oito casos, nenhum pulado". Os cinco pontos entregues ao Owner foram dados
+como bem postos; quatro estão decididos (§6, rodada 13). A igualdade das duas fatias da captura 67, que o
+revisor tratou como afirmação do autor, tem agora a saída guardada (`bloco5r/fatias_captura67_v9_v10.txt`).
+**A revisão da adaptação do ciclo está fechada**; não é a autorização do ciclo, que é do Owner, nem atesta
+o resultado dele.
+
+### Rodada 56 — Codex conta 1, sobre a implementação do Bloco 5R em `f9f74e2..d8a7229` (16/11/2026)
+
+Relatório em `codex1_bloco5r_impl_r1.md`: **3 bloqueantes e 3 ajustes** (RVB5RI-1-01 a 06). Os três
+bloqueantes eram de cobertura em fator pequeno, fora dos três perfis dos testes, e foram reproduzidos em
+memória; as decisões que pediam piso novo são do Owner (§6, rodada 14).
+
+| Achado | O que mudou |
+|---|---|
+| 01 — o F29 não cobre um só pedido em aberto | `orders` com piso de 8 e dois pedidos `pending` garantidos (Q54); testes de 0, 1 e 2 em diante |
+| 02 — o orçamento de eventos do F26 | Os obrigatórios levantados antes de repartir; `ticket_events` com piso de 20 (Q55); a tabela sai no alvo exato |
+| 03 — o F27 abaixo do piso e sem os estados | A sobra volta para a outra origem e o estado que falta entra no lugar do que sobra; o limite do piso absoluto declarado (Q56) |
+| 04 — exceções de quarentena largas nas guardas | A 17 só com `resolved` rejeitado; a 18 só sem item nenhum do SKU; a 20 com o limite declarado e a conferência par a par no ciclo |
+| 05 — a guarda 20 incompleta | Abertura no começo e na versão 1; a carga histórica até o corte inclusive |
+| 06 — a medida das reservas em dois documentos | Fica só na Geração de Dados §4.3 |
+
+As medidas do H1 e do H2 foram refeitas depois das correções: as chaves do legado que mudam são as mesmas
+que a Q50 aceitou, uma a uma. A rodada 2 segue para a mesma conta.
