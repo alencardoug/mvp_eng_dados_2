@@ -568,6 +568,45 @@ def test_reservations_never_repeat_an_item_when_items_are_scarce(config) -> None
     assert violations_18_reservation_belongs_to_an_item(data) == []
 
 
+@pytest.mark.parametrize("carts, orders", [(1, 3), (0, 4), (3, 1), (4, 0)])
+def test_reservations_refill_from_the_other_origin(config, carts, orders) -> None:
+    """F27, RVB5RI-2-01: com uma origem curta e itens que bastem nas duas, a tabela sai no alvo.
+
+    O que não coube nos carrinhos volta para os pedidos que sobraram; sem a volta, quatro itens
+    elegíveis (um de carrinho, três de pedido) davam duas reservas. Nenhum item reservado duas vezes.
+    """
+    import datetime as dt
+
+    from mvp_ed1.generator.dataset import Dataset
+    from mvp_ed1.generator.domains.estoque import _reservas
+    from mvp_ed1.generator.engine import Motor
+
+    motor = Motor(config, seed=1, fator=0.000001)
+    target = motor.linhas("stock_reservations")
+    assert target == carts + orders  # a capacidade basta exatamente para o alvo
+    moment = motor.inicio + dt.timedelta(days=30)
+    data = Dataset()
+    data.guardar("carts", [
+        {"id": i, "status": "abandoned", "created_at": moment,
+         "__itens": [{"product_variant_id": 1, "quantity": 2}]}
+        for i in range(1, carts + 1)
+    ])
+    data.guardar("orders", [
+        {"id": i, "status": "paid", "placed_at": moment} for i in range(1, orders + 1)
+    ])
+    data.guardar("order_items", [
+        {"id": i, "order_id": i, "product_variant_id": 1, "quantity": 1} for i in range(1, orders + 1)
+    ])
+    moves = [{"warehouse_id": 1, "product_variant_id": 1}]
+
+    reservations = _reservas(motor, data, moves)
+
+    assert len(reservations) == target
+    origins = [(row["cart_id"], row["order_id"]) for row in reservations]
+    assert len(set(origins)) == len(origins)
+    assert sum(1 for cart, _ in origins if cart is not None) == carts
+
+
 def _tampered(data, table: str, row_id, key: str = "id", **changes):
     """O conjunto com uma linha trocada — os demais objetos são os mesmos, intocados."""
     tables = {name: data[name] for name in data}

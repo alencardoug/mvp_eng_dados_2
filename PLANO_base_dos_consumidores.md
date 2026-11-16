@@ -2091,3 +2091,15 @@ memória; as decisões que pediam piso novo são do Owner (§6, rodada 14).
 
 As medidas do H1 e do H2 foram refeitas depois das correções: as chaves do legado que mudam são as mesmas
 que a Q50 aceitou, uma a uma. A rodada 2 segue para a mesma conta.
+
+### Rodada 57 — Codex conta 1, sobre `92c911f` (16/11/2026)
+
+Relatório em `codex1_bloco5r_impl_r2.md`: **nenhum bloqueante**; das seis respostas, quatro resolvem e duas
+resolvem em parte, e **um ajuste novo** (RVB5RI-2-01): a volta das reservas para a outra origem não tinha teste
+que a discriminasse. Corrigido com `test_reservations_refill_from_the_other_origin`, com a contraprova (sem a
+volta, dois dos quatro casos falham). O revisor reproduziu a varredura de 20 sementes nos três fatores e o H1 e
+o H2. **Ficam como não verificado, para o ciclo**, as duas partes em aberto: a ausência de um desfecho do
+pagamento em aberto não tem guarda no armazém (a cobertura é cobrada no gerador; RVB5RI-1-01); e as exceções de
+quarentena — a 17 não prova a precedência temporal do evento rejeitado, a 20 exonera o par inteiro, e as
+contraprovas com rejeição pertinente e irrelevante não existem —, que se conferem chamado a chamado e par a par
+sobre o lote novo na D3 (RVB5RI-1-04). A rodada 3 segue para a mesma conta.
