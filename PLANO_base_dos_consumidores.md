@@ -947,6 +947,13 @@ cobertura não vazia**, nos fatores do `retail` e do legado: a invariante univer
 nenhum `reopened` ou `lost` sobra (RVB5R-1-02). E as contraprovas: a correção desfeita faz a invariante falhar.
 As mesmas relações, no armazém, são as guardas do ramo.
 
+**As guardas do ramo** (16/11/2026): `dbt/tests/invariante_15_…` a `invariante_20_…`, uma por invariante, com o
+achado no cabeçalho (Qualidade de Dados §4.4, com elas). Sobre o
+armazém de hoje, as seis falham, como têm de falhar, e as contagens são as dos achados; o `make dbt-build` e o
+`make check` ficariam vermelhos nelas até o ciclo: por isso estão no disco, fora do Git, até a decisão do Owner
+sobre como entram (a adaptação do ciclo, abaixo). O F30 não tem guarda própria: quem o confere é o
+oráculo do legado (`test_b_a_limpeza_compilada_concorda_com_o_oraculo`).
+
 **A regeneração.** O [roteiro da v1.1.0](https://github.com/alencardoug/bi-como-codigo/blob/2b70224/docs/regeneration_runbook.md#4-the-cycle)
 continua dono do procedimento geral (as fases A a G), com a
 [Execução Local §3.2](docs/execucao_local.md#32-regerar-uma-origem-que-já-alimenta-streaming). Mas ele foi escrito
@@ -978,6 +985,118 @@ recuo, e revisada por outro agente. Ela cobre, no mínimo:
   sem `FORCE=1` de memória;
 - **o pacote de recuperação** (fase G) refeito, porque o de hoje guarda o dado que deixa de existir;
 - **nada no GCP** (Q14).
+
+#### A adaptação do ciclo (16/11/2026, para a revisão e para o Owner)
+
+O roteiro da v1.1.0 continua dono das linhas A1 a G11; aqui só o que muda nelas. Tudo abaixo foi medido em
+16/11/2026, sem efeito (leituras e geração em memória); as saídas estão em
+`data/medicoes/base_consumidores/bloco5r/` e em `data/medicoes/v1_1_0/`, fora do Git. **Nada destrutivo
+rodou.** O diário do ciclo é `data/medicoes/diario_bloco5r.md`, e as saídas de cada linha,
+`data/medicoes/bloco5r_ciclo/<linha>_a<tentativa>_<nome>`.
+
+**Parâmetros** (S1). Os mesmos da carga de hoje: semente `20260904`, `as_of` `2026-09-01`, fator `dev`; no
+legado, semente `20260906`, fator `0.05` e **catálogo na versão 10** (F30) — a única diferença de parâmetro.
+`PRE` é `f9f74e2`, o pai do primeiro *commit* do ramo; `MAINT` é a ponta do `bloco-5r` com a árvore limpa.
+Nenhuma migração, `pyproject.toml` nem `uv.lock` muda entre os dois: um `.venv` serve aos dois.
+
+**O estado de partida, medido** (o que a A1 registra):
+
+| O quê | Medido | O que muda no roteiro |
+|---|---|---|
+| `data/source/geracao.json` | Existe: carga de 04/11/2026, semente `20260904`, corte `2026-09-01`, fator `dev`, 252.987 linhas, *commit* `61b9f4a` | A A1 espera o arquivo **presente** e o guarda como está; a B3 o reescreve, e o registro de antes vai ao diário com o SHA-256 |
+| `oltp.inventory_movements` | 18.125 linhas, `event_sequence` até 18.125: 13.725 da geração e 4.400 do produtor | A calibração do H1 corta o livro no fim da geração, não no `max_event_sequence` do pacote aprovado (15.925) |
+| `raw.inventory_movements_stream` | 18.125 linhas | A B2 o esvazia |
+| Lote do legado | `060c3fc9…`, catálogo 9, 0 mutações abertas no diário do manifesto | O H2 compara com o estado real, que hoje é o próprio lote |
+| Capturas do legado | 19 `complete`, a selecionada é a 67; livro retido na época 2 (`epoch_0002_20261104T143228Z`) | A A8 abre a época 3 (`make ledger-baseline`); as capturas do ciclo ficam acima da 67 |
+| Cursor do produtor | **Ausente neste checkout** (`.stream/` não existe); o último está no `mvp_eng_dados_1`, arquivado: `stream_seed` `20260904`, 9.791 emitidos acumulados, 11/11/2026 | Decisão do Owner (abaixo): sem cursor, o produtor recomeça do zero com a mesma semente |
+| Pacote aprovado | `data/recovery/aprovado`, corte de 04/11/2026, *commit* `6d93d72` (do `mvp_eng_dados_1`) | O corte de antes do ciclo (A3) é um pacote novo, em `~/mvp_ed1-recovery-pre-bloco5r`; os três de antes (`…-20260925T123221Z`, `…-pre-v1.1.0`, `…-v1.1.0`) não são tocados |
+| Ambiente | Bancos e Airflow de pé, Airbyte e *streaming* pausados; janela parada | A G11 devolve este estado |
+
+**H1 — o que muda de conteúdo, medido em memória** (`h1_antes_f9f74e2.json`, do gerador de `PRE` numa árvore
+de trabalho à parte; `h1_depois_ramo.json`, do ramo):
+
+- a calibração passa: as duas origens de hoje **são** a geração de `PRE` — 39 tabelas do varejo iguais e
+  `inventory_balances` excluída, com o livro lido até 13.725; as 40 do legado iguais. Pede a ferramenta nova
+  `make source-oracle CALIBRACAO=geracao`, que corta o livro no fim da geração da medida e exige que
+  `data/source/geracao.json` seja o registro dela (no ramo, com teste);
+- no varejo mudam 18 das 40 tabelas; o total vai de 252.987 a 252.498 linhas. Mudam de contagem
+  `inventory_movements` (13.725 → 12.711), `inventory_balances` (2.914 → 2.926), `shipments` (3.595 → 3.644),
+  `shipment_items` (7.305 → 7.417), `delivery_events` (17.340 → 17.597) e `ticket_events` (1.723 → 1.818); as
+  outras 12 mudam só de conteúdo;
+- no legado mudam 21 das 40; o lote vai de `060c3fc9…` a `b7164a09…`.
+
+**H2 — as chaves do legado que mudam** (`make generation-compare … MANIFESTO_ANTES=data/legacy/manifesto.json`;
+`data/medicoes/v1_1_0/20261116T174927Z_comparacao_ea41fe4.json`). O esperado na v1.1.0 era nenhuma; aqui
+mudam em seis tabelas:
+
+| Tabela | Removidas | Acrescentadas | Mantidas |
+|---|---|---|---|
+| `inventory_movements` | 57 | 0 | 627 |
+| `shipment_items` | 1 | 0 | 382 |
+| `delivery_events` | 0 | 9 | 872 |
+| `ticket_events` | 0 | 7 | 83 |
+| `inventory_balances` | 0 | 3 | 144 |
+| `shipments` | 0 | 1 | 189 |
+
+As 58 removidas entram em `trusted.legacy_removed_records` para sempre, como remoção que o sistema legado
+nunca fez — a memória de exclusão persiste por construção. **O aceite é do Owner** (como a N54 da v1.1.0), e
+vai à T3 como `REMOCOES_ACEITAS=`; sem ele o ciclo não começa.
+
+**As linhas que mudam:**
+
+- **A3 a A6** — o corte de antes do ciclo, sob `PRE`: `RECOVERY_DIR=$HOME/mvp_ed1-recovery-pre-bloco5r`. É o
+  ponto de recuo de tudo o que vem depois (§6 do roteiro); a volta roda o código de `PRE`.
+- **A7** — `make seed-data DRY_RUN=1`, `make legacy-plan` e a T1 de novo, sob `MAINT`: as contagens e os
+  *digests* de `h1_depois_ramo.json`. Diferença para a medida: para, o ramo mudou depois dela.
+- **A8** — `make ledger-baseline` abre a época 3.
+- **B1 a B5** — como no roteiro. O oráculo da B5 é `make source-oracle MEDIDA=<a medida da A7>`, sem
+  calibração: depois da carga, todas as tabelas, e `event_sequence` de 1 a 12.711.
+- **C4, E10** — os quatro zeros, com `linhas_lote` = `linhas_fluxo` = a contagem da origem (12.711 na C4).
+- **D2** — a captura do legado é a primeira sob o catálogo 10.
+- **D3** — `make dbt-build RESET=1` é também **a prova da Q37** (Bloco 6): além dos oráculos do roteiro, as
+  26 PKs e as 58 FKs de `analytics` instaladas ao fim, pela guarda de `tests/test_chaves.py`, e a linha do
+  log de execução fechada com o escopo `analytics`. **E as seis guardas do ramo** (`invariante_15` a `20`)
+  entre os testes que passam: é a primeira execução delas sobre o dado novo. Guarda vermelha aqui para o
+  ciclo — a correção não chegou ao armazém, ou a exceção do legado não é a que a guarda prevê —, e a
+  explicação se confere no lote novo, uma a uma, antes de qualquer ajuste na guarda.
+- **D4, F6** — a T3 com `REMOCOES_ACEITAS=` do H2 aceito e `REAPARICOES_ACEITAS=` da comparação sobre o estado
+  real.
+- **D5** — as sondas do H5 da v1.1.0 (M3, M7 a M9) repetidas, porque valem para qualquer geração, e as
+  medidas da fila repetidas no armazém: `bloco5_significados_contra_o_dado_20261115.txt` e
+  `bloco5r_f27_reservas_20261115.txt`, com zero no que a fila corrigiu.
+- **E1 a E11** — o produtor exercitado com `LIMITE=2200`, como na v1.1.0; a E1 registra o cursor que a
+  decisão abaixo deixar.
+- **F1** — `make check` no lugar das "quatro etapas": hoje são cinco, com o pacote de metadados.
+- **F3** — a DAG tem hoje as tarefas da v1.1.0 mais o que as Etapas seguintes acrescentaram; o oráculo é
+  "todas `success`, cada uma na primeira tentativa", pela contagem que `make dag-status` der, registrada.
+- **F4** — substituída pela sequência de publicação: `make catalog-derivados` → `make dbt-build` →
+  `make catalog` → `make test` → `make catalog` → `make check-offline`; então o *commit* (as guardas, os
+  derivados, o pacote), a árvore limpa, **um `make dbt-build` do *commit* limpo** para a procedência
+  `verified`, e o pacote de metadados embalado. É aqui que o `dominios.yml` troca a declaração do
+  `gateway_response_code` pelo significado aceito na Q41, junto com o dado.
+- **G3 a G9** — o pacote de recuperação refeito sobre o dado novo; a segunda cópia em
+  `~/mvp_ed1-recovery-bloco5r`. A restauração (G7) abre a época seguinte do livro, e pede a segunda
+  autorização do Owner.
+- **Depois do ciclo, fora do roteiro:** a auditoria das 16 views e as conferências de população
+  (`tests/auditoria/`), `tests/test_janela_legado.py`, a remedição das ligações da Parte A uma a uma, as 16
+  linhas `feita` de Consumidores §5, a medida do giro da V5.
+
+**Os comandos destrutivos, na ordem, cada um com a confirmação do Owner imediatamente antes:**
+`make stream-down FORCE=1` (B1), `make stream-reset-sink FORCE=1` (B2), `make seed-data FORCE=1` (B3),
+`make seed-legacy FORCE=1` (B4), `make dbt-build RESET=1` (D3), `RESTAURAR=1 make recovery-restore` (G7) e
+`make recovery-promote` (G8). Cada receita é conferida lendo o texto do `Makefile`, nunca com `make -n`.
+A troca de ambientes pesados é a dos alvos guardados; recusa por memória para e vai ao Owner.
+
+**Os pontos de recuo.** Até a A8, nada foi destruído. Da B1 à C4, a memória do armazém está intacta: a volta
+é recarregar as origens de `PRE` pelo pacote da A3. Da D3 em diante o histórico SCD é outro, e a volta é a
+restauração do pacote da A3 sob o código de `PRE` (§6 do roteiro), com uma época nova do livro.
+
+**O que fica com o Owner, antes do primeiro comando:**
+
+1. o aceite das 58 chaves removidas do legado (H2);
+2. o cursor do produtor: trazer o do `mvp_eng_dados_1` (9.791 emitidos) ou recomeçar do zero neste checkout;
+3. como as guardas entram no Git: a A3 e a G3 pedem a árvore limpa, e as guardas só ficam verdes depois da D3;
+4. as duas autorizações do roteiro — a regeneração (P5) e a janela de restauração (G6).
 
 **O que muda para quem consome.** Todas as 16 views mudam de valor: a correção do F24 muda quem compra e o que
 se vende, e daí todo o resto. Antes de regerar, um aviso fora do Git aos dois consumidores (`bi-como-codigo` e
