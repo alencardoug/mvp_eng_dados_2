@@ -839,7 +839,7 @@ entre as ocorrências aptas (revisão do Bloco 5R, rodada 1, §4).
 
 **A fila.** Cada correção do gerador entra aqui com o achado, a causa no código e a invariante; o achado novo
 segue a regra de entrada do F22 (a evidência medida, o efeito, o que fazer aqui) e entra na fila sem esperar o
-fim. Hoje: F24, F25, F26, F27, V4 e F22. No ramo, cada guarda do armazém declara o achado da fila que ela
+fim. Hoje: F24, F25, F26, F27, V4, F22, F29 e F30. No ramo, cada guarda do armazém declara o achado da fila que ela
 confere — um achado pode ter várias —, e a entrada no `main` exige todas verdes sobre o dado novo.
 
 **As correções.** São do declarativo (`generator/geracao.yml`) quando forem parâmetro, e do código do domínio
@@ -861,14 +861,18 @@ proporção em `geracao.yml` é declaração, e passa pela revisão do Owner (CL
      é de produto `draft` (RVB5R-1-01) —, e o pedido completa variantes de todas, inclusive no pedido que vem
      de carrinho. A correção garante **candidatos elegíveis em todo fator**, sem tirar o `draft` do cadastro
      nem baixar a cobertura do ADR-0014;
+   - a variante com `is_active = false` de produto `active` vende como a de `discontinued`: só antes dos 90
+     dias que precedem o fim do período, no carrinho e no pedido (Q39);
    - o cupom herda o cliente e o instante do pedido (`marketing.resgates`): não há o que filtrar ali; o
      chamado sem pedido continua podendo ser de qualquer cliente — a Q21 trata da compra, não do atendimento;
    - **a medir antes de aceitar:** quantos clientes e produtos ficam sem venda, os pisos de cobertura e se a
      proporção de referência dos pedidos (Geração §4) continua de pé. O que ela mudar volta ao Owner.
 2. **F25 — o extravio** (Q22): no laço de `remessas` (`generator/domains/logistica.py`), o extravio deixa de
    sair da remessa sorteada como `delivered` e passa a valer para a remessa em trânsito de pedido `shipped` — a
-   regra que `_garantir_extravio` já declara. A taxa `extravio` continua a mesma, sobre a nova base; o número de
-   remessas `lost` e a cobertura do `lost` nos fatores pequenos são medidos antes e depois. **A remessa do
+   regra que `_garantir_extravio` já declara. A taxa `extravio` continua querendo dizer 0,4% de **todas** as
+   remessas despachadas, e as extraviadas saem das que estão em trânsito (Q43): sobre a base nova, como este item
+   dizia antes da medida, sobraria 1 remessa `lost` no varejo, contra 13. O número de remessas `lost` e a
+   cobertura do `lost` nos fatores pequenos são medidos antes e depois. **A remessa do
    legado `returned` sem evento de devolução** (`SHP-00000081`) é falha declarada: o catálogo do legado injeta
    `FK_ORPHAN` no `shipment_id` do evento 381 (`81` → `952899`), e o oráculo o rejeita (RVB5R-1-06). Não se
    corrige.
@@ -889,6 +893,7 @@ proporção em `geracao.yml` é declaração, e passa pela revisão do Owner (CL
      `trusted.support_tickets` (`resolved` ou `closed`) não lê o `closed_at`, e a descrição dele já é
      compatível: não muda.
 4. **F27 — a reserva de estoque** (Q28; não é a invariante 8, RVB5R-2-01): a reserva passa a ser de um SKU que está no carrinho ou no pedido dela;
+   e leva a quantidade desse item (Q40);
    hoje `_reservas` (`generator/domains/estoque.py`) sorteia o par armazém × variante à parte, e só 12 das 4.200
    reservas da origem principal são de um item do próprio carrinho ou pedido (`bloco5r_f27_reservas_20261115.txt`).
    O armazém continua saindo dos pares com movimento daquele SKU. O `draft` sai por consequência do F24. O
@@ -902,11 +907,29 @@ proporção em `geracao.yml` é declaração, e passa pela revisão do Owner (CL
    recebimento com antecedência, ou dimensionar o estoque inicial pela demanda — são medidas em memória sobre o
    gerador já com o F24 e o F27 (quantos ajustes sobram, por tipo de saída; o giro indefinido; a proporção de
    referência dos movimentos) e levadas ao Owner com a recomendação antes do código; a escolha é dele.
+   **Escolhida (Q42): a abertura pela demanda, com folga de 50%** — o par com saída sem lastro abre o período
+   com a maior falta acumulada dele mais a folga (`folga_da_abertura`, em `geracao.yml`).
 6. **F22 — o código do adquirente** (Q26): o `gateway_response_code` deixa de ser sorteado na lista
    (`generator/geracao.yml`, `payment_transactions`) e passa a seguir o `transaction_result`, nos três —
    `succeeded`, `failed` e `pending`. O mapa e o significado de cada código, pela convenção do mercado, são
    proposta para o aceite do Owner, como na Q19; até o ciclo, o catálogo declara o que a Q17 decidiu (sem
-   significado de negócio neste dado), e o ciclo troca a declaração junto com o dado.
+   significado de negócio neste dado), e o ciclo troca a declaração junto com o dado. **O mapa aceito (Q41):**
+   `succeeded` → `00`; `pending` → `GW-OK`; `failed` → sorteio por peso entre `51` (40), `05` (30), `57` (10),
+   `91` (10) e `GW-TIMEOUT` (10), declarado em `geracao.yml`.
+7. **F29 — a autorização pendente que some** (Q46; achado novo, pela regra de entrada): o desfecho do pedido em
+   aberto é sorteado meio a meio entre `pending` e `authorized` (`_desfecho`, `generator/domains/pagamentos.py`),
+   e com poucos pedidos em aberto um dos dois some — o perfil do legado (fator 0,05, semente própria) tem 3, e
+   os 3 saíam `authorized`: nenhuma transação `pending`, e por isso nenhum `GW-OK` do F22. A correção garante
+   os dois desfechos em qualquer fator e semente, como a reabertura garantida do F26, e a invariante do F22
+   passa a exigir os três resultados em todo perfil.
+8. **F30 — a validade da reserva tratada como fato consumado** (Q48; achado novo, pela regra de entrada): a
+   limpeza do legado aplica `DATE_FUTURE` a `stock_reservations.expires_at`, que é prazo — a reserva ativa no
+   corte vence até 48 h depois dele. O lote de hoje não tem nenhuma vencendo depois do corte, por acaso da
+   semente (o varejo tem 33); o do ramo tem 4, e 3 reservas íntegras eram rejeitadas
+   (`test_b_a_limpeza_compilada_concorda_com_o_oraculo`, na sequência da Q44). A correção é do declarativo: a
+   coluna entra nas `promessas` do `legacy/catalogo.yml`, a versão do catálogo vai a 10, e os modelos de
+   limpeza são regenerados (`make legacy-models`). **O armazém de hoje foi tratado pela versão 9**: o
+   tratamento novo só chega a ele com o ciclo, que refaz a captura do legado.
 
 **O que fica fora, e a interação** (Q26). O diário da janela do GCP (Pendências V3, item 3,
 `gcp/mutacoes_da_janela.yml`) não entra: ele só roda no Cloud SQL. As ocorrências aptas que ele escolhe saem do
@@ -1351,6 +1374,34 @@ Medido antes de perguntar: Bloco 6, "O que foi medido". Perguntadas depois da re
 | **Q36** | O alcance das *constraints* e onde o consumidor lê as chaves | **PK e FK, e só**: o `not_null` e as chaves naturais continuam como teste, e o pacote não ganha campo de chaves. O consumidor lê as chaves no banco (no BigQuery, o alvo do F10) e no `.yml`; o pacote **não** as dá por inteiro: os testes que ele publica não trazem o destino da FK (`to`, `field`) nem distinguem a PK de outra coluna única (a `dim_date` tem `date_key` e `full_date`) Era a recomendada | (b) um campo `keys` por relação no pacote, ou os argumentos nos testes publicados — mudança de esquema, com a linha `prevista`; (c) também o `not_null` como *constraint* nas 164 colunas — no BigQuery vira `REQUIRED`, imposto |
 | **Q37** | Onde se prova o `RESET=1`, se ele apaga o histórico SCD, que é permanente | **No ciclo do Bloco 5R**, que já regera a origem e roda o `RESET=1` (Q25): a prova vai junto, sem apagar nada a mais; até lá é pendência declarada Era a recomendada | (b) agora, no armazém — apaga o histórico SCD fora do ciclo; (c) agora, num clone (`create database … template warehouse`), que pede o armazém sem nenhuma conexão: pausar o Airflow; (d) uma sonda isolada com *snapshots* de brinquedo, que exercita a troca das chaves SCD sem tocar no armazém |
 | **Q38** | Como se garante uma invocação de `analytics` de cada vez, se o ciclo da Q34 a pressupõe e nada hoje impede um `make dbt-build` durante a DAG (o log de procedência detecta a sobreposição, não a barra). **O log não é só de `analytics`:** a abertura registra todo `build`, `run`, `seed` e `snapshot`, e o `governance.abrir` registra as mutações fora do dbt — as duas capturas da DAG, que rodam em paralelo de propósito, e a `test_fato` da prova da fato incremental, que chama um `dbt run` de dentro da própria linha aberta. Uma exclusão global no log recusaria esses dois | **Uma linha aberta por vez, só entre as invocações do dbt que reconstroem `analytics`**: a abertura de um `run` ou `build` grava um escopo (`analytics`) quando a seleção tem modelo dessa camada (`selected_resources`) ou chega vazia à execução — o `dbt retry`, que não diz o que reconstrói (medido; item 5) —, o mesmo predicado das macros da Q34; o `seed` e o `snapshot`, e o retry deles, não reconstroem `analytics` e ficam fora; e um índice único parcial sobre o escopo das linhas `started` torna a admissão atômica; a recusada não muda *constraint* (Q34) e os nós dela são pulados. As capturas e as mutações não entram no escopo e seguem como hoje; o `dbt run` aninhado da `test_fato` entra e não colide com a linha dela. Fica de fora a escrita em `analytics` que não passa pelo dbt (a adulteração da `test_fato`, só na prova). **Muda o ADR-0054** (uma coluna e um índice no log; de detectar para impedir, nesse escopo): depois de toda falha que pule o fecho — órfão, acesso, interrupção —, nenhuma execução de `analytics` é admitida até o abandono pelo custodiante, que confirma antes que o escritor terminou (item 6) Era a recomendada | (b) uma trava consultiva de sessão do PostgreSQL, tomada por uma sessão própria da preparação ao fim da instalação, com a adesão de cada chamador — mecanismo novo, não medido; (c) não impedir: a concorrência fica declarada não suportada e o log a acusa; a intercalação continua possível, e a reposição depois dela segue as condições do item 6; (d) a exclusão global no log, mudando também o paralelismo das capturas da DAG e o protocolo da `test_fato` |
+
+### Rodada 11 — a forma das correções do Bloco 5R: respondida em 16/11/2026
+
+Medido antes de perguntar, em memória, sobre o gerador já com as correções anteriores da fila
+(`data/medicoes/base_consumidores/bloco5r/`, fora do Git). O Owner escolheu a recomendada nas nove.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q39** | F24: a variante com `is_active = false` de produto `active` (6% das variantes; 58 itens de pedido, 5 deles nos últimos 90 dias) pode vender? A Q23 só tratou do estado do produto | **Como o `discontinued`**: só vende antes dos 90 dias que precedem o fim do período, no carrinho e no pedido — a mesma leitura cadastral, coerente no tempo, da Q23. Era a recomendada | Só o estado do produto conta (a variante inativa vende sempre, com ressalva no catálogo); nunca vende, como o `draft` |
+| **Q40** | F27: a reserva passa a ser de um SKU do carrinho ou do pedido dela (Q28); e a quantidade, hoje sorteada de 1 a 5 sem relação com o item? | **A quantidade do item** a que a reserva pertence. Muda o reservado e o disponível da projeção (P12), que a auditoria repetida cobre. Era a recomendada | Manter o sorteio de 1 a 5, como ressalva conhecida |
+| **Q41** | F22: que mapa o `gateway_response_code` segue? | **Os 7 códigos, `pending` = `GW-OK`**: `succeeded` → `00`; `failed` → sorteio por peso entre `51` (saldo insuficiente, 40), `05` (não autorizada, genérica, 30), `57` (transação não permitida, 10), `91` (emissor indisponível, 10) e `GW-TIMEOUT` (sem resposta do adquirente no prazo, 10); `pending` → `GW-OK` (o *gateway* aceitou a requisição, a resposta do adquirente ainda não chegou). Conserva os 7 códigos, sem nulo novo, e cada código passa a ter um significado só. Os pesos são declaração, em `geracao.yml`. Era a recomendada | 6 códigos, com o `pending` nulo; separar o cartão (códigos ISO) do Pix e do boleto (`GW-OK` e `GW-TIMEOUT`) |
+| **Q42** | V4: que forma tira a correção-relâmpago do estoque? Medido no varejo, já com o F24 e o F27: 1.785 correções em 706 pares, 1.211 de 5.577 linhas da P11 com giro indefinido; a falta real é de 5.552 unidades, quase toda em pares sem estoque de abertura | **A abertura pela demanda, com folga de 50%**: o par com saída sem lastro abre o período com a maior falta acumulada dele mais 50% (`folga_da_abertura: 0.5`). Medido: 691 aberturas criadas e 15 aumentadas, 0 correções, 0 linhas de giro indefinido, 12.655 movimentos (referência 12.000 ±25%). O custo aceito: a abertura "adivinha" a demanda futura do par. Era a recomendada | A abertura pela demanda sem folga (0 correções, 9 linhas de giro indefinido); o recebimento com antecedência (mais realista, mas as 4 tabelas de compras quase dobram, fora da tolerância, e a compra passaria a ser gerada depois da venda) |
+| **Q43** | F25: com o extravio só na remessa em trânsito, a taxa de 0,4% sobre a base nova dá 1 remessa `lost` no varejo, contra 13 (a base cai de cerca de 3.200 entregues para cerca de 250 em trânsito). Como fica o volume? | **Mantém o volume**: o parâmetro continua 0,004 e continua querendo dizer 0,4% das remessas despachadas (cerca de 14); as extraviadas saem das que estão em trânsito, e é esperado que sejam uma fatia alta delas (cerca de 5%) — num retrato, a remessa perdida fica parada em pedido `shipped`. Revê o "sobre a nova base" do item 2 do Bloco 5R. Era a recomendada | A taxa sobre a base nova (1 `lost` no varejo e 1 no legado, na prática só a do piso de cobertura) |
+| **Q44** | Como commitar o código no ramo, se o `make check-offline` fica vermelho só no pacote de metadados (insumos mudados, testes novos fora do JUnit do pacote)? | **Rodar a sequência sobre o dado antigo** (`make catalog` → `make test` → `make catalog`), antes de escrever as guardas do armazém; o *commit* sai com o `check-offline` verde. Se o `make test` falhar com o gerador novo sobre a carga antiga, para e volta ao Owner. Era a recomendada | Commitar com o vermelho declarado na mensagem; nenhum *commit* até o ciclo |
+| **Q45** | F27: com cada item reservado no máximo uma vez, só há 890 itens de pedido em aberto no varejo, e a divisão declarada `origem_carrinho: 0.6` sai 79% / 21%. O que fazer com o parâmetro? | **Fica 0,6, como intenção**: o comentário diz que o efetivo depende dos itens de pedido em aberto; o que não cabe nos pedidos vai para os carrinhos, e as 4.200 reservas se mantêm. A divisão efetiva vai medida à Geração de Dados §4. Era a recomendada | Declarar o efetivo (cerca de 0,8); deixar faltar reserva (a tabela cairia para cerca de 3.400) |
+| **Q46** | O perfil do legado não tem transação `pending` — já não tinha antes do bloco —, e por isso o `GW-OK` não aparece nele. Entra na fila? | **Entra, como F29**: cobertura de enumeração que depende da semente, contra o ADR-0014; o gerador garante ao menos uma autorização `pending` e uma `authorized` em qualquer fator e semente, com a cobertura conferida no perfil do legado. Era a recomendada | Fica como está, e o catálogo marca `GW-OK` e `pending` como não observados no legado |
+| **Q47** | A simulação da P11 mostra giro mediano de cerca de 0,01 por trimestre: o estoque (abertura de 10 a 400 unidades, compras de 40 a 500) é muito maior que a venda (1 a 3 unidades por item). Não está na fila. O que fazer? | **Vai às Pendências, fora deste ciclo**: medido no armazém depois do ciclo e registrado como trabalho adiado, com a medida. Mexer em volume de estoque e de compras agora muda referências declaradas e aumenta o risco de um ciclo que já leva seis correções (sete, com o F29 da Q46). Era a recomendada | Entrar na fila deste ciclo; não registrar |
+
+### Rodada 12 — da sequência da Q44 sobre o dado antigo: respondida em 16/11/2026
+
+Medido antes de perguntar: o `make test` da Q44 falhou em `test_b_a_limpeza_compilada_concorda_com_o_oraculo`,
+e a execução parou, como a Q44 mandava. Em memória, no perfil de que o legado parte: 4 reservas com
+`expires_at` depois do corte no ramo, nenhuma antes dele; no varejo, 38 e 33.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q48** | A limpeza do legado acusa `DATE_FUTURE` em `stock_reservations.expires_at` de 3 reservas íntegras: a reserva ativa vence até 48 h depois do corte, e a coluna não está nas `promessas` do `legacy/catalogo.yml`, onde já está `carts.expires_at`. Como resolver? | **Declarar como promessa**: `stock_reservations.expires_at` entra nas `promessas`; validade de reserva é prazo, não fato consumado. A versão do catálogo sobe, e entra na fila como F30. Mudança de tratamento do legado dentro do desenho do ADR-0022. Era a recomendada | O gerador não passar do corte (a reserva ativa ficaria com validade menor que a declarada); aceitar a rejeição (reserva íntegra na quarentena, com o oráculo esperando o `DATE_FUTURE` sem injeção) |
+| **Q49** | A promessa da Q48 muda 2 modelos dbt do legado (`stg_legacy__stock_reservations`, `legacy_classifications`), e o `make catalog` recusa com o *manifest* atrasado; sem ele o pacote não fecha e o `check-offline` não fica verde. Roda-se o `make dbt-build` no armazém de hoje? | **O `make dbt-build` normal, sem `RESET`**: reclassifica a captura atual do legado sob a versão 10 do catálogo — o lote de hoje não tem reserva vencendo depois do corte, e o resultado linha a linha é o mesmo; a quarentena ganha as linhas da versão nova ao lado das antigas (ADR-0037). A procedência do armazém fica `not_verified` até o *build* do ciclo, porque a árvore estava suja. Rodado em 16/11/2026: 1.073 testes do dbt e 1.707 do `pytest` passando, `check-offline` verde. Era a recomendada | Commitar com o vermelho declarado; nenhum *commit* até o ciclo |
 
 ## 7. Definição de pronto aplicada
 
