@@ -1679,3 +1679,21 @@ campos `metrics` e `filters` do pacote).
 **A revisão da implementação da Parte B está fechada.** Falta dela a linha `feita` em
 [Consumidores §5](docs/consumidores.md), que espera um `make dbt-build` em *commit* limpo para o
 `invocation_id`. Isso não é o aceite do declarativo, que é do Owner.
+
+### Rodadas 46 a 51 — Codex conta 2, sobre o desenho do Bloco 6 (15 e 16/11/2026)
+
+Relatórios em `codex2_bloco6_desenho_r1.md` a `r6.md`; objeto inicial `b624c1f` (o desenho e a rodada 10 de
+perguntas). As respostas a cada rodada estão em `bloco6_desenho_r1_respostas.md` a `r5_respostas.md`, e as
+sondas, em `bloco6_sonda/` — tudo em `data/medicoes/base_consumidores/`, fora do Git.
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 46 | `e36a975` | 1 bloqueante, 3 ajustes (RVB6-1-01 a 04) | `numeric(p,s)` por alvo; o que o *contract* não pega (a escala, medido) e a guarda de tipo; a sonda representativa, que travou em *deadlock* com a FK instalada só no fim — as FKs passam a sair no começo da execução e voltar no fim; a Q36 diz o que o pacote não publica |
+| 47 | `1e47d69` | 2 bloqueantes, 4 ajustes (RVB6-2-01 a 06) | A Q38, uma invocação de `analytics` de cada vez; nada muda sem a abertura do log (a falha dela não impede o `on-run-end`, medido); o `--full-refresh` deixa de ser recuperação garantida; a guarda de tipo lê o `typmod` do cursor; as macros só agem quando a seleção tem `analytics` |
+| 48 | `08142d4` | 1 bloqueante, 2 ajustes (RVB6-3-01 a 03) | A exclusão da Q38 restrita às invocações do dbt que reconstroem `analytics` (o log tem também as capturas paralelas e a `test_fato`); a recuperação com o abandono antes do reparo |
+| 49 | `efe77ab` | 1 bloqueante (RVB6-4-01) | O `dbt retry` chega aos *hooks* com a seleção vazia (medido) e entra nas macros e na exclusão |
+| 50 | `b1503fe` | 1 bloqueante, 1 ajuste (RVB6-5-01 e 02) | Sai a alternativa de proibir o retry só na tarefa de `analytics`; o mesmo predicado na exclusão e nas macros; o custo com as retentativas |
+| 51 | — | nenhum | — |
+
+**A revisão do desenho do Bloco 6 está fechada.** Faltam as respostas do Owner à rodada 10 (Q34 a Q38) e,
+depois delas, o ADR do Bloco 6 e a implementação, com as provas do item 9.
