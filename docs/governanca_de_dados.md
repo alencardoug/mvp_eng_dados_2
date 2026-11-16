@@ -10,10 +10,10 @@
 
 | Campo | Informação |
 |---|---|
-| Versão | 2.25 |
+| Versão | 2.26 |
 | Situação | Vigente para a fase local |
 | Responsável | Líder de Governança |
-| Última revisão | 15/11/2026 — §6, a procedência do armazém pelo log de execução (ADR-0054); §7, o `analyst` lê a view da procedência; 10/11/2026 — §5.2 alinhada às decisões D79 e D80 da Etapa 13; 05/11/2026 — §5.1: a coluna é achada pelo nome que o YAML lê, e todo conteúdo final é lido estrito antes de qualquer escrita; o domínio é escrito e conferido no `meta` efetivo; o limite do escritor em bloco (rodadas 11 e 12 do lote 3 da v1.1.0) |
+| Última revisão | 16/11/2026 — §6, a admissão de uma invocação de `analytics` de cada vez (ADR-0056); 15/11/2026 — §6, a procedência do armazém pelo log de execução (ADR-0054); §7, o `analyst` lê a view da procedência; 10/11/2026 — §5.2 alinhada às decisões D79 e D80 da Etapa 13; 05/11/2026 — §5.1: a coluna é achada pelo nome que o YAML lê, e todo conteúdo final é lido estrito antes de qualquer escrita; o domínio é escrito e conferido no `meta` efetivo; o limite do escritor em bloco (rodadas 11 e 12 do lote 3 da v1.1.0) |
 
 ---
 
@@ -302,7 +302,7 @@ descrição precise ser reescrita.
 | Linhagem origem → consumo | Toda coluna analítica aponta para a sua origem | Linhagem do dbt entre modelos; por coluna e fora do dbt, [Dicionário §3](dicionario_de_dados.md#3-linhagem), gerada de `models/lineage.py` e conferida por `make check` |
 | Procedência entre origens | Registro empilhado identifica se veio da origem principal ou da legada | [Origem Legada](origem_legada.md) |
 | Certificado de captura do legado | Toda sincronização do legado deixa, por tabela, contagem e hash de conteúdo da origem antes e depois do *job*, o recebido no bruto e o vínculo com o *job*; só captura `complete` nas 40 tabelas é elegível ([ADR-0044](adr/0044-certificar-cada-captura-do-legado-por-conteudo.md)) | `governance.legacy_captures` — o primeiro conjunto do log de execução do [ADR-0023](adr/0023-escopo-do-schema-governance.md) materializado |
-| Procedência do armazém | Toda execução do dbt que escreve o armazém, e toda escrita suportada fora dele, fica registrada em duas fases; só o último *build* integral, aprovado, de *commit* conhecido e limpo, sem nada aberto nem depois, verifica "este armazém é deste *commit*" ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)) | `governance.dbt_invocations` e a *view* `governance.warehouse_provenance` — o segundo conjunto do log de execução do [ADR-0023](adr/0023-escopo-do-schema-governance.md) materializado |
+| Procedência do armazém | Toda execução do dbt que escreve o armazém, e toda escrita suportada fora dele, fica registrada em duas fases; só o último *build* integral, aprovado, de *commit* conhecido e limpo, sem nada aberto nem depois, verifica "este armazém é deste *commit*" ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)). Uma invocação que reconstrói `analytics` é admitida de cada vez: a abertura grava o escopo `analytics`, e um índice parcial recusa a segunda enquanto a primeira está aberta ([ADR-0056](adr/0056-chaves-declaradas-em-analytics.md)) | `governance.dbt_invocations` e a *view* `governance.warehouse_provenance` — o segundo conjunto do log de execução do [ADR-0023](adr/0023-escopo-do-schema-governance.md) materializado |
 | Regras de acesso por camada | Cada camada tem papéis de leitura e escrita | Seção 7, `+grants`, `meta.grants` e `meta.writers` |
 | Retenção | Todo objeto tem prazo e critério de descarte | Seção 8 e `meta.retention` |
 | Segredos fora do repositório | Credenciais só em `.env` local; `.env.example` versionado sem valores | `.gitignore` + revisão de cada entrega |

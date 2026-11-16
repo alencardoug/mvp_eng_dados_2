@@ -27,10 +27,15 @@ clean-targets: ["target", "dbt_packages"]
 # grants das fontes e o `revoke` do que não está declarado saem desta macro.
 # O log de execução (ADR-0054): a abertura antes de qualquer nó; o fecho **por último**, depois do
 # acesso — se um *hook* anterior falha, o dbt pula o fecho, e a linha aberta bloqueia a procedência.
+#
+# As FKs de `analytics` (ADR-0056): saem logo depois da abertura e voltam depois do acesso, antes do fecho.
+# Com órfão, a instalação falha e o fecho não grava — a procedência fica `not_verified`.
 on-run-start:
   - "{{ registrar_abertura() }}"
+  - "{{ retirar_chaves_estrangeiras() }}"
 on-run-end:
   - "{{ aplicar_acesso_por_camada() }}"
+  - "{{ instalar_chaves() }}"
   - "{{ falha_de_teste_antes_do_fecho() }}"
   - "{{ registrar_fecho(results) }}"
 
@@ -132,6 +137,12 @@ models:
     analytics:
       +schema: analytics
       +materialized: table
+      # As chaves declaradas (ADR-0056, F10). O contrato faz o *build* falhar quando o tipo base que
+      # um modelo calcula muda; o `data_type` de cada coluna é declaração, escrita uma vez a partir do
+      # tipo calculado (`models/data_types.py`), e os modificadores que o contrato não compara ficam com
+      # a guarda do `make test`. A PK de cada modelo nasce com a tabela, pelo contrato; as FKs não: elas
+      # saem no começo de cada execução de `analytics` e voltam no fim (`macros/chaves.sql`).
+      +contract: {enforced: true}
       # ── Fase GCP (Etapa 13, G1.4; arquitetura §5) ────────────────────────────
       # Particionamento pelo instante do evento de cada fato, por mês, e
       # *clustering* pela origem e pelas chaves de filtro mais frequentes. Só o

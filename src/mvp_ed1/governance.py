@@ -211,6 +211,28 @@ MIGRACOES: tuple[tuple[str, tuple[str, ...]], ...] = (
             """,
         ),
     ),
+    (
+        # Uma invocação de `analytics` de cada vez (ADR-0056, Q38). A abertura grava o escopo quando a
+        # invocação reconstrói `analytics` (o predicado das chaves, `macros/chaves.sql`), e o índice
+        # parcial torna a admissão atômica: a segunda abertura com o escopo, enquanto a primeira está
+        # aberta, viola o índice e é recusada. As capturas, as mutações fora do dbt, o `seed` e o
+        # `snapshot` gravam nulo e seguem como antes. A linha aberta só sai pelo fecho ou pelo abandono.
+        "0004_escopo_exclusivo",
+        (
+            f"""
+            alter table {SCHEMA}.dbt_invocations add column if not exists exclusive_scope text
+                constraint ck_dbt_invocations_scope check (exclusive_scope is null or exclusive_scope = 'analytics')
+            """,
+            f"""
+            create unique index if not exists ux_dbt_invocations_open_scope on {SCHEMA}.dbt_invocations (exclusive_scope)
+                where status = 'started' and exclusive_scope is not null
+            """,
+            f"""
+            comment on column {SCHEMA}.dbt_invocations.exclusive_scope is
+            'O escopo que admite uma invocação de cada vez (ADR-0056): analytics na que reconstrói analytics; nulo nas demais.'
+            """,
+        ),
+    ),
 )
 
 #: O que a regra de leitura pode responder, na ordem em que a *view* testa (ADR-0054).
@@ -454,6 +476,15 @@ MIGRACOES_BIGQUERY: tuple[tuple[str, tuple[str, ...]], ...] = (
             )
             options (description = 'Log de execução (ADR-0023, ADR-0054): cada execução do dbt que escreve o armazém e cada escrita suportada fora dele, em duas fases.')
             """,
+        ),
+    ),
+    (
+        # Só a coluna (ADR-0056): o BigQuery não impõe unicidade, e a admissão atômica lá precisa de outro
+        # meio, não desenhado nesta fase.
+        "0004_escopo_exclusivo",
+        (
+            "alter table `{projeto}.{dataset}.dbt_invocations` add column if not exists exclusive_scope string "
+            "options (description = 'O escopo que admite uma invocação de cada vez (ADR-0056): analytics na que reconstrói analytics; nulo nas demais.')",
         ),
     ),
 )

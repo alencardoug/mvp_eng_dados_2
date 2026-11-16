@@ -12,8 +12,8 @@
 |---|---|
 | Ferramentas | `dbt` (testes nativos) + `dbt-expectations` + `pytest` para o código Python |
 | Decisão | [ADR-0003](adr/0003-stack-airbyte-dbt-airflow.md) |
-| Versão | 1.18 |
-| Última revisão | 05/11/2026 — §4, a guarda dos literais de instante trata a expressão Jinja dentro do literal como opaca e declara as grafias que não lê (rodada 11 do lote 3 da v1.1.0) |
+| Versão | 1.19 |
+| Última revisão | 16/11/2026 — §4, o contrato e as chaves de `analytics` (ADR-0056, Bloco 6) |
 
 ---
 
@@ -147,6 +147,15 @@ passar por ausência do caso.
   ([ADR-0018](adr/0018-fatos-e-views-a-partir-de-perguntas-de-negocio.md));
 - verificação de **contrato** nas views de consumo: `contract: enforced` quebra o *build* quando
   colunas, tipos ou obrigatoriedade mudam;
+- **contrato e chaves em `analytics`** ([ADR-0056](adr/0056-chaves-declaradas-em-analytics.md), F10): as
+  513 colunas têm `data_type` declarado, e o contrato quebra o *build* quando o tipo base calculado muda —
+  também na fato incremental. Os modificadores (precisão, escala, comprimento) o contrato não compara: a
+  escala menor grava arredondada e calada (medido). Quem os compara é `tests/test_chaves.py`, depois do
+  *build*, com o tipo que o SQL compilado calcula lido do cursor. Cada tabela tem PK na chave substituta,
+  e as 58 `relationships` viram FK **imposta** no PostgreSQL (`NOT ENFORCED` no BigQuery), instalada no fim
+  de cada execução de `analytics`: o órfão faz a execução falhar em vez de entrar calado na fato. O
+  `relationships` continua — ele prova os valores e diz quantos falham; a FK prova que a relação existe
+  no banco. A mesma guarda confere que o armazém tem exatamente as chaves declaradas, validadas;
 - **identidade composta no consumo**: `tests/test_identidade_no_consumo.py` lê o SQL das views, sem
   banco, e falha quando uma delas conta, reduz por `distinct`, agrupa ou junta por identificador da
   origem sem `source_system` ao lado — a regra da macro `empilhado`. O `build` não tem como ver esse

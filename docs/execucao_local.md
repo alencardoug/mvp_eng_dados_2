@@ -10,9 +10,9 @@
 | Campo | Informação |
 |---|---|
 | Interface | `Makefile` — a operação inteira acontece no terminal |
-| Versão | 1.18 |
+| Versão | 1.19 |
 | Situação | Operação da Etapa 12 (B0–B4) implementada; o ciclo da §3 está na ordem que o B5 executa e mede. Reconstrução com *streaming* conferida na D31 |
-| Última revisão | 04/11/2026 — os alvos da v1.1.0: medidas da geração, oráculo das origens e livro retido (ADR-0050) |
+| Última revisão | 16/11/2026 — a recusa da invocação sobreposta e a falha da instalação das chaves de `analytics` (ADR-0056); 04/11/2026 — os alvos da v1.1.0: medidas da geração, oráculo das origens e livro retido (ADR-0050) |
 
 Este documento é, hoje, o **contrato** do que a execução local deve oferecer. Cada alvo é
 preenchido e conferido — executando-o — na etapa em que nasce, conforme o
@@ -739,6 +739,30 @@ listagem, que traz os 100 mais recentes, não alcançar esse instante com folga 
 Airbyte dá o início em segundos), marque-a com
 `make governance-abandonar INVOCACAO=<invocation_id>` e rode um `make dbt-build` de um *checkout* limpo.
 O `invocation_id` da linha aberta sai de `select * from governance.dbt_invocations where status = 'started'`.
+
+Se a linha aberta é de uma invocação que reconstrói `analytics` (`exclusive_scope = 'analytics'`),
+**nenhuma outra dessas é admitida até o abandono** ([ADR-0056](adr/0056-chaves-declaradas-em-analytics.md)):
+o `make dbt-build` seguinte falha logo na abertura, com a violação de `ux_dbt_invocations_open_scope`, e pula
+todos os nós. É a mesma conferência acima — confirmar que a execução terminou —, e só ela libera.
+
+### A execução falha no fim com `violates foreign key constraint`
+
+A instalação das chaves de `analytics`, no fim da execução, achou uma fato apontando para uma chave que a
+dimensão não tem mais ([ADR-0056](adr/0056-chaves-declaradas-em-analytics.md)). A execução sai com erro, o
+fecho não grava, e a procedência fica `not_verified` com `open_execution`; as linhas órfãs **ficam** na fato e
+as FKs, de fora. Nesta ordem:
+
+1. o diagnóstico, só de leitura: o *anti-join* da fato com a dimensão pela coluna que a mensagem cita, e a
+   chave natural do registro;
+2. confirmar que a execução terminou, e abandoná-la (`make governance-abandonar`, como acima);
+3. corrigir a causa — a dimensão — por código versionado;
+4. um `make dbt-build`, que instala as FKs de novo se a causa sumiu;
+5. conferir a população (os testes `fato_reconcilia_com_a_condutora` e
+   `legado_na_fato_segue_a_captura_corrente`) e as chaves (`tests/test_chaves.py`).
+
+O `--full-refresh` da fato incremental **não** é recuperação garantida: as junções dela deixam de fora o
+movimento cujo destino continua faltando. E nenhuma linha se apaga para a FK passar — remoção ou outro
+destino é decisão do Owner.
 
 ### `make seed-data` recusa executar
 

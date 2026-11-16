@@ -12,8 +12,8 @@
 |---|---|
 | Natureza | Documento de fundamentação — apoia a decisão **D23** |
 | Decisão que sustenta | **D23**, fechada pelo [ADR-0016](adr/0016-materializacao-por-camada.md) |
-| Versão | 1.0 |
-| Última revisão | 04/09/2026 |
+| Versão | 1.1 |
+| Última revisão | 16/11/2026 — §4, as chaves e a troca de tabela (ADR-0056) |
 
 ---
 
@@ -177,6 +177,12 @@ O que segue é a análise camada a camada. A escolha foi tomada em 04/09/2026 e 
 `incremental` muda de estratégia: `merge` local, `insert_overwrite` particionado no BigQuery. Essa
 diferença é conhecida e configurável por perfil do dbt — mas precisa estar escrita no ADR, porque é
 uma das poucas coisas que não se replicam sem tradução.
+
+**As chaves e a troca de tabela** ([ADR-0056](adr/0056-chaves-declaradas-em-analytics.md)). A `table` do
+dbt recria por troca de nomes e apaga a antiga com `drop … cascade`: a FK de uma fato para a dimensão
+recriada cai junto, e a `incremental`, que não se recria, não a recupera. Por isso as FKs de `analytics`
+não vivem durante a execução — saem no começo e voltam no fim —, e a PK, que nasce com a tabela pelo
+contrato, é a única chave que a materialização carrega. A materialização em si não mudou.
 
 ---
 

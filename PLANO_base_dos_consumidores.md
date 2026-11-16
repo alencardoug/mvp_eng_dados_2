@@ -1166,6 +1166,26 @@ dbt-postgres 1.11.0, dbt-bigquery 1.12.2.
     (16/11/2026) e da revisão deste desenho; ele separa o ciclo medido nas sondas do que só a entrega e o
     Bloco 5R vão provar.
 
+#### O que a entrega mediu (16/11/2026, no armazém real)
+
+Os registros e os roteiros estão em `data/medicoes/base_consumidores/bloco6_entrega/` (fora do Git): o estado
+das chaves e do log antes e depois de cada prova (`estado.py`), os *logs* dos *builds*, e os roteiros das provas
+4 e 6. Quatro *threads* em todas.
+
+| Prova | O que se fez | O que se mediu |
+|---|---|---|
+| 1. Instalação inicial | o primeiro `make dbt-build` com o contrato, sobre o armazém de hoje (sem nenhuma *constraint*) | 59 instaladas: a PK da `fact_inventory_movement`, que já existia sem ela, e as 58 FKs; 26 PKs pelo contrato; tudo validado; `PASS=1073`; populações iguais |
+| 2. Segunda execução | outro `make dbt-build` (a incremental pelo `merge`) | 58 FKs retiradas e 58 instaladas; a PK da incremental ficou |
+| 3. Só uma dimensão | `make dbt-build DBT_ARGS="-s dim_product"` | as 58 FKs de volta, inclusive das fatos fora da seleção; **4 views de `consumption` caíram pelo `cascade`** — o comportamento que já estava documentado em Execução Local, de antes do Bloco 6; o *build* completo as repõe |
+| Retry sem modelo de `analytics` | `dbt retry` do teste que falhou na prova 3 | escopo `analytics` gravado; as 58 FKs retiradas e reinstaladas, por cautela |
+| 4. Duas sobrepostas | um `build -s dim_date` durante um `make dbt-build` | a segunda recusada na abertura (`duplicate key … ux_dbt_invocations_open_scope`), todos os nós pulados, nenhuma FK reinstalada no meio da primeira (só as 26 PKs durante); a primeira terminou verde com as 58. Observação: os *hooks* do fim da recusada rodam — o de acesso inclusive, idempotente |
+| 6. Interrompida | `make dbt-build` morto por SIGTERM no meio | as FKs de fora e a linha `started`; a execução seguinte recusada pelo índice; depois do abandono pelo custodiante, o *build* reinstalou as 58 |
+| Custo | o *hook* de instalação em cada *build* completo | 1,6 a 1,9 s para as 58 FKs (e a PK, na primeira); a retirada, 0,02 s |
+
+Nenhum *deadlock* nos seis *builds* completos. **Não provado no armazém real:** o retry que reconstrói uma
+dimensão (só na sonda); o órfão (só na sonda; induzi-lo aqui exigiria mudar dimensão); o `RESET=1` (Q37, no
+Bloco 5R); o BigQuery (L9).
+
 ### Fechamento
 
 `make check` verde; catálogo, dicionário, linhagem e pacote regenerados; revisão por outro agente

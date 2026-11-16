@@ -28,28 +28,36 @@ models:
       série de datas.
     columns:
       - name: date_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: full_date
+        data_type: date
         description: "A data, uma linha por dia do calendário do período simulado."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: year_number
+        data_type: integer
         description: "Ano da data."
         meta:
           sensitivity: internal
       - name: quarter_number
+        data_type: integer
         description: "Trimestre do ano, de 1 a 4."
         meta:
           sensitivity: internal
       - name: month_number
+        data_type: integer
         description: "Mês do ano, de 1 a 12."
         meta:
           sensitivity: internal
       - name: month_name
+        data_type: text
         description: "Nome do mês por extenso, no idioma do banco."
         meta:
           sensitivity: internal
@@ -79,18 +87,22 @@ models:
                 meta:
                   value_domain: month_name
       - name: year_month
+        data_type: text
         description: "Ano e mês, no formato AAAA-MM."
         meta:
           sensitivity: internal
       - name: day_of_month
+        data_type: integer
         description: "Dia do mês, de 1 a 31."
         meta:
           sensitivity: internal
       - name: day_of_week
+        data_type: integer
         description: "Dia da semana ISO: 1 é segunda-feira, 7 é domingo."
         meta:
           sensitivity: internal
       - name: day_name
+        data_type: text
         description: "Nome do dia da semana por extenso, no idioma do banco."
         meta:
           sensitivity: internal
@@ -115,22 +127,27 @@ models:
                 meta:
                   value_domain: day_of_week
       - name: iso_week_number
+        data_type: integer
         description: "Número da semana ISO no ano."
         meta:
           sensitivity: internal
       - name: month_start_date
+        data_type: date
         description: "Primeiro dia do mês da data."
         meta:
           sensitivity: internal
       - name: quarter_start_date
+        data_type: date
         description: "Primeiro dia do trimestre da data."
         meta:
           sensitivity: internal
       - name: year_start_date
+        data_type: date
         description: "Primeiro dia do ano da data."
         meta:
           sensitivity: internal
       - name: is_weekend
+        data_type: boolean
         description: "Verdadeiro no sábado e no domingo."
         meta:
           sensitivity: internal
@@ -147,33 +164,41 @@ models:
           chave_natural: customer_natural_key
     columns:
       - name: customer_key
+        data_type: text
+        constraints:
+          - type: primary_key
         meta:
           sensitivity: internal
         description: Chave substituta da **versão** do cliente (ADR-0017).
         data_tests: [unique, not_null]
       - name: customer_natural_key
+        data_type: bigint
         description: "Identificador do cliente na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: is_active
+        data_type: boolean
         meta:
           description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("active_customer") }}'
       - name: is_repeat_buyer
+        data_type: boolean
         meta:
           description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("repeat_purchase") }}'
       - name: is_deleted
+        data_type: boolean
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
         description: Exclusão lógica na origem; a linha permanece na dimensão (ADR-0029).
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -194,71 +219,85 @@ models:
                 meta:
                   value_domain: source_system
       - name: customer_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural do cliente na origem; estável entre cargas."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: first_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Primeiro nome do cliente (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: last_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Sobrenome do cliente (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: customer_full_name
+        data_type: text
         description: "Nome completo do cliente: o primeiro nome e o sobrenome, separados por espaço (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: customer_document
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Documento de identificação do cliente (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: birth_date
+        data_type: date
         description: "Data de nascimento do cliente (sintética)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: registered_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio do cadastro, distinto de `created_at`."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: first_order_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante do primeiro pedido realizado do cliente; nulo para quem nunca comprou. Conta o pedido cujos itens foram todos rejeitados e estão na quarentena, que não chega a `fact_sales_order_item`: a primeira compra pode não estar na fato."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: last_order_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante do último pedido realizado do cliente; nulo para quem nunca comprou."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_count
+        data_type: bigint
         description: "**Aditiva entre clientes, só na versão vigente** (`is_current`) — pedidos realizados do cliente, com o valor atual repetido em cada versão dele; zero para quem nunca comprou. Conta também o pedido cujos itens foram todos rejeitados e estão na quarentena, que não chega a `fact_sales_order_item`."
         meta:
           sensitivity: internal
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
       - name: lifetime_net_revenue_amount
+        data_type: numeric
         description: "**Aditiva entre clientes, só na versão vigente** (`is_current`) — receita líquida dos itens dos pedidos realizados do cliente, com o valor atual repetido em cada versão dele; zero para quem nunca comprou."
         meta:
           sensitivity: confidential
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
       - name: is_churned
+        data_type: boolean
         description: "Verdadeiro quando o cliente já comprou, mas o último pedido realizado é anterior a 180 dias da data de referência dos dados (`active_customer_window_days`)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: days_since_last_order
+        data_type: "{{ 'numeric(12,2)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Dias entre o último pedido realizado do cliente e a data de referência dos dados; nulo para quem nunca comprou."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: customer_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado do relacionamento: active, inactive, blocked ou pending."
         meta:
           description_inherited: true
@@ -281,44 +320,53 @@ models:
                 meta:
                   value_domain: customer_status
       - name: customer_segment_id
+        data_type: bigint
         description: "Segmento comercial ao qual o cliente pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: customer_segment_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável do segmento, usado como chave natural."
         meta:
           description_inherited: true
           sensitivity: public
       - name: customer_segment_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome do segmento do cliente; 'Sem segmento' quando ele não tem um."
         meta:
           sensitivity: public
       - name: city
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Cidade; alimenta a dimensão de geografia."
         meta:
           description_inherited: true
           sensitivity: public
       - name: state_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Unidade federativa em sigla de duas letras."
         meta:
           description_inherited: true
           sensitivity: public
       - name: country
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "País em código ISO de duas letras."
         meta:
           description_inherited: true
           sensitivity: public
       - name: valid_from
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
         meta:
           sensitivity: internal
       - name: valid_to
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
         meta:
           description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
           sensitivity: internal
       - name: is_current
+        data_type: boolean
         description: "Verdadeiro na versão vigente — a que não tem fim de vigência."
         meta:
           sensitivity: internal
@@ -335,23 +383,29 @@ models:
           chave_natural: product_natural_key
     columns:
       - name: product_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: product_natural_key
+        data_type: bigint
         description: "Identificador da variante do produto (o SKU) na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: is_deleted
+        data_type: boolean
         description: "Verdadeiro quando a variante, o seu produto ou a sua categoria foi excluído logicamente na origem (ADR-0029)."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -372,56 +426,67 @@ models:
                 meta:
                   value_domain: source_system
       - name: sku
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código de estoque da variante; chave natural do SKU."
         meta:
           description_inherited: true
           sensitivity: public
       - name: product_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural do produto na origem."
         meta:
           description_inherited: true
           sensitivity: public
       - name: product_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome comercial do produto."
         meta:
           description_inherited: true
           sensitivity: public
       - name: variant_size
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Tamanho da variante."
         meta:
           description_inherited: true
           sensitivity: public
       - name: variant_color
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Cor da variante."
         meta:
           description_inherited: true
           sensitivity: public
       - name: variant_package
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Embalagem ou unidade de venda."
         meta:
           description_inherited: true
           sensitivity: public
       - name: barcode
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código de barras da variante (sintético)."
         meta:
           description_inherited: true
           sensitivity: public
       - name: weight_grams
+        data_type: integer
         description: "Peso em gramas, usado no cálculo de frete."
         meta:
           description_inherited: true
           sensitivity: public
       - name: product_id
+        data_type: bigint
         description: "Identificador do produto na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: launched_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de lançamento comercial."
         meta:
           description_inherited: true
           sensitivity: public
       - name: product_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado do produto: draft, active ou discontinued."
         meta:
           description_inherited: true
@@ -443,64 +508,77 @@ models:
                 meta:
                   value_domain: product_status
       - name: variant_is_active
+        data_type: boolean
         description: "Indica se o SKU continua disponível para venda."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: product_category_id
+        data_type: bigint
         description: "Identificador da categoria na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: leaf_category_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome comercial da categoria."
         meta:
           description_inherited: true
           sensitivity: public
       - name: sub_category_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da categoria intermediária da variante, entre a raiz e a folha; nulo quando a categoria da variante é uma raiz."
         meta:
           description_inherited: true
           sensitivity: public
       - name: root_category_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
         meta:
           description_inherited: true
           sensitivity: public
       - name: brand_id
+        data_type: bigint
         description: "Identificador da marca na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: brand_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da marca do produto; 'Sem marca' quando ele não tem uma."
         meta:
           sensitivity: public
       - name: brand_country
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "País de origem, em código ISO."
         meta:
           description_inherited: true
           sensitivity: public
       - name: variant_is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
       - name: product_is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
       - name: valid_from
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
         meta:
           sensitivity: internal
       - name: valid_to
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
         meta:
           description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
           sensitivity: internal
       - name: is_current
+        data_type: boolean
         description: "Verdadeiro na versão vigente — a que não tem fim de vigência."
         meta:
           sensitivity: internal
@@ -519,17 +597,22 @@ models:
       dois.
     columns:
       - name: category_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: category_natural_key
+        data_type: bigint
         description: "Identificador da categoria na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -550,20 +633,24 @@ models:
                 meta:
                   value_domain: source_system
       - name: category_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome comercial da categoria."
         meta:
           description_inherited: true
           sensitivity: public
       - name: sub_category_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da categoria intermediária; na categoria que não tem intermediária, o da própria folha."
         meta:
           sensitivity: public
       - name: root_category_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da categoria raiz da variante, no topo da árvore de categorias."
         meta:
           description_inherited: true
           sensitivity: public
       - name: category_depth
+        data_type: integer
         description: "Profundidade na hierarquia, com a raiz em zero."
         meta:
           description_inherited: true
@@ -577,11 +664,15 @@ models:
       repetem entre as origens no dado de hoje.
     columns:
       - name: brand_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da marca: hash de `source_system` e `brand_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -602,16 +693,19 @@ models:
                 meta:
                   value_domain: source_system
       - name: brand_natural_key
+        data_type: bigint
         description: "Identificador da marca na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: brand_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da marca."
         meta:
           description_inherited: true
           sensitivity: public
       - name: brand_country
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "País de origem, em código ISO."
         meta:
           description_inherited: true
@@ -629,11 +723,15 @@ models:
       aparecer agrupada.
     columns:
       - name: sales_channel_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: channel_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Natureza do canal: web, app ou store."
         meta:
           description_inherited: true
@@ -656,6 +754,7 @@ models:
                 meta:
                   value_domain: sales_channel_type
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -677,26 +776,31 @@ models:
                 meta:
                   value_domain: source_system
       - name: sales_channel_natural_key
+        data_type: bigint
         description: "Identificador do canal de venda na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: sales_channel_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável do canal."
         meta:
           description_inherited: true
           sensitivity: public
       - name: sales_channel_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome do canal de venda."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_active
+        data_type: boolean
         description: "Indica se o canal continua operando."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
@@ -710,11 +814,15 @@ models:
       "Desconhecido". Atende a venda e a remessa, e o membro desconhecido evita chave nula na fato.
     columns:
       - name: geography_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do lugar: hash de país, unidade federativa e cidade; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           sensitivity: public
         data_tests: [unique, not_null]
       - name: region
+        data_type: text
         description: "Região do IBGE a que a unidade federativa pertence."
         meta:
           description_inherited: true
@@ -736,21 +844,25 @@ models:
                 meta:
                   value_domain: ibge_region
       - name: country
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "País em código ISO de duas letras."
         meta:
           description_inherited: true
           sensitivity: public
       - name: state_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Unidade federativa em sigla de duas letras."
         meta:
           description_inherited: true
           sensitivity: public
       - name: state_name
+        data_type: text
         description: "Nome da unidade federativa por extenso."
         meta:
           description_inherited: true
           sensitivity: public
       - name: city
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Cidade; alimenta a dimensão de geografia."
         meta:
           description_inherited: true
@@ -776,11 +888,15 @@ models:
               line_total_amount: line_total_amount
     columns:
       - name: order_item_key
+        data_type: text
+        constraints:
+          - type: primary_key
         meta:
           sensitivity: internal
         description: Chave do grão. O `unique` abaixo é o que prova o grão declarado.
         data_tests: [unique, not_null]
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -789,6 +905,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -797,6 +914,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: product_key
+        data_type: text
         description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
         meta:
           description_inherited: true
@@ -805,6 +923,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_product'), field: product_key}
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -813,6 +932,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: category_key
+        data_type: text
         description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -821,6 +941,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_category'), field: category_key}
       - name: geography_key
+        data_type: text
         description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
         meta:
           sensitivity: public
@@ -828,12 +949,14 @@ models:
           - not_null
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: net_revenue_amount
+        data_type: numeric
         meta:
           description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: confidential
         description: '{{ doc("net_revenue") }}'
         data_tests: [not_null]
       - name: quantity
+        data_type: integer
         description: "Quantidade comprada do SKU."
         meta:
           description_inherited: true
@@ -841,6 +964,7 @@ models:
         data_tests:
           - dbt_expectations.expect_column_values_to_be_between: {min_value: 1}
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -861,6 +985,7 @@ models:
                 meta:
                   value_domain: source_system
       - name: brand_key
+        data_type: text
         description: "Chave substituta da marca: hash de `source_system` e `brand_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -868,21 +993,25 @@ models:
         data_tests:
           - relationships: {to: ref('dim_brand'), field: brand_key}
       - name: order_id
+        data_type: bigint
         description: "Pedido ao qual o item pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_item_id
+        data_type: bigint
         description: "Identificador do item do pedido na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do pedido; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado atual do pedido; o histórico das mudanças está em `fact_order_status_event`."
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
@@ -908,65 +1037,78 @@ models:
                 meta:
                   value_domain: order_status
       - name: order_date
+        data_type: date
         description: "Data do pedido, no fuso de São Paulo."
         meta:
           sensitivity: internal
       - name: placed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio em que o pedido foi feito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_realised
+        data_type: boolean
         description: "Verdadeiro quando o pedido é venda realizada: pago, em separação, enviado, entregue ou devolvido. O pendente e o cancelado não contam."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_cancelled
+        data_type: boolean
         description: "Verdadeiro quando o pedido está cancelado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_from_cart
+        data_type: boolean
         description: "Verdadeiro quando o pedido nasceu de um carrinho; falso em venda direta."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: has_post_order_repeat
+        data_type: boolean
         description: "Verdadeiro quando o cliente fez outro pedido realizado em até 90 dias depois deste (`repeat_purchase_window_days`); nulo enquanto a janela não fechou na data de referência dos dados (ADR-0036)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_repeat_window_closed
+        data_type: boolean
         description: "Verdadeiro quando já se passaram 90 dias do pedido na data de referência dos dados: a janela da recompra pós-pedido está fechada."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: days_to_next_order
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Dias até o próximo pedido realizado do mesmo cliente; nulo quando não houve outro."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: unit_price
+        data_type: numeric
         description: "Preço unitário praticado na venda."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: gross_revenue_amount
+        data_type: numeric
         description: "Aditiva — receita bruta da linha: quantidade vezes preço unitário, antes do desconto, arredondada a centavos."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: discount_amount
+        data_type: numeric
         description: "Desconto aplicado a este item."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: tax_amount
+        data_type: numeric
         description: "Imposto simulado sobre este item."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: line_total_amount
+        data_type: numeric
         description: "Valor total da linha, já arredondado."
         meta:
           description_inherited: true
@@ -992,12 +1134,16 @@ models:
               cart_value_amount: "case when event_type = 'created' then cart_value_amount else 0 end"
     columns:
       - name: cart_event_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do evento do carrinho: hash de `source_system`, `cart_id` e `event_type` — um evento de cada tipo por carrinho (ADR-0017)."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: event_date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1006,6 +1152,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: cart_created_date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1014,6 +1161,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -1022,6 +1170,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: customer_key
+        data_type: text
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
@@ -1029,6 +1178,7 @@ models:
         data_tests:
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: event_type
+        data_type: text
         description: "Tipo do evento do ciclo de vida do carrinho: created (a criação), converted, abandoned ou expired. Não é o estado do carrinho, que usa open no lugar de created."
         meta:
           description_inherited: true
@@ -1048,6 +1198,7 @@ models:
                 meta:
                   value_domain: cart_event_type
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -1068,59 +1219,72 @@ models:
                 meta:
                   value_domain: source_system
       - name: cart_id
+        data_type: bigint
         description: "Identificador do carrinho na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: occurred_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante do evento: a criação do carrinho, no evento de criação; a conversão, no de conversão; e, no carrinho que não converteu, o que vier primeiro entre a expiração e a data de referência dos dados."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: event_date
+        data_type: date
         description: "Data do evento, no fuso de São Paulo."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: cart_created_date
+        data_type: date
         description: "Data da criação do carrinho, no fuso de São Paulo."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_anonymous
+        data_type: boolean
         description: "Verdadeiro quando o carrinho não tem cliente identificado — sessão anônima."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: cart_count
+        data_type: integer
         description: "Aditiva — 1 no evento de criação do carrinho, 0 nos demais: soma-se para contar carrinhos."
         meta:
           sensitivity: internal
       - name: closed_cart_count
+        data_type: integer
         description: "Aditiva — 1 no evento que fecha o carrinho (conversão, abandono ou expiração), 0 na criação."
         meta:
           sensitivity: internal
       - name: converted_cart_count
+        data_type: integer
         description: "Aditiva — 1 quando o evento converte o carrinho em pedido, 0 nos demais."
         meta:
           sensitivity: internal
       - name: abandoned_cart_count
+        data_type: integer
         description: "Aditiva — 1 quando o evento fecha o carrinho sem compra, por abandono ou expiração; 0 nos demais."
         meta:
           sensitivity: internal
       - name: cart_item_count
+        data_type: bigint
         description: "Aditiva — itens do carrinho, no evento de criação; 0 nos demais."
         meta:
           sensitivity: internal
       - name: cart_unit_count
+        data_type: bigint
         description: "Aditiva — unidades do carrinho, no evento de criação; 0 nos demais."
         meta:
           sensitivity: internal
       - name: cart_value_amount
+        data_type: numeric
         description: "Aditiva — valor do carrinho, no evento de criação; 0 nos demais."
         meta:
           sensitivity: confidential
       - name: abandoned_value_amount
+        data_type: numeric
         description: "Aditiva — valor do carrinho fechado sem compra, no evento de abandono ou expiração; 0 nos demais."
         meta:
           sensitivity: confidential
@@ -1138,11 +1302,15 @@ models:
       mesmo membro tem uma chave em cada origem, e agrupar pela chave o parte em dois.
     columns:
       - name: payment_method_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: method_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Natureza do meio: cartão, pix, boleto, carteira ou vale."
         meta:
           description_inherited: true
@@ -1167,6 +1335,7 @@ models:
                 meta:
                   value_domain: payment_method_type
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -1187,36 +1356,43 @@ models:
                 meta:
                   value_domain: source_system
       - name: payment_method_natural_key
+        data_type: bigint
         description: "Identificador do meio de pagamento na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: payment_method_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável do meio de pagamento."
         meta:
           description_inherited: true
           sensitivity: public
       - name: payment_method_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome do meio de pagamento."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_card
+        data_type: boolean
         description: "Verdadeiro para cartão de crédito ou de débito."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_instant
+        data_type: boolean
         description: "Verdadeiro para meio de liquidação imediata: Pix ou cartão de débito."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_active
+        data_type: boolean
         description: "Indica se o meio continua aceito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
@@ -1236,17 +1412,22 @@ models:
             combination_of_columns: [source_system, supplier_natural_key]
     columns:
       - name: supplier_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do fornecedor: hash de `source_system` e `supplier_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: supplier_natural_key
+        data_type: bigint
         description: "Identificador do fornecedor na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -1267,35 +1448,42 @@ models:
                 meta:
                   value_domain: source_system
       - name: supplier_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural do fornecedor na origem."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: supplier_legal_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Razão social do fornecedor (sintética)."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: supplier_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome do fornecedor: o fantasia, ou a razão social quando não há nome fantasia."
         meta:
           sensitivity: confidential
       - name: supplier_country
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "País do fornecedor, em código ISO."
         meta:
           description_inherited: true
           sensitivity: public
       - name: payment_terms_days
+        data_type: integer
         description: "Prazo de pagamento negociado, em dias."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: is_active
+        data_type: boolean
         description: "Indica se o fornecedor continua ativo."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
@@ -1311,11 +1499,15 @@ models:
       dois.
     columns:
       - name: warehouse_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: geography_key
+        data_type: text
         description: "Lugar do armazém em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
         meta:
           sensitivity: public
@@ -1323,6 +1515,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -1343,36 +1536,43 @@ models:
                 meta:
                   value_domain: source_system
       - name: warehouse_natural_key
+        data_type: bigint
         description: "Identificador do armazém na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: warehouse_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável do armazém."
         meta:
           description_inherited: true
           sensitivity: public
       - name: warehouse_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome do armazém."
         meta:
           description_inherited: true
           sensitivity: public
       - name: warehouse_city
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Cidade do armazém."
         meta:
           description_inherited: true
           sensitivity: public
       - name: warehouse_state
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Unidade federativa do armazém."
         meta:
           description_inherited: true
           sensitivity: public
       - name: warehouse_state_name
+        data_type: text
         description: "Nome da unidade federativa por extenso."
         meta:
           description_inherited: true
           sensitivity: public
       - name: warehouse_region
+        data_type: text
         description: "Região do IBGE a que a unidade federativa pertence."
         meta:
           description_inherited: true
@@ -1398,21 +1598,25 @@ models:
                 meta:
                   value_domain: ibge_region
       - name: warehouse_country
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "País, em código ISO."
         meta:
           description_inherited: true
           sensitivity: public
       - name: capacity_units
+        data_type: integer
         description: "Capacidade máxima em unidades."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: is_active
+        data_type: boolean
         description: "Indica se o armazém está operando."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
@@ -1436,11 +1640,15 @@ models:
               captured_amount: captured_amount
     columns:
       - name: payment_transaction_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da transação de pagamento: hash de `source_system` e `payment_transaction_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1449,6 +1657,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: payment_method_key
+        data_type: text
         description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1457,6 +1666,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_payment_method'), field: payment_method_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -1465,6 +1675,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: transaction_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Operação financeira: authorization, capture, void ou refund."
         meta:
           description_inherited: true
@@ -1487,6 +1698,7 @@ models:
                 meta:
                   value_domain: payment_transaction_type
       - name: transaction_result
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Desfecho da operação: succeeded, failed ou pending."
         meta:
           description_inherited: true
@@ -1508,6 +1720,7 @@ models:
                 meta:
                   value_domain: payment_transaction_result
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -1528,6 +1741,7 @@ models:
                 meta:
                   value_domain: source_system
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -1535,36 +1749,43 @@ models:
         data_tests:
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: payment_transaction_id
+        data_type: bigint
         description: "Identificador da transação de pagamento na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: transaction_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural da transação."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: payment_id
+        data_type: bigint
         description: "Pagamento ao qual a transação pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: payment_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural do pagamento."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_id
+        data_type: bigint
         description: "Pedido que o pagamento quita."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do pedido; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: gateway_response_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código de retorno do adquirente simulado."
         meta:
           description_inherited: true
@@ -1590,52 +1811,63 @@ models:
                 meta:
                   value_domain: gateway_response_code
       - name: occurred_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio da operação."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: installments
+        data_type: integer
         description: "Número de parcelas acordadas."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_instalment_plan
+        data_type: boolean
         description: "Verdadeiro quando o pagamento é parcelado, em mais de uma parcela."
         meta:
           description_inherited: true
           sensitivity: public
       - name: attempt_count
+        data_type: integer
         description: "Aditiva — 1 por transação: soma-se para contar tentativas."
         meta:
           sensitivity: internal
       - name: approved_count
+        data_type: integer
         description: "Aditiva — 1 quando a transação foi aprovada, 0 nas demais."
         meta:
           sensitivity: internal
       - name: authorization_count
+        data_type: integer
         description: "Aditiva — 1 quando a transação é uma autorização, 0 nas demais."
         meta:
           sensitivity: internal
       - name: approved_authorization_count
+        data_type: integer
         description: "Aditiva — 1 quando a transação é uma autorização aprovada, 0 nas demais."
         meta:
           sensitivity: internal
       - name: transaction_amount
+        data_type: numeric
         description: "Valor movimentado nesta operação."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: authorized_amount
+        data_type: numeric
         description: "Aditiva — valor autorizado: o da transação quando ela é uma autorização bem-sucedida; zero nas demais."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: captured_amount
+        data_type: numeric
         description: "Aditiva — valor capturado: o da transação quando ela é uma captura bem-sucedida; zero nas demais."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: refunded_amount
+        data_type: numeric
         description: "Aditiva — valor estornado: o da transação quando ela é um estorno bem-sucedido; zero nas demais."
         meta:
           description_inherited: true
@@ -1655,11 +1887,15 @@ models:
               refund_amount: refund_amount
     columns:
       - name: refund_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do reembolso: hash de `source_system` e `refund_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1668,6 +1904,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: refund_amount
+        data_type: numeric
         description: "Valor reembolsado."
         meta:
           description_inherited: true
@@ -1676,6 +1913,7 @@ models:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between: {min_value: 0.01}
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -1696,6 +1934,7 @@ models:
                 meta:
                   value_domain: source_system
       - name: payment_method_key
+        data_type: text
         description: "Chave substituta do meio de pagamento: hash de `source_system` e `payment_method_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1703,6 +1942,7 @@ models:
         data_tests:
           - relationships: {to: ref('dim_payment_method'), field: payment_method_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -1710,6 +1950,7 @@ models:
         data_tests:
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -1717,36 +1958,43 @@ models:
         data_tests:
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: refund_id
+        data_type: bigint
         description: "Identificador do reembolso na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: refund_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural do reembolso."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: payment_transaction_id
+        data_type: bigint
         description: "Transação de captura que está sendo revertida."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: payment_id
+        data_type: bigint
         description: "Pagamento ao qual a transação pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_id
+        data_type: bigint
         description: "Pedido que o pagamento quita."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do pedido; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: refund_reason
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Motivo comercial do reembolso."
         meta:
           description_inherited: true
@@ -1769,6 +2017,7 @@ models:
                 meta:
                   value_domain: refund_reason
       - name: refund_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado do reembolso: requested, completed ou rejected."
         meta:
           description_inherited: true
@@ -1790,30 +2039,36 @@ models:
                 meta:
                   value_domain: refund_status
       - name: refunded_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante registrado do reembolso, em qualquer estado: está preenchido também no solicitado e no recusado, e só marca a conclusão quando o estado é completed."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_completed
+        data_type: boolean
         description: "Verdadeiro quando o reembolso foi concluído."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_full_refund
+        data_type: boolean
         description: "Verdadeiro quando o reembolso alcança o valor capturado do pagamento."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: refund_count
+        data_type: integer
         description: "Aditiva — 1 por reembolso: soma-se para contar reembolsos."
         meta:
           sensitivity: internal
       - name: originally_captured_amount
+        data_type: numeric
         description: "Valor capturado na transação de captura que este reembolso reverte; não é o capturado do período."
         meta:
           description_reason: "o texto herdado é o da transação genérica e não diz que é a captura revertida (F14)"
           sensitivity: confidential
       - name: completed_refund_amount
+        data_type: numeric
         description: "Aditiva — valor do reembolso quando ele foi concluído; 0 nos demais."
         meta:
           sensitivity: confidential
@@ -1833,11 +2088,15 @@ models:
               received_cost_amount: received_cost_amount
     columns:
       - name: purchase_order_item_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da linha do pedido de compra: hash de `source_system` e `purchase_order_item_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: supplier_key
+        data_type: text
         description: "Chave substituta do fornecedor: hash de `source_system` e `supplier_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1846,6 +2105,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_supplier'), field: supplier_key}
       - name: product_key
+        data_type: text
         description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
         meta:
           description_inherited: true
@@ -1854,6 +2114,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_product'), field: product_key}
       - name: quantity_ordered
+        data_type: integer
         description: "Quantidade solicitada ao fornecedor."
         meta:
           description_inherited: true
@@ -1861,6 +2122,7 @@ models:
         data_tests:
           - dbt_expectations.expect_column_values_to_be_between: {min_value: 1}
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -1881,6 +2143,7 @@ models:
                 meta:
                   value_domain: source_system
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1888,6 +2151,7 @@ models:
         data_tests:
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: category_key
+        data_type: text
         description: "Chave substituta da categoria: hash de `source_system` e `product_category_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -1895,21 +2159,25 @@ models:
         data_tests:
           - relationships: {to: ref('dim_category'), field: category_key}
       - name: purchase_order_item_id
+        data_type: bigint
         description: "Identificador do item do pedido de compra na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: purchase_order_id
+        data_type: bigint
         description: "Ordem de compra à qual o item pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: po_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número da ordem de compra; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: purchase_order_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado da ordem de compra: draft, placed, partially_received, received ou cancelled."
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
@@ -1933,61 +2201,73 @@ models:
                 meta:
                   value_domain: purchase_order_status
       - name: ordered_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de emissão da ordem."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: expected_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Data prometida de entrega pelo fornecedor."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: first_received_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante do primeiro recebimento **concluído** da linha; nulo enquanto nenhum foi concluído."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: last_received_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante do último recebimento **concluído** da linha; nulo enquanto nenhum foi concluído."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_fully_received
+        data_type: boolean
         description: "Verdadeiro quando a quantidade recebida em recebimentos concluídos alcança a pedida."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_not_received
+        data_type: boolean
         description: "Verdadeiro quando nenhuma unidade da linha chegou em recebimento concluído."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_cancelled
+        data_type: boolean
         description: "Verdadeiro quando o pedido de compra está cancelado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: quantity_received
+        data_type: bigint
         description: "Aditiva — unidades recebidas da linha, somando só os recebimentos **concluídos**; zero enquanto nenhum foi concluído."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: quantity_outstanding
+        data_type: bigint
         description: "Aditiva — unidades pedidas que ainda não chegaram em recebimento concluído."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: unit_cost
+        data_type: numeric
         description: "Custo unitário negociado."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: ordered_cost_amount
+        data_type: numeric
         description: "Custo total do item, já arredondado."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: received_cost_amount
+        data_type: numeric
         description: "Aditiva — custo do que chegou: a quantidade recebida vezes o custo unitário de cada recebimento **concluído**, arredondado a centavos."
         meta:
           description_inherited: true
@@ -2021,23 +2301,29 @@ models:
               cogs_amount: cogs_amount
     columns:
       - name: movement_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do movimento de estoque: hash de `source_system` e `movement_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: movement_id
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
         description: Chave do evento; é ela que torna o reprocessamento idempotente.
         data_tests: [unique, not_null]
       - name: idempotency_key
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave que impede aplicação duplicada pelo consumidor (ADR-0019)."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -2046,6 +2332,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: product_key
+        data_type: text
         description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
         meta:
           description_inherited: true
@@ -2054,6 +2341,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_product'), field: product_key}
       - name: warehouse_key
+        data_type: text
         description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -2062,18 +2350,21 @@ models:
           - not_null
           - relationships: {to: ref('dim_warehouse'), field: warehouse_key}
       - name: quantity_delta
+        data_type: integer
         meta:
           sensitivity: internal
           description_reason: "diz a aditividade da medida nesta fato, que o texto herdado não diz; aditiva, porque é delta assinado (RVL3-10)"
         description: '**Aditiva** — variação assinada do saldo: positiva na entrada, negativa na saída; a soma num período é a variação líquida do estoque nele.'
         data_tests: [not_null]
       - name: cogs_amount
+        data_type: numeric
         meta:
           description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: confidential
         description: '{{ doc("cost_of_goods_sold") }}'
         data_tests: [not_null]
       - name: movement_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Tipo controlado do movimento; determina o sinal da quantidade."
         meta:
           description_inherited: true
@@ -2100,6 +2391,7 @@ models:
                 meta:
                   value_domain: inventory_movement_type
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -2120,11 +2412,13 @@ models:
                 meta:
                   value_domain: source_system
       - name: event_sequence
+        data_type: bigint
         description: "Ordem do evento dentro da sua origem. No varejo, a sequência técnica que o banco atribui; no legado, a identidade física da linha na captura — desempate técnico, sem promessa de ordem de negócio (D40)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: source_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Processo de negócio que originou o movimento."
         meta:
           description_inherited: true
@@ -2148,70 +2442,84 @@ models:
                 meta:
                   value_domain: inventory_source_type
       - name: source_id
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Identificador do registro que causou o movimento."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: correlation_id
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Agrupa eventos relacionados; obrigatório nos pares de transferência."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: aggregate_version
+        data_type: bigint
         description: "Ordem do evento dentro do par armazém/SKU; sem lacuna nem repetição."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: occurred_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio do movimento; é por ele que o Beam janela (ADR-0019)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: recorded_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento em que a origem registrou o evento; base da leitura incremental."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: movement_date
+        data_type: date
         description: "Data do movimento, no fuso de São Paulo."
         meta:
           sensitivity: internal
       - name: is_inbound
+        data_type: boolean
         description: "Verdadeiro quando o movimento é de entrada: todo tipo que não é venda, devolução a fornecedor, transferência de saída ou ajuste de saída."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_outbound
+        data_type: boolean
         description: "Verdadeiro quando o movimento é de saída: venda (`sale_dispatch`), devolução a fornecedor, transferência de saída ou ajuste de saída."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_sale
+        data_type: boolean
         description: "Verdadeiro quando o movimento é a saída de uma venda (`sale_dispatch`)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: quantity_in
+        data_type: integer
         description: "Aditiva — unidades que entraram no movimento; zero numa saída."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: quantity_out
+        data_type: integer
         description: "Aditiva — unidades que saíram no movimento, em número positivo; zero numa entrada."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: unit_cost
+        data_type: numeric
         description: "Custo unitário, quando aplicável ao tipo."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: movement_cost_amount
+        data_type: numeric
         description: "Aditiva — custo do movimento: a quantidade movimentada, em valor absoluto, vezes o custo unitário (zero sem custo), arredondado a centavos."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: recording_delay_seconds
+        data_type: integer
         description: "Segundos entre o instante de negócio do movimento e o seu registro na origem."
         meta:
           description_inherited: true
@@ -2233,17 +2541,22 @@ models:
             combination_of_columns: [source_system, carrier_natural_key]
     columns:
       - name: carrier_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da transportadora: hash de `source_system` e `carrier_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: carrier_natural_key
+        data_type: bigint
         description: "Identificador da transportadora na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: service_level
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         meta:
           description_inherited: true
           sensitivity: public
@@ -2262,12 +2575,14 @@ models:
                 meta:
                   value_domain: carrier_service_level
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -2288,26 +2603,31 @@ models:
                 meta:
                   value_domain: source_system
       - name: carrier_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável da transportadora."
         meta:
           description_inherited: true
           sensitivity: public
       - name: carrier_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da transportadora."
         meta:
           description_inherited: true
           sensitivity: public
       - name: service_level_rank
+        data_type: integer
         description: "Ordem da modalidade, da mais lenta à mais rápida: 1 standard, 2 express, 3 same_day."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: tracking_url_template
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Modelo de URL de rastreio, com marcador do código."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_active
+        data_type: boolean
         description: "Indica se a transportadora está em uso."
         meta:
           description_inherited: true
@@ -2334,17 +2654,22 @@ models:
               quantity_shipped: quantity_shipped
     columns:
       - name: shipment_item_key
+        data_type: text
+        constraints:
+          - type: primary_key
         meta:
           sensitivity: internal
         description: Prova do grão — uma linha por item de remessa.
         data_tests: [unique, not_null]
       - name: shipment_item_id
+        data_type: bigint
         description: "Identificador do item da remessa na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: date_key
+        data_type: text
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
@@ -2353,6 +2678,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: delivered_date_key
+        data_type: text
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
@@ -2360,6 +2686,7 @@ models:
         data_tests:
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: carrier_key
+        data_type: text
         description: "Chave substituta da transportadora: hash de `source_system` e `carrier_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -2368,6 +2695,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_carrier'), field: carrier_key}
       - name: warehouse_key
+        data_type: text
         description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -2376,6 +2704,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_warehouse'), field: warehouse_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -2384,6 +2713,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: product_key
+        data_type: text
         description: "Chave substituta da **versão** da variante do produto: hash de `source_system`, `product_variant_id` e do início da vigência da versão (ADR-0017)."
         meta:
           description_inherited: true
@@ -2392,6 +2722,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_product'), field: product_key}
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -2400,6 +2731,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: geography_key
+        data_type: text
         description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
         meta:
           sensitivity: public
@@ -2407,21 +2739,25 @@ models:
           - not_null
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: is_on_time
+        data_type: boolean
         meta:
           description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("on_time_delivery") }}'
       - name: order_to_delivery_days
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         meta:
           sensitivity: internal
         description: '{{ doc("order_to_delivery_cycle") }}'
       - name: quantity_shipped
+        data_type: integer
         meta:
           sensitivity: internal
           description_reason: "diz a aditividade da medida nesta fato, que o texto herdado não diz"
         description: '**Aditiva** — unidades que viajaram nesta caixa.'
         data_tests: [not_null]
       - name: shipment_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado da remessa: created, picking, dispatched, in_transit, delivered, returned ou lost."
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
@@ -2444,6 +2780,7 @@ models:
                 meta:
                   value_domain: shipment_status
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -2464,36 +2801,43 @@ models:
                 meta:
                   value_domain: source_system
       - name: shipment_id
+        data_type: bigint
         description: "Remessa à qual o item pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_item_id
+        data_type: bigint
         description: "Item de pedido sendo enviado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_id
+        data_type: bigint
         description: "Pedido ao qual o item pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: shipment_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural da remessa."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do pedido; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: tracking_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código de rastreio junto à transportadora."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado atual do pedido; o histórico das mudanças está em `fact_order_status_event`."
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
@@ -2523,95 +2867,115 @@ models:
                 meta:
                   value_domain: order_status
       - name: placed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio em que o pedido foi feito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: shipped_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento do despacho."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: estimated_delivery_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Prazo de entrega prometido ao cliente."
         meta:
           description_inherited: true
           sensitivity: public
       - name: delivered_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante da entrega, o do último evento de entrega da remessa; nulo enquanto ela não foi entregue."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: returned_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante da devolução, o do último evento de devolução; nulo sem devolução."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_dispatched
+        data_type: boolean
         description: "Verdadeiro quando a remessa saiu do armazém."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_delivered
+        data_type: boolean
         description: "Verdadeiro quando a remessa foi entregue."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_returned
+        data_type: boolean
         description: "Verdadeiro quando a remessa voltou ao remetente."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_lost
+        data_type: boolean
         description: "Verdadeiro quando a remessa está extraviada."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_shipment_count
+        data_type: bigint
         description: "Não aditiva entre itens — número de remessas do pedido, repetido em cada item dele."
         meta:
           sensitivity: internal
       - name: delivered_shipment_count
+        data_type: bigint
         description: "Não aditiva entre itens — remessas entregues do pedido, repetidas em cada item dele."
         meta:
           sensitivity: internal
       - name: is_order_cycle_closed
+        data_type: boolean
         description: "Verdadeiro quando todas as remessas do pedido foram entregues e o ciclo de entrega está fechado (ADR-0033)."
         meta:
           sensitivity: internal
       - name: is_cycle_closing_shipment
+        data_type: boolean
         description: "Verdadeiro na última remessa entregue do pedido. Ela fecha o ciclo de entrega só quando `is_order_cycle_closed` também é verdadeiro (ADR-0033); com o ciclo aberto, marca a mais recente das já entregues."
         meta:
           sensitivity: internal
       - name: is_split_order
+        data_type: boolean
         description: "Verdadeiro quando o pedido foi dividido em mais de uma remessa."
         meta:
           sensitivity: internal
       - name: order_delivered_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante da entrega mais recente entre as remessas já entregues do pedido; nulo sem nenhuma entregue. É o fim do ciclo só quando `is_order_cycle_closed` é verdadeiro."
         meta:
           sensitivity: internal
       - name: quantity_ordered
+        data_type: integer
         description: "**Não aditiva entre itens de remessa** — quantidade comprada do SKU na linha do pedido, repetida em cada item de remessa da linha: some uma vez por linha do pedido, nunca por item de remessa."
         meta:
           sensitivity: internal
           description_reason: a fato está no grão do item de remessa e o valor é da linha do pedido — o herdado não diz o grão (RVL3-2-03)
       - name: shipped_share_of_line
+        data_type: "{{ 'numeric(12,6)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Fração da linha do pedido que viajou nesta remessa: a quantidade enviada sobre a pedida, de 0 a 1."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: failed_attempt_count
+        data_type: bigint
         description: "**Não aditiva entre itens** — tentativas de entrega da remessa que falharam, repetidas em cada item dela: some uma vez por remessa, nunca por item."
         meta:
           sensitivity: public
           description_reason: a fato está no grão do item e o valor é da remessa — o herdado diria aditiva por item (RVL3-03)
       - name: delivery_delay_days
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Dias entre a entrega e o prazo prometido: positivo é atraso, negativo é adiantamento; nulo sem entrega."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: transit_days
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Dias entre o despacho e a entrega; nulo enquanto falta um dos dois."
         meta:
           description_inherited: true
@@ -2641,11 +3005,15 @@ models:
               failed_attempt_count: failed_attempt_count
     columns:
       - name: shipment_key
+        data_type: text
+        constraints:
+          - type: primary_key
         meta:
           sensitivity: internal
         description: Prova do grão — uma linha por remessa.
         data_tests: [unique, not_null]
       - name: date_key
+        data_type: text
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
@@ -2654,6 +3022,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: delivered_date_key
+        data_type: text
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
@@ -2661,6 +3030,7 @@ models:
         data_tests:
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: carrier_key
+        data_type: text
         description: "Chave substituta da transportadora: hash de `source_system` e `carrier_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -2669,6 +3039,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_carrier'), field: carrier_key}
       - name: warehouse_key
+        data_type: text
         description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -2677,6 +3048,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_warehouse'), field: warehouse_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -2685,6 +3057,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -2693,6 +3066,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: geography_key
+        data_type: text
         description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
         meta:
           sensitivity: public
@@ -2700,15 +3074,18 @@ models:
           - not_null
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: is_on_time
+        data_type: boolean
         meta:
           description_reason: "a coluna implementa o conceito do glossário de negócio, e o texto é o dele"
           sensitivity: internal
         description: '{{ doc("on_time_delivery") }}'
       - name: order_to_delivery_days
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         meta:
           sensitivity: internal
         description: '{{ doc("order_to_delivery_cycle") }}'
       - name: shipment_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado da remessa: created, picking, dispatched, in_transit, delivered, returned ou lost."
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
@@ -2731,6 +3108,7 @@ models:
                 meta:
                   value_domain: shipment_status
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -2751,31 +3129,37 @@ models:
                 meta:
                   value_domain: source_system
       - name: shipment_id
+        data_type: bigint
         description: "Identificador da remessa na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_id
+        data_type: bigint
         description: "Pedido que a remessa atende."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: shipment_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural da remessa."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do pedido; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: tracking_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código de rastreio junto à transportadora."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado atual do pedido; o histórico das mudanças está em `fact_order_status_event`."
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
@@ -2805,85 +3189,103 @@ models:
                 meta:
                   value_domain: order_status
       - name: placed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio em que o pedido foi feito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: shipped_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento do despacho."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: estimated_delivery_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Prazo de entrega prometido ao cliente."
         meta:
           description_inherited: true
           sensitivity: public
       - name: delivered_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante da entrega, o do último evento de entrega da remessa; nulo enquanto ela não foi entregue."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: returned_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante da devolução, o do último evento de devolução; nulo sem devolução."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_dispatched
+        data_type: boolean
         description: "Verdadeiro quando a remessa saiu do armazém."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_delivered
+        data_type: boolean
         description: "Verdadeiro quando a remessa foi entregue."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_returned
+        data_type: boolean
         description: "Verdadeiro quando a remessa voltou ao remetente."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_lost
+        data_type: boolean
         description: "Verdadeiro quando a remessa está extraviada."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_shipment_count
+        data_type: bigint
         description: "Não aditiva entre remessas — número de remessas do pedido, repetido em cada remessa dele."
         meta:
           sensitivity: internal
       - name: delivered_shipment_count
+        data_type: bigint
         description: "Não aditiva entre remessas — remessas entregues do pedido, repetidas em cada remessa dele."
         meta:
           sensitivity: internal
       - name: is_order_cycle_closed
+        data_type: boolean
         description: "Verdadeiro quando todas as remessas do pedido foram entregues e o ciclo de entrega está fechado (ADR-0033)."
         meta:
           sensitivity: internal
       - name: is_cycle_closing_shipment
+        data_type: boolean
         description: "Verdadeiro na última remessa entregue do pedido. Ela fecha o ciclo de entrega só quando `is_order_cycle_closed` também é verdadeiro (ADR-0033); com o ciclo aberto, marca a mais recente das já entregues."
         meta:
           sensitivity: internal
       - name: is_split_order
+        data_type: boolean
         description: "Verdadeiro quando o pedido foi dividido em mais de uma remessa."
         meta:
           sensitivity: internal
       - name: order_delivered_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante da entrega mais recente entre as remessas já entregues do pedido; nulo sem nenhuma entregue. É o fim do ciclo só quando `is_order_cycle_closed` é verdadeiro."
         meta:
           sensitivity: internal
       - name: failed_attempt_count
+        data_type: bigint
         description: "Aditiva — tentativas de entrega da remessa que falharam."
         meta:
           description_inherited: true
           sensitivity: public
       - name: delivery_delay_days
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Dias entre a entrega e o prazo prometido: positivo é atraso, negativo é adiantamento; nulo sem entrega."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: transit_days
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Dias entre o despacho e a entrega; nulo enquanto falta um dos dois."
         meta:
           description_inherited: true
@@ -2909,17 +3311,22 @@ models:
               hours_in_previous_status: hours_in_previous_status
     columns:
       - name: order_status_event_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da transição de estado do pedido: hash de `source_system` e `order_status_event_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: order_status_event_id
+        data_type: bigint
         description: "Identificador da mudança de estado do pedido na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -2928,6 +3335,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -2936,6 +3344,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -2944,6 +3353,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: geography_key
+        data_type: text
         description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
         meta:
           sensitivity: public
@@ -2951,6 +3361,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: to_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado resultante da transição."
         meta:
           description_inherited: true
@@ -2973,6 +3384,7 @@ models:
                 meta:
                   value_domain: order_status
       - name: from_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         meta:
           description_inherited: true
           sensitivity: internal
@@ -2996,16 +3408,19 @@ models:
                 meta:
                   value_domain: order_status
       - name: hours_in_previous_status
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         meta:
           description_reason: "diz como somar no grão da transição, que o texto herdado não diz"
           sensitivity: internal
         description: '**Não aditiva** — tempo no estado de origem; soma dentro do pedido, nunca entre pedidos.'
       - name: transition_count
+        data_type: integer
         meta:
           sensitivity: internal
         description: '**Aditiva** — sempre 1, para que a contagem seja uma soma explícita.'
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -3026,16 +3441,19 @@ models:
                 meta:
                   value_domain: source_system
       - name: order_id
+        data_type: bigint
         description: "Pedido cujo estado mudou."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do pedido; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: change_reason
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Motivo registrado para a transição."
         meta:
           description_inherited: true
@@ -3053,26 +3471,31 @@ models:
                 meta:
                   value_domain: order_change_reason
       - name: status_sequence
+        data_type: bigint
         description: "Posição da transição na história do pedido, por ordem de data (1 é a criação)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: placed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio em que o pedido foi feito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: changed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio da transição."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: previous_changed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Instante da transição anterior do mesmo pedido; nulo na primeira."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: current_order_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado atual do pedido, repetido em cada transição dele; as transições são as linhas desta fato."
         meta:
           description_reason: "o texto herdado aponta para o que não está em analytics (F15)"
@@ -3098,31 +3521,37 @@ models:
                 meta:
                   value_domain: order_status
       - name: is_order_creation
+        data_type: boolean
         description: "Verdadeiro na primeira transição do pedido, que não vem de estado nenhum."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_current_status
+        data_type: boolean
         description: "Verdadeiro na transição mais recente do pedido — a do estado em que ele está."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_terminal_status
+        data_type: boolean
         description: "Verdadeiro quando a transição leva o pedido a um estado final: `cancelled` ou `returned`."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_cancellation
+        data_type: boolean
         description: "Verdadeiro quando a transição leva o pedido a `cancelled`."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_return
+        data_type: boolean
         description: "Verdadeiro quando a transição leva o pedido a `returned`."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_realised
+        data_type: boolean
         description: "Verdadeiro quando o pedido é venda realizada: pago, em separação, enviado, entregue ou devolvido. O pendente e o cancelado não contam."
         meta:
           description_inherited: true
@@ -3143,17 +3572,22 @@ models:
             combination_of_columns: [source_system, campaign_natural_key]
     columns:
       - name: campaign_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da campanha: hash de `source_system` e `campaign_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: campaign_natural_key
+        data_type: bigint
         description: "Identificador da campanha na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: campaign_objective
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Objetivo comercial da campanha."
         meta:
           description_inherited: true
@@ -3173,6 +3607,7 @@ models:
                 meta:
                   value_domain: campaign_objective
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -3193,46 +3628,55 @@ models:
                 meta:
                   value_domain: source_system
       - name: campaign_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: campaign_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: campaign_valid_from
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Início da vigência da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: campaign_valid_to
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Fim da vigência da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: budget_amount
+        data_type: numeric
         description: "Orçamento previsto da campanha."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: campaign_is_active
+        data_type: boolean
         description: "Indica se a campanha está ativa."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_running
+        data_type: boolean
         description: "Verdadeiro quando a data de referência dos dados (`as_of_date`, 01/09/2026) cai dentro da vigência da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_finished
+        data_type: boolean
         description: "Verdadeiro quando a vigência da campanha terminou antes de a data de referência dos dados (`as_of_date`, 01/09/2026)."
         meta:
           description_inherited: true
           sensitivity: public
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
@@ -3247,11 +3691,15 @@ models:
       nome legível e de agrupamento.
     columns:
       - name: support_category_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da categoria de chamado: hash de `category_code` (ADR-0017)."
         meta:
           sensitivity: public
         data_tests: [unique, not_null]
       - name: support_category_natural_key
+        data_type: "{{ 'character varying(20)' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável da categoria de chamado; chave natural."
         meta:
           description_inherited: true
@@ -3274,12 +3722,14 @@ models:
                 meta:
                   value_domain: support_ticket_category
       - name: support_category_name
+        data_type: text
         description: "Nome da categoria de chamado."
         meta:
           description_inherited: true
           sensitivity: public
         data_tests: [not_null]
       - name: support_category_group
+        data_type: text
         description: "Grupo que reúne categorias de chamado afins."
         meta:
           description_inherited: true
@@ -3304,6 +3754,7 @@ models:
                 meta:
                   value_domain: support_category_group
       - name: support_category_description
+        data_type: text
         description: "O que a categoria de chamado cobre."
         meta:
           description_inherited: true
@@ -3322,17 +3773,22 @@ models:
           chave_natural: coupon_natural_key
     columns:
       - name: coupon_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da **versão** do cupom: hash de `source_system`, `coupon_id` e do início da vigência da versão (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: coupon_natural_key
+        data_type: bigint
         description: "Identificador do cupom na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: discount_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Natureza do desconto: percentage ou fixed."
         meta:
           description_inherited: true
@@ -3350,12 +3806,14 @@ models:
                 meta:
                   value_domain: discount_type
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -3376,61 +3834,73 @@ models:
                 meta:
                   value_domain: source_system
       - name: coupon_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código digitado pelo cliente."
         meta:
           description_inherited: true
           sensitivity: public
       - name: coupon_valid_from
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Início da vigência do cupom."
         meta:
           description_inherited: true
           sensitivity: public
       - name: coupon_valid_to
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Fim da vigência do cupom."
         meta:
           description_inherited: true
           sensitivity: public
       - name: max_redemptions
+        data_type: bigint
         description: "Limite total de utilizações; nulo quando ilimitado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: redemption_count
+        data_type: bigint
         description: "**Aditiva entre cupons, só na versão vigente** (`is_current`) — resgates do cupom, com o valor atual repetido em cada versão dele; zero quando ele nunca foi usado."
         meta:
           sensitivity: internal
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
       - name: redeemed_discount_amount
+        data_type: numeric
         description: "**Aditiva entre cupons, só na versão vigente** (`is_current`) — desconto total concedido nos resgates do cupom, com o valor atual repetido em cada versão dele; zero quando ele nunca foi usado."
         meta:
           sensitivity: confidential
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
       - name: is_exhausted
+        data_type: boolean
         description: "Verdadeiro quando o cupom tem limite de usos e os resgates já o alcançaram."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_redeemable_now
+        data_type: boolean
         description: "Verdadeiro quando a data de referência dos dados (`as_of_date`, 01/09/2026) cai dentro da vigência do cupom."
         meta:
           description_inherited: true
           sensitivity: public
       - name: campaign_id
+        data_type: bigint
         description: "Campanha à qual o cupom pertence."
         meta:
           description_inherited: true
           sensitivity: public
       - name: campaign_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código estável da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: campaign_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Nome da campanha."
         meta:
           description_inherited: true
           sensitivity: public
       - name: campaign_objective
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Objetivo comercial da campanha."
         meta:
           description_inherited: true
@@ -3453,30 +3923,36 @@ models:
                 meta:
                   value_domain: campaign_objective
       - name: discount_value
+        data_type: numeric
         description: "Valor do desconto: percentual quando `percentage`, moeda quando `fixed`."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: min_order_amount
+        data_type: numeric
         description: "Valor mínimo de pedido para o cupom ser elegível."
         meta:
           description_inherited: true
           sensitivity: public
       - name: coupon_is_active
+        data_type: boolean
         description: "Indica se o cupom continua aceito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: valid_from
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
         meta:
           sensitivity: internal
       - name: valid_to
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
         meta:
           description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
           sensitivity: internal
       - name: is_current
+        data_type: boolean
         description: "Verdadeiro na versão vigente — a que não tem fim de vigência."
         meta:
           sensitivity: internal
@@ -3493,17 +3969,22 @@ models:
           chave_natural: support_agent_natural_key
     columns:
       - name: support_agent_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta da **versão** do atendente: hash de `source_system`, `support_agent_id` e do início da vigência da versão (ADR-0017). O membro desconhecido tem chave própria."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: support_agent_natural_key
+        data_type: bigint
         description: "Identificador do atendente na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: agent_team
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Equipe de atendimento à qual o agente pertence."
         meta:
           description_inherited: true
@@ -3527,12 +4008,14 @@ models:
                 meta:
                   value_domain: support_agent_team
       - name: is_deleted
+        data_type: boolean
         description: "{{ doc(\"is_deleted\") }}"
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -3554,60 +4037,72 @@ models:
                 meta:
                   value_domain: source_system
       - name: agent_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Chave natural do agente."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: agent_first_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Primeiro nome do agente (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: agent_last_name
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Sobrenome do agente (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: agent_full_name
+        data_type: text
         description: "Nome completo do atendente: o primeiro nome e o sobrenome, separados por espaço (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: agent_email
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "E-mail corporativo do agente (sintético)."
         meta:
           description_inherited: true
           sensitivity: personal
       - name: hired_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Início do período de atuação do agente."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: handled_ticket_count
+        data_type: bigint
         description: "**Não aditiva entre atendentes nem entre versões** — chamados distintos em que o atendente registrou algum evento, com o valor atual repetido em cada versão dele; um chamado atendido por dois conta para os dois."
         meta:
           sensitivity: internal
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
       - name: handled_event_count
+        data_type: bigint
         description: "**Aditiva entre atendentes, só na versão vigente** (`is_current`) — eventos de chamado registrados pelo atendente, com o valor atual repetido em cada versão dele."
         meta:
           sensitivity: internal
           description_reason: o valor atual de trusted, repetido em cada versão da dimensão — o herdado diria aditiva sem a vigência (RVL3-2-03)
       - name: agent_is_active
+        data_type: boolean
         description: "Indica se o agente continua atuando."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: valid_from
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Início da vigência da versão, lido como instante UTC do `dbt_valid_from` do snapshot. Na primeira, o início do período simulado (01/01/2024), e não o instante da primeira captura do snapshot."
         meta:
           sensitivity: internal
       - name: valid_to
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Fim da vigência da versão: o `dbt_valid_to` do snapshot, gravado em UTC sem fuso, lido como instante UTC (`at time zone 'UTC'`); nulo na versão vigente."
         meta:
           description_reason: a leitura explícita em UTC calcula sobre o `dbt_valid_to`, que é `timestamp` sem fuso — o texto da convenção diria o valor intacto (RVL3-3-03)
           sensitivity: internal
       - name: is_current
+        data_type: boolean
         description: "Verdadeiro na versão vigente — a que não tem fim de vigência. O membro desconhecido é sempre vigente."
         meta:
           sensitivity: internal
@@ -3635,17 +4130,22 @@ models:
               coupon_discount_amount: coupon_discount_amount
     columns:
       - name: coupon_redemption_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do resgate de cupom: hash de `source_system` e `coupon_redemption_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: coupon_redemption_id
+        data_type: bigint
         description: "Identificador do resgate de cupom na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: order_id
+        data_type: bigint
         meta:
           sensitivity: internal
           description_reason: "acrescenta ao significado herdado a restrição que o teste deste modelo cobra"
@@ -3655,6 +4155,7 @@ models:
           exigi-la do id sozinho reprovaria dado correto.
         data_tests: [not_null]
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -3663,6 +4164,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: coupon_key
+        data_type: text
         description: "Chave substituta da **versão** do cupom: hash de `source_system`, `coupon_id` e do início da vigência da versão (ADR-0017)."
         meta:
           description_inherited: true
@@ -3671,6 +4173,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_coupon'), field: coupon_key}
       - name: campaign_key
+        data_type: text
         description: "Chave substituta da campanha: hash de `source_system` e `campaign_id` (ADR-0017)."
         meta:
           description_inherited: true
@@ -3679,6 +4182,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_campaign'), field: campaign_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -3687,6 +4191,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: sales_channel_key
+        data_type: text
         description: "Chave substituta do canal de venda: hash de `source_system` e `sales_channel_id`; o membro desconhecido tem chave própria (ADR-0017)."
         meta:
           description_inherited: true
@@ -3695,6 +4200,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: geography_key
+        data_type: text
         description: "Lugar da entrega do pedido em `dim_geography`; o membro desconhecido quando o endereço não casa com nenhum lugar."
         meta:
           sensitivity: public
@@ -3702,17 +4208,20 @@ models:
           - not_null
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: is_eligible
+        data_type: boolean
         meta:
           sensitivity: confidential
         description: "Verdadeiro quando o resgate atende ao mesmo tempo à vigência do cupom, ao valor mínimo do pedido e ao limite de usos."
         data_tests: [not_null]
       - name: coupon_discount_amount
+        data_type: numeric
         meta:
           sensitivity: confidential
           description_reason: "diz a aditividade da medida nesta fato, que o texto herdado não diz"
         description: '**Aditiva** — desconto efetivamente concedido.'
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -3733,21 +4242,25 @@ models:
                 meta:
                   value_domain: source_system
       - name: coupon_id
+        data_type: bigint
         description: "Cupom utilizado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do pedido; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: coupon_code
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Código digitado pelo cliente."
         meta:
           description_inherited: true
           sensitivity: public
       - name: discount_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Natureza do desconto: percentage ou fixed."
         meta:
           description_inherited: true
@@ -3768,6 +4281,7 @@ models:
                 meta:
                   value_domain: discount_type
       - name: campaign_objective
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Objetivo comercial da campanha."
         meta:
           description_inherited: true
@@ -3790,65 +4304,78 @@ models:
                 meta:
                   value_domain: campaign_objective
       - name: redemption_sequence
+        data_type: bigint
         description: "Posição do resgate entre os do mesmo cupom, por ordem de data (1 é o primeiro); é ela que mede o limite de usos."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: redeemed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio da utilização."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: placed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio em que o pedido foi feito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_within_validity
+        data_type: boolean
         description: "Verdadeiro quando o resgate aconteceu dentro da vigência do cupom."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_above_minimum
+        data_type: boolean
         description: "Verdadeiro quando o subtotal do pedido alcança o valor mínimo do cupom, ou o cupom não tem mínimo."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: is_within_limit
+        data_type: boolean
         description: "Verdadeiro quando o resgate cabe no limite de usos do cupom, pela ordem dos resgates, ou o cupom não tem limite."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_discount_bounded
+        data_type: boolean
         description: "Verdadeiro quando o desconto do resgate não passa do subtotal do pedido."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: order_is_cancelled
+        data_type: boolean
         description: "Verdadeiro quando o pedido está cancelado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_realised
+        data_type: boolean
         description: "Verdadeiro quando o pedido é venda realizada: pago, em separação, enviado, entregue ou devolvido. O pendente e o cancelado não contam."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: redemption_count
+        data_type: integer
         description: "Aditiva — 1 por resgate: soma-se para contar resgates."
         meta:
           sensitivity: internal
       - name: order_subtotal_amount
+        data_type: numeric
         description: "Soma dos itens antes de desconto, frete e imposto."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: order_total_amount
+        data_type: numeric
         description: "Valor total do pedido; reconcilia os demais campos."
         meta:
           description_inherited: true
           sensitivity: confidential
       - name: discount_share_of_order
+        data_type: "{{ 'numeric(12,6)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Não aditiva — fração do subtotal do pedido que o cupom descontou, de 0 a 1; nula em pedido sem subtotal."
         meta:
           sensitivity: confidential
@@ -3872,17 +4399,22 @@ models:
             # só contagem: as horas até atribuição e resolução nascem na própria fato
     columns:
       - name: support_ticket_event_key
+        data_type: text
+        constraints:
+          - type: primary_key
         description: "Chave substituta do evento de chamado: hash de `source_system` e `ticket_event_id` (ADR-0017)."
         meta:
           sensitivity: internal
         data_tests: [unique, not_null]
       - name: ticket_event_id
+        data_type: bigint
         description: "Identificador do evento do chamado na origem, gerado pelo banco transacional."
         meta:
           description_inherited: true
           sensitivity: internal
         data_tests: [not_null]
       - name: date_key
+        data_type: text
         description: "Chave substituta da data: hash de `full_date` (ADR-0017)."
         meta:
           description_inherited: true
@@ -3891,6 +4423,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_date'), field: date_key}
       - name: customer_key
+        data_type: text
         description: "Chave substituta da **versão** do cliente (ADR-0017)."
         meta:
           description_inherited: true
@@ -3899,6 +4432,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_customer'), field: customer_key}
       - name: support_category_key
+        data_type: text
         description: "Chave substituta da categoria de chamado: hash de `category_code` (ADR-0017)."
         meta:
           description_inherited: true
@@ -3907,6 +4441,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_support_category'), field: support_category_key}
       - name: support_agent_key
+        data_type: text
         meta:
           sensitivity: internal
           description_reason: "diz o papel da coluna neste modelo, que o texto herdado não diz"
@@ -3915,6 +4450,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_support_agent'), field: support_agent_key}
       - name: sales_channel_key
+        data_type: text
         meta:
           sensitivity: internal
         description: Membro desconhecido quando o chamado não nasceu de um pedido.
@@ -3922,6 +4458,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_sales_channel'), field: sales_channel_key}
       - name: geography_key
+        data_type: text
         description: "Lugar do endereço de entrega do cliente em `dim_geography`; o membro desconhecido quando não há endereço que case."
         meta:
           sensitivity: public
@@ -3929,6 +4466,7 @@ models:
           - not_null
           - relationships: {to: ref('dim_geography'), field: geography_key}
       - name: ticket_event_type
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Natureza do evento no chamado."
         meta:
           description_inherited: true
@@ -3950,11 +4488,13 @@ models:
                 meta:
                   value_domain: ticket_event_type
       - name: event_count
+        data_type: integer
         meta:
           sensitivity: internal
         description: '**Aditiva** — sempre 1, para que a contagem de eventos seja uma soma explícita.'
         data_tests: [not_null]
       - name: source_system
+        data_type: text
         description: "{{ doc(\"source_system\") }}"
         meta:
           description_inherited: true
@@ -3975,21 +4515,25 @@ models:
                 meta:
                   value_domain: source_system
       - name: support_ticket_id
+        data_type: bigint
         description: "Chamado ao qual o evento pertence."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: ticket_number
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Número do chamado; chave natural."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_id
+        data_type: bigint
         description: "Pedido relacionado ao chamado, quando houver."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: ticket_category
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Motivo do chamado."
         meta:
           description_inherited: true
@@ -4014,6 +4558,7 @@ models:
                 meta:
                   value_domain: support_ticket_category
       - name: ticket_priority
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Prioridade atribuída ao chamado."
         meta:
           description_inherited: true
@@ -4036,6 +4581,7 @@ models:
                 meta:
                   value_domain: ticket_priority
       - name: ticket_status
+        data_type: "{{ 'character varying' if target.type != 'bigquery' else 'string' }}"
         description: "Estado atual do chamado."
         meta:
           description_inherited: true
@@ -4059,96 +4605,115 @@ models:
                 meta:
                   value_domain: ticket_status
       - name: event_sequence
+        data_type: bigint
         description: "Posição do evento na história do chamado, por ordem de data (1 é a abertura)."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: occurred_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio do evento."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: opened_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de abertura do chamado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: closed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de encerramento do chamado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: order_placed_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
         description: "Momento de negócio em que o pedido foi feito."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_ticket_creation
+        data_type: boolean
         description: "Verdadeiro quando o evento abre o chamado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_assignment
+        data_type: boolean
         description: "Verdadeiro quando o evento atribui o chamado a um atendente."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_message
+        data_type: boolean
         description: "Verdadeiro quando o evento é uma mensagem."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_status_change
+        data_type: boolean
         description: "Verdadeiro quando o evento muda o estado do chamado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_resolution
+        data_type: boolean
         description: "Verdadeiro quando o evento resolve o chamado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_reopening
+        data_type: boolean
         description: "Verdadeiro quando o evento reabre o chamado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_from_customer
+        data_type: boolean
         description: "Verdadeiro quando o evento veio do cliente, sem atendente."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_closed
+        data_type: boolean
         description: "Verdadeiro quando o chamado está resolvido ou fechado."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: has_order
+        data_type: boolean
         description: "Verdadeiro quando o chamado está ligado a um pedido."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: was_reopened
+        data_type: boolean
         description: "Verdadeiro quando o chamado foi reaberto pelo menos uma vez."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: is_solved_first_time
+        data_type: boolean
         description: "Verdadeiro quando o chamado foi resolvido e nunca reaberto."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: reopening_count
+        data_type: bigint
         description: "**Não aditiva entre eventos** — vezes que o chamado foi reaberto, repetidas em cada evento dele: some uma vez por chamado, nunca por evento."
         meta:
           sensitivity: internal
           description_reason: a fato está no grão do evento e o valor é do chamado — o herdado diria aditiva por evento (RVL3-03)
       - name: hours_to_assignment
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Horas entre a abertura do chamado e a primeira atribuição a um atendente; nulo enquanto ele não foi atribuído."
         meta:
           description_inherited: true
           sensitivity: internal
       - name: hours_to_resolution
+        data_type: "{{ 'numeric(12,4)' if target.type != 'bigquery' else 'numeric' }}"
         description: "Horas entre a abertura do chamado e a primeira resolução; nulo enquanto ele não foi resolvido."
         meta:
           description_inherited: true

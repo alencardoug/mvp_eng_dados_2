@@ -25,14 +25,17 @@
     {%- if _escreve_o_armazem() -%}
         {%- set commit = env_var('MVP_GIT_COMMIT', '') -%}
         {%- set sujo = env_var('MVP_GIT_TREE_DIRTY', '') | lower -%}
-        insert into governance.dbt_invocations (invocation_id, command, git_commit, git_tree_dirty, dbt_version, target)
+        {#- O escopo `analytics` admite uma invocação dessas de cada vez (ADR-0056): a segunda, com a primeira
+            aberta, viola o índice parcial do log, a abertura falha e os nós são pulados. -#}
+        insert into governance.dbt_invocations (invocation_id, command, git_commit, git_tree_dirty, dbt_version, target, exclusive_scope)
         values (
             '{{ invocation_id }}',
             '{{ flags.WHICH }}',
             {{ "'" ~ commit ~ "'" if modules.re.fullmatch('[0-9a-f]{40}', commit) else 'null' }},
             {{ sujo if sujo in ['true', 'false'] else 'null' }},
             '{{ dbt_version }}',
-            '{{ target.name }}'
+            '{{ target.name }}',
+            {{ "'analytics'" if _age_nas_chaves() else 'null' }}
         );
         commit;
     {%- else -%}
