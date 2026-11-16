@@ -2131,3 +2131,16 @@ da Q57 a Q61**, revisado como arquivo, fora da árvore: nenhum bloqueante, **um 
 da Q60 comparava por substring e aceitava `reenviado` por `enviado` e um estado a mais. Corrigido no *patch*: a
 enumeração é comparada termo a termo, com contraprovas das quatro formas de erro. A rodada 4 segue para a conta 2
 (pedido do Owner, 16/11/2026).
+
+### Rodada 59 — Codex conta 2, sobre o *patch* da rodada 15 corrigido (16/11/2026)
+
+Relatório em `codex2_bloco5r_impl_r4.md`: **nenhum achado**. O RVB5RI-3-01 resolvido (a guarda da Q60 compara a
+enumeração termo a termo; os contraexemplos da rodada 3 e outros acusam); as partes em aberto do RVB5RI-1-01 e 04
+continuam como não verificado, para o ciclo. O revisor declarou um desvio: leu `git stash list`, fora da lista do
+pedido, sem alterar nada.
+
+**A revisão da implementação do Bloco 5R está fechada** (rodadas 56 a 59). Fica declarado como não provado, para o
+ciclo: o dado novo no armazém, com as seis guardas (fora do Git até a D3, Q53); a falta de um desfecho do
+pagamento em aberto no armazém, que não tem guarda própria (a cobertura é cobrada no gerador); as exceções de
+quarentena das guardas 17 e 20, conferidas chamado a chamado e par a par na D3; e o *patch* da Q57 a Q61, que
+entra na F0. Isso não é o aceite do declarativo, que é do Owner.
