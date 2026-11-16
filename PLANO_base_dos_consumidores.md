@@ -2122,3 +2122,12 @@ pagamento em aberto não tem guarda no armazém (a cobertura é cobrada no gerad
 quarentena — a 17 não prova a precedência temporal do evento rejeitado, a 20 exonera o par inteiro, e as
 contraprovas com rejeição pertinente e irrelevante não existem —, que se conferem chamado a chamado e par a par
 sobre o lote novo na D3 (RVB5RI-1-04). A rodada 3 segue para a mesma conta.
+
+### Rodada 58 — Codex conta 1, sobre `dcb7a0e` e o *patch* da rodada 15 (16/11/2026)
+
+Relatório em `codex1_bloco5r_impl_r3.md`. **(A) O fechamento:** o RVB5RI-2-01 resolvido — o teste da volta das
+reservas é determinístico, não passa por vacuidade e falha sem a volta —, e nada novo bloqueia. **(B) O *patch*
+da Q57 a Q61**, revisado como arquivo, fora da árvore: nenhum bloqueante, **um ajuste** (RVB5RI-3-01) — a guarda
+da Q60 comparava por substring e aceitava `reenviado` por `enviado` e um estado a mais. Corrigido no *patch*: a
+enumeração é comparada termo a termo, com contraprovas das quatro formas de erro. A rodada 4 segue para a conta 2
+(pedido do Owner, 16/11/2026).
