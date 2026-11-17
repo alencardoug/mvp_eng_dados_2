@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 17/11/2026. A rodada 1 de revisão foi aplicada (§7). Falta: a rodada 2 e as respostas do Owner (§5). Nada foi executado |
+| Estado | **Proposto** em 17/11/2026. As rodadas 1 e 2 de revisão foram aplicadas (§7). Falta: a rodada 3 e as respostas do Owner (§5). Nada foi executado |
 | Origem | Pedido do Owner, 17/11/2026, depois de ler o que os três consumidores anotaram sobre a `v2.1.0`: "tomar todas as soluções mais robustas, mesmo que inclua regenerar bases e ADR [...] Reabre, resolve e fecha". Na mesma conversa, o Owner incluiu a V5 (a regeneração adiada pela Q47), a V6, a V7, a D63 e a D64 |
 | Base | `4d6f797`, sobre a `v2.1.0` (`eb11709`) |
 | Entradas lidas | `gdados/docs/alinhamento_entre_projetos.md` §7; `nl_sql/PENDENCIAS.md` item 9 e o parecer de 17/11/2026; `bi-como-codigo/docs/upstream_questions.md` UQ-16 a UQ-20, todos em 17/11/2026 |
@@ -71,6 +71,20 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
   - **prazo esgotado é falha**, registrada como tal, nunca encerramento limpo;
   - o teste distingue um contador que parou de um ramo concluído e cobre a **execução sem produtor**, que é a da
     publicação (Bloco 5) e a do passo 7 da restauração.
+
+  **O sinal ainda não existe e é entrega deste bloco** (RVRB-2-02). Hoje nada sai do *pipeline* quando uma janela
+  fecha sem cruzar o limiar: `AcumularSaldoEAlertar.process` retorna sem emitir, tanto no *snapshot* quanto na
+  janela comum (`pipeline.py:226–242`). E o `yield` de `PublicarAlerta` não confirma a entrega, porque o
+  `produce` é assíncrono e o `poll(0)` não espera (`transport.py:282–291`). O Bloco 1 entrega:
+  - **uma confirmação por janela concluída**, emitida também quando ela não gera alerta, com o fim da janela e as
+    chaves processadas;
+  - **a entrega confirmada do alerta** (o `flush` do produtor, ou o *callback* de entrega) antes de a confirmação
+    contar;
+  - **a leitura pelo medidor:** ele espera até que todas as chaves com evento na última janela até o corte
+    estejam confirmadas. Uma chave só não basta.
+
+  O meio da confirmação (contador do Beam, registro em arquivo ou mensagem) é escolhido no desenho, com medida.
+  **Se pedir um destino durável novo, como um tópico, volta ao Owner** antes de ser implementado (`CLAUDE.md` §5).
 - **V7:** o `make recovery-restore` passa a chamar o `make ledger-treatment` no passo que constrói a
   quarentena da captura, com teste de que a época aberta sai com o registro.
 - **V6:** primeiro a medida, depois a correção. O que fica no ar no desligamento: *threads daemon* e o
@@ -100,18 +114,27 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
        registro e de ingestão não entram;
      - toda saída por venda tem a remessa dela. O vínculo é o que o gerador grava (`generator/domains/estoque.py:153–163`):
        `source_type='sale'` e `source_id` igual ao `shipment_code` de uma remessa da mesma `source_system` na
-       `fact_shipment`. Não há FK de movimento para remessa (`models/inventory.py:184–206`). A falta explicada pela
-       quarentena do legado (a remessa rejeitada, como a 47, de código inválido) é classificada à parte, pela
-       junção com a quarentena e o motivo, nunca descartada nem contada como falha. Transferência, devolução e
-       ajuste ficam fora da exigência. A consulta 4 do BI (`q_p08_november.sql`) **não** serve de contraprova:
+       `fact_shipment`. Não há FK de movimento para remessa (`models/inventory.py:184–206`). Transferência,
+       devolução e ajuste ficam fora da exigência.
+
+       **O legado tem um caso que nenhuma junção explica** (RVRB-2-01). A injeção trocou o código da remessa 47
+       por `N/A` (`NULL_DISGUISED`). O tratamento o anulou e rejeitou a remessa (`NULL_REQUIRED`). O movimento
+       nasce antes da injeção e guarda o código anterior. A quarentena só tem o que o legado entregou
+       (`legacy/dbt.py:189–249`, `classification.sql:185–206`), e o código original só existe no manifesto de
+       injeção. Esse manifesto é oráculo de teste, não dado, e não pode alimentar a guarda. A forma da regra no
+       legado é a **Q72**. Recomendada: a regra é estrita no varejo, onde o produtor escreve. No legado, ela não
+       reprova o `check`: é medida nas fases (i) e (iii), e cada caso fica listado no diário, explicado pela
+       quarentena com o código intacto ou não demonstrável. Esse é o custo da (a). Nada sai do dado, e o que não
+       for demonstrável vira achado ao Owner. A consulta 4 do BI (`q_p08_november.sql`) **não** serve de contraprova:
        ela filtra `source_type='shipment'` e o id numérico, que o gerador não grava;
    - para a V5, o giro dentro da faixa declarada.
 
    **Quando as guardas valem** (RVRB-1-02). São três fases, com o resultado esperado de cada uma:
    - **(i) Controle positivo, antes do ciclo:** rodar as guardas sobre o armazém da `v2.1.0`. Elas **devem
      falhar** e achar os eventos de 17/11. A medida diz quantos acham, quantos são do exercício e quantos a
-     quarentena explica. Uma guarda que nunca falhou não prova que pega o F31. Também é a atribuição do antes →
-     depois: separa o que sai pelo F31 do que muda pela V5;
+     quarentena explica. Uma guarda que nunca falhou não prova que pega o F31. A medida dá, em eventos, a parte
+     do F31 no antes → depois. A separação por view entre o F31 e a V5 não decorre só dela, e o que não for
+     separável é declarado assim;
    - **(ii) Durante o exercício,** sobre o estado que vai ser descartado: a falha é esperada, registrada no diário
      e não impede o passo seguinte. Os *builds* que a prova incremental pede depois de eventos vivos acontecem
      aqui;
@@ -129,7 +152,12 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
      `_retail__sources.yml` é escrito à mão, mas as colunas dele já são espelho da declaração, escrito por
      `sensitivity.main` (`models/descriptions.py`). O espelho passa a levar também a descrição da tabela;
    - **`raw_legacy` (40):** o `_legacy__sources.yml` é gerado (`legacy/dbt.py::sources_yml`, "Não edite") e só
-     emite nome e colunas. O gerador passa a emitir a descrição da tabela, vinda da mesma declaração;
+     emite nome e colunas. O gerador passa a emitir a descrição da tabela: o significado da entidade vem do
+     `table_meta`, e o gerador o **qualifica** como relação retida, com as capturas, as ocorrências físicas, os
+     valores textuais, os defeitos preservados e a retenção (RVRB-2-03). Copiar o texto sem qualificar
+     descreveria errado a relação. Por exemplo, "saldo atual de cada SKU por armazém" não é o grão de
+     `raw_legacy.inventory_balances`. O pacote publica a descrição de cada tabela, e não a do agrupamento
+     (`models/pacote.py:239–247`), então a qualificação tem de estar na tabela;
    - **`staging`, `trusted`, `snapshots` e `quarantine` (53):** no `.yml` de cada modelo, que é declaração. Os
      modelos descrevem o grão e o papel.
 2. Estender `tests/test_descricao.py` às relações, com **teto zero** e uma mensagem que nomeia cada relação
@@ -172,7 +200,8 @@ Uma subseção do diário, revisada pelo outro agente **antes** do primeiro desc
 - **o corte de recuo:** um pacote de recuperação do estado de partida, com SHA-256 e cópia fora do *checkout*,
   **antes** do exercício (o "pre-bloco5r" do 5R, A3);
 - **o cursor do produtor** (Q71): o estado de partida tem o cursor de 17/11 (2.200 emitidos), e a regeneração
-  descarta os eventos que ele conta;
+  descarta os eventos que ele conta. O tratamento escolhido acontece **antes** de embalar o estado final, porque
+  `ARTEFATOS` leva o cursor no pacote, e a restauração o traria de volta;
 - **os oráculos de cada passo** e o que cada falha esperada significa, pelas três fases das guardas
   (Bloco 2, item 4);
 - **as provas que se mantêm,** cada uma com o passo em que roda:
@@ -182,7 +211,12 @@ Uma subseção do diário, revisada pelo outro agente **antes** do primeiro desc
   - a DAG real;
   - a T3 e a procedência `verified` depois da restauração, e o catálogo do estado final;
   - os registros de tratamento (`ledger-treatment`), inclusive depois de *build* que falha;
-  - a comparação dos dois caminhos (C4 e E10).
+  - a comparação dos dois caminhos (C4 e E10);
+  - a medida do conteúdo das duas origens antes da carga (H1 e B5);
+  - o H2 contra o estado real e o manifesto anterior congelado. As aceitações de remoção e de reaparição são
+    **desta geração**, e as da Q50 não valem para ela;
+  - a publicação de *commit* limpo e o pacote de recuperação renovado sobre o dado novo (G3 a G9 do 5R), com a
+    identidade do corte de recuo fixada.
 - **o que não se prova na base publicada** (abaixo), e onde fica provado.
 
 #### Os passos
@@ -203,8 +237,11 @@ Uma subseção do diário, revisada pelo outro agente **antes** do primeiro desc
    comparados (C4). Depois, a captura do legado, o `dbt-build RESET=1` (D3), que refaz o SCD e os incrementais,
    as guardas na fase (iii), a procedência `verified`, o `check`, a DAG e a restauração (com a V7).
 5. **A conferência de resíduo zero**, antes do aceite. Nenhum movimento com `occurred_at` depois da `as_of_date`
-   no destino quente, no `raw`, no *staging*, no `trusted` e na fato; os saldos de `analytics` iguais aos da
-   origem regenerada; o cursor do produtor no estado que a Q71 escolher. **A memória mantida** é a do pacote
+   no destino quente, no `raw`, no *staging*, no `trusted` e na fato; os saldos de `analytics`, com a população
+   declarada (RVRB-2-04): **no varejo**, conjunto de chaves e saldos iguais aos da origem regenerada, no corte
+   comum; **no legado**, a população apta da captura selecionada, com as divergências explicadas pelo tratamento
+   corrente (`trusted/inventory_balances.sql`, `saldo_reconstruido_confere_com_a_projecao.sql`). O par armazém 1
+   × variante 30 da V4 é o exemplo: a abertura dele é rejeitada, e o livro apto começa na versão 2; o cursor do produtor no estado que a Q71 escolher. **A memória mantida** é a do pacote
    de recuperação (`recovery/pacote.py:42–49`): `raw_legacy`, `governance`, `snapshots` e `quarantine`. O `raw`
    e o `analytics` não são memória e se refazem da origem.
 6. **O depois:** a mesma captura das 16 views, e a diferença por view publicada em Consumidores §5 (linhas e
@@ -287,6 +324,7 @@ não seja ambígua.
 | Q69 | A *tag* desta fase | `v2.2.0` / `v2.1.1` | **`v2.2.0`**: o dado muda |
 | Q70 | A ordem de Consumidores §5 | Corrigir a ordem / Corrigir e guardar com teste a ordem por data | **Corrigir e guardar** |
 | Q71 | O cursor do produtor (`emitidos_acumulados` 2.200 de 17/11, mais os do exercício), depois do descarte | **(a)** Guardado com SHA-256 no diário e removido: o estado publicado parte do zero, como a Q52. **(b)** Mantido: o próximo exercício continua a sequência, mas o cursor conta eventos que não estão no livro | **(a)**: depois do descarte, o cursor descreveria um livro que não existe mais, e o pacote de recuperação o levaria junto |
+| Q72 | A regra "toda venda tem remessa" no legado, onde a injeção pode destruir o código da remessa (a 47) e nenhuma tabela guarda o original (RVRB-2-01) | **(a)** Estrita no varejo, onde o produtor escreve. No legado, não reprova o `check`: é medida nas fases (i) e (iii), com cada caso listado: explicado pela quarentena com o código intacto, ou não demonstrável. O que não for demonstrável vira achado ao Owner. **(b)** Estrita nas duas origens, com o não demonstrável como falha: a injeção deliberada reprovaria o `check` a cada regeneração. **(c)** Estrita nas duas, e o tratamento do legado passa a guardar o vínculo polimórfico do movimento com a remessa rejeitada: é tratamento de dados novo e pede ADR. Ler o manifesto de injeção na guarda foi descartado, porque é usar o oráculo como dado | **(a)**: o F31 nasce do produtor, que só escreve no varejo, e lá a regra não tem exceção. No legado, nada é exonerado em silêncio, e a medida diz se a (c) é necessária |
 
 ---
 
@@ -325,3 +363,21 @@ Relatório: `data/medicoes/reabertura/codex2_plano_r1.md`, fora do Git.
 
 **Achado do autor, fora da rodada:** o cursor do produtor (Q71). O estado de partida tem o cursor de 17/11, e o
 descarte tira do livro os eventos que ele conta.
+
+### Rodada 2 — codex2, sobre `9c3f698` (17/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_plano_r2.md`, fora do Git. **Conclusão do Codex:** nada bloqueia
+o Bloco 0. A forma (e) continua viável. RVRB-1-01, 02, 06, 07 e 08 estão resolvidos; 03, 04 e 05, em parte. A
+análise da Q71 está correta, e nenhum outro estado do exercício atravessa o descarte. A situação de cada achado
+está no relatório. **Aplicada em 17/11/2026:**
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVRB-2-01 | bloqueante | Bloco 2, item 4: o caso da remessa 47, sem junção possível. A forma da regra no legado vai ao Owner, Q72. O Bloco 5 espera a resposta |
+| RVRB-2-02 | ajuste | Bloco 1, D63: a confirmação por janela concluída, a entrega confirmada e a leitura pelo medidor. Destino durável novo volta ao Owner |
+| RVRB-2-03 | ajuste | Bloco 3: a descrição de `raw_legacy` qualificada pelo gerador como relação retida |
+| RVRB-2-04 | ajuste | Bloco 5, passo 5: a população da igualdade dos saldos, por origem |
+
+Também vieram das verificações: na adaptação, o H1 e o B5, o H2 desta geração, o *commit* limpo e o pacote
+renovado; o cursor tratado antes do pacote; e a atribuição F31 × V5 sem prometer mais que a medida dá.
+
