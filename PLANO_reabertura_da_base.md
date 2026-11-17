@@ -33,6 +33,7 @@ Pendências, ADR, especificação do pacote, Consumidores.
 | 13 | **UQ-20:** as linhas "Não medido" de Consumidores §5 citam os arquivos `*_depois.csv` dos Blocos 1 e 1b, ou dizem o que é mensurável | BI | Não | 6 |
 | 14 | **A ordem das linhas de Consumidores §5:** a linha de 17/11 (`905ba9c`) vem antes da de 16/11 (`d4297ed`, `e1ac94f`) | `gdados`, §7 | Não | 6 |
 | 15 | **O cabeçalho dos Achados.** Ele diz que ali vive "o que o `nl_sql` descobriu", mas os F17 a F30 foram achados aqui | `nl_sql`, item 9 | Não | 6 |
+| 16 | **F34: o destino das chaves estrangeiras fora do pacote.** Em `eb11709`, os 76 testes `relationships` trazem a relação e a coluna testadas, mas não as referenciadas, e as 26 PKs e 58 FKs de `analytics` (ADR-0056) não estão no pacote. A página de estrutura do `gdados` precisa delas para o diagrama entidade-relacionamento | `gdados@52c4359`, §7 (entrou depois de `cc70fc6`) | Não | 4 |
 
 **Fica fora**, com o motivo:
 - **Trocar o código `GW-OK`:** mudaria o dado, e o significado já está declarado (`nl_sql`, item 9).
@@ -44,7 +45,7 @@ Pendências, ADR, especificação do pacote, Consumidores.
 
 ### Bloco 0 — a abertura (só documentos)
 
-1. Registrar o F31, o F32 e o F33 nos [Achados](docs/achados_nl_sql.md), pela regra de entrada (Consumidores
+1. Registrar o F31 a F34 nos [Achados](docs/achados_nl_sql.md), pela regra de entrada (Consumidores
    §4), cada um com a origem (o consumidor que o levantou) e este plano como destino.
 2. Uma linha `prevista` em Consumidores §5 para cada mudança que alcança um consumidor: o dado das 16 views
    (itens 1, 2 e 7), o pacote (itens 3 a 6) e os textos (itens 12 a 15).
@@ -94,7 +95,7 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
    sem descrição.
 3. Revisão integral do Owner: é declarativo, e são 123 textos. É o maior volume da fase (risco R14).
 
-### Bloco 4 — o pacote (F33, UQ-18, UQ-19)
+### Bloco 4 — o pacote (F33, UQ-18, UQ-19, F34)
 
 1. **F33:** a nota de `registro_fase_gcp` atualizada, e uma entrada nova em `environments` para a Capacidade
    §2.14, de onde os portais leem o custo.
@@ -103,6 +104,12 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
    `view_rules`. Um teste guarda que essa chave é única em cada view do armazém.
 3. **UQ-19:** cada entrada de `view_audits` ganha os ids das suas verificações em `checks`, de onde vêm o
    resultado e a data. É campo novo do formato 1 (Q13), e o esquema e o exemplo mudam junto.
+
+4. **F34:** `relations.*.primary_key` e `relations.*.foreign_keys` (`column`, `references_relation`,
+   `references_column`), derivados pela **mesma regra** que instala as chaves (`dbt/macros/chaves.sql`,
+   `_chaves_declaradas`): as PKs pelas colunas com `constraints: primary_key`, e as FKs pelos testes
+   `relationships` cujo `to` é um modelo de `analytics`. Cada teste `relationships` do pacote ganha o destino
+   (`to` e `field`). Um teste guarda que o pacote traz as mesmas PKs e FKs que a macro instala.
 
 ### Bloco 5 — o ciclo
 
@@ -185,7 +192,7 @@ não seja ambígua.
 ## 6. Definição de pronto aplicada
 
 A do `CLAUDE.md` §7, e mais:
-- os quinze itens do §1 respondidos: feitos, ou devolvidos ao Owner com a medida;
+- os dezesseis itens do §1 respondidos: feitos, ou devolvidos ao Owner com a medida;
 - o antes → depois das 16 views publicado;
 - os três consumidores avisados uma vez, com a *tag*.
 
@@ -193,4 +200,12 @@ A do `CLAUDE.md` §7, e mais:
 
 ## 7. Rodadas de revisão
 
-Nenhuma ainda. A primeira é a deste plano, antes de qualquer execução.
+### Rodada 1 — codex2, sobre `cc70fc6` (17/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_plano_r1.md`, fora do Git.
+- **Conclusão do Codex:** nada impede o Bloco 0. O Bloco 5 tem 3 bloqueantes (RVRB-1-01, 02 e 06) e há 5 ajustes
+  (03, 04, 05, 07 e 08).
+- **A forma (e) confirmada** pela evidência do 5R: o descarte completo retira os eventos do exercício.
+- **Posição do autor:** `data/medicoes/reabertura/parecer_claude_r1.md`. Concorda com os oito.
+- **A aplicar no plano.** A rodada 2 vem depois disso.
+- **O item 16 (F34)** entrou depois do objeto da rodada, a partir do canal do `gdados`.
