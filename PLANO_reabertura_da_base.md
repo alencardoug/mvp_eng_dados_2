@@ -48,7 +48,7 @@ Pendências, ADR, especificação do pacote, Consumidores.
    §4), cada um com a origem (o consumidor que o levantou) e este plano como destino.
 2. Uma linha `prevista` em Consumidores §5 para cada mudança que alcança um consumidor: o dado das 16 views
    (itens 1, 2 e 7), o pacote (itens 3 a 6) e os textos (itens 12 a 15).
-3. Abrir a D93 nas Pendências para o item 1. A decisão vira ADR pela Q64.
+3. Abrir a D93 nas Pendências para o item 1. A decisão vira ADR se a forma da Q64 pedir.
 4. O README passa a apontar para este plano no estado do projeto.
 
 ### Bloco 1 — a operação (código e testes, sem dado)
@@ -68,17 +68,23 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
 
 ### Bloco 2 — a regeneração declarada (F31 e V5)
 
-1. **Medir o alcance do produtor** antes de escolher a forma (Q64): que tabelas da origem ele escreve
-   (`inventory_movements`, `inventory_balances` e outras); que modelos e views leem cada uma; que
-   *snapshots* capturam os saldos. Só leitura, no código e no armazém.
-2. **A D93 e o ADR-0057**, com a forma escolhida e a contrapartida na fase GCP. O contrato do evento
-   (Modelo de Dados §5) muda se a forma marcar a origem.
+1. **Medir o alcance do produtor** antes de fechar a forma (Q64). Só leitura, no código e no armazém.
+   - Que tabelas da origem ele escreve: `inventory_movements`, `inventory_balances` e outras.
+   - Que modelos e views leem cada uma.
+   - **Se a regeneração tira do armazém os eventos do exercício.** A `fact_inventory_movement` é incremental,
+     o livro quente é *append-only* e o `inventory_balances` chega por `dedup_history`. O que decide é como o
+     ciclo do Bloco 5R tratou o livro e as épocas ao regenerar.
+2. **A D93**, com a forma escolhida e a contrapartida na fase GCP. Na forma (e), não há ADR de tratamento de
+   dados: muda a ordem do ciclo e entra uma guarda. As formas (a) e (b) pedem ADR (0057), porque mudam o
+   contrato do evento (Modelo de Dados §5) ou a restauração.
 3. **V5:** a declaração em `generator/geracao.yml` (abertura e compras pela demanda) e a meta da Q67, medida
    em memória no varejo antes do ciclo, como a V4 fez (Q42).
-4. Guardas novas, uma por correção: para o F31, nenhum movimento de venda sem pedido nas views de consumo e
-   nenhum evento do exercício no estado publicado, conforme a forma; para a V5, o giro dentro da faixa
-   declarada.
-5. A revisão integral do Owner sobre o declarativo: `geracao.yml`, o ADR e as guardas.
+4. Guardas novas, uma por correção:
+   - para o F31, nenhum movimento depois da `as_of_date` e nenhuma venda sem pedido no `analytics`;
+   - para a V5, o giro dentro da faixa declarada.
+5. Uma linha na [Execução Local](docs/execucao_local.md) diz que o `stream-produce` suja o estado publicado e
+   que a guarda acusa isso.
+6. A revisão integral do Owner sobre o declarativo: `geracao.yml`, a D93 (e o ADR, se houver) e as guardas.
 
 ### Bloco 3 — as descrições das relações (F32)
 
@@ -105,12 +111,16 @@ sem `FORCE`.
 
 1. **O antes:** captura das 16 views, numa transação `REPEATABLE READ READ ONLY`, sobre o armazém da
    `v2.1.0`, com SHA-256 de cada saída.
-2. A regeneração das duas origens, com a memória do armazém mantida, como no Bloco 5R.
-3. O exercício de *streaming* sob a forma da D93, com a medição da D63 e a observação da V6.
-4. A sincronização, o `dbt-build`, a procedência `verified`, o `check` e a restauração (com a V7).
+2. **O exercício de *streaming*, na forma (e):** o produtor, a comparação dos dois caminhos, a medição da D63
+   e a observação da V6, sobre o estado que a regeneração vai descartar.
+3. A regeneração das duas origens, com a memória do armazém mantida, como no Bloco 5R.
+4. A publicação **sem produtor**: o *snapshot* do CDC entrega o livro regenerado, como na C3 do Bloco 5R. Em
+   seguida, a sincronização, o `dbt-build`, a procedência `verified`, o `check` e a restauração (com a V7).
 5. **O depois:** a mesma captura das 16 views, e a diferença por view publicada em Consumidores §5 (linhas
    e somas antes e depois, por view).
 6. As guardas novas passam no armazém. A P11 é medida contra a meta da V5.
+
+Se a Q64 ficar com outra forma, os passos 2 a 4 voltam à ordem do Bloco 5R.
 
 ### Bloco 6 — os textos depois do ciclo
 
@@ -132,7 +142,10 @@ UQ-17, UQ-20, a ordem de Consumidores §5 (Q70) e o cabeçalho dos Achados.
   `column: null`).
 - **As escritas do produtor:** `oltp.inventory_movements`, com os tipos e os pesos de `PESOS`, e
   `oltp.inventory_balances`, por `_mover_saldo` em `src/mvp_ed1/streaming/producer.py`. Por isso, filtrar só
-  os movimentos não basta para a P12. É o que a medida do Bloco 2 decide.
+  os movimentos não basta para a P12.
+- **Os caminhos até o armazém:** os movimentos chegam pelo CDC, e o Airbyte só os recarrega em `full_refresh`
+  para reconciliar (`airbyte/streams.yml`). Os saldos chegam em `dedup_history`. O livro é *append-only* por
+  contrato (Modelo de Dados), e a `fact_inventory_movement` é incremental.
 - **O diário do Bloco 5R:** E4 (2.200 eventos, às 02:57) e E9 (a sincronização e o `dbt-build`, às 03:05),
   nessa ordem.
 - **O `plano_de_desenvolvimento.md:347`:** a frase do custo já traz a leitura de 16/11. Só o pacote e o exemplo
@@ -159,7 +172,7 @@ não seja ambígua.
 
 | # | Pergunta | Opções | Recomendação |
 |---|---|---|---|
-| Q64 | A forma da correção do F31 (D93, ADR-0057) | **(a)** O produtor marca a origem do evento como exercício. O `analytics` conserva o evento marcado, as views de consumo e os saldos publicados o excluem por regra declarada, e uma guarda o confere. Nada é descartado. **(b)** Depois do exercício, a origem volta ao corte de antes dele, e o estado publicado não traz resíduo do teste. **(c)** O produtor emite eventos coerentes com o domínio, com venda ligada a pedido e dentro da janela, o que cruza domínios. **(d)** O produtor deixa de emitir venda: não resolve os saldos nem o custo dos outros tipos | **Provisória: (a)**, como num ambiente corporativo: o evento de teste fica identificável e fora do que se publica, sem descarte. A resposta só vem depois da medida do Bloco 2, item 1: se os saldos e os *snapshots* tornarem a (a) cara demais, a (b) passa à frente |
+| Q64 | A forma da correção do F31 (D93) | **(e)** O exercício roda **antes** da regeneração, sobre o estado que ela vai descartar. Depois de regenerar, publica-se sem produtor. Uma guarda no estado publicado falha o `check` se aparecer movimento depois da `as_of_date` ou venda sem pedido. **(a)** O produtor marca a origem do evento como exercício, e as views e os saldos publicados o excluem por regra declarada (contrato do evento e ADR). **(b)** Depois do exercício, a origem e o armazém voltam ao corte de antes dele, pela restauração. **(c)** O produtor emite eventos coerentes com o domínio, com venda ligada a pedido. **(d)** O produtor deixa de emitir venda: não resolve os saldos nem o custo dos outros tipos. **Descartadas (Owner perguntou, 17/11):** apagar as linhas ou trocar células, porque o livro é *append-only* por contrato, o CDC levaria a edição ao livro quente como evento novo, o histórico do `inventory_balances` (`dedup_history`) e as capturas certificadas a registrariam, e as regras 3 e 4 do `CLAUDE.md` a proíbem; e o estorno (linhas compensatórias), que devolve o saldo mas não tira a venda bruta da P11 nem o custo da P08, e deixa as datas depois da `as_of_date` | **(e)**, se a medida do Bloco 2, item 1, confirmar que a regeneração tira do armazém os eventos do exercício (a fato de movimentos é incremental). Resolve os saldos sem tocar em nenhuma linha, não muda o contrato do evento e não pede ADR de tratamento de dados. A guarda torna visível qualquer exercício futuro sobre o estado publicado. Fica declarado na D93 que a (c) é o caminho se um dia o produtor simular operação continuada de verdade (intenção da fase GCP). Se a medida não confirmar, a (b) |
 | Q65 | A D63 | As opções (a), (b) e (c) das Pendências | **(a)** |
 | Q66 | A D64 | As opções (a) e (b) das Pendências | **(a)** |
 | Q67 | A meta do giro da V5 | **(a)** Uma faixa declarada para a mediana trimestral da P11, a fixar com a medida em memória. **(b)** Só "maior que hoje", sem faixa | **(a)**. A faixa é escolha sua: a proposta parte da medida em memória, e não de um número de fora |
