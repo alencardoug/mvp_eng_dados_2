@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 17/11/2026. Falta: a revisão por outro agente (§7) e as respostas da rodada 1 (§5). Nada foi executado |
+| Estado | **Proposto** em 17/11/2026. A rodada 1 de revisão foi aplicada (§7). Falta: a rodada 2 e as respostas do Owner (§5). Nada foi executado |
 | Origem | Pedido do Owner, 17/11/2026, depois de ler o que os três consumidores anotaram sobre a `v2.1.0`: "tomar todas as soluções mais robustas, mesmo que inclua regenerar bases e ADR [...] Reabre, resolve e fecha". Na mesma conversa, o Owner incluiu a V5 (a regeneração adiada pela Q47), a V6, a V7, a D63 e a D64 |
 | Base | `4d6f797`, sobre a `v2.1.0` (`eb11709`) |
 | Entradas lidas | `gdados/docs/alinhamento_entre_projetos.md` §7; `nl_sql/PENDENCIAS.md` item 9 e o parecer de 17/11/2026; `bi-como-codigo/docs/upstream_questions.md` UQ-16 a UQ-20, todos em 17/11/2026 |
@@ -60,7 +60,17 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
   seguro para URL nos dois lugares do `Makefile`, um teste em `tests/test_makefile.py` e a chave da máquina
   trocada ao recriar o Airflow.
 - **D63:** a forma que a Q65 escolher. Recomendada: a opção (a) das Pendências. O medidor espera, com prazo,
-  um sinal do ramo de alerta, e a restauração reposiciona o grupo do Beam no início do *log*.
+  um sinal do ramo de alerta, e a restauração reposiciona o grupo do Beam no início do *log*. O sinal tem de
+  provar a drenagem (RVRB-1-04), e nem o contador de `alertas_emitidos` parado nem o *watermark* passando do
+  maior horário de evento a provam:
+  - **o sinal:** o fechamento da última janela (`FixedWindows`, `AfterWatermark`, `streaming/pipeline.py`) que
+    contém o maior `occurred_at` até o corte, observado depois de o ramo de alertas processar e publicar essa
+    janela;
+  - **zero alertas é legítimo** quando o oráculo por janela também dá zero. Os painéis só de *snapshot* não
+    emitem alerta (`pipeline.py:226–232`);
+  - **prazo esgotado é falha**, registrada como tal, nunca encerramento limpo;
+  - o teste distingue um contador que parou de um ramo concluído e cobre a **execução sem produtor**, que é a da
+    publicação (Bloco 5) e a do passo 7 da restauração.
 - **V7:** o `make recovery-restore` passa a chamar o `make ledger-treatment` no passo que constrói a
   quarentena da captura, com teste de que a época aberta sai com o registro.
 - **V6:** primeiro a medida, depois a correção. O que fica no ar no desligamento: *threads daemon* e o
@@ -72,28 +82,60 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
 1. **Medir o alcance do produtor** antes de fechar a forma (Q64). Só leitura, no código e no armazém.
    - Que tabelas da origem ele escreve: `inventory_movements`, `inventory_balances` e outras.
    - Que modelos e views leem cada uma.
-   - **Se a regeneração tira do armazém os eventos do exercício.** A `fact_inventory_movement` é incremental,
-     o livro quente é *append-only* e o `inventory_balances` chega por `dedup_history`. O que decide é como o
-     ciclo do Bloco 5R tratou o livro e as épocas ao regenerar.
+   - **Se o ciclo tira do armazém os eventos do exercício.** A regeneração das fontes, sozinha, não os tira
+     (RVRB-1-01): o destino quente `raw.inventory_movements_stream` continua com eles, e o *staging* o une ao
+     lote; o `merge` da `fact_inventory_movement` na partição `retail` não apaga o que sumiu da origem
+     (`fact_inventory_movement.sql:56–89`); e os saldos cujo `updated_at` volta no tempo não chegam sem
+     *reset* do cursor do Airbyte. Quem os tira é a **sequência de descarte** do Bloco 5, a do 5R (diário B1,
+     B2, C2 e D3). A rodada 1 confirmou a sequência pela evidência do 5R: a B2 removeu 18.125 linhas do destino
+     quente. Falta a medida desta fase, que é a conferência de resíduo zero do Bloco 5.
 2. **A D93**, com a forma escolhida e a contrapartida na fase GCP. Na forma (e), não há ADR de tratamento de
    dados: muda a ordem do ciclo e entra uma guarda. As formas (a) e (b) pedem ADR (0057), porque mudam o
    contrato do evento (Modelo de Dados §5) ou a restauração.
 3. **V5:** a declaração em `generator/geracao.yml` (abertura e compras pela demanda) e a meta da Q67, medida
    em memória no varejo antes do ciclo, como a V4 fez (Q42).
 4. Guardas novas, uma por correção:
-   - para o F31, nenhum movimento depois da `as_of_date` e nenhuma venda sem pedido no `analytics`;
+   - **para o F31, duas regras** (RVRB-1-03):
+     - nenhum movimento com `occurred_at` depois da `as_of_date`, no fuso do gerador. Os *timestamps* de
+       registro e de ingestão não entram;
+     - toda saída por venda tem a remessa dela. O vínculo é o que o gerador grava (`generator/domains/estoque.py:153–163`):
+       `source_type='sale'` e `source_id` igual ao `shipment_code` de uma remessa da mesma `source_system` na
+       `fact_shipment`. Não há FK de movimento para remessa (`models/inventory.py:184–206`). A falta explicada pela
+       quarentena do legado (a remessa rejeitada, como a 47, de código inválido) é classificada à parte, pela
+       junção com a quarentena e o motivo, nunca descartada nem contada como falha. Transferência, devolução e
+       ajuste ficam fora da exigência. A consulta 4 do BI (`q_p08_november.sql`) **não** serve de contraprova:
+       ela filtra `source_type='shipment'` e o id numérico, que o gerador não grava;
    - para a V5, o giro dentro da faixa declarada.
+
+   **Quando as guardas valem** (RVRB-1-02). São três fases, com o resultado esperado de cada uma:
+   - **(i) Controle positivo, antes do ciclo:** rodar as guardas sobre o armazém da `v2.1.0`. Elas **devem
+     falhar** e achar os eventos de 17/11. A medida diz quantos acham, quantos são do exercício e quantos a
+     quarentena explica. Uma guarda que nunca falhou não prova que pega o F31. Também é a atribuição do antes →
+     depois: separa o que sai pelo F31 do que muda pela V5;
+   - **(ii) Durante o exercício,** sobre o estado que vai ser descartado: a falha é esperada, registrada no diário
+     e não impede o passo seguinte. Os *builds* que a prova incremental pede depois de eventos vivos acontecem
+     aqui;
+   - **(iii) Depois da regeneração:** o `check` integral, com as guardas obrigatórias, é condição de publicação.
+     Nenhum *build* do estado publicado acontece antes da regeneração. As descrições (Bloco 3) e o pacote
+     (Bloco 4) entram no `dbt-build` da publicação.
 5. Uma linha na [Execução Local](docs/execucao_local.md) diz que o `stream-produce` suja o estado publicado e
    que a guarda acusa isso.
 6. A revisão integral do Owner sobre o declarativo: `geracao.yml`, a D93 (e o ADR, se houver) e as guardas.
 
 ### Bloco 3 — as descrições das relações (F32)
 
-1. Descrever as 123 relações no `.yml` de cada camada. Os *sources* `raw` e `raw_legacy` descrevem a tabela
-   de origem; os modelos e os *snapshots* descrevem o grão e o papel.
+1. Descrever as 123 relações **no dono declarativo de cada grupo**, nunca no derivado (RVRB-1-05):
+   - **`raw` (30):** a descrição já existe no `table_meta` dos modelos SQLAlchemy (`models/base.py:51–53`). O
+     `_retail__sources.yml` é escrito à mão, mas as colunas dele já são espelho da declaração, escrito por
+     `sensitivity.main` (`models/descriptions.py`). O espelho passa a levar também a descrição da tabela;
+   - **`raw_legacy` (40):** o `_legacy__sources.yml` é gerado (`legacy/dbt.py::sources_yml`, "Não edite") e só
+     emite nome e colunas. O gerador passa a emitir a descrição da tabela, vinda da mesma declaração;
+   - **`staging`, `trusted`, `snapshots` e `quarantine` (53):** no `.yml` de cada modelo, que é declaração. Os
+     modelos descrevem o grão e o papel.
 2. Estender `tests/test_descricao.py` às relações, com **teto zero** e uma mensagem que nomeia cada relação
-   sem descrição.
-3. Revisão integral do Owner: é declarativo, e são 123 textos. É o maior volume da fase (risco R14).
+   sem descrição. A guarda inventaria também as fontes e os objetos materializados sem declaração no `.yml`.
+3. Revisão integral do Owner: é declarativo, e são até 123 textos. É o maior volume da fase (risco R14). As 70
+   de `raw` e `raw_legacy` saem de textos que já existem na declaração, e a revisão confere o transporte.
 
 ### Bloco 4 — o pacote (F33, UQ-18, UQ-19, F34)
 
@@ -113,19 +155,75 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
 
 ### Bloco 5 — o ciclo
 
-Mesma forma do ciclo do Bloco 5R, com um diário próprio (`data/medicoes/diario_reabertura.md`) e
-sem `FORCE`.
+Mesma forma do ciclo do Bloco 5R, com um diário próprio (`data/medicoes/diario_reabertura.md`).
 
-1. **O antes:** captura das 16 views, numa transação `REPEATABLE READ READ ONLY`, sobre o armazém da
-   `v2.1.0`, com SHA-256 de cada saída.
-2. **O exercício de *streaming*, na forma (e):** o produtor, a comparação dos dois caminhos, a medição da D63
-   e a observação da V6, sobre o estado que a regeneração vai descartar.
-3. A regeneração das duas origens, com a memória do armazém mantida, como no Bloco 5R.
-4. A publicação **sem produtor**: o *snapshot* do CDC entrega o livro regenerado, como na C3 do Bloco 5R. Em
-   seguida, a sincronização, o `dbt-build`, a procedência `verified`, o `check` e a restauração (com a V7).
-5. **O depois:** a mesma captura das 16 views, e a diferença por view publicada em Consumidores §5 (linhas
-   e somas antes e depois, por view).
-6. As guardas novas passam no armazém. A P11 é medida contra a meta da V5.
+**Dois `FORCE` diferentes** (RVRB-1-01). Um é a **autorização de descarte**: o `stream-down FORCE=1` apaga os
+tópicos e o *slot* de replicação, o `stream-reset-sink FORCE=1` esvazia o destino quente, e o
+`seed-data FORCE=1` e o `seed-legacy FORCE=1` trocam as origens (diário B1 a B4). Cada um é confirmado pelo
+Owner no passo em que roda, como no 5R. O outro é o **desvio do *preflight* de memória** (`CLAUDE.md` §5), que
+continua proibido sem a liberação da máquina pelo Owner. Os dois nunca se confundem no diário.
+
+#### A adaptação do ciclo (antes de qualquer passo destrutivo)
+
+Uma subseção do diário, revisada pelo outro agente **antes** do primeiro descarte, como a adaptação do 5R
+(RVRB-1-06). Ela fixa:
+- **os parâmetros:** `LIMITE`, a semente, o `QUANTAS` da duplicação, o prazo da D63 e as épocas do livro de
+  capturas (qual se encerra, qual abre e com que linha de base);
+- **o corte de recuo:** um pacote de recuperação do estado de partida, com SHA-256 e cópia fora do *checkout*,
+  **antes** do exercício (o "pre-bloco5r" do 5R, A3);
+- **o cursor do produtor** (Q71): o estado de partida tem o cursor de 17/11 (2.200 emitidos), e a regeneração
+  descarta os eventos que ele conta;
+- **os oráculos de cada passo** e o que cada falha esperada significa, pelas três fases das guardas
+  (Bloco 2, item 4);
+- **as provas que se mantêm,** cada uma com o passo em que roda:
+  - a T3 (`memory-oracle`) antes de encerrar a época e depois do ciclo;
+  - a comparação H2, com as remoções e reaparições aceitas;
+  - a T4 depois dos tratamentos;
+  - a DAG real;
+  - a T3 e a procedência `verified` depois da restauração, e o catálogo do estado final;
+  - os registros de tratamento (`ledger-treatment`), inclusive depois de *build* que falha;
+  - a comparação dos dois caminhos (C4 e E10).
+- **o que não se prova na base publicada** (abaixo), e onde fica provado.
+
+#### Os passos
+
+1. **O antes:** a captura das 16 views, numa transação `REPEATABLE READ READ ONLY`, sobre o armazém da
+   `v2.1.0`, com SHA-256 de cada saída. Em seguida, o **controle positivo** das guardas, fase (i).
+2. **O exercício de *streaming*, na forma (e),** sobre o estado que vai ser descartado: o produtor, a
+   duplicação, a espera da D63 com o sinal novo, a observação da V6, a sincronização e o `dbt-build` com os
+   eventos vivos (a prova incremental) e a comparação dos dois caminhos. As guardas falham, fase (ii), como
+   esperado.
+3. **O descarte**, na ordem do 5R:
+   1. `stream-down FORCE=1`: os tópicos e o *slot* (B1);
+   2. `stream-reset-sink FORCE=1`: o destino quente vazio, conferido (B2);
+   3. `seed-data FORCE=1` e `seed-legacy FORCE=1`: as duas origens regeneradas pela declaração nova (B3, B4),
+      e o oráculo das fontes (B5);
+   4. `sync-airbyte RESET=1`: o `raw` relido da origem nova, com o cursor descartado (C2).
+4. **A publicação sem produtor:** o *snapshot* do CDC entrega o livro regenerado (C3) e os dois caminhos são
+   comparados (C4). Depois, a captura do legado, o `dbt-build RESET=1` (D3), que refaz o SCD e os incrementais,
+   as guardas na fase (iii), a procedência `verified`, o `check`, a DAG e a restauração (com a V7).
+5. **A conferência de resíduo zero**, antes do aceite. Nenhum movimento com `occurred_at` depois da `as_of_date`
+   no destino quente, no `raw`, no *staging*, no `trusted` e na fato; os saldos de `analytics` iguais aos da
+   origem regenerada; o cursor do produtor no estado que a Q71 escolher. **A memória mantida** é a do pacote
+   de recuperação (`recovery/pacote.py:42–49`): `raw_legacy`, `governance`, `snapshots` e `quarantine`. O `raw`
+   e o `analytics` não são memória e se refazem da origem.
+6. **O depois:** a mesma captura das 16 views, e a diferença por view publicada em Consumidores §5 (linhas e
+   somas antes e depois, por view). A comparação usa as chaves medidas e as regras de aditividade declaradas,
+   sem somar taxas nem denominadores repetidos.
+7. As guardas novas passam no armazém. A P11 é medida contra a meta da V5.
+
+#### O que a base publicada não prova
+
+É o custo aceito da forma (e). Sem produtor sobre a base nova, a publicação prova o *snapshot* do CDC e a
+reconstrução, mas **não** prova, nessa base:
+- a entrega de eventos vivos;
+- as transições de alerta;
+- a parcela quente da P12;
+- o avanço incremental depois de eventos vivos.
+
+Os quatro ficam provados no passo 2, sobre a base descartada, com o diário como evidência, e o aviso aos
+consumidores diz isso. Combinar a (e) com a (b) provaria os quatro na base publicada, ao custo de uma
+restauração a mais. Não é recomendada agora.
 
 Se a Q64 ficar com outra forma, os passos 2 a 4 voltam à ordem do Bloco 5R.
 
@@ -139,7 +237,8 @@ UQ-17, UQ-20, a ordem de Consumidores §5 (Q70) e o cabeçalho dos Achados.
 - A revisão por outro agente, por bloco, e a do fechamento.
 - O aceite do Owner e a *tag* (Q69).
 - Um aviso único aos três consumidores, com a *tag* e Consumidores §5.
-- O que **não** foi provado continua declarado: o BigQuery (L9).
+- O que **não** foi provado continua declarado: o BigQuery (L9) e o que a base publicada não prova sobre o
+  *streaming* (Bloco 5).
 
 ---
 
@@ -169,6 +268,7 @@ UQ-17, UQ-20, a ordem de Consumidores §5 (Q70) e o cabeçalho dos Achados.
 | R14, o volume que ninguém revisa | As 123 descrições e o `geracao.yml` vão à revisão integral do Owner, e as guardas cobrem o derivado |
 | Consumidor que lê no meio do ciclo | Nenhuma janela de leitura durante o Bloco 5. O `nl_sql` e o BI esperam a *tag* |
 | A forma do F31 se mostrar maior que o previsto | A Q64 só é respondida depois da medida do Bloco 2 |
+| Resíduo do exercício no estado publicado | A sequência de descarte explícita e a conferência de resíduo zero (Bloco 5, passos 3 e 5). As guardas (fase iii) falham o `check` |
 
 ---
 
@@ -179,13 +279,14 @@ não seja ambígua.
 
 | # | Pergunta | Opções | Recomendação |
 |---|---|---|---|
-| Q64 | A forma da correção do F31 (D93) | **(e)** O exercício roda **antes** da regeneração, sobre o estado que ela vai descartar. Depois de regenerar, publica-se sem produtor. Uma guarda no estado publicado falha o `check` se aparecer movimento depois da `as_of_date` ou venda sem pedido. **(a)** O produtor marca a origem do evento como exercício, e as views e os saldos publicados o excluem por regra declarada (contrato do evento e ADR). **(b)** Depois do exercício, a origem e o armazém voltam ao corte de antes dele, pela restauração. **(c)** O produtor emite eventos coerentes com o domínio, com venda ligada a pedido. **(d)** O produtor deixa de emitir venda: não resolve os saldos nem o custo dos outros tipos. **Descartadas (Owner perguntou, 17/11):** apagar as linhas ou trocar células, porque o livro é *append-only* por contrato, o CDC levaria a edição ao livro quente como evento novo, o histórico do `inventory_balances` (`dedup_history`) e as capturas certificadas a registrariam, e as regras 3 e 4 do `CLAUDE.md` a proíbem; e o estorno (linhas compensatórias), que devolve o saldo mas não tira a venda bruta da P11 nem o custo da P08, e deixa as datas depois da `as_of_date` | **(e)**, se a medida do Bloco 2, item 1, confirmar que a regeneração tira do armazém os eventos do exercício (a fato de movimentos é incremental). Resolve os saldos sem tocar em nenhuma linha, não muda o contrato do evento e não pede ADR de tratamento de dados. A guarda torna visível qualquer exercício futuro sobre o estado publicado. Fica declarado na D93 que a (c) é o caminho se um dia o produtor simular operação continuada de verdade (intenção da fase GCP). Se a medida não confirmar, a (b) |
+| Q64 | A forma da correção do F31 (D93) | **(e)** O exercício roda **antes** da regeneração, sobre o estado que ela vai descartar. Depois de regenerar, publica-se sem produtor. Uma guarda no estado publicado falha o `check` se aparecer movimento depois da `as_of_date` ou venda sem pedido. **(a)** O produtor marca a origem do evento como exercício, e as views e os saldos publicados o excluem por regra declarada (contrato do evento e ADR). **(b)** Depois do exercício, a origem e o armazém voltam ao corte de antes dele, pela restauração. **(c)** O produtor emite eventos coerentes com o domínio, com venda ligada a pedido. **(d)** O produtor deixa de emitir venda: não resolve os saldos nem o custo dos outros tipos. **Descartadas (Owner perguntou, 17/11):** apagar as linhas ou trocar células, porque o livro é *append-only* por contrato, a alteração ou exclusão na origem atravessa o transporte como mensagem de CDC e o `envelope.py` a recusa com `ContratoViolado` (`u`, `d` e `t`), o que para o *pipeline*, o histórico do `inventory_balances` (`dedup_history`) e as capturas certificadas a registrariam, e as regras 3 e 4 do `CLAUDE.md` a proíbem; e o estorno (linhas compensatórias), que devolve o saldo mas não tira a venda bruta da P11 nem o custo da P08, e deixa as datas depois da `as_of_date` | **(e)**, se a medida do Bloco 2, item 1, e a conferência de resíduo zero do Bloco 5 confirmarem que a sequência de descarte tira do armazém os eventos do exercício (a fato de movimentos é incremental). Resolve os saldos sem tocar em nenhuma linha, não muda o contrato do evento e não pede ADR de tratamento de dados. A guarda torna visível qualquer exercício futuro sobre o estado publicado. Fica declarado na D93 que a (c) é o caminho se um dia o produtor simular operação continuada de verdade (intenção da fase GCP). Se a medida não confirmar, a (b) |
 | Q65 | A D63 | As opções (a), (b) e (c) das Pendências | **(a)** |
 | Q66 | A D64 | As opções (a) e (b) das Pendências | **(a)** |
 | Q67 | A meta do giro da V5 | **(a)** Uma faixa declarada para a mediana trimestral da P11, a fixar com a medida em memória. **(b)** Só "maior que hoje", sem faixa | **(a)**. A faixa é escolha sua: a proposta parte da medida em memória, e não de um número de fora |
 | Q68 | Medir o antes → depois das 16 views neste ciclo | Sim / Não, como a Q63 | **Sim**: os dois consumidores que esperam vão comparar valores, e o diff daqui evita que cada um o refaça |
 | Q69 | A *tag* desta fase | `v2.2.0` / `v2.1.1` | **`v2.2.0`**: o dado muda |
 | Q70 | A ordem de Consumidores §5 | Corrigir a ordem / Corrigir e guardar com teste a ordem por data | **Corrigir e guardar** |
+| Q71 | O cursor do produtor (`emitidos_acumulados` 2.200 de 17/11, mais os do exercício), depois do descarte | **(a)** Guardado com SHA-256 no diário e removido: o estado publicado parte do zero, como a Q52. **(b)** Mantido: o próximo exercício continua a sequência, mas o cursor conta eventos que não estão no livro | **(a)**: depois do descarte, o cursor descreveria um livro que não existe mais, e o pacote de recuperação o levaria junto |
 
 ---
 
@@ -207,5 +308,20 @@ Relatório: `data/medicoes/reabertura/codex2_plano_r1.md`, fora do Git.
   (03, 04, 05, 07 e 08).
 - **A forma (e) confirmada** pela evidência do 5R: o descarte completo retira os eventos do exercício.
 - **Posição do autor:** `data/medicoes/reabertura/parecer_claude_r1.md`. Concorda com os oito.
-- **A aplicar no plano.** A rodada 2 vem depois disso.
 - **O item 16 (F34)** entrou depois do objeto da rodada, a partir do canal do `gdados`.
+
+**Aplicada em 17/11/2026.** A coluna Situação está no relatório. Onde cada achado entrou:
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVRB-1-01 | bloqueante | Bloco 2, item 1 (a regeneração sozinha não tira os eventos); Bloco 5: os dois `FORCE`, o passo 3 (a sequência de descarte) e o passo 5 (a conferência de resíduo zero e o alcance da memória mantida); Riscos |
+| RVRB-1-02 | bloqueante | Bloco 2, item 4: as três fases das guardas, com o controle positivo sobre a `v2.1.0` |
+| RVRB-1-03 | ajuste | Bloco 2, item 4: o vínculo por `source_type='sale'` e `shipment_code`, a quarentena classificada à parte, o `occurred_at` |
+| RVRB-1-04 | ajuste | Bloco 1, D63: o sinal pelo fechamento da última janela, o zero legítimo, o prazo como falha, a execução sem produtor |
+| RVRB-1-05 | ajuste | Bloco 3: o dono declarativo de cada grupo. Conferido: o `_retail__sources.yml` é escrito à mão, com as colunas espelhadas da declaração por `sensitivity.main`; o `_legacy__sources.yml` é gerado |
+| RVRB-1-06 | bloqueante | Bloco 5: a adaptação do ciclo, revisada antes do primeiro descarte, e o que a base publicada não prova; Fechamento |
+| RVRB-1-07 | ajuste | Nos avisos, fora do Git. O do `gdados` foi corrigido por `resposta_gdados_20261117b.md`. O do `nl_sql` foi corrigido no lugar: nenhum texto do `nl_sql` cita o `aviso_nl_sql_20261117b.md` |
+| RVRB-1-08 | ajuste | Q64: a justificativa do CDC |
+
+**Achado do autor, fora da rodada:** o cursor do produtor (Q71). O estado de partida tem o cursor de 17/11, e o
+descarte tira do livro os eventos que ele conta.
