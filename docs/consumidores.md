@@ -150,6 +150,7 @@ aqui como `prevista` antes do *commit* que a faz.
 | Fim da auditoria das 16 views (Bloco 1b, com a P13 depois da D66) | `4da9e60` | BI (N85: as etapas 2.4 a 2.10 fixam este) |
 | Primeira versão do pacote (Bloco 4) | `acb26d0` | `gdados`, BI |
 | Fim do ciclo do Bloco 5R: o dado regerado, as 16 views com o valor novo, o pacote com `on_zero_denominator` e a procedência verificada | `d40ec9d` | `gdados`, BI; o `nl_sql`, se reimportar |
+| `v2.1.0`, o fechamento da fase da base dos consumidores: o mesmo modelo e o mesmo dado de `d40ec9d`, com os documentos do fechamento e os itens em aberto do pacote atualizados (a V4 fechada; a V6 e a V7) | `eb11709` | `gdados`, BI — **o marco a preferir**; o `nl_sql`, se reimportar |
 
 ---
 
