@@ -1003,3 +1003,85 @@ def test_airbyte_config_aplica_um_recurso_por_vez(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
     aplicacoes = [c for c in chamadas if c.startswith("terraform") and " apply" in c]
     assert aplicacoes and all("-parallelism=1" in c.split() for c in aplicacoes), chamadas
+
+
+# ── D64: a chave Fernet do Airflow ──────────────────────────────────────────
+
+FERNET = RAIZ / "docker" / "fernet.sh"
+
+#: A chave que o `Makefile` gerava até 17/11/2026: 32 caracteres alfanuméricos, que o Airflow recusa.
+CHAVE_COMO_SENHA = "aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW"
+
+
+def _fernet(*argumentos: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run([str(FERNET), *argumentos], capture_output=True, text=True)
+
+
+def test_a_chave_gerada_e_a_que_o_fernet_aceita():
+    """Oráculo de fora do script: a própria biblioteca que o Airflow usa (D64)."""
+    from cryptography.fernet import Fernet
+
+    chaves = {_fernet("gerar").stdout.strip() for _ in range(5)}
+
+    assert len(chaves) == 5, "a geração repetiu chave"
+    for chave in chaves:
+        Fernet(chave)  # levanta ValueError com a chave inválida
+        assert _fernet("valida", chave).returncode == 0, chave
+
+
+def test_a_chave_gerada_como_senha_e_recusada_pelos_dois():
+    """A contraprova: a chave de antes é inválida para o Fernet e para o script."""
+    from cryptography.fernet import Fernet
+
+    with pytest.raises(ValueError):
+        Fernet(CHAVE_COMO_SENHA)
+    assert _fernet("valida", CHAVE_COMO_SENHA).returncode == 1
+    assert _fernet("valida", "").returncode != 0
+
+
+def test_garantir_troca_so_a_chave_invalida(tmp_path):
+    """A inválida é trocada; o resto do arquivo, linha a linha, fica igual."""
+    from cryptography.fernet import Fernet
+
+    env = tmp_path / ".env"
+    antes = ["AIRFLOW_PORT=8081", "AIRFLOW_JWT_SECRET=segredo", f"AIRFLOW_FERNET_KEY={CHAVE_COMO_SENHA}", "OUTRA=1"]
+    env.write_text("\n".join(antes) + "\n", encoding="utf-8")
+
+    r = _fernet("garantir", str(env))
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "trocada" in r.stdout
+    depois = env.read_text(encoding="utf-8").splitlines()
+    assert [l for l in depois if not l.startswith("AIRFLOW_FERNET_KEY=")] == [l for l in antes if not l.startswith("AIRFLOW_FERNET_KEY=")]
+    nova = next(l for l in depois if l.startswith("AIRFLOW_FERNET_KEY=")).partition("=")[2]
+    Fernet(nova)
+
+
+def test_garantir_nao_toca_a_chave_valida_nem_o_env_sem_chave(tmp_path):
+    """Trocar a válida tornaria ilegível o que já foi cifrado com ela."""
+    valida = _fernet("gerar").stdout.strip()
+    com = tmp_path / "com.env"
+    com.write_text(f"AIRFLOW_FERNET_KEY={valida}\n", encoding="utf-8")
+    sem = tmp_path / "sem.env"
+    sem.write_text("AIRFLOW_PORT=8081\n", encoding="utf-8")
+
+    for env in (com, sem):
+        antes = env.read_bytes()
+        r = _fernet("garantir", str(env))
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert r.stdout == ""
+        assert env.read_bytes() == antes
+
+
+def test_o_makefile_gera_a_chave_fernet_pelo_script_e_a_confere_antes_de_subir():
+    """Os dois lugares que escrevem a chave usam o script, e o `airflow-up` troca a inválida antes do `up`."""
+    texto = (RAIZ / "Makefile").read_text(encoding="utf-8")
+    escritas = [l for l in texto.splitlines() if "AIRFLOW_FERNET_KEY=" in l]
+
+    assert len(escritas) == 2, escritas
+    assert all("$$(docker/fernet.sh gerar)" in l for l in escritas), escritas
+
+    receita = _receitas(texto)["airflow-up"]
+    garantir = next(i for i, l in enumerate(receita) if "docker/fernet.sh garantir .env" in l)
+    subida = next(i for i, l in enumerate(receita) if "up -d" in l)
+    assert garantir < subida, receita

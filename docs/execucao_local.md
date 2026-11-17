@@ -62,7 +62,9 @@ existente, porque trocar as senhas torna os volumes já criados inacessíveis. V
 chaves que nasceram depois do `.env`: `make airflow-up` acrescenta os segredos do Airflow, e
 `make dbt-build` o login de leitura do armazém
 ([Governança §7](governanca_de_dados.md#7-regras-de-acesso-por-camada)) — só o que falta, sem
-tocar no resto.
+tocar no resto. A única troca é a da chave Fernet do Airflow **inválida**: `make airflow-up` a substitui
+por uma válida (`docker/fernet.sh`, D64), porque com ela o Airflow nunca cifrou nada. A chave válida fica como
+está.
 
 ---
 

@@ -238,7 +238,7 @@ env: ## Gera um .env com portas padrão e senhas aleatórias (não sobrescreve)
 		echo "# Airflow (Etapa 5) — porta e segredos do orquestrador."; \
 		echo "AIRFLOW_PORT=8081"; \
 		echo "AIRFLOW_JWT_SECRET=$$(pw)"; \
-		echo "AIRFLOW_FERNET_KEY=$$(pw)"; \
+		echo "AIRFLOW_FERNET_KEY=$$(docker/fernet.sh gerar)"; \
 		echo "AIRFLOW_DB_NAME=airflow"; \
 		echo "AIRFLOW_DB_USER=airflow"; \
 		echo "AIRFLOW_DB_PASSWORD=$$(pw)"; \
@@ -634,7 +634,10 @@ airflow-up: require-env require-abctl ## Sobe o Airflow local (LocalExecutor, tr
 		{ echo ""; echo "# Airflow (Etapa 5) — acrescentado por 'make airflow-up'."; \
 		  echo "AIRFLOW_PORT=8081"; \
 		  echo "AIRFLOW_JWT_SECRET=$$(pw)"; \
-		  echo "AIRFLOW_FERNET_KEY=$$(pw)"; } >> .env; }
+		  echo "AIRFLOW_FERNET_KEY=$$(docker/fernet.sh gerar)"; } >> .env; }
+	@# A chave Fernet não é senha: são 32 bytes em base64 seguro para URL (D64). A inválida, gerada como
+	@# senha até 17/11/2026, é trocada aqui; o `up` adiante recria os contêineres com ela.
+	@docker/fernet.sh garantir .env
 	@$(GARANTIR_LIVRO_NO_ENV)
 	@$(GARANTIR_REDE)
 	@$(CREDENCIAIS); \
