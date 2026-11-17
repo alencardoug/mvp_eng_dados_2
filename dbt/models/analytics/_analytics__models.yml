@@ -1792,13 +1792,13 @@ models:
           sensitivity: internal
           value_domain: gateway_response_code
           values:
-            "00": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
-            "05": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
-            "51": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
-            "57": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
-            "91": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
-            "GW-OK": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
-            "GW-TIMEOUT": "Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado."
+            "00": "Aprovada. É o código de toda transação `succeeded` — autorização, captura, estorno e reembolso."
+            "05": "Recusada sem motivo detalhado (não autorizada, genérica)."
+            "51": "Recusada por saldo insuficiente."
+            "57": "Recusada por transação não permitida ao portador."
+            "91": "Recusada por emissor indisponível."
+            "GW-OK": "Pendente. O gateway aceitou a requisição, e a resposta do adquirente ainda não chegou; é o código de toda transação `pending`."
+            "GW-TIMEOUT": "Recusada por falta de resposta do adquirente no prazo."
         data_tests:
           - not_null:
               config:

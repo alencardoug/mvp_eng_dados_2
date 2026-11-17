@@ -18,9 +18,9 @@
 # aceitou para os domínios que o repositório só listava pelo nome (rodada 7 do plano). Valor sem fonte
 # não entra: é pergunta ao Owner.
 #
-# Três significados aceitos são desmentidos pelo dado de hoje e esperam a regeneração do Bloco 5R:
-# `customer_status` e `product_status` (F24), o `lost` da remessa (F25), o `reopened` e o `resolved` do
-# chamado (F26). O `gateway_response_code` declara o que a Q17 decidiu até a mesma regeneração (F22).
+# Os significados que o dado de antes desmentia — `customer_status` e `product_status` (F24), o `lost`
+# da remessa (F25), o `reopened` e o `resolved` do chamado (F26) — valem desde a regeneração do Bloco 5R
+# (17/11/2026), e o `gateway_response_code` passou a ter o significado do mapa aceito na Q41 (F22).
 
 domains:
 
@@ -191,29 +191,29 @@ domains:
         source: Owner, aceite de 15/11/2026 (Q19)
 
   gateway_response_code:
-    description: Código de retorno do adquirente simulado. Sem significado de negócio neste dado (F22); o desfecho está em `transaction_result`.
+    description: Código de retorno do adquirente simulado. Segue o resultado da transação (F22, invariante 19 do Modelo de Dados §4); o desfecho continua em `transaction_result`.
     values:
       "00":
-        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
-        source: Q17; Achados, F22
-      "05":
-        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
-        source: Q17; Achados, F22
-      "51":
-        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
-        source: Q17; Achados, F22
-      "57":
-        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
-        source: Q17; Achados, F22
-      "91":
-        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
-        source: Q17; Achados, F22
+        meaning: Aprovada. É o código de toda transação `succeeded` — autorização, captura, estorno e reembolso.
+        source: Owner, aceite de 16/11/2026 (Q41); geracao.yml, payment_transactions
       "GW-OK":
-        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
-        source: Q17; Achados, F22
+        meaning: Pendente. O gateway aceitou a requisição, e a resposta do adquirente ainda não chegou; é o código de toda transação `pending`.
+        source: Owner, aceite de 16/11/2026 (Q41); geracao.yml, payment_transactions
+      "51":
+        meaning: Recusada por saldo insuficiente.
+        source: Owner, aceite de 16/11/2026 (Q41); geracao.yml, payment_transactions
+      "05":
+        meaning: Recusada sem motivo detalhado (não autorizada, genérica).
+        source: Owner, aceite de 16/11/2026 (Q41); geracao.yml, payment_transactions
+      "57":
+        meaning: Recusada por transação não permitida ao portador.
+        source: Owner, aceite de 16/11/2026 (Q41); geracao.yml, payment_transactions
+      "91":
+        meaning: Recusada por emissor indisponível.
+        source: Owner, aceite de 16/11/2026 (Q41); geracao.yml, payment_transactions
       "GW-TIMEOUT":
-        meaning: Sem significado de negócio neste dado; o gerador sorteia o código sem relação com o resultado.
-        source: Q17; Achados, F22
+        meaning: Recusada por falta de resposta do adquirente no prazo.
+        source: Owner, aceite de 16/11/2026 (Q41); geracao.yml, payment_transactions
 
   refund_status:
     description: Estado do reembolso.
