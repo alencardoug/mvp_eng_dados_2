@@ -285,7 +285,10 @@ junto do F24 a F26 e do F22; a forma da correção é escolha sua, com a medida 
 (`folga_da_abertura`, em `geracao.yml`). No ramo `bloco-5r`, medido em memória no varejo: nenhuma
 correção-relâmpago, nenhuma linha de giro indefinido na P11 simulada; a invariante 20 do
 [Modelo de Dados §4](modelo_de_dados.md#4-invariantes-de-negócio) a guarda. No armazém, só depois do
-ciclo; a V4 fecha com a medida dele.
+ciclo; a V4 fecha com a medida dele. **Medido no armazém depois do ciclo (17/11/2026):** nenhum ajuste criado
+para cobrir uma saída, nas duas origens (a guarda `invariante_20_saida_com_lastro_desde_a_abertura` passa); a
+P11 tem 6.626 linhas, **3** com giro indefinido (eram 1.216 de 6.990). As 3 ficam como estão, sem explicação
+medida ainda.
 
 *Efeito de não decidir:* o giro indefinido nesses pares, declarado na view e no glossário.
 
@@ -295,7 +298,8 @@ ciclo; a V4 fecha com a medida dele.
 mostra giro mediano de cerca de 0,01 por trimestre, em qualquer das formas medidas: o estoque — abertura
 de 10 a 400 unidades por par, compras de 40 a 500 — é muito maior que a venda, de 1 a 3 unidades por
 item. O giro é definido e coerente com o livro; não é realista para varejo. A medida é da simulação, no
-varejo; **a do armazém está pendente**, e se faz depois do ciclo do Bloco 5R.
+varejo. **No armazém, depois do ciclo do Bloco 5R (17/11/2026):** mediana 0,02 e p90 0,49 nas 6.626 linhas
+da P11, as duas origens juntas.
 
 Corrigir é mudar declaração em várias tabelas (`geracao.yml`: abertura, compras, as referências que
 delas dependem), com a sua revisão integral, e regerar as duas origens. Decidido em 16/11/2026 (Q47 do

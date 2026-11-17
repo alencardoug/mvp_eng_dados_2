@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 17/11/2026 (o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -357,7 +357,7 @@ inventário.
   (Q41) está em `generator/geracao.yml` — `succeeded` → `00`, `pending` → `GW-OK`, `failed` → um dos cinco
   motivos de recusa, por peso —, guardado pela invariante 19 do Modelo de Dados §4. No varejo, as 7.102
   transações seguem o mapa: 3.381 autorizações e todas as capturas, estornos e reembolsos com `00`, 74
-  pendentes com `GW-OK`, 212 recusadas entre `51`, `05`, `57`, `91` e `GW-TIMEOUT`. Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
+  pendentes com `GW-OK`, 212 recusadas entre `51`, `05`, `57`, `91` e `GW-TIMEOUT`. Medido em memória no gerador corrigido e, depois do ciclo do Bloco 5R (17/11/2026), no armazém, nas duas origens: a guarda `invariante_19_codigo_do_adquirente_segue_o_resultado` passa.
 
 ### F23 — As tabelas das Perguntas de Negócio divergem das views · **Gravidade: média**
 
@@ -389,7 +389,7 @@ inventário.
   evento, e a variante inativa segue a regra do `discontinued` (Q39); invariante 15. No varejo, nenhum
   pedido nem carrinho identificado de `pending` ou `blocked`, nenhum item de `draft`, e nenhuma venda de
   `inactive`, de `discontinued` ou de variante inativa dentro da janela; os 25 produtos `discontinued`
-  continuam com venda antiga, e 193 dos 210 clientes `inactive`, com pedido antigo. Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
+  continuam com venda antiga, e 193 dos 210 clientes `inactive`, com pedido antigo. Medido em memória no gerador corrigido e, depois do ciclo do Bloco 5R (17/11/2026), no armazém, nas duas origens: a guarda `invariante_15_cadastro_respeitado_no_tempo` passa.
 
 ### F25 — A remessa extraviada aparece em pedido entregue · **Gravidade: média**
 
@@ -406,7 +406,7 @@ inventário.
 - **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
   (Q25). **No ramo `bloco-5r` (16/11/2026):** o extravio sai das remessas em trânsito, com o volume mantido (Q43) — 0,4% de
   todas as despachadas; invariante 16. No varejo, 14 remessas `lost`, todas em pedido `shipped` (antes, 13,
-  todas em pedido `delivered`). Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
+  todas em pedido `delivered`). Medido em memória no gerador corrigido e, depois do ciclo do Bloco 5R (17/11/2026), no armazém, nas duas origens: a guarda `invariante_16_extravio_so_em_transito` passa.
 
 ### F26 — O chamado é reaberto sem ter sido resolvido · **Gravidade: baixa**
 
@@ -421,7 +421,7 @@ inventário.
 - **Aqui**, pela decisão do Owner (Q22 e Q24): corrigir o gerador e regerar, no Bloco 5R, no fim da fase
   (Q25). **No ramo `bloco-5r` (16/11/2026):** os eventos obrigatórios entram antes dos opcionais, e o `closed_at` fica só no
   `closed`; invariante 17. No varejo, os 15 chamados reabertos têm o `resolved` antes do `reopened`, nenhum
-  `resolved` ou `closed` fica sem o evento de resolução, e os 94 `resolved` têm `closed_at` nulo. Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
+  `resolved` ou `closed` fica sem o evento de resolução, e os 94 `resolved` têm `closed_at` nulo. Medido em memória no gerador corrigido e, depois do ciclo do Bloco 5R (17/11/2026), no armazém, nas duas origens: a guarda `invariante_17_livro_do_chamado_acompanha_o_estado` passa.
 
 ### F27 — A reserva de estoque não é de um item do carrinho nem do pedido · **Gravidade: baixa**
 
@@ -441,7 +441,7 @@ inventário.
   do carrinho ou do pedido dela, no Bloco 5R, no fim da fase. **No ramo `bloco-5r` (16/11/2026):** a reserva nasce de um item, com
   o SKU e a quantidade dele (Q40), no máximo uma por item; invariante 18. No varejo, as 4.200 reservas são
   de um item da própria origem; a divisão efetiva entre carrinho e pedido, que não é a declarada (Q45),
-  está medida na [Geração de Dados §4.3](geracao_de_dados.md#43-onde-os-números-vivem). Medido em memória, no gerador corrigido; no armazém só vale depois do ciclo, que as guardas do ramo conferem.
+  está medida na [Geração de Dados §4.3](geracao_de_dados.md#43-onde-os-números-vivem). Medido em memória no gerador corrigido e, depois do ciclo do Bloco 5R (17/11/2026), no armazém, nas duas origens: a guarda `invariante_18_reserva_e_de_um_item_da_origem` passa.
 
 ### F28 — A contagem de pedidos da P06 se diz aditiva e se repete entre categorias · **Gravidade: baixa**
 

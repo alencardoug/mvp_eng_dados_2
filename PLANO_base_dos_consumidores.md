@@ -1676,6 +1676,15 @@ guardada fora da árvore como as guardas (Q53), e entra na F0 do ciclo, junto co
 no *stash* "Parte B, Q57 a Q61" e em `data/medicoes/base_consumidores/bloco5r/parteB_q57_q61.patch`. Na F0, as
 linhas `feita` da Q58 a Q60 (texto) e a da Q57 (a `prevista` passa a `feita`) entram em Consumidores §5.
 
+### Rodada 16 — dentro do ciclo do Bloco 5R, na D3: respondida em 17/11/2026
+
+Medido antes de perguntar (diário do ciclo, D3): o `dbt-build RESET=1` passou em 1.078 de 1.079; as seis guardas
+das invariantes 15 a 20 passam e as chaves do Bloco 6 estão instaladas. Falhou `entrega_projetada_tem_evento_no_livro`.
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q62** | A remessa 45 do **legado** está `delivered` na origem, mas o evento `delivered` dela foi para a quarentena por `DATE_FUTURE` (a injeção pôs a data em 2027) — falha deliberada do catálogo, cujos alvos mudaram com o lote novo. A remessa está em `quarantine.rejected_shipment_deliveries` com o motivo; o teste falha sempre que essa quarentena não está vazia | **Tolerar só o explicado pelo legado**: o teste aceita a remessa do legado cujo evento `delivered` está na quarentena do tratamento corrente (`explicado_pela_quarentena`, com o tipo do evento) e continua falhando para qualquer outra divergência, toda a do varejo inclusive — o padrão da D35. Lê `is_delivery_unbacked` em `trusted.shipments`, porque a tabela da quarentena não guarda a origem e o `shipment_id` 45 existe nas duas. Contraprovas no banco: com outro tipo de evento, ou sem a exceção, a remessa volta a ser acusada. Era a recomendada | Aceitar o vermelho, declarado (a F1 nunca ficaria verde com este lote); mudar a injeção do legado e regerar (contraria o plano: a falha deliberada não se corrige para forçar zero) |
+
 ## 7. Definição de pronto aplicada
 
 A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda nesta fase:
