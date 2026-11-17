@@ -244,7 +244,12 @@ class PublicarAlerta(beam.DoFn):
         self._editor = pubsub_v1.PublisherClient()
         self._topico = self._editor.topic_path(self._projeto.projeto, self._nuvem.topico_de_alertas)
 
-    def process(self, alerta: dict[str, Any]):
+    def process(self, painel: dict[str, Any]):
+        # O `AcumularSaldoEAlertar` entrega todo painel concluído, com o alerta dele ou sem alerta (D63).
+        # Na nuvem não há confirmação: o *worker* não tem o diretório da execução local.
+        alerta = painel.get("alerta")
+        if alerta is None:
+            return
         self._pendentes.append(self._editor.publish(
             self._topico,
             json.dumps(alerta, ensure_ascii=False, default=str).encode(),

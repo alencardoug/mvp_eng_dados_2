@@ -89,7 +89,7 @@ Airbyte e *streaming* são automáticas (seção 5).
 | 8 | `make sync-legacy` | Captura o legado em `raw_legacy` e a **certifica** em `governance.legacy_captures` (duas fases, [ADR-0044](adr/0044-certificar-cada-captura-do-legado-por-conteudo.md)); cada execução acrescenta uma captura e a registra no livro retido, que precisa de época corrente ([Origem Legada §4.3](origem_legada.md#43-o-livro-retido-da-memória-v110)) | Etapa 10 · v1.1.0 |
 | 9 | `make stream-up` | Sobe Redpanda e Kafka Connect e aplica o conector Debezium; pausa o Airbyte | Etapa 7 |
 | 10 | `make stream-run` | Sobe o *pipeline* Beam — **primeiro plano**, noutro terminal | Etapa 7 |
-| 11 | `make stream-wait ATE_SEQ=<corte>` | Espera o livro quente alcançar a origem; o corte é o que `make stream-corte` imprime. Depois, `Ctrl-C` no `stream-run` | Etapa 12 |
+| 11 | `make stream-wait ATE_SEQ=<corte>` e `make stream-drain ATE_SEQ=<corte>` | Espera o livro quente alcançar a origem; o corte é o que `make stream-corte` imprime. Depois, espera o ramo de alertas confirmar cada painel do que esta execução gravou (D63). Só então `Ctrl-C` no `stream-run` | Etapa 12 · reabertura |
 | 12 | `make airbyte-up` | Retoma o Airbyte; pausa o *streaming* | Etapa 5 · 12 |
 | 13 | `make dbt-build` | O primeiro *build* completo: modelos, testes de dados e reconciliações | Etapa 5 |
 | 14 | `make check` | Verificação completa em cinco etapas, parando na primeira falha: segredos e documentos, `dbt build` (modelos, testes de dados, reconciliações), classificação e linhagem derivadas em dia com os modelos, `pytest`, pacote de metadados em dia com os resultados; `FATO=1` e `RESET=1` passam adiante. Tempo e memória medidos na [Capacidade §2.12](capacidade_e_recuperacao.md#212-o-ciclo-do-zero-medido--b5-25092026) | Etapa 11 |
@@ -261,6 +261,7 @@ origem e destinos; não contorne a falha enfraquecendo a imutabilidade ou editan
 | `make dag-wait` | Espera a execução da DAG terminar; `RUN_ID=` (padrão: a última disparada), `PRAZO=` | Etapa 12 |
 | `make stream-corte` | Imprime o `max(event_sequence)` da origem — o fim de uma medição | Etapa 12 |
 | `make stream-wait` | Espera o livro quente alcançar `ATE_SEQ=`; `PID=` vigia o *pipeline*, `PRAZO=` | Etapa 12 |
+| `make stream-drain` | Espera o ramo de alertas confirmar os painéis da execução (`EXECUCAO=`, sem ele a mais recente); `ATE_SEQ=`, `PID=`, `PRAZO=`; prazo esgotado é falha ([Streaming §5.1](streaming.md#51-quando-o-ramo-de-alerta-terminou)) | Reabertura |
 | `make docs-generate` | Só gera o catálogo — tem fim, e por isso é o que se mede | Etapa 12 |
 | `make dbt-rebuild` | Reconstrói tudo **sem** derrubar os *snapshots* — o *build* de uma restauração | Etapa 12 |
 | `make recovery-pack` | Monta o candidato do pacote de recuperação; exige janela parada e árvore limpa | Etapa 12 |

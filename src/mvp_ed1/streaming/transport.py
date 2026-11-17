@@ -259,33 +259,68 @@ class LerDoTransporte(beam.PTransform):
 
 
 class PublicarAlerta(beam.DoFn):
-    """Emite o alerta no tópico separado (Streaming §5).
+    """Emite o alerta no tópico separado (Streaming §5), e confirma o painel (D63).
 
     Publicar e não gravar: alerta é sinal para outro sistema — um webhook, um
     painel, uma reposição —, não linha de dado. O ponto de extensão fica no
     tópico, e o MVP só precisa que o evento seja emitido, registrado e testado.
+
+    **A entrega é confirmada antes de seguir.** O `produce` do Kafka é assíncrono, e o `poll(0)` não
+    espera: o `yield` logo depois não dizia que o alerta chegou. Agora cada alerta espera o `flush`, e o
+    *callback* de entrega diz se deu certo; entrega que falha, ou que não termina no prazo, para o
+    *pipeline* com erro, em vez de seguir como se tivesse saído. Só então o painel é confirmado no
+    diretório da execução (`drenagem.Confirmador`), com ou sem alerta. Alertas são poucos (144 no ciclo
+    de 17/11/2026), e esperar cada um custa pouco.
     """
 
-    def __init__(self, transporte: Transporte):
-        self._transporte = transporte
-        self._produtor = None
+    #: Quanto o `flush` espera a entrega de um alerta, em segundos.
+    PRAZO_DA_ENTREGA = 30
 
-    def setup(self):
+    def __init__(self, transporte: Transporte, confirmacoes: str | None = None):
+        self._transporte = transporte
+        self._confirmacoes = confirmacoes
+        self._produtor = None
+        self._confirmador = None
+
+    def _fabricar(self):
         from confluent_kafka import Producer
 
-        self._produtor = Producer({"bootstrap.servers": self._transporte.bootstrap})
+        return Producer({"bootstrap.servers": self._transporte.bootstrap})
+
+    def setup(self):
+        self._produtor = self._fabricar()
+        if self._confirmacoes is not None:
+            from mvp_ed1.streaming.drenagem import Confirmador
+
+            self._confirmador = Confirmador(self._confirmacoes)
 
     def teardown(self):
         if self._produtor is not None:
             self._produtor.flush(10)
+        if self._confirmador is not None:
+            self._confirmador.fechar()
 
-    def process(self, alerta: dict[str, Any]):
+    def process(self, painel: dict[str, Any]):
         import json
 
-        self._produtor.produce(
-            self._transporte.topico_de_alertas,
-            key=f"{alerta['warehouse_id']}:{alerta['product_variant_id']}".encode(),
-            value=json.dumps(alerta, ensure_ascii=False, default=str).encode(),
-        )
-        self._produtor.poll(0)
-        yield alerta
+        alerta = painel.get("alerta")
+        if alerta is not None:
+            falhas: list[Any] = []
+            self._produtor.produce(
+                self._transporte.topico_de_alertas,
+                key=f"{alerta['warehouse_id']}:{alerta['product_variant_id']}".encode(),
+                value=json.dumps(alerta, ensure_ascii=False, default=str).encode(),
+                on_delivery=lambda erro, _mensagem: falhas.append(erro) if erro is not None else None,
+            )
+            restantes = self._produtor.flush(self.PRAZO_DA_ENTREGA)
+            if restantes or falhas:
+                raise RuntimeError(
+                    f"entrega do alerta não confirmada ({alerta['warehouse_id']}:{alerta['product_variant_id']}): "
+                    f"{falhas[0] if falhas else f'{restantes} mensagem(ns) pendente(s) depois de {self.PRAZO_DA_ENTREGA} s'}"
+                )
+        if self._confirmador is not None:
+            from mvp_ed1.streaming.drenagem import confirmacao
+
+            self._confirmador.escrever(confirmacao(painel, painel["chave"]))
+        if alerta is not None:
+            yield alerta

@@ -216,6 +216,30 @@ inventá-lo exigiria migração, regeração e um ADR que ninguém pediu. O valo
 [`streaming/fluxo.yml`](../streaming/fluxo.yml), espelhado em `dbt_project.yml` para a view da P12 —
 com um teste do `pytest` conferindo que os dois concordam, pelo mesmo arranjo de `as_of_date`.
 
+### 5.1 Quando o ramo de alerta terminou
+
+Até 17/11/2026 o medidor esperava o livro quente alcançar o corte e encerrava o Beam. O ramo de
+alerta só recebe painéis quando o *watermark* fecha as janelas, e a contagem de alertas de uma
+medição dependia de quanto tempo sobrava
+([D63](pendencias.md#d63--o-medidor-do-streaming-encerra-o-beam-antes-de-o-ramo-de-alerta-drenar-decidida-em-17112026)).
+Nem o contador de alertas parado nem o *watermark* passando do maior evento provam que o ramo
+terminou. O que prova, desde então (`streaming/drenagem.py`):
+
+- **cada execução local registra o seu diretório** em `data/streaming/execucoes/`, com o instante
+  em que o *pipeline* foi construído — o mesmo corte da semente da D62;
+- **todo painel concluído é confirmado** pelo publicador, com a contagem dos seus eventos, também
+  o painel sem alerta. Com alerta, a confirmação só sai depois de o transporte confirmar a entrega,
+  e a entrega que falha para o *pipeline*;
+- **`make stream-drain` espera a cobertura do que esta execução gravou.** O ramo de alerta só recebe
+  o que o destino deixou entrar agora: o que já estava lá entra na semente, sem painel. A expectativa
+  é, por armazém × SKU e janela, a contagem das linhas com `_stream_extracted_at` a partir daquele
+  instante. Um par fecha quando a soma dos seus painéis, os atrasados incluídos, a iguala. Prazo
+  esgotado é falha. Evento além do atraso tolerado não gera painel, e a espera falha por ele em vez
+  de esquecê-lo.
+
+O `make medir CENARIO=streaming` chama o `stream-drain` depois do `stream-wait` e antes do SIGINT.
+Na nuvem não há confirmação: o *worker* do Dataflow não tem o diretório local.
+
 ---
 
 ## 6. Convivência com o Airbyte

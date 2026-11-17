@@ -207,7 +207,7 @@ def comando_pipeline(args) -> int:
 
     fluxo = cfg.carregar()
     try:
-        executar(fluxo)
+        executar(fluxo, execucao_dir=args.execucao)
     except KeyboardInterrupt:
         print("\npipeline interrompido. O offset confirmado retoma de onde parou.")
     return 0
@@ -221,20 +221,28 @@ def comando_corte(_args: argparse.Namespace) -> int:
     return 0
 
 
-def comando_aguardar(args: argparse.Namespace) -> int:
-    """Espera o livro alcançar o corte; imprime o progresso a cada leitura."""
+def _vigia(pid: int | None):
+    """O predicado "o pipeline ainda está vivo", ou `None` sem PID."""
     import os as _os
 
+    if pid is None:
+        return None
+
+    def vivo() -> bool:  # noqa: D401 — predicado, não descrição
+        try:
+            _os.kill(pid, 0)
+        except (OSError, ProcessLookupError):
+            return False
+        return True
+
+    return vivo
+
+
+def comando_aguardar(args: argparse.Namespace) -> int:
+    """Espera o livro alcançar o corte; imprime o progresso a cada leitura."""
     from mvp_ed1.streaming import espera
 
-    vivo = None
-    if args.pid is not None:
-        def vivo() -> bool:  # noqa: D401 — predicado, não descrição
-            try:
-                _os.kill(args.pid, 0)
-            except (OSError, ProcessLookupError):
-                return False
-            return True
+    vivo = _vigia(args.pid)
 
     def reportar(f: espera.Faltantes) -> None:
         LOG.info(
@@ -263,6 +271,39 @@ def comando_aguardar(args: argparse.Namespace) -> int:
         f"até a sequência {args.ate_seq}.",
         file=sys.stderr,
     )
+    return 1
+
+
+def comando_drenar(args: argparse.Namespace) -> int:
+    """Espera o ramo de alertas confirmar cada painel do que esta execução gravou (D63)."""
+    from mvp_ed1 import db
+    from mvp_ed1.streaming import drenagem, espera
+
+    execucao = drenagem.Execucao.ler(args.execucao)
+    motor = espera._motor(db.WAREHOUSE)
+    destino = cfg.carregar().destino.qualificado
+
+    def reportar(d: drenagem.Drenagem) -> None:
+        LOG.info("ramo de alertas: %d/%d pares fechados, %d/%d eventos confirmados%s",
+                 d.fechados, d.pares, d.eventos_confirmados, d.eventos_esperados,
+                 f"; {len(d.excedentes)} par(es) confirmados a mais" if d.excedentes else "")
+
+    r = drenagem.aguardar(
+        lambda: drenagem.medir_no_armazem(execucao, ate_seq=args.ate_seq, destino=destino, motor=motor),
+        prazo_s=args.prazo, intervalo_s=args.intervalo, vivo=_vigia(args.pid), reportar=reportar,
+    )
+    if r.drenado:
+        print(f"ramo de alertas drenado: {r.ultimo.pares} pares e {r.ultimo.eventos_esperados} eventos desta "
+              f"execução confirmados em {r.segundos:.1f}s ({execucao.diretorio})")
+        return 0
+    motivo = {
+        "prazo": f"prazo de {args.prazo:.0f}s esgotado",
+        "morreu": f"o pipeline (PID {args.pid}) morreu sob a espera",
+    }[r.motivo]
+    exemplos = ", ".join(map(str, (r.ultimo.faltam or r.ultimo.excedentes)[:3]))
+    print(f"ERRO: {motivo} — {r.ultimo.fechados} de {r.ultimo.pares} pares fechados, "
+          f"{len(r.ultimo.excedentes)} confirmados a mais (ex.: {exemplos}). O ramo de alertas não drenou.",
+          file=sys.stderr)
     return 1
 
 
@@ -295,7 +336,10 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--limite", type=int, default=None)
     pr.set_defaults(func=comando_produzir)
 
-    sub.add_parser("pipeline", help="sobe o pipeline Beam").set_defaults(func=comando_pipeline)
+    pl = sub.add_parser("pipeline", help="sobe o pipeline Beam")
+    pl.add_argument("--execucao", default=None,
+                    help="diretório da execução (D63); sem ele, um novo em data/streaming/execucoes/")
+    pl.set_defaults(func=comando_pipeline)
 
     sub.add_parser(
         "corte", help="imprime o max(event_sequence) da origem — o fim de uma medição"
@@ -310,6 +354,14 @@ def main(argv: list[str] | None = None) -> int:
         help="PID do pipeline; se ele morrer, a espera falha em vez de esgotar o prazo",
     )
     ag.set_defaults(func=comando_aguardar)
+
+    dr = sub.add_parser("drenar", help="espera o ramo de alertas confirmar o que esta execução gravou (D63)")
+    dr.add_argument("--execucao", default=None, help="diretório da execução; sem ele, a mais recente")
+    dr.add_argument("--ate-seq", type=int, default=None)
+    dr.add_argument("--prazo", type=float, default=900.0, help="segundos; esgotado é falha")
+    dr.add_argument("--intervalo", type=float, default=2.0, help="segundos entre leituras")
+    dr.add_argument("--pid", type=int, default=None, help="PID do pipeline; se ele morrer, a espera falha")
+    dr.set_defaults(func=comando_drenar)
 
     args = p.parse_args(argv)
     return args.func(args)

@@ -687,11 +687,11 @@ stream-connector: require-env ## Aplica as declarações de streaming/connectors
 stream-status: require-env ## Estado do conector Debezium e das tarefas
 	@$(STREAM) status
 
-stream-run: require-env ## Sobe o pipeline Beam (primeiro plano; Ctrl-C encerra)
+stream-run: require-env ## Sobe o pipeline Beam (primeiro plano; Ctrl-C encerra); EXECUCAO= o diretório da execução
 	@# Primeiro plano de propósito: job de streaming que sobe em segundo plano
 	@# e morre em silêncio é o pior modo de falha possível — o tópico enche, o
 	@# saldo congela e nada avisa.
-	@$(STREAM) pipeline
+	@$(STREAM) pipeline $(if $(EXECUCAO),--execucao '$(EXECUCAO)')
 
 stream-produce: require-env ## Emite eventos novos no livro da origem; LIMITE=, SEED=
 	@$(STREAM) produzir $(if $(LIMITE),--limite $(LIMITE)) $(if $(SEED),--semente $(SEED))
@@ -705,6 +705,13 @@ stream-corte: require-env ## Imprime o max(event_sequence) da origem — o fim d
 stream-wait: require-env ## Espera o livro quente alcançar ATE_SEQ=; PID= vigia o pipeline, PRAZO=
 	@test -n "$(ATE_SEQ)" || { echo "ERRO: ATE_SEQ= é obrigatório — espera sem corte mediria para sempre."; exit 2; }
 	@$(STREAM) aguardar --ate-seq $(ATE_SEQ) $(if $(PID),--pid $(PID)) $(if $(PRAZO),--prazo $(PRAZO))
+
+stream-drain: require-env ## Espera o ramo de alertas confirmar o que a execução gravou (D63); EXECUCAO=, ATE_SEQ=, PID=, PRAZO=
+	@# Depois do `stream-wait`, que prova o ramo 1, e antes de encerrar o Beam: o ramo de alertas só
+	@# recebe painéis quando o *watermark* fecha as janelas, e encerrar antes perdia os alertas em voo.
+	@# Prazo esgotado é falha.
+	@$(STREAM) drenar $(if $(EXECUCAO),--execucao '$(EXECUCAO)') $(if $(ATE_SEQ),--ate-seq $(ATE_SEQ)) \
+		$(if $(PID),--pid $(PID)) $(if $(PRAZO),--prazo $(PRAZO))
 
 stream-alerts: require-env ## Lê e resume o tópico de alerta de estoque baixo
 	@$(STREAM) alertas $(if $(MOSTRAR),--mostrar $(MOSTRAR)) $(if $(GRUPO),--grupo $(GRUPO))

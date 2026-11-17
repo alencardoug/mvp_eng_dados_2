@@ -427,7 +427,10 @@ if [ -n "$CENARIO" ]; then
 			#     encerrar: ele só saía pelo SIGKILL do prazo. `setsid` separa o
 			#     grupo, mas não restaura a disposição herdada. O `exec` mantém o
 			#     PID que `$!` anota — e que vira o grupo que se encerra.
-			( trap - INT QUIT; exec setsid make --no-print-directory stream-run ) &
+			#     A execução tem diretório próprio (D63): é onde o publicador
+			#     confirma os painéis, e o passo (5b) o lê.
+			EXECUCAO="$RAIZ/data/streaming/execucoes/medir_$(date -u +%Y%m%dT%H%M%SZ)_$$"
+			( trap - INT QUIT; exec setsid make --no-print-directory stream-run EXECUCAO="$EXECUCAO" ) &
 			BEAM=$!
 			FILHOS+=("$BEAM")
 			echo "[medir] pipeline Beam sob guarda: grupo $BEAM"
@@ -448,6 +451,12 @@ if [ -n "$CENARIO" ]; then
 			# (5) espera o livro alcançar o corte, vigiando o pipeline. Se ele
 			#     morrer sob a espera, ela falha em vez de esgotar o prazo.
 			_executar_alvo stream-wait ATE_SEQ="$CORTE" PID="$BEAM" || CODIGO=$?
+		fi
+		if [ "$CODIGO" -eq 0 ]; then
+			# (5b) espera o ramo de alertas confirmar cada painel do que esta
+			#      execução gravou, antes do SIGINT (D63). O livro no corte só prova
+			#      o ramo 1: os alertas saem quando o *watermark* fecha as janelas.
+			_executar_alvo stream-drain EXECUCAO="$EXECUCAO" ATE_SEQ="$CORTE" PID="$BEAM" || CODIGO=$?
 		fi
 		# (6) encerra só o que iniciou, sempre — inclusive quando algo falhou.
 		_encerrar_filhos

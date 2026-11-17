@@ -534,13 +534,15 @@ CENARIO_OK = textwrap.dedent(
     stream-up:
     \t@echo subiu
     stream-run:
-    \t@echo $$$$ > pipeline.pid; sleep 600
+    \t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600
     stream-produce:
     \t@echo "produzi $(LIMITE)" > produziu
     stream-corte:
     \t@cat corte 2>/dev/null || echo 7
     stream-wait:
     \t@echo "esperei ate $(ATE_SEQ) vigiando $(PID)" > esperou
+    stream-drain:
+    \t@test -f esperou && echo "drenei $(EXECUCAO) ate $(ATE_SEQ) vigiando $(PID)" > drenou
     """
 )
 
@@ -635,7 +637,7 @@ def test_o_pipeline_lancado_encerra_pelo_sigint_e_nao_pelo_prazo(tmp_path):
     que nasce assim não instala o `KeyboardInterrupt`: o pipeline não saía no
     SIGINT e só morria no SIGKILL do prazo — com o medidor dizendo 0.
     """
-    makefile = CENARIO_OK.replace("\t@echo $$$$ > pipeline.pid; sleep 600", "\t@python3 pipeline.py")
+    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600', "\t@python3 pipeline.py")
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
     (trabalho / "pipeline.py").write_text(PIPELINE_PYTHON, encoding="utf-8")
 
@@ -653,7 +655,7 @@ def test_o_pipeline_lancado_encerra_pelo_sigint_e_nao_pelo_prazo(tmp_path):
 
 def test_encerramento_forcado_fica_no_registro(tmp_path):
     """O que só sai por SIGKILL não fechou o que abriu — e o registro diz isso."""
-    makefile = CENARIO_OK.replace("\t@echo $$$$ > pipeline.pid; sleep 600", "\t@trap '' INT; sleep 600")
+    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600', "\t@trap '' INT; sleep 600")
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
     ambiente["MEDIR_PRAZO_ENCERRAMENTO"] = "2"
 
@@ -669,7 +671,7 @@ def test_encerramento_forcado_fica_no_registro(tmp_path):
 def test_cenario_propaga_a_falha_de_quem_morre(tmp_path):
     """Pipeline que não sobe é falha da medição, não uma medição de zero."""
     makefile = CENARIO_OK.replace(
-        "\t@echo $$$$ > pipeline.pid; sleep 600", "\t@exit 1"
+        '\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600', "\t@exit 1"
     )
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
 
@@ -680,6 +682,45 @@ def test_cenario_propaga_a_falha_de_quem_morre(tmp_path):
 
     assert r.returncode != 0, r.stdout
     assert not (trabalho / "esperou").exists(), "não se espera o que não subiu"
+
+
+def test_o_ramo_de_alertas_drena_depois_do_livro_e_na_mesma_execucao(tmp_path):
+    """D63: o SIGINT esperava só o ramo 1. A drenagem vem depois do livro no corte, lê a execução
+    que o pipeline registrou e vigia o mesmo pipeline."""
+    ambiente, trabalho = _ambiente(tmp_path, makefile=CENARIO_OK)
+    (trabalho / "corte").write_text("7\n", encoding="utf-8")
+
+    r = subprocess.run(
+        [str(MEDIR), "--cenario", "streaming"],
+        cwd=trabalho, capture_output=True, text=True, env=ambiente, timeout=120,
+    )
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    execucao = (trabalho / "execucao_do_pipeline").read_text(encoding="utf-8").strip()
+    assert "/data/streaming/execucoes/medir_" in execucao
+    drenou = (trabalho / "drenou").read_text(encoding="utf-8")
+    pid = (trabalho / "esperou").read_text(encoding="utf-8").split("vigiando ")[1].strip()
+    assert drenou.strip() == f"drenei {execucao} ate 7 vigiando {pid}"
+
+
+def test_drenagem_que_falha_e_falha_da_medicao_e_o_pipeline_morre_igual(tmp_path):
+    """Prazo esgotado na drenagem não é encerramento limpo: o código propaga, e o encerramento roda."""
+    makefile = CENARIO_OK.replace(
+        '\t@test -f esperou && echo "drenei $(EXECUCAO) ate $(ATE_SEQ) vigiando $(PID)" > drenou',
+        "\t@echo prazo esgotado >&2; exit 1",
+    )
+    ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
+    (trabalho / "corte").write_text("7\n", encoding="utf-8")
+
+    r = subprocess.run(
+        [str(MEDIR), "--cenario", "streaming"],
+        cwd=trabalho, capture_output=True, text=True, env=ambiente, timeout=120,
+    )
+
+    assert r.returncode != 0, r.stdout
+    pid = int((trabalho / "pipeline.pid").read_text(encoding="utf-8"))
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
 
 
 # ── A espera do livro quente: o fim que o pipeline não tem ──────────────────
