@@ -26,7 +26,7 @@ Faker → PostgreSQL → Airbyte → dbt → datamart → consumption     (batch
 |---|---|
 | **Estado** | Continuação do `mvp_eng_dados_1` desde 13/11/2026 ([D92](docs/pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026)). Fase local concluída: `v1.0.0`, em 04/10/2026, e a versão de manutenção `v1.1.0`, em 05/11/2026. A fase GCP (Etapa 13, M6) foi autorizada em 06/11/2026, desmontada em 13/11/2026 e **aceita com ressalvas** no mesmo dia, com o custo real lido em 16/11/2026 — o estado é do [Plano](docs/plano_de_desenvolvimento.md), e o processo, do [Registro da fase GCP](docs/registro_fase_gcp.md). Depois dela, a fase da base dos consumidores (13 a 17/11/2026), aceita em 17/11/2026 com a *tag* `v2.1.0` — o [plano dela](PLANO_base_dos_consumidores.md) |
 | **Stack** | PostgreSQL · Airbyte (em Kubernetes local) · dbt · Airflow · Debezium sobre Kafka Connect · Redpanda · Apache Beam · Terraform · Docker · Python com SQLAlchemy e Alembic |
-| **Escopo** | Na `v1.1.0`: 40 tabelas de origem e uma origem legada defeituosa de propósito; nove camadas no armazém; 10 fatos, 15 dimensões e 16 views de consumo, uma por pergunta de negócio |
+| **Escopo** | Na `v2.1.0`: 40 tabelas de origem e uma origem legada defeituosa de propósito; nove camadas no armazém; 11 fatos, 15 dimensões e 16 views de consumo, uma por pergunta de negócio; um pacote de metadados versionado para os portais que leem este repositório |
 | **Qualidade** | No fim da fase da base dos consumidores (17/11/2026): `make check` verde com `PASS=1079` e 1.734 testes Python, e o armazém com a procedência `verified`. No aceite da `v1.1.0` (05/11/2026): `PASS=907` e 1.079 testes Python; reconciliação em toda fronteira entre camadas; toda coluna classificada por sensibilidade, conferida por igualdade a cada `make check`. O medido de cada etapa está no [Plano](docs/plano_de_desenvolvimento.md) |
 | **Processo** | 33 dias e 306 *commits* do primeiro *commit* à `v1.0.0`; as Etapas 10 a 12 revisadas por um segundo agente, em rodadas até não restar achado |
 | **Reprodutível** | O ciclo inteiro refeito num clone novo e medido passo a passo, e um ponto único de recuperação restaurado de ponta a ponta |
@@ -51,6 +51,10 @@ cada minuto veio. Também fica fora do mapa abaixo.
 2. **GCP** — replicação do fluxo na nuvem, provisionada por Terraform, com a mesma governança
    materializada em *policy tags*. A contrapartida de cada peça local está no
    [mapa de paridade](docs/arquitetura.md#5-mapa-de-paridade-local--gcp).
+3. **Base dos consumidores** — depois do GCP, de volta ao ambiente local: o que os três projetos que leem
+   este repositório precisavam dele — governança completa, pacote de metadados, procedência, chaves e o dado
+   sintético coerente com os significados declarados. Fechada na `v2.1.0`
+   ([plano](PLANO_base_dos_consumidores.md)).
 
 ## Mapa da documentação
 
@@ -75,8 +79,8 @@ Cada assunto tem **um único dono documental**. Se a informação está em dois 
 | [Dicionário de Dados](docs/dicionario_de_dados.md) | Registro: objetos, campos, classificação aplicada e linhagem | **Gerado** pelo `make catalog` |
 | [Glossário de Negócio](docs/glossario_de_negocio/) | Conceitos do varejo e as perguntas de negócio, importados pelo dbt | Vigente |
 | [Glossário Técnico](docs/glossario.md) | Termos de engenharia de dados usados no projeto | Vigente |
-| [Achados do nl_sql](docs/achados_nl_sql.md) | O que o banco de provas NL→SQL (projeto apartado) descobriu e mudou, para replicar aqui com os desvios: falhas deste projeto, melhorias de governança e registro | Em andamento — aberto em 12/11/2026 |
-| [Consumidores](docs/consumidores.md) | Quem lê este repositório (`nl_sql`, `gdados`, `bi-como-codigo`), como lê, como pede o banco, os canais e o que mudou para quem consome | Vigente — aberto em 14/11/2026 |
+| [Achados do nl_sql](docs/achados_nl_sql.md) | O que o banco de provas NL→SQL (projeto apartado) descobriu e mudou, para replicar aqui com os desvios: falhas deste projeto, melhorias de governança e registro | Vigente — aberto em 12/11/2026; de F1 a F30, cada achado com o que foi feito dele até a `v2.1.0` |
+| [Consumidores](docs/consumidores.md) | Quem lê este repositório (`nl_sql`, `gdados`, `bi-como-codigo`), como lê, como pede o banco, os canais e o que mudou para quem consome | Vigente — aberto em 14/11/2026; o marco a fixar é a `v2.1.0` (§6) |
 | [Pacote de Metadados](docs/pacote_de_metadados.md) | O contrato do pacote da D91 que os portais leem: formato, campos, regras, [esquema](docs/pacote_de_metadados.schema.json) e [exemplo](docs/pacote_de_metadados.exemplo.json) | Formato 1, gerado pelo `make catalog` desde 14/11/2026 |
 | [Pendências do Owner](docs/pendencias.md) | O que está parado esperando decisão sua, em ordem de urgência | Decisões: 3 pendentes; verificações e trabalho: 6 adiadas, em 17/11/2026. Quais são, no cabeçalho das [Pendências](docs/pendencias.md) |
 | [Registro de Decisões](docs/adr/) | ADRs aceitos e decisões ainda pendentes | 56 aceitos, 1 pendente (D43, adiada) |
