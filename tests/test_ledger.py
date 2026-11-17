@@ -283,6 +283,26 @@ def test_a_restauracao_abre_a_sua_epoca_depois_da_conferencia_e_antes_da_captura
     assert "mvp_ed1.recovery.ledger baseline" in next(l for l in texto.splitlines() if l.startswith("LIVRO_LINHA_DE_BASE ="))
 
 
+
+def test_a_restauracao_registra_o_tratamento_da_epoca_que_abre() -> None:
+    """V7: o passo 8 construía a quarentena da captura sem registrar o tratamento na época aberta.
+
+    No ciclo do Bloco 5R, a época 4 ficou sem o registro do tratamento da captura 76 até a revisão do
+    fechamento apontar (RVFC-1-02). O registro vem depois do `dbt-rebuild`, que constrói a quarentena,
+    e antes do `check`, que é o próximo *build*; e depois da época aberta, porque é nela que ele cai.
+    """
+    from test_makefile import RAIZ, _receitas
+
+    passos = _receitas((RAIZ / "Makefile").read_text(encoding="utf-8"))["recovery-restore"]
+
+    def onde(trecho: str) -> int:
+        return next(i for i, l in enumerate(passos) if trecho in l)
+
+    registro = onde("ledger-treatment NOME=")
+    assert passos.index("$(LIVRO_LINHA_DE_BASE)") < onde("dbt-rebuild") < registro < onde("$(MAKE) --no-print-directory check")
+    assert "FORCE" not in passos[registro], "o registro não é descarte: não leva FORCE"
+    assert sum("ledger-treatment" in l for l in passos) == 1
+
 @pytest.mark.integracao
 def test_o_registro_de_tratamento_da_a_fatia_da_quarentena(armazem) -> None:
     """Independente da classificação: as rejeitadas da fatia corrente somam o que a quarentena tem nela."""

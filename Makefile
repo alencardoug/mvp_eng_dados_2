@@ -803,6 +803,10 @@ recovery-restore: require-env require-venv ## A sequência de restauração, pas
 	@rm -f "$(RECOVERY_JOB)"
 	@$(MAKE) --no-print-directory sync-legacy JOB_EM="$(RECOVERY_JOB)"
 	@$(MAKE) --no-print-directory dbt-rebuild
+	@# V7: a quarentena da captura acabou de ser construída, e a época aberta neste passo registra o
+	@# tratamento dela antes de qualquer outro *build*. Sem o registro, um tratamento que o substituísse
+	@# deixaria a fatia sem explicação na T3. O nome é único porque cada restauração abre a sua época.
+	@$(MAKE) --no-print-directory ledger-treatment NOME=recovery_restore_tratamento.json
 	@$(MAKE) --no-print-directory check
 	@echo "── 9/9 oráculos explícitos ──"
 	@job=$$(cat "$(RECOVERY_JOB)" 2>/dev/null); [ -n "$$job" ] || { \

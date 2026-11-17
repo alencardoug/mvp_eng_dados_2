@@ -761,7 +761,9 @@ confunde com uma restauração.
    ([ADR-0050](adr/0050-guardar-a-memoria-do-legado-num-livro-retido.md)) — sem ela, a recuperação
    pararia na memória que a restauração substituiu, e uma restauração repetida abre outra;
    reconstrói com `dbt-rebuild` — **nunca**
-   `dbt-build RESET=1`, que derrubaria o histórico SCD que acabou de voltar — e roda o `check`;
+   `dbt-build RESET=1`, que derrubaria o histórico SCD que acabou de voltar —; registra na época aberta
+   o tratamento da captura que o *rebuild* acabou de construir (`ledger-treatment`, V7), antes de qualquer
+   outro *build*; e roda o `check`;
 9. confere os oráculos explícitos: as fontes iguais ao manifesto, a memória contida e intacta, a
    captura nova certificada acima da retida, a auditoria dela igual ao que a classificação rejeitou,
    a memória de exclusões renascida igual e o livro da origem inteiro e igual nos dois caminhos.
