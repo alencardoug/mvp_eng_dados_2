@@ -94409,20 +94409,6 @@
   },
   "open_items": [
     {
-      "anchor": "docs/pendencias.md#d63--o-medidor-do-streaming-encerra-o-beam-antes-de-o-ramo-de-alerta-drenar",
-      "id": "D63",
-      "objects": null,
-      "state": "pending",
-      "title": "o medidor do *streaming* encerra o Beam antes de o ramo de alerta drenar"
-    },
-    {
-      "anchor": "docs/pendencias.md#d64--a-chave-fernet-do-airflow-gerada-pelo-projeto-é-inválida",
-      "id": "D64",
-      "objects": null,
-      "state": "pending",
-      "title": "a chave Fernet do Airflow gerada pelo projeto é inválida"
-    },
-    {
       "anchor": "docs/pendencias.md#d43--a-guarda-de-identidade-como-função-no-armazém-adiada-em-16092026",
       "id": "D43",
       "objects": null,
@@ -94907,7 +94893,7 @@
       "tests/test_verificador_adr.py",
       "tests/test_vigencia_em_utc.py"
     ],
-    "inputs_sha256": "82e0f54b0bd07557729464bab7bf587d54d0b1ad241b091ac741114839110591",
+    "inputs_sha256": "96e7d28c1fefb6603a6faf51ea2ac38a2d443e126324273beac29fb9ac049738",
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {

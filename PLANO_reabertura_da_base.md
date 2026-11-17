@@ -47,8 +47,11 @@ Pendências, ADR, especificação do pacote, Consumidores.
 
 1. Registrar o F31 a F34 nos [Achados](docs/achados_nl_sql.md), pela regra de entrada (Consumidores
    §4), cada um com a origem (o consumidor que o levantou) e este plano como destino.
-2. Uma linha `prevista` em Consumidores §5 para cada mudança que alcança um consumidor: o dado das 16 views
-   (itens 1, 2 e 7), o pacote (itens 3 a 6) e os textos (itens 12 a 15).
+2. Uma linha `prevista` em Consumidores §5 para cada mudança de **esquema**: os campos novos do pacote (itens 6 e
+   16). A regra da seção (A sequência de uma linha) faz valor e texto entrarem uma vez só, já `feita`. Por isso o
+   dado das 16 views (itens 1, 2 e 7), as descrições (item 3), a nota do custo (item 4), a especificação
+   (item 5) e os textos (itens 12 a 15) entram no fim, com o *commit* e o *build*. O que está previsto mudar de
+   valor fica apontado para este plano no texto da seção.
 3. Abrir a D93 nas Pendências para o item 1. A decisão vira ADR se a forma da Q64 pedir.
 4. O README passa a apontar para este plano no estado do projeto.
 

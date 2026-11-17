@@ -13,59 +13,23 @@
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
 | Verificações e trabalho adiados | 6 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026; V6, o Python que aborta no desligamento do pipeline do *streaming*, registrada em 17/11/2026; V7, a restauração que não registra o tratamento na época que abre, registrada em 17/11/2026) |
-| Decisões pendentes | 3 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2` e a D66 na fase da base dos consumidores (§2) |
-| Última revisão | 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Decisões pendentes | 1 (D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D63 e a D64, levantadas em 04/10/2026, foram respondidas em 17/11/2026 e esperam a implementação na reabertura da base (§2). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2`, a D66 na fase da base dos consumidores, e a D63, a D64 e a D93 na reabertura da base (§2) |
+| Última revisão | 17/11/2026 — a reabertura da base: D63 e D64 respondidas, V5 a V7 incluídas, D93 decidida (§2); 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
 ## 1. Esperando você
 
-As duas primeiras nasceram da validação do material de estudo da fase local, em 04/10/2026, que
-rodou cada laboratório na máquina. Nada foi alterado no código; as saídas estão em
-`data/medicoes/material_estudo/` (fora do Git), e o relato inteiro, na §15 de
-[`CONVERSAS_COM_CHAT/PLANO_material_de_estudo.md`](../CONVERSAS_COM_CHAT/PLANO_material_de_estudo.md),
-onde aparecem como achados A a C. O B, a contagem dupla no saldo do alerta, foi a D62, fechada no
-G2.3 da Etapa 13 (§2). O achado D, a venda antes do lançamento, foi a D65, fechada pela
-v1.1.0 (§2).
+A D63 e a D64 nasceram da validação do material de estudo da fase local, em 04/10/2026, que rodou cada
+laboratório na máquina. As saídas estão em `data/medicoes/material_estudo/` (fora do Git), e o relato inteiro,
+na §15 de [`CONVERSAS_COM_CHAT/PLANO_material_de_estudo.md`](../CONVERSAS_COM_CHAT/PLANO_material_de_estudo.md),
+onde aparecem como achados A a C. O B, a contagem dupla no saldo do alerta, foi a D62, fechada no G2.3 da
+Etapa 13 (§2). O achado D, a venda antes do lançamento, foi a D65, fechada pela v1.1.0 (§2). **A D63 e a D64
+foram respondidas pelo Owner em 17/11/2026** e estão no §2, com a implementação no
+[plano da reabertura](../PLANO_reabertura_da_base.md), Bloco 1.
 
-### D63 — o medidor do *streaming* encerra o Beam antes de o ramo de alerta drenar
-
-**Pergunta:** o que `make medir CENARIO=streaming` deve esperar antes do SIGINT, e a restauração deve
-reposicionar o *offset* do grupo do Beam?
-
-**Medido em 04/10/2026.** O medidor espera o destino alcançar o corte (`stream-wait`, ramo 1) e
-encerra o Beam; os alertas saem do ramo 2, que só recebe painéis quando o *watermark* fecha as
-janelas. Com `LIMITE=2200`, zero alertas e nenhuma linha "saldo semeado" no *log*, contra cerca de
-60 aberturas que um oráculo por janela, em SQL, previa. Repetido com 200 eventos e 90 s de espera: 8
-alertas logo em seguida, e 14 alguns minutos mais tarde. O *offset* confirmado do grupo `mvp_ed1_beam` era 6009, num tópico
-cujo *log* começa em 13700 — estado deixado pela restauração de 25/09 —, e o Beam releu 13.700
-mensagens antes das novas. O "11 alertas" da linha 6 do B5 também dependeu de tempo.
-
-*Opções:* **(a)** esperar, com prazo, um sinal do ramo de alerta (o *watermark* passar do maior tempo
-de evento produzido, ou o contador `alertas_emitidos` estabilizar) e, na restauração, reposicionar o
-grupo no início do *log* ao refazer o *snapshot* — recomendada; **(b)** uma espera fixa depois do
-`stream-wait`; **(c)** só documentar que o medidor não mede alertas.
-
-*Efeito de não decidir:* a contagem de alertas de uma medição não é reproduzível, e o oráculo de
-alerta do roteiro pode passar ou falhar por tempo.
-
-### D64 — a chave Fernet do Airflow gerada pelo projeto é inválida
-
-**Pergunta:** corrigir a geração da `AIRFLOW_FERNET_KEY` e trocar a chave desta máquina?
-
-**Medido em 04/10/2026.** `airflow connections add` e `airflow variables set` falham com
-`Could not create Fernet object: Fernet key must be 32 url-safe base64-encoded bytes`. O `Makefile`
-gera a chave com 32 caracteres alfanuméricos, em `make env` e em `airflow-up`;
-o Airflow exige 32 bytes em base64 seguro para URL (44 caracteres). Nunca apareceu porque nada no
-projeto grava Connection nem Variable.
-
-*Opções:* **(a)** gerar nos dois lugares com `head -c 32 /dev/urandom | base64 | tr '+/' '-_'`, sem
-pré-requisito novo, com teste em `test_makefile.py`, e trocar a chave desta máquina recriando os
-contêineres do Airflow — sem dado cifrado a perder, porque nada foi gravado — recomendada; **(b)**
-só documentar a limitação.
-
-*Efeito de não decidir:* nenhum no fluxo atual; qualquer uso futuro de Connections ou Variables
-falha.
+Na mesma data, o Owner **incluiu a V5, a V6 e a V7 na reabertura da base**. As três ficam aqui até a
+implementação ser aceita, cada uma com o bloco do plano.
 
 ### D43 — a guarda de identidade como função no armazém (adiada em 16/09/2026)
 
@@ -283,6 +247,9 @@ delas dependem), com a sua revisão integral, e regerar as duas origens. Decidid
 *Efeito de não decidir:* a P11 responde com um giro que nenhuma operação real teria; a ordem entre os
 pares continua informativa, o nível não.
 
+**Reaberta em 17/11/2026 pelo Owner:** entra na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 2 e 5). A meta é uma faixa
+declarada para a mediana trimestral da P11, fixada pelo Owner depois da medida em memória (Q67).
+
 ### V6 — o Python aborta no desligamento do pipeline do *streaming* (registrada em 17/11/2026)
 
 **Pergunta:** quando investigar? No ciclo do Bloco 5R (diário, C3, E8 e o passo 7 da G7), o SIGINT ao pipeline
@@ -299,6 +266,9 @@ alertas drenar).
 *Efeito de não decidir:* um arquivo de núcleo nos encerramentos em que acontece, e um código de saída que não é o
 do encerramento limpo para quem chamar o `make stream-run` direto.
 
+**Incluída em 17/11/2026** na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 1 e 5): primeiro a medida, depois a correção. Se a
+causa não aparecer, volta ao Owner com a medida.
+
 ### V7 — a restauração não registra o tratamento na época que abre (registrada em 17/11/2026)
 
 **Pergunta:** quando acrescentar o registro? O `make recovery-restore` abre uma época nova do livro retido antes
@@ -310,6 +280,8 @@ que a Q51 aceitou como exceção.
 
 *Efeito de não decidir:* depois de cada restauração, o operador precisa lembrar do `make ledger-treatment` antes
 de qualquer outra captura ou *build*.
+
+**Incluída em 17/11/2026** na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 1 e 5).
 
 ## 1.1 Decididas e implementadas
 
@@ -406,6 +378,70 @@ cada lote e estão no histórico em `28044c7^`, `20ea4f3^` e `4cf41ff^`.
 ---
 
 ## 2. Decisões já fechadas
+
+### D93 — os eventos do exercício de *streaming* saem do estado publicado (decidida em 17/11/2026)
+
+**Pergunta:** como tirar do estado publicado os eventos que o `make stream-produce` grava na origem, e que a `v2.1.0`
+levou às views ([F31](achados_nl_sql.md#f31--os-eventos-do-exercício-de-streaming-chegam-às-views--gravidade-alta))?
+
+*Opções e motivos:* na Q64 do [plano da reabertura](../PLANO_reabertura_da_base.md).
+
+**Decidida em 17/11/2026: a forma (e).** O exercício roda **antes** da regeneração, sobre o estado que ela descarta.
+Depois de regenerar, publica-se sem produtor. Guardas no estado publicado reprovam o `check` se houver movimento
+depois da `as_of_date` ou saída por venda sem remessa (no legado, pela Q72). Não muda o contrato do evento nem a
+restauração, e por isso não há ADR de tratamento de dados. Apagar linhas, trocar células e estorno foram
+descartados (motivos na Q64).
+
+**Condição:** a conferência de resíduo zero do Bloco 5. Se a sequência de descarte não tirar os eventos do armazém,
+a forma passa à (b), com ADR. **O custo aceito:** a base publicada não prova a entrega de eventos vivos, as
+transições de alerta, a parcela quente da P12 nem o avanço incremental depois deles. Os quatro ficam provados no
+exercício, sobre a base descartada. **Na fase GCP:** a (c), um produtor com eventos coerentes com o domínio, é o
+caminho se um dia ele simular operação continuada.
+
+### D63 — o medidor do *streaming* encerra o Beam antes de o ramo de alerta drenar (decidida em 17/11/2026)
+
+**Pergunta:** o que `make medir CENARIO=streaming` deve esperar antes do SIGINT, e a restauração deve
+reposicionar o *offset* do grupo do Beam?
+
+**Medido em 04/10/2026.** O medidor espera o destino alcançar o corte (`stream-wait`, ramo 1) e
+encerra o Beam; os alertas saem do ramo 2, que só recebe painéis quando o *watermark* fecha as
+janelas. Com `LIMITE=2200`, zero alertas e nenhuma linha "saldo semeado" no *log*, contra cerca de
+60 aberturas que um oráculo por janela, em SQL, previa. Repetido com 200 eventos e 90 s de espera: 8
+alertas logo em seguida, e 14 alguns minutos mais tarde. O *offset* confirmado do grupo `mvp_ed1_beam` era 6009, num tópico
+cujo *log* começa em 13700 — estado deixado pela restauração de 25/09 —, e o Beam releu 13.700
+mensagens antes das novas. O "11 alertas" da linha 6 do B5 também dependeu de tempo.
+
+*Opções:* **(a)** esperar, com prazo, um sinal do ramo de alerta (o *watermark* passar do maior tempo
+de evento produzido, ou o contador `alertas_emitidos` estabilizar) e, na restauração, reposicionar o
+grupo no início do *log* ao refazer o *snapshot* — recomendada; **(b)** uma espera fixa depois do
+`stream-wait`; **(c)** só documentar que o medidor não mede alertas.
+
+*Efeito de não decidir:* a contagem de alertas de uma medição não é reproduzível, e o oráculo de
+alerta do roteiro pode passar ou falhar por tempo.
+
+**Respondida em 17/11/2026: (a)**, na forma que a revisão do plano fixou (Q65 do [plano da reabertura](../PLANO_reabertura_da_base.md), Bloco 1). Os dois sinais
+da opção acima não provam a drenagem. Em lugar deles: uma confirmação por janela concluída, também sem alerta; a
+entrega confirmada do alerta; e a espera pelo que a execução inseriu, com prazo esgotado como falha.
+
+### D64 — a chave Fernet do Airflow gerada pelo projeto é inválida (decidida em 17/11/2026)
+
+**Pergunta:** corrigir a geração da `AIRFLOW_FERNET_KEY` e trocar a chave desta máquina?
+
+**Medido em 04/10/2026.** `airflow connections add` e `airflow variables set` falham com
+`Could not create Fernet object: Fernet key must be 32 url-safe base64-encoded bytes`. O `Makefile`
+gera a chave com 32 caracteres alfanuméricos, em `make env` e em `airflow-up`;
+o Airflow exige 32 bytes em base64 seguro para URL (44 caracteres). Nunca apareceu porque nada no
+projeto grava Connection nem Variable.
+
+*Opções:* **(a)** gerar nos dois lugares com `head -c 32 /dev/urandom | base64 | tr '+/' '-_'`, sem
+pré-requisito novo, com teste em `test_makefile.py`, e trocar a chave desta máquina recriando os
+contêineres do Airflow — sem dado cifrado a perder, porque nada foi gravado — recomendada; **(b)**
+só documentar a limitação.
+
+*Efeito de não decidir:* nenhum no fluxo atual; qualquer uso futuro de Connections ou Variables
+falha.
+
+**Respondida em 17/11/2026: (a)** (Q66 do [plano da reabertura](../PLANO_reabertura_da_base.md), Bloco 1).
 
 ### D66 — a P13 passa a ler uma fato no grão da remessa (decidida em 14/11/2026)
 

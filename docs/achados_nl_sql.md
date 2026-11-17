@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 17/11/2026 (F31 a F34, dos consumidores na `v2.1.0`, com destino no [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -487,6 +487,56 @@ inventário.
   são regenerados dele. O `make dbt-build` de 16/11/2026 retratou a captura de então sob a versão 10 com o mesmo
   resultado linha a linha; o lote novo (`9ecb9fe1…`) chegou com o ciclo do Bloco 5R, em 17/11/2026, tratado sob a
   versão 10, e a reserva que vence depois do corte não é mais rejeitada.
+
+### F31 a F34 — o que os consumidores acharam na `v2.1.0` (17/11/2026)
+
+Os quatro vieram dos consumidores, cada um pelo seu canal (Consumidores §4), depois da `v2.1.0`. A correção
+de cada um está no [plano da reabertura](../PLANO_reabertura_da_base.md), que diz o bloco. Aqui fica só o defeito.
+
+### F31 — Os eventos do exercício de *streaming* chegam às views · **Gravidade: alta**
+
+- **Origem:** `bi-como-codigo`, UQ-16 (`docs/upstream_questions.md`, 17/11/2026).
+- **Evidência:** no ciclo de 17/11/2026, o `make stream-produce LIMITE=2200` (diário do Bloco 5R, E4, 02:57 UTC)
+  gravou 2.200 eventos no livro da origem, com a data do relógio e depois da `as_of_date` (2026-09-01). A
+  sincronização e o `dbt-build` da E9 (03:05) os levaram ao `analytics`. O produtor também move
+  `oltp.inventory_balances` (`streaming/producer.py`, `_mover_saldo`). O BI mediu 984 movimentos `sale` sem
+  pedido, R$ 6.604.745,09 de custo na P08 de novembro, 17.555 unidades de saída na P11 de 2026-T4 e o saldo
+  −7 do SKU-0000030 no CD São Paulo, na P12. A revisão do plano recalculou o custo, as saídas e o saldo sobre as
+  capturas do BI, sem medida nova no armazém. O vínculo de venda da consulta do BI não é o que o gerador grava (plano,
+  Bloco 2, item 4), e os 984 ainda não foram recontados pelo vínculo certo.
+- **Efeito:** a P08, a P11 e a P12 da `v2.1.0` respondem com movimentos de um exercício de teste, datados
+  depois do corte.
+- **Aqui:** a D93 (forma (e) da Q64): o exercício roda antes da regeneração, sobre o estado que ela descarta, e
+  uma guarda reprova o estado publicado que o tiver. Plano, Blocos 2 e 5.
+
+### F32 — As relações sem descrição não têm guarda · **Gravidade: média**
+
+- **Origem:** `gdados`, `docs/alinhamento_entre_projetos.md` §7 (17/11/2026).
+- **Evidência:** o pacote em `eb11709` lista 123 relações sem descrição (`description_gaps` com `column` nulo):
+  40 em `raw_legacy`, 30 em `raw`, 29 em `trusted`, 19 em `staging`, 4 em `snapshots` e 1 em `quarantine`. O
+  [Dicionário de Dados](dicionario_de_dados.md) §1.1 diz que objeto sem descrição bloqueia a etapa, mas
+  `tests/test_descricao.py` só conta colunas. O "141 → 0" de Consumidores §5 é das colunas.
+- **Efeito:** o portal mostra 123 relações em branco, e nada impede a próxima.
+- **Aqui:** as descrições no dono declarativo de cada grupo, e a guarda com teto zero. Plano, Bloco 3.
+
+### F33 — A nota do custo do GCP está desatualizada no pacote · **Gravidade: baixa**
+
+- **Origem:** `gdados`, §7 (17/11/2026).
+- **Evidência:** a entrada `registro_fase_gcp` de `environments` diz "o custo real entra quando o faturamento
+  fechar" (`models/pacote.py:97` e o exemplo do pacote). O custo foi lido em 16/11/2026
+  ([Capacidade](capacidade_e_recuperacao.md) §2.14), e `environments` não tem entrada para esse documento.
+- **Efeito:** o portal diz que o custo não foi lido.
+- **Aqui:** a nota atualizada e a entrada nova. Plano, Bloco 4.
+
+### F34 — O destino das chaves estrangeiras fica fora do pacote · **Gravidade: média**
+
+- **Origem:** `gdados@52c4359`, §7 (17/11/2026).
+- **Evidência:** em `eb11709`, os 76 testes `relationships` do pacote trazem a relação e a coluna testadas, mas
+  não as referenciadas. As 26 PKs e as 58 FKs de `analytics` ([ADR-0056](adr/0056-chaves-declaradas-em-analytics.md))
+  não estão no pacote.
+- **Efeito:** a página de estrutura do `gdados` não desenha o diagrama entidade-relacionamento.
+- **Aqui:** `relations.*.primary_key` e `relations.*.foreign_keys`, derivados pela mesma regra que instala as
+  chaves (`dbt/macros/chaves.sql`), e o destino em cada `relationships`. Campos novos, formato 1. Plano, Bloco 4.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
