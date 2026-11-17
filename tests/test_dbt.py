@@ -110,6 +110,24 @@ def test_as_of_date_do_dbt_bate_com_a_do_gerador(config, projeto_dbt) -> None:
     assert str(projeto_dbt["vars"]["period_start"]) == config.period_start.isoformat()
 
 
+def test_as_janelas_e_o_mapa_das_guardas_batem_com_os_do_gerador(config, projeto_dbt) -> None:
+    """As guardas das invariantes 15 e 19 leem do `dbt_project.yml` o que o gerador declara.
+
+    O mesmo arranjo do `as_of_date`: o dono é o `geracao.yml`, e o espelho que
+    divergisse faria a guarda do armazém conferir outra regra que não a do gerador.
+    """
+    espelho = projeto_dbt["vars"]
+    vendas = config.tabelas["orders"].processo
+    assert espelho["active_customer_window_days"] == vendas["cliente_inativo_sem_compra_dias"]
+    assert espelho["off_sale_window_days"] == vendas["variante_fora_de_venda_sem_venda_dias"]
+    codigos = config.tabelas["payment_transactions"].processo["codigo_de_retorno"]
+    assert {resultado: set(lista) for resultado, lista in espelho["gateway_codes_by_result"].items()} == {
+        "succeeded": {str(codigos["succeeded"])},
+        "pending": {str(codigos["pending"])},
+        "failed": {str(codigo) for codigo in codigos["failed"]},
+    }
+
+
 #: Fontes de `raw` que **não** vêm do Airbyte. Desde a Etapa 7 há uma: o
 #: caminho quente escreve os próprios deltas em `raw` (ADR-0031), e o `staging`
 #: os lê como qualquer outra fonte da camada. A lista é explícita de propósito —

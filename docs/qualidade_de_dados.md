@@ -220,7 +220,7 @@ A data de entrega vem do livro `delivery_events`; `shipments.delivered_at` é co
 
 | Teste | O que prova |
 |---|---|
-| `entrega_projetada_tem_evento_no_livro` | A coluna e o livro não divergem — e quando divergirem, a remessa está em `quarantine.rejected_shipment_deliveries`, com código e motivo, não descartada |
+| `entrega_projetada_tem_evento_no_livro` | A coluna e o livro não divergem — e quando divergirem, a remessa está em `quarantine.rejected_shipment_deliveries`, com código e motivo, não descartada. No legado, a divergência é tolerada só onde a quarentena do tratamento corrente tem o evento `delivered` rejeitado daquela remessa — a falha deliberada do catálogo (Q62 do [plano](../PLANO_base_dos_consumidores.md)); no varejo, nunca |
 | `pedido_dividido_fecha_na_ultima_remessa` | O ciclo de entrega do pedido nunca é menor que a chegada de qualquer remessa dele, e só é declarado fechado quando **todas** chegaram ([ADR-0033](adr/0033-entrega-medida-em-dois-graos.md)) |
 | `remessa_leva_ao_menos_um_item` | Invariante 13, bloqueante após o conserto da D31; evita a remessa sem representação na fato de itens |
 | `invariante_10_causalidade_das_datas` | Nenhuma etapa do ciclo antecede a anterior, incluindo a promessa de prazo, que é feita **no** despacho |
@@ -238,6 +238,35 @@ No mesmo universo de entregues, `sum(delivered_count)` em P13 e
 eram 3.141 e 3.221 respectivamente. O novo número não é uma subtração das remessas vazias: o
 efeito da geração sobre os dados dependentes foi medido, como registra
 [Capacidade §2.7](capacidade_e_recuperacao.md#27-re-medição-da-d31--05092026).
+
+### 4.4 As invariantes 15 a 20 no armazém
+
+As regras que o Bloco 5R do [plano da base dos consumidores](../PLANO_base_dos_consumidores.md) pôs
+no gerador têm cada uma a sua guarda sobre `trusted`, nas duas origens. Cada guarda declara no
+cabeçalho o achado da fila que confere.
+
+| Teste | Achado | O que prova |
+|---|---|---|
+| `invariante_15_cadastro_respeitado_no_tempo` | F24 | Nenhum pedido nem carrinho identificado de cliente `pending` ou `blocked`, nenhum item de produto `draft`; `inactive`, `discontinued` e variante inativa sem venda dentro da janela |
+| `invariante_16_extravio_so_em_transito` | F25 | Remessa `lost` só em pedido `shipped` |
+| `invariante_17_livro_do_chamado_acompanha_o_estado` | F26 | A resolução no livro, a reabertura depois dela, o reaberto `in_progress`, e `closed_at` exatamente no `closed` |
+| `invariante_18_reserva_e_de_um_item_da_origem` | F27 | A reserva é do SKU e da quantidade de um item do carrinho ou do pedido dela, uma por item, em armazém que movimentou o SKU |
+| `invariante_19_codigo_do_adquirente_segue_o_resultado` | F22, F29 | O código de retorno pertence ao conjunto do resultado da transação |
+| `invariante_20_saida_com_lastro_desde_a_abertura` | V4 | Nenhum ajuste criado para cobrir uma saída; uma abertura por par, no começo do período e na versão 1; saldo corrido nunca negativo — só na carga histórica, até o corte inclusive |
+
+As janelas da 15 e o mapa da 19 são espelhos, em `vars` do `dbt_project.yml`, dos parâmetros do
+gerador; um teste do `pytest` confere a igualdade, como no `as_of_date`. A 15 e a 18 leem `staging` e
+`trusted` e levam a etiqueta `fronteira` (§7). No legado, a 17, a 18 e a 20 toleram a diferença só onde a
+quarentena a explica (§5): a 17, só com um evento `resolved` rejeitado do chamado; a 18, só quando a origem
+da reserva não tem item nenhum daquele SKU; a 20, no par com movimento rejeitado — a mais larga das três, e
+cada par exonerado se confere um a um no ciclo.
+
+**Sobre o dado de antes do ciclo do Bloco 5R elas falham por desenho**, e por isso vivem no ramo
+`bloco-5r` até o ciclo. Medido no armazém em 16/11/2026, antes dele: a 16 acusa 13 remessas; a 17, 14
+reaberturas sem resolução e 13 chamados encerrados sem o evento; a 20, 1.792 ajustes no varejo e 59 no
+legado — os números dos achados. **O resultado sobre o dado novo está pendente**, e é critério de
+conclusão do bloco.
+
 
 ---
 

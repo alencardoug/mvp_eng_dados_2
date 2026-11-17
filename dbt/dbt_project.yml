@@ -54,6 +54,17 @@ vars:
   active_customer_window_days: 180
   repeat_purchase_window_days: 90
 
+  # Espelhos de parâmetros do gerador para as guardas das invariantes 15 e 19
+  # (`dbt/tests/`). O dono dos valores é `src/mvp_ed1/generator/geracao.yml` —
+  # `variante_fora_de_venda_sem_venda_dias` e `codigo_de_retorno` —, e um teste
+  # do `pytest` confere que são iguais, como no `as_of_date`. A janela do
+  # cliente inativo é a do cliente ativo, logo acima.
+  off_sale_window_days: 90
+  gateway_codes_by_result:
+    succeeded: ['00']
+    pending: ['GW-OK']
+    failed: ['05', '51', '57', '91', 'GW-TIMEOUT']
+
   # Horizonte do calendário além do "hoje" da simulação.
   #
   # `dim_date` ia até `as_of_date`, e o caminho quente da Etapa 7 produz evento
