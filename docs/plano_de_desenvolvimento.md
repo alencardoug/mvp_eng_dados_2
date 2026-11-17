@@ -364,7 +364,8 @@ o relato, o [Registro da fase GCP](registro_fase_gcp.md).*
 *Sem número de etapa: depois do M6, a fase que completa o que os três projetos que leem este repositório —
 `gdados`, `nl_sql` e `bi-como-codigo` — precisam dele. O plano, as decisões (Q1 a Q63), as rodadas de revisão e
 o diário do ciclo de regeneração vivem no [plano da fase](../PLANO_base_dos_consumidores.md); aqui fica o que este
-repositório precisa saber dela. **Fechamento proposto em 17/11/2026, à espera do aceite do Owner.***
+repositório precisa saber dela. **Aceita pelo Owner em 17/11/2026**, depois de duas rodadas de revisão do
+fechamento por outro agente, com o declarativo final da fase.*
 
 | | |
 |---|---|
@@ -372,9 +373,9 @@ repositório precisa saber dela. **Fechamento proposto em 17/11/2026, à espera 
 | **Pré-requisito** | M6 |
 | **Decisões** | [ADR-0053](adr/0053-fato-no-grao-da-remessa.md) — a P13 no grão da remessa · [ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md) — a procedência do armazém · [ADR-0055](adr/0055-dominios-e-metricas-declarados-uma-vez.md) — domínios e métricas declarados uma vez · [ADR-0056](adr/0056-chaves-declaradas-em-analytics.md) — as chaves de `analytics` · as perguntas Q1 a Q63, no §6 do plano da fase |
 | **Critérios de conclusão** | As 16 views auditadas contra referências independentes ✓, de novo sobre o dado regerado; o pacote de metadados publicado, com domínios, métricas, montagem das views e procedência ✓; as chaves como *constraints* ✓, provadas com o `RESET=1`; o gerador corrigido, com as invariantes 15 a 20 e a guarda de cada uma no armazém ✓; a regeneração das duas origens com a memória mantida e o pacote de recuperação refeito, restaurado e promovido ✓ ([Capacidade §2.15](capacidade_e_recuperacao.md#215-a-regeneração-do-bloco-5r-medida--17112026)); `make check` verde e a procedência `verified` ✓ |
-| **Limitações declaradas** | O BigQuery (L9): as descrições curtas e as *constraints* `NOT ENFORCED` nunca foram aplicadas lá; o "antes" das 16 views na regeneração, pela Q63 (Consumidores §5); as exceções de quarentena das guardas 17 e 20 contra um lote que as exercite de verdade; o *retry* que reconstrói uma dimensão e o órfão, no armazém real; a V4 a fechar, a V5 a V7 em aberto ([Pendências](pendencias.md)) |
+| **Limitações declaradas** | O BigQuery (L9): as descrições curtas e as *constraints* `NOT ENFORCED` nunca foram aplicadas lá; o "antes" das 16 views na regeneração, pela Q63 (Consumidores §5); as exceções de quarentena das guardas 17 e 20 contra um lote que as exercite de verdade; o *retry* que reconstrói uma dimensão e o órfão, no armazém real; a **época 2 do livro retido encerrada com duas diferenças declaradas** (Q51) — a fatia da captura 67 sob o catálogo 9 sem registro de tratamento, igual linha a linha à do catálogo 10, e as migrações `0003` e `0004` de `governance` fora da linha de base —, sem edição da época; a V5 a V7 em aberto ([Pendências](pendencias.md)) |
 | **Para os consumidores** | O que mudou, em [Consumidores §5](consumidores.md#5-o-que-mudou-para-quem-consome); o *commit* a fixar, no §6 |
-| **Versão** | *Tag* `v2.1.0` (Q5) no *commit* do aceite |
+| **Versão** | *Tag* `v2.1.0` (Q5) no *commit* do aceite, 17/11/2026 |
 
 ---
 

@@ -24,7 +24,7 @@ Faker → PostgreSQL → Airbyte → dbt → datamart → consumption     (batch
 
 | | |
 |---|---|
-| **Estado** | Continuação do `mvp_eng_dados_1` desde 13/11/2026 ([D92](docs/pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026)). Fase local concluída: `v1.0.0`, em 04/10/2026, e a versão de manutenção `v1.1.0`, em 05/11/2026. A fase GCP (Etapa 13, M6) foi autorizada em 06/11/2026, desmontada em 13/11/2026 e **aceita com ressalvas** no mesmo dia, com o custo real lido em 16/11/2026 — o estado é do [Plano](docs/plano_de_desenvolvimento.md), e o processo, do [Registro da fase GCP](docs/registro_fase_gcp.md). Depois dela, a fase da base dos consumidores (13 a 17/11/2026), com a `v2.1.0` proposta ao aceite do Owner — o [plano dela](PLANO_base_dos_consumidores.md) |
+| **Estado** | Continuação do `mvp_eng_dados_1` desde 13/11/2026 ([D92](docs/pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026)). Fase local concluída: `v1.0.0`, em 04/10/2026, e a versão de manutenção `v1.1.0`, em 05/11/2026. A fase GCP (Etapa 13, M6) foi autorizada em 06/11/2026, desmontada em 13/11/2026 e **aceita com ressalvas** no mesmo dia, com o custo real lido em 16/11/2026 — o estado é do [Plano](docs/plano_de_desenvolvimento.md), e o processo, do [Registro da fase GCP](docs/registro_fase_gcp.md). Depois dela, a fase da base dos consumidores (13 a 17/11/2026), aceita em 17/11/2026 com a *tag* `v2.1.0` — o [plano dela](PLANO_base_dos_consumidores.md) |
 | **Stack** | PostgreSQL · Airbyte (em Kubernetes local) · dbt · Airflow · Debezium sobre Kafka Connect · Redpanda · Apache Beam · Terraform · Docker · Python com SQLAlchemy e Alembic |
 | **Escopo** | Na `v1.1.0`: 40 tabelas de origem e uma origem legada defeituosa de propósito; nove camadas no armazém; 10 fatos, 15 dimensões e 16 views de consumo, uma por pergunta de negócio |
 | **Qualidade** | No fim da fase da base dos consumidores (17/11/2026): `make check` verde com `PASS=1079` e 1.734 testes Python, e o armazém com a procedência `verified`. No aceite da `v1.1.0` (05/11/2026): `PASS=907` e 1.079 testes Python; reconciliação em toda fronteira entre camadas; toda coluna classificada por sensibilidade, conferida por igualdade a cada `make check`. O medido de cada etapa está no [Plano](docs/plano_de_desenvolvimento.md) |
@@ -78,7 +78,7 @@ Cada assunto tem **um único dono documental**. Se a informação está em dois 
 | [Achados do nl_sql](docs/achados_nl_sql.md) | O que o banco de provas NL→SQL (projeto apartado) descobriu e mudou, para replicar aqui com os desvios: falhas deste projeto, melhorias de governança e registro | Em andamento — aberto em 12/11/2026 |
 | [Consumidores](docs/consumidores.md) | Quem lê este repositório (`nl_sql`, `gdados`, `bi-como-codigo`), como lê, como pede o banco, os canais e o que mudou para quem consome | Vigente — aberto em 14/11/2026 |
 | [Pacote de Metadados](docs/pacote_de_metadados.md) | O contrato do pacote da D91 que os portais leem: formato, campos, regras, [esquema](docs/pacote_de_metadados.schema.json) e [exemplo](docs/pacote_de_metadados.exemplo.json) | Formato 1, gerado pelo `make catalog` desde 14/11/2026 |
-| [Pendências do Owner](docs/pendencias.md) | O que está parado esperando decisão sua, em ordem de urgência | Decisões: 3 pendentes; verificações e trabalho: 7 adiadas, em 17/11/2026. Quais são, no cabeçalho das [Pendências](docs/pendencias.md) |
+| [Pendências do Owner](docs/pendencias.md) | O que está parado esperando decisão sua, em ordem de urgência | Decisões: 3 pendentes; verificações e trabalho: 6 adiadas, em 17/11/2026. Quais são, no cabeçalho das [Pendências](docs/pendencias.md) |
 | [Registro de Decisões](docs/adr/) | ADRs aceitos e decisões ainda pendentes | 56 aceitos, 1 pendente (D43, adiada) |
 | [Materialização no dbt](docs/materializacao.md) | Materializações, estratégias de incremental e o critério de robustez que escolhe entre elas | Vigente — base do [ADR-0016](docs/adr/0016-materializacao-por-camada.md) |
 | [Registro de Riscos](docs/riscos.md) | Riscos **R1**–**R14** e seus tratamentos | Vigente |
@@ -145,7 +145,7 @@ com o *re-snapshot* do CDC ([Capacidade §3](docs/capacidade_e_recuperacao.md#3-
 No aceite, depois de quatro rodadas de revisão final por outro agente: `make check` verde com
 `PASS=905` e 637 testes Python, e o histórico inteiro sem segredo não tratado.
 
-**A fase da base dos consumidores fecha em 17/11/2026, com a `v2.1.0` proposta ao aceite do Owner**
+**A fase da base dos consumidores fechou em 17/11/2026, aceita pelo Owner, com a *tag* `v2.1.0`**
 ([plano](PLANO_base_dos_consumidores.md)). Ela corrige aqui o que os três projetos que leem este repositório —
 o portal `gdados`, o `nl_sql` e a vitrine `bi-como-codigo` — mostraram que faltava: os números de três views e a
 auditoria das 16 contra referências independentes; as descrições, o grão e os textos que o BigQuery corta; o

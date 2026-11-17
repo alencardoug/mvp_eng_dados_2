@@ -94451,13 +94451,6 @@
       "title": "o que o fechamento da Etapa 13 deixa (registrada em 13/11/2026)"
     },
     {
-      "anchor": "docs/pendencias.md#v4--a-correção-relâmpago-do-gerador-de-estoque-registrada-em-14112026",
-      "id": "V4",
-      "objects": null,
-      "state": "deferred",
-      "title": "a correção-relâmpago do gerador de estoque (registrada em 14/11/2026)"
-    },
-    {
       "anchor": "docs/pendencias.md#v5--o-giro-de-estoque-muito-baixo-do-dado-sintético-registrada-em-16112026",
       "id": "V5",
       "objects": null,
@@ -94914,7 +94907,7 @@
       "tests/test_verificador_adr.py",
       "tests/test_vigencia_em_utc.py"
     ],
-    "inputs_sha256": "400fbc0bba0fdae25cfb747e14c8dbdfbce56ca4abdb08e7f81d5cf5ab02da6d",
+    "inputs_sha256": "82e0f54b0bd07557729464bab7bf587d54d0b1ad241b091ac741114839110591",
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {

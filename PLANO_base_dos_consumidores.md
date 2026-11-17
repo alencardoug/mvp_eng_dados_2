@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Executado; fechamento proposto em 17/11/2026**, à espera do aceite do Owner e da *tag* `v2.1.0` (§3, "Fechamento"). Histórico: **proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); **alinhamento central** das pendências dos três consumidores em 14/11/2026 (§2.2), com a rodada 4 de perguntas respondida (Q12 a Q14, §6) e o **Bloco 0b entregue** (§3); **Bloco 1 entregue** em 14/11/2026, com a Q8 respondida e o ADR-0052 (§3); próximo: a revisão do Bloco 1 e o Bloco 1b |
+| Estado | **Fechado e aceito pelo Owner em 17/11/2026**, com a *tag* `v2.1.0` (§3, "Fechamento"). Histórico: **proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); **alinhamento central** das pendências dos três consumidores em 14/11/2026 (§2.2), com a rodada 4 de perguntas respondida (Q12 a Q14, §6) e o **Bloco 0b entregue** (§3); **Bloco 1 entregue** em 14/11/2026, com a Q8 respondida e o ADR-0052 (§3); próximo: a revisão do Bloco 1 e o Bloco 1b |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
-| Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
+| Sai do repositório | **Fica** (decisão de 17/11/2026, rodada 18 do §6): como o `PLANO_etapa_13.md`, é o registro das decisões e das revisões da fase, e os documentos apontam para ele. O que ficou aberto está nas [Pendências](docs/pendencias.md) |
 
 Este plano **não decide nada**: ordena o que já está aberto em outros donos — a V2 e a D91 das
 [Pendências](docs/pendencias.md), o Bloco B do `PLANO_revisao_governanca.md` e as falhas F1 a F10
@@ -1473,7 +1473,7 @@ ENFORCED` nunca foram aplicadas no BigQuery nesta fase. Para o `nl_sql`, o efeit
 continua sendo medição dele, no GCP dele. Declara também, conforme a Q9, quantas das 16 views foram
 auditadas, e quais.
 
-#### O fechamento, em 17/11/2026 (proposto ao aceite do Owner)
+#### O fechamento, em 17/11/2026 (aceito pelo Owner no mesmo dia)
 
 - **`make check` verde** em `4137dc7`, no passo 8 da restauração do ciclo: `PASS=1079`, 1.734 testes Python,
   19 pulados, cada um com o motivo; catálogo, dicionário, linhagem e pacote regenerados na mesma sequência; o
@@ -1492,11 +1492,16 @@ auditadas, e quais.
   (Consumidores §5, reconstruível do corte da A3) — e por isso também a afirmação de que cada view mudou de valor
   é esperada, não medida; as exceções de quarentena das guardas 17 e 20 contra um lote que as exercite de
   verdade (só um par exonerado neste); o retry que reconstrói uma dimensão e o órfão no armazém real (Bloco 6).
-- **Fora desta fase, nas Pendências:** a V4, medida e com as 3 linhas restantes explicadas (a falha deliberada do
-  legado num par), fechá-la é do Owner; a V5 (o giro baixo do dado sintético); a V6 (o Python que aborta no
+- **Fora desta fase, nas Pendências:** a V4, medida, explicada e fechada no aceite; a V5 (o giro baixo do dado sintético); a V6 (o Python que aborta no
   desligamento do pipeline, achado no ciclo); a V1 a V3; a D43, a D63 e a D64. Nenhuma muda o que os consumidores
   leem, salvo a V5, que pede outra regeneração e fica para uma fase que regere por outros motivos também.
-- **A nota de versão** é a seção "Status" do README, e a *tag* `v2.1.0` (Q5) marca o *commit* que o Owner aceitar.
+- **A nota de versão** é a seção "Status" do README, e a *tag* `v2.1.0` (Q5) marca o *commit* do aceite.
+- **O aceite** (17/11/2026): o Owner aprovou o fechamento — "Por mim, aprovado" — depois das duas rodadas de revisão
+  dele (§9, rodadas 60 e 61), e com ele o declarativo final da fase: os catálogos dos domínios e das métricas
+  (`docs/glossario_de_negocio/dominios.yml`, `metricas.yml`), o contrato e o esquema do pacote, as chaves de
+  `analytics`, as declarações do gerador (`generator/geracao.yml`) e do catálogo do legado (`legacy/catalogo.yml`,
+  versão 10). Os textos do Bloco 3 já tinham o aceite de 15/11/2026. As decisões pequenas do aceite ele delegou
+  (rodada 18).
 
 ---
 
@@ -1740,6 +1745,18 @@ das invariantes 15 a 20 passam e as chaves do Bloco 6 estão instaladas. Falhou 
 | | Pergunta | Decisão do Owner | Alternativas apresentadas |
 |---|---|---|---|
 | **Q63** | O "antes" das 16 views para as linhas `feita` de Consumidores §5: o corte da A3 guarda as origens e a memória do armazém, não `consumption`, e reconstruí-lo pede um banco efêmero a partir do corte, perto de uma hora de máquina. Quem usaria: o `bi-como-codigo`, que guarda a própria captura do pin anterior e calcula a diferença com mais detalhe; o `gdados` não lê valores; o `nl_sql` está congelado | **As 16 linhas sem o "antes" medido**: cada uma diz que a view lê o dado regerado e qual correção da fila a alcança, e a mudança fica rotulada como esperada e não medida view a view (P5); só a P11 tem o número. O "antes" é reconstruível do corte da A3 (`~/mvp_ed1-recovery-pre-bloco5r`), se um consumidor pedir. Revê, para este ciclo, o "caso de antes e de depois" do Bloco 5R ("O que muda para quem consome"). Era a recomendada | Reconstruir agora as views antigas num banco efêmero; perguntar antes ao `bi-como-codigo`, pelo aviso, se ele precisa do número |
+
+### Rodada 18 — as decisões pequenas do aceite, delegadas pelo Owner em 17/11/2026
+
+O Owner aprovou o fechamento e delegou ao Claude Code as quatro escolhas abaixo ("Tome as melhores decisões para
+estas decisões pequenas"). Registradas como decididas por delegação, não como perguntas respondidas.
+
+| | O quê | Escolhido | Por quê |
+|---|---|---|---|
+| **Q64** | A V4 | **Fecha** | A correção-relâmpago sumiu no armazém (guarda 20), e as 3 linhas restantes são a falha deliberada do legado num par |
+| **Q65** | A DAG `fluxo_batch`, deixada pausada na G11 | **Fica pausada** | O agendamento é `None`; nada a dispara sozinho, e despausar é do momento da próxima execução |
+| **Q66** | O ramo `bloco-5r` | **Apagado** (local; nunca publicado) | Todo no `main` desde `d40ec9d` |
+| **Q67** | Este plano, que o cabeçalho mandava tirar com `git rm` ao fechar | **Fica** | Como o `PLANO_etapa_13.md`: é o registro das Q1 a Q67 e das rodadas de revisão, e os documentos — Consumidores, Achados, Pendências, o Plano de Desenvolvimento — apontam para ele |
 
 ## 7. Definição de pronto aplicada
 
@@ -2211,3 +2228,14 @@ ciclo: o dado novo no armazém, com as seis guardas (fora do Git até a D3, Q53)
 pagamento em aberto no armazém, que não tem guarda própria (a cobertura é cobrada no gerador); as exceções de
 quarentena das guardas 17 e 20, conferidas chamado a chamado e par a par na D3; e o *patch* da Q57 a Q61, que
 entra na F0. Isso não é o aceite do declarativo, que é do Owner.
+
+### Rodadas 60 e 61 — Codex conta 2, sobre o fechamento (17/11/2026)
+
+Relatórios em `codex2_fechamento_r1.md` e `r2.md`; objeto inicial `40ca4dd`.
+
+| Rodada | *Commit* respondido | Achados | O que mudou |
+|---|---|---|---|
+| 60 | `dfe3790`, `4fa5b1e` | 2 bloqueantes, 6 ajustes, 1 observação (RVFC-1-01 a 09) | A Q63 (o "antes" não medido) e a mudança de valor rotulada como esperada; o tratamento da captura 76 registrado na época 4, e a V7; a F29 por origem e a P11 medidas com consulta guardada; a DAG que falhou antes de passar; estados velhos; a V6; a fase no Plano de Desenvolvimento |
+| 61 | o *commit* do aceite | 3 ajustes, 1 observação (RVFC-2-01 a 04) | Este plano fica (Q67), e a ressalva da Q51 no Plano de Desenvolvimento; a V6 com dois abortos vistos, não três; a prova de que as 3 linhas da P11 são do legado; o aceite do Owner e as decisões delegadas (rodada 18) |
+
+**A revisão do fechamento está fechada.**
