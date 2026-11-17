@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 17/11/2026. As rodadas 1 a 4 de revisão foram aplicadas (§7). Falta: a rodada 5 e as respostas do Owner (§5). Nada foi executado |
+| Estado | **Proposto** em 17/11/2026. Revisado em cinco rodadas, e a quinta saiu sem achado (§7). Falta: as respostas do Owner (§5). Nada foi executado |
 | Origem | Pedido do Owner, 17/11/2026, depois de ler o que os três consumidores anotaram sobre a `v2.1.0`: "tomar todas as soluções mais robustas, mesmo que inclua regenerar bases e ADR [...] Reabre, resolve e fecha". Na mesma conversa, o Owner incluiu a V5 (a regeneração adiada pela Q47), a V6, a V7, a D63 e a D64 |
 | Base | `4d6f797`, sobre a `v2.1.0` (`eb11709`) |
 | Entradas lidas | `gdados/docs/alinhamento_entre_projetos.md` §7; `nl_sql/PENDENCIAS.md` item 9 e o parecer de 17/11/2026; `bi-como-codigo/docs/upstream_questions.md` UQ-16 a UQ-20, todos em 17/11/2026 |
@@ -433,4 +433,11 @@ duplicatas não entram na expectativa, e o atraso além da tolerância dá falha
 | # | Veredito | Onde entrou |
 |---|---|---|
 | RVRB-4-01 | bloqueante | Bloco 1, D63: a expectativa é o inserido por esta execução, com marca do *sink*; a contraprova do destino preenchido; o atraso além da tolerância. Bloco 2, Q72 (d): a lista num *seed* versionado |
+
+### Rodada 5 — codex2, sobre `b10907c` (17/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_plano_r5.md`, fora do Git. **Nenhum achado aberto.** Nada bloqueia o
+Bloco 0. O Bloco 5 espera só as respostas Q65 a Q72 e os pré-requisitos já declarados. O RVRB-4-01 está
+resolvido, e o conjunto inserido pode ser registrado sem coluna nova no destino quente. A frase do *seed* da Q72
+(d) está correta. **A revisão do plano está encerrada.**
 
