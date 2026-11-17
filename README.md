@@ -78,7 +78,7 @@ Cada assunto tem **um único dono documental**. Se a informação está em dois 
 | [Achados do nl_sql](docs/achados_nl_sql.md) | O que o banco de provas NL→SQL (projeto apartado) descobriu e mudou, para replicar aqui com os desvios: falhas deste projeto, melhorias de governança e registro | Em andamento — aberto em 12/11/2026 |
 | [Consumidores](docs/consumidores.md) | Quem lê este repositório (`nl_sql`, `gdados`, `bi-como-codigo`), como lê, como pede o banco, os canais e o que mudou para quem consome | Vigente — aberto em 14/11/2026 |
 | [Pacote de Metadados](docs/pacote_de_metadados.md) | O contrato do pacote da D91 que os portais leem: formato, campos, regras, [esquema](docs/pacote_de_metadados.schema.json) e [exemplo](docs/pacote_de_metadados.exemplo.json) | Formato 1, gerado pelo `make catalog` desde 14/11/2026 |
-| [Pendências do Owner](docs/pendencias.md) | O que está parado esperando decisão sua, em ordem de urgência | Decisões: 3 pendentes; verificações e trabalho: 5 adiadas, em 16/11/2026. Quais são, no cabeçalho das [Pendências](docs/pendencias.md) |
+| [Pendências do Owner](docs/pendencias.md) | O que está parado esperando decisão sua, em ordem de urgência | Decisões: 3 pendentes; verificações e trabalho: 6 adiadas, em 17/11/2026. Quais são, no cabeçalho das [Pendências](docs/pendencias.md) |
 | [Registro de Decisões](docs/adr/) | ADRs aceitos e decisões ainda pendentes | 56 aceitos, 1 pendente (D43, adiada) |
 | [Materialização no dbt](docs/materializacao.md) | Materializações, estratégias de incremental e o critério de robustez que escolhe entre elas | Vigente — base do [ADR-0016](docs/adr/0016-materializacao-por-camada.md) |
 | [Registro de Riscos](docs/riscos.md) | Riscos **R1**–**R14** e seus tratamentos | Vigente |

@@ -1485,9 +1485,10 @@ auditadas, e quais.
   lá, e o efeito no Gemini do `nl_sql` é medição dele; o "antes" das 16 views na regeneração (Consumidores §5,
   reconstruível do corte da A3); as exceções de quarentena das guardas 17 e 20 contra um lote que as exercite de
   verdade (só um par exonerado neste); o retry que reconstrói uma dimensão e o órfão no armazém real (Bloco 6).
-- **Fora desta fase, nas Pendências:** a V4 medida, com 3 linhas de giro indefinido ainda sem explicação; a V5
-  (o giro baixo do dado sintético); a V1 a V3; a D43, a D63 e a D64. O que o ciclo levantou e ficou sem registro:
-  o aborto do Python no desligamento do pipeline (diário, E8), não documentado.
+- **Fora desta fase, nas Pendências:** a V4, medida e com as 3 linhas restantes explicadas (a falha deliberada do
+  legado num par), fechá-la é do Owner; a V5 (o giro baixo do dado sintético); a V6 (o Python que aborta no
+  desligamento do pipeline, achado no ciclo); a V1 a V3; a D43, a D63 e a D64. Nenhuma muda o que os consumidores
+  leem, salvo a V5, que pede outra regeneração e fica para uma fase que regere por outros motivos também.
 - **A nota de versão** é a seção "Status" do README, e a *tag* `v2.1.0` (Q5) marca o *commit* que o Owner aceitar.
 
 ---

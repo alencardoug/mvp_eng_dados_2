@@ -12,9 +12,9 @@
 |---|---|
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
-| Verificações e trabalho adiados | 5 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026) |
+| Verificações e trabalho adiados | 6 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026; V6, o Python que aborta no desligamento do pipeline do *streaming*, registrada em 17/11/2026) |
 | Decisões pendentes | 3 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2` e a D66 na fase da base dos consumidores (§2) |
-| Última revisão | 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Última revisão | 17/11/2026 — V4 medida no armazém e as 3 linhas restantes explicadas; V6 registrada; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -287,8 +287,12 @@ correção-relâmpago, nenhuma linha de giro indefinido na P11 simulada; a invar
 [Modelo de Dados §4](modelo_de_dados.md#4-invariantes-de-negócio) a guarda. No armazém, só depois do
 ciclo; a V4 fecha com a medida dele. **Medido no armazém depois do ciclo (17/11/2026):** nenhum ajuste criado
 para cobrir uma saída, nas duas origens (a guarda `invariante_20_saida_com_lastro_desde_a_abertura` passa); a
-P11 tem 6.626 linhas, **3** com giro indefinido (eram 1.216 de 6.990). As 3 ficam como estão, sem explicação
-medida ainda.
+P11 tem 6.626 linhas, **3** com giro indefinido (eram 1.216 de 6.990). **As 3 estão explicadas** (medido em
+17/11/2026, só leitura): são o SKU-0000030 no CD São Paulo, em 2024-T3, 2025-T1 e 2025-T2 — o par armazém 1 ×
+variante 30, que a view junta pelo nome nas duas origens. No legado, a abertura desse par (`+101`) foi para a
+quarentena por `NUM_AMBIGUOUS` (`"101 caixas"`, falha deliberada do catálogo), e sem ela o saldo médio do
+trimestre fica negativo; é o mesmo par que a guarda 20 exonerou (diário do ciclo, D5). Não é a correção-relâmpago:
+a V4 está resolvida no que ela pedia, e fechá-la é decisão sua.
 
 *Efeito de não decidir:* o giro indefinido nesses pares, declarado na view e no glossário.
 
@@ -307,6 +311,20 @@ delas dependem), com a sua revisão integral, e regerar as duas origens. Decidid
 
 *Efeito de não decidir:* a P11 responde com um giro que nenhuma operação real teria; a ordem entre os
 pares continua informativa, o nível não.
+
+### V6 — o Python aborta no desligamento do pipeline do *streaming* (registrada em 17/11/2026)
+
+**Pergunta:** quando investigar? No ciclo do Bloco 5R (diário, C3, E8 e o passo 7 da G7), o SIGINT ao pipeline
+imprime a mensagem de encerramento limpo — "pipeline interrompido. O offset confirmado retoma de onde parou." —
+e, **depois** dela, o Python aborta com núcleo: "Fatal Python error: _enter_buffered_busy: could not acquire lock
+for <_io.BufferedWriter name='<stderr>'> at interpreter shutdown, possibly due to daemon threads", e o `make`
+sai com "Abortado (arquivo core criado)". O medidor registra o encerramento como limpo, nenhum processo sobra no
+host, e o offset confirmado se mostrou certo depois (os quatro zeros da C4 e da E10). Medido três vezes em
+17/11/2026; não medido antes desta fase, nem o efeito sobre os alertas em voo (a D63 é vizinha: o medidor
+encerra antes de o ramo de alertas drenar).
+
+*Efeito de não decidir:* um arquivo de núcleo a cada encerramento do pipeline, e um código de saída que não é o
+do encerramento limpo para quem chamar o `make stream-run` direto.
 
 ## 1.1 Decididas e implementadas
 
