@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 17/11/2026. As rodadas 1 e 2 de revisão foram aplicadas (§7). Falta: a rodada 3 e as respostas do Owner (§5). Nada foi executado |
+| Estado | **Proposto** em 17/11/2026. As rodadas 1 a 3 de revisão foram aplicadas (§7). Falta: a rodada 4 e as respostas do Owner (§5). Nada foi executado |
 | Origem | Pedido do Owner, 17/11/2026, depois de ler o que os três consumidores anotaram sobre a `v2.1.0`: "tomar todas as soluções mais robustas, mesmo que inclua regenerar bases e ADR [...] Reabre, resolve e fecha". Na mesma conversa, o Owner incluiu a V5 (a regeneração adiada pela Q47), a V6, a V7, a D63 e a D64 |
 | Base | `4d6f797`, sobre a `v2.1.0` (`eb11709`) |
 | Entradas lidas | `gdados/docs/alinhamento_entre_projetos.md` §7; `nl_sql/PENDENCIAS.md` item 9 e o parecer de 17/11/2026; `bi-como-codigo/docs/upstream_questions.md` UQ-16 a UQ-20, todos em 17/11/2026 |
@@ -80,8 +80,14 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
     chaves processadas;
   - **a entrega confirmada do alerta** (o `flush` do produtor, ou o *callback* de entrega) antes de a confirmação
     contar;
-  - **a leitura pelo medidor:** ele espera até que todas as chaves com evento na última janela até o corte
-    estejam confirmadas. Uma chave só não basta.
+  - **a leitura pelo medidor, pela cobertura de todo o corte** (RVRB-3-01). O medidor calcula, a partir do livro
+    durável até o corte, o conjunto esperado de pares (chave, janela) e a contagem de eventos de cada par. Ele
+    espera até que as confirmações cubram **todos** os pares, inclusive os das janelas anteriores e os painéis
+    tardios: a confirmação leva a contagem acumulada do par, e o par fecha quando ela iguala a esperada. Com
+    alerta, a confirmação só conta depois da entrega bem-sucedida. Confirmar só a última janela não basta, e
+    também não basta a última janela de cada chave;
+  - **a contraprova:** a última janela confirmada e um par anterior retido. A espera continua e, no fim do prazo,
+    falha.
 
   O meio da confirmação (contador do Beam, registro em arquivo ou mensagem) é escolhido no desenho, com medida.
   **Se pedir um destino durável novo, como um tópico, volta ao Owner** antes de ser implementado (`CLAUDE.md` §5).
@@ -122,10 +128,14 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
        nasce antes da injeção e guarda o código anterior. A quarentena só tem o que o legado entregou
        (`legacy/dbt.py:189–249`, `classification.sql:185–206`), e o código original só existe no manifesto de
        injeção. Esse manifesto é oráculo de teste, não dado, e não pode alimentar a guarda. A forma da regra no
-       legado é a **Q72**. Recomendada: a regra é estrita no varejo, onde o produtor escreve. No legado, ela não
-       reprova o `check`: é medida nas fases (i) e (iii), e cada caso fica listado no diário, explicado pela
-       quarentena com o código intacto ou não demonstrável. Esse é o custo da (a). Nada sai do dado, e o que não
-       for demonstrável vira achado ao Owner. A consulta 4 do BI (`q_p08_november.sql`) **não** serve de contraprova:
+       legado é a **Q72**. Recomendada, a (d) (RVRB-3-02): a regra é estrita no varejo, onde o produtor escreve. No
+       legado, a ausência explicada pela quarentena corrente com o código intacto passa. Os casos não
+       demonstráveis são inventariados a partir do dado observado, e você aprova uma **lista explícita de
+       exceções desta geração**, declarada e revisada por inteiro. A guarda **falha** para qualquer caso fora da
+       lista. Cada exceção tem a identidade do movimento, o `source_id`, a captura, o catálogo e a impressão do
+       tratamento, e a evidência fica congelada no diário. A lista é refeita a cada regeneração. Ela não
+       recupera o código destruído, não lê o manifesto de injeção e não muda a classificação. É um aceite de
+       qualidade limitado, não um vínculo explicado. Nada sai do dado. A consulta 4 do BI (`q_p08_november.sql`) **não** serve de contraprova:
        ela filtra `source_type='shipment'` e o id numérico, que o gerador não grava;
    - para a V5, o giro dentro da faixa declarada.
 
@@ -204,6 +214,8 @@ Uma subseção do diário, revisada pelo outro agente **antes** do primeiro desc
   `ARTEFATOS` leva o cursor no pacote, e a restauração o traria de volta;
 - **os oráculos de cada passo** e o que cada falha esperada significa, pelas três fases das guardas
   (Bloco 2, item 4);
+- **a parada da Q72**, se a resposta for a (d): o inventário dos casos não demonstráveis do legado, medido
+  depois da carga, e a aprovação da lista pelo Owner antes da fase (iii);
 - **as provas que se mantêm,** cada uma com o passo em que roda:
   - a T3 (`memory-oracle`) antes de encerrar a época e depois do ciclo;
   - a comparação H2, com as remoções e reaparições aceitas;
@@ -324,7 +336,7 @@ não seja ambígua.
 | Q69 | A *tag* desta fase | `v2.2.0` / `v2.1.1` | **`v2.2.0`**: o dado muda |
 | Q70 | A ordem de Consumidores §5 | Corrigir a ordem / Corrigir e guardar com teste a ordem por data | **Corrigir e guardar** |
 | Q71 | O cursor do produtor (`emitidos_acumulados` 2.200 de 17/11, mais os do exercício), depois do descarte | **(a)** Guardado com SHA-256 no diário e removido: o estado publicado parte do zero, como a Q52. **(b)** Mantido: o próximo exercício continua a sequência, mas o cursor conta eventos que não estão no livro | **(a)**: depois do descarte, o cursor descreveria um livro que não existe mais, e o pacote de recuperação o levaria junto |
-| Q72 | A regra "toda venda tem remessa" no legado, onde a injeção pode destruir o código da remessa (a 47) e nenhuma tabela guarda o original (RVRB-2-01) | **(a)** Estrita no varejo, onde o produtor escreve. No legado, não reprova o `check`: é medida nas fases (i) e (iii), com cada caso listado: explicado pela quarentena com o código intacto, ou não demonstrável. O que não for demonstrável vira achado ao Owner. **(b)** Estrita nas duas origens, com o não demonstrável como falha: a injeção deliberada reprovaria o `check` a cada regeneração. **(c)** Estrita nas duas, e o tratamento do legado passa a guardar o vínculo polimórfico do movimento com a remessa rejeitada: é tratamento de dados novo e pede ADR. Ler o manifesto de injeção na guarda foi descartado, porque é usar o oráculo como dado | **(a)**: o F31 nasce do produtor, que só escreve no varejo, e lá a regra não tem exceção. No legado, nada é exonerado em silêncio, e a medida diz se a (c) é necessária |
+| Q72 | A regra "toda venda tem remessa" no legado, onde a injeção pode destruir o código da remessa (a 47) e nenhuma tabela guarda o original (RVRB-2-01) | **(a)** Estrita no varejo, onde o produtor escreve. No legado, não reprova o `check`: é medida nas fases (i) e (iii), com cada caso listado: explicado pela quarentena com o código intacto, ou não demonstrável. O que não for demonstrável vira achado ao Owner. **(b)** Estrita nas duas origens, com o não demonstrável como falha: a injeção deliberada reprovaria o `check` a cada regeneração. **(c)** Estrita nas duas, e o tratamento do legado passa a guardar o vínculo polimórfico do movimento com a remessa rejeitada: é tratamento de dados novo e pede ADR. Ler o manifesto de injeção na guarda foi descartado, porque é usar o oráculo como dado. **(d)** Estrita no varejo. No legado, a ausência explicada pela quarentena corrente passa, os casos não demonstráveis entram numa lista de exceções desta geração aprovada pelo Owner, com identidade, captura, catálogo, impressão do tratamento e evidência congelada, e qualquer caso fora da lista reprova o `check`. Custo: a lista é refeita e reaprovada a cada regeneração, com uma parada para o Owner no Bloco 5 entre a carga e a fase (iii) | **(d)**: é a única sem tratamento novo em que um caso novo no legado reprova o `check`, e a escolha do Owner foi a solução mais robusta. A (a) é a mais leve e deixa passar caso novo, que só é anotado. A (c) fica para se a lista crescer a ponto de pedir o vínculo no tratamento |
 
 ---
 
@@ -380,4 +392,16 @@ está no relatório. **Aplicada em 17/11/2026:**
 
 Também vieram das verificações: na adaptação, o H1 e o B5, o H2 desta geração, o *commit* limpo e o pacote
 renovado; o cursor tratado antes do pacote; e a atribuição F31 × V5 sem prometer mais que a medida dá.
+
+### Rodada 3 — codex2, sobre `66d898e` (17/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_plano_r3.md`, fora do Git. **Conclusão do Codex:** nada bloqueia
+o Bloco 0. RVRB-2-01, 03 e 04 estão resolvidos; o 02, em parte. As verificações confirmam que o produtor só
+escreve no varejo, que a (a) da Q72 respeita a regra 4, e que H1/B5, H2, o *commit* limpo, o pacote renovado,
+a Q71 e a atribuição F31 × V5 estão corretos. **Aplicada em 17/11/2026:**
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVRB-3-01 | bloqueante | Bloco 1, D63: a espera pela cobertura de todos os pares (chave, janela) do corte, pela contagem esperada calculada do livro, inclusive janelas anteriores e painéis tardios, e a contraprova do par retido |
+| RVRB-3-02 | ajuste | Bloco 2, item 4, e Q72: a opção (d), uma lista de exceções desta geração aprovada pelo Owner, com reprovação de caso novo, agora a recomendada; a parada dela na adaptação do ciclo |
 
