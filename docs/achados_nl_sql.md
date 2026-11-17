@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 17/11/2026 (o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -527,3 +527,4 @@ inventário.
 | 12/11/2026 | (este documento) | Limite de 1.024 caracteres por descrição como causa das descrições cortadas; grão das dimensões | F4, F8 |
 | 13/11/2026 | `f3b96fb` | `tabelas.yaml`: grão, uso e datas das 25 tabelas, conferidos nos dados; canal de volta passa a ser este repositório (D92) | F8, F11, F12, F13 |
 | 14/11/2026 | `ce09526` | `colunas.yaml`: texto das 477 colunas com as correções da original; decisões da resposta central (Q14) | F14, F15, F16 |
+| 17/11/2026 | `05a425f` | Recebido o aviso da `v2.1.0` (`eb11709`). O `nl_sql` continua com a importação congelada (11/11/2026 + `cbc5271`). Reimportar nesse marco está para decisão do Owner (`PENDENCIAS.md` item 9 do `nl_sql`), e os próximos passos de lá foram replanejados. Visto de lá: o `valores.yaml` do `nl_sql` declara significados que o dado congelado desmente, e o `GW-OK` está como aprovada, não como pendente (F22). Nenhuma das 19 referências lê essas colunas. Nada a fazer aqui | F22, F24 a F30 |
