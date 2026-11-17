@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 17/11/2026. Revisado em cinco rodadas, e a quinta saiu sem achado (§7). Falta: as respostas do Owner (§5). Nada foi executado |
+| Estado | **Proposto** em 17/11/2026. **Aprovado** em 17/11/2026: revisado em cinco rodadas, a quinta sem achado (§7), e as Q64 a Q72 respondidas pelo Owner (§5). Nada foi executado |
 | Origem | Pedido do Owner, 17/11/2026, depois de ler o que os três consumidores anotaram sobre a `v2.1.0`: "tomar todas as soluções mais robustas, mesmo que inclua regenerar bases e ADR [...] Reabre, resolve e fecha". Na mesma conversa, o Owner incluiu a V5 (a regeneração adiada pela Q47), a V6, a V7, a D63 e a D64 |
 | Base | `4d6f797`, sobre a `v2.1.0` (`eb11709`) |
 | Entradas lidas | `gdados/docs/alinhamento_entre_projetos.md` §7; `nl_sql/PENDENCIAS.md` item 9 e o parecer de 17/11/2026; `bi-como-codigo/docs/upstream_questions.md` UQ-16 a UQ-20, todos em 17/11/2026 |
@@ -354,6 +354,23 @@ não seja ambígua.
 | Q70 | A ordem de Consumidores §5 | Corrigir a ordem / Corrigir e guardar com teste a ordem por data | **Corrigir e guardar** |
 | Q71 | O cursor do produtor (`emitidos_acumulados` 2.200 de 17/11, mais os do exercício), depois do descarte | **(a)** Guardado com SHA-256 no diário e removido: o estado publicado parte do zero, como a Q52. **(b)** Mantido: o próximo exercício continua a sequência, mas o cursor conta eventos que não estão no livro | **(a)**: depois do descarte, o cursor descreveria um livro que não existe mais, e o pacote de recuperação o levaria junto |
 | Q72 | A regra "toda venda tem remessa" no legado, onde a injeção pode destruir o código da remessa (a 47) e nenhuma tabela guarda o original (RVRB-2-01) | **(a)** Estrita no varejo, onde o produtor escreve. No legado, não reprova o `check`: é medida nas fases (i) e (iii), com cada caso listado: explicado pela quarentena com o código intacto, ou não demonstrável. O que não for demonstrável vira achado ao Owner. **(b)** Estrita nas duas origens, com o não demonstrável como falha: a injeção deliberada reprovaria o `check` a cada regeneração. **(c)** Estrita nas duas, e o tratamento do legado passa a guardar o vínculo polimórfico do movimento com a remessa rejeitada: é tratamento de dados novo e pede ADR. Ler o manifesto de injeção na guarda foi descartado, porque é usar o oráculo como dado. **(d)** Estrita no varejo. No legado, a ausência explicada pela quarentena corrente passa, os casos não demonstráveis entram numa lista de exceções desta geração aprovada pelo Owner, com identidade, captura, catálogo, impressão do tratamento e evidência congelada, e qualquer caso fora da lista reprova o `check`. Custo: a lista é refeita e reaprovada a cada regeneração, com uma parada para o Owner no Bloco 5 entre a carga e a fase (iii) | **(d)**: é a única sem tratamento novo em que um caso novo no legado reprova o `check`, e a escolha do Owner foi a solução mais robusta. A (a) é a mais leve e deixa passar caso novo, que só é anotado. A (c) fica para se a lista crescer a ponto de pedir o vínculo no tratamento |
+
+
+### Respostas do Owner (17/11/2026)
+
+A Q64 foi respondida antes, pela forma (e). As Q65 a Q72 foram respondidas nesta data, todas pela recomendação:
+
+| # | Resposta |
+|---|---|
+| Q64 | **(e)**: o exercício antes da regeneração, a publicação sem produtor e as guardas no estado publicado |
+| Q65 | **(a)**, na forma do Bloco 1: a confirmação por janela concluída, a entrega confirmada e a espera pelo que a execução inseriu |
+| Q66 | **(a)**: a chave em base64 seguro para URL nos dois lugares, com teste, e a troca ao recriar o Airflow |
+| Q67 | **(a)**: uma faixa declarada para a mediana trimestral da P11, fixada pelo Owner depois da medida em memória |
+| Q68 | **Sim**: o antes → depois das 16 views, medido e publicado por view |
+| Q69 | **`v2.2.0`** |
+| Q70 | **Corrigir e guardar** com teste a ordem por data |
+| Q71 | **(a)**: o cursor guardado com SHA-256 no diário e removido antes de embalar o estado final |
+| Q72 | **(d)**: a lista de exceções do legado desta geração, num *seed* versionado aprovado pelo Owner, e caso novo reprova o `check` |
 
 ---
 
