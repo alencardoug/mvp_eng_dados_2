@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); **alinhamento central** das pendências dos três consumidores em 14/11/2026 (§2.2), com a rodada 4 de perguntas respondida (Q12 a Q14, §6) e o **Bloco 0b entregue** (§3); **Bloco 1 entregue** em 14/11/2026, com a Q8 respondida e o ADR-0052 (§3); próximo: a revisão do Bloco 1 e o Bloco 1b |
+| Estado | **Executado; fechamento proposto em 17/11/2026**, à espera do aceite do Owner e da *tag* `v2.1.0` (§3, "Fechamento"). Histórico: **proposto** em 13/11/2026; rodada 1 de perguntas respondida no mesmo dia (§6); **revisão fechada** na rodada 3, sem achado aberto (§9); **emendado** no mesmo dia com o que a leitura dos planos dos consumidores acrescentou (§2.1), o que abriu a rodada 3 de perguntas, **respondida** pelas recomendações (Q9 a Q11, §6); a emenda teve a rodada 4 de revisão (um bloqueante e três ajustes, aceitos e respondidos no §9), e a rodada 5 a **fechou sem achado**; **Bloco 0 entregue** em 13/11/2026 (§3); **alinhamento central** das pendências dos três consumidores em 14/11/2026 (§2.2), com a rodada 4 de perguntas respondida (Q12 a Q14, §6) e o **Bloco 0b entregue** (§3); **Bloco 1 entregue** em 14/11/2026, com a Q8 respondida e o ADR-0052 (§3); próximo: a revisão do Bloco 1 e o Bloco 1b |
 | Origem | Pedido do Owner, 13/11/2026: "a próxima fase é favorecer e completar o trabalho que dá base para `gdados`, `nl_sql` e `bi-como-codigo`" |
 | Base | `5df9536` (`origin/main`), com `README.md` e `docs/achados_nl_sql.md` alterados e fora do Git |
 | Sai do repositório | Com `git rm`, quando a fase fechar; o que ficar aberto vai para as [Pendências](docs/pendencias.md) |
@@ -1219,10 +1219,13 @@ prova, contra o critério de conclusão abaixo:
   só par, do legado, com motivo pertinente (a abertura rejeitada);
 - a prova da Q37: o `RESET=1` com as chaves do Bloco 6, 26 PKs e 58 FKs instaladas, `tests/test_chaves.py` sem pulo;
 - a memória do legado contida (D4 e F6), com 67 chaves na memória de exclusão, o calculado antes; as sondas do H5;
-  os quatro zeros em C4 e E10; a DAG de ponta a ponta na primeira tentativa; o `make check` inteiro;
+  os quatro zeros em C4 e E10; a DAG de ponta a ponta — a primeira execução falhou em 39 s, sem captura nem *build*
+  (o Airflow sem as credenciais do Airbyte), e a segunda passou com as 16 tarefas na primeira tentativa; o `make
+  check` inteiro; os dois desfechos do pagamento em aberto presentes no armazém nas duas origens (F29;
+  `data/medicoes/bloco5r_ciclo/pos_f29_por_origem.*`);
 - a procedência `verified` do build do commit limpo (`33dc10e1-…`, `b3212a4`); o pacote de recuperação refeito,
   restaurado e promovido, com as cinco retenções íntegras;
-- a V4: 3 linhas de giro indefinido na P11, eram 1.216.
+- a V4: 3 linhas de giro indefinido na P11, eram 1.216 (consulta e saída em `data/medicoes/bloco5r_ciclo/pos_p11_agregados.*`, fora do Git).
 
 O que saiu do roteiro, e está no diário: o nó do Airbyte não subia (dois registros órfãos de 09/11 no `containerd`,
 reparados com a autorização do Owner); a Q62, na D3; e três erros meus de operação, sem efeito no dado — o
@@ -1475,6 +1478,9 @@ auditadas, e quais.
 - **`make check` verde** em `4137dc7`, no passo 8 da restauração do ciclo: `PASS=1079`, 1.734 testes Python,
   19 pulados, cada um com o motivo; catálogo, dicionário, linhagem e pacote regenerados na mesma sequência; o
   armazém com a procedência `verified`.
+- **O livro retido depois da restauração:** a G7 abriu a época 4 e construiu a quarentena da captura 76 sem
+  registrar o tratamento; registrado depois, enquanto ainda era o corrente (`G7_a1_tratamento.json`), e a T3 da
+  época 4 dá "memória contida" (revisão do fechamento, RVFC-1-02). Que a restauração não registre sozinha é a V7.
 - **A revisão por outro agente, por bloco:** rodadas 1 a 59 do §9 — os Blocos 0 a 6, a L5, a Q6, o desenho e a
   implementação do Bloco 5R e a adaptação do ciclo —, cada revisão fechada sem achado aberto. Nenhuma revisão
   cobre o fechamento em si: é a rodada que este texto pede antes da *tag*.
@@ -1482,8 +1488,9 @@ auditadas, e quais.
   terminou em `4da9e60`, com a P13 depois da D66, e roda a cada `make check`; passou de novo sobre o dado
   regenerado.
 - **Não provado:** o BigQuery (L9) — as descrições curtas e as *constraints* `NOT ENFORCED` nunca foram aplicadas
-  lá, e o efeito no Gemini do `nl_sql` é medição dele; o "antes" das 16 views na regeneração (Consumidores §5,
-  reconstruível do corte da A3); as exceções de quarentena das guardas 17 e 20 contra um lote que as exercite de
+  lá, e o efeito no Gemini do `nl_sql` é medição dele; o "antes" das 16 views na regeneração, pela Q63
+  (Consumidores §5, reconstruível do corte da A3) — e por isso também a afirmação de que cada view mudou de valor
+  é esperada, não medida; as exceções de quarentena das guardas 17 e 20 contra um lote que as exercite de
   verdade (só um par exonerado neste); o retry que reconstrói uma dimensão e o órfão no armazém real (Bloco 6).
 - **Fora desta fase, nas Pendências:** a V4, medida e com as 3 linhas restantes explicadas (a falha deliberada do
   legado num par), fechá-la é do Owner; a V5 (o giro baixo do dado sintético); a V6 (o Python que aborta no
@@ -1727,6 +1734,12 @@ das invariantes 15 a 20 passam e as chaves do Bloco 6 estão instaladas. Falhou 
 | | Pergunta | Decisão do Owner | Alternativas apresentadas |
 |---|---|---|---|
 | **Q62** | A remessa 45 do **legado** está `delivered` na origem, mas o evento `delivered` dela foi para a quarentena por `DATE_FUTURE` (a injeção pôs a data em 2027) — falha deliberada do catálogo, cujos alvos mudaram com o lote novo. A remessa está em `quarantine.rejected_shipment_deliveries` com o motivo; o teste falha sempre que essa quarentena não está vazia | **Tolerar só o explicado pelo legado**: o teste aceita a remessa do legado cujo evento `delivered` está na quarentena do tratamento corrente (`explicado_pela_quarentena`, com o tipo do evento) e continua falhando para qualquer outra divergência, toda a do varejo inclusive — o padrão da D35. Lê `is_delivery_unbacked` em `trusted.shipments`, porque a tabela da quarentena não guarda a origem e o `shipment_id` 45 existe nas duas. Contraprovas no banco: com outro tipo de evento, ou sem a exceção, a remessa volta a ser acusada. Era a recomendada | Aceitar o vermelho, declarado (a F1 nunca ficaria verde com este lote); mudar a injeção do legado e regerar (contraria o plano: a falha deliberada não se corrige para forçar zero) |
+
+### Rodada 17 — depois do ciclo do Bloco 5R: respondida em 17/11/2026
+
+| | Pergunta | Decisão do Owner | Alternativas apresentadas |
+|---|---|---|---|
+| **Q63** | O "antes" das 16 views para as linhas `feita` de Consumidores §5: o corte da A3 guarda as origens e a memória do armazém, não `consumption`, e reconstruí-lo pede um banco efêmero a partir do corte, perto de uma hora de máquina. Quem usaria: o `bi-como-codigo`, que guarda a própria captura do pin anterior e calcula a diferença com mais detalhe; o `gdados` não lê valores; o `nl_sql` está congelado | **As 16 linhas sem o "antes" medido**: cada uma diz que a view lê o dado regerado e qual correção da fila a alcança, e a mudança fica rotulada como esperada e não medida view a view (P5); só a P11 tem o número. O "antes" é reconstruível do corte da A3 (`~/mvp_ed1-recovery-pre-bloco5r`), se um consumidor pedir. Revê, para este ciclo, o "caso de antes e de depois" do Bloco 5R ("O que muda para quem consome"). Era a recomendada | Reconstruir agora as views antigas num banco efêmero; perguntar antes ao `bi-como-codigo`, pelo aviso, se ele precisa do número |
 
 ## 7. Definição de pronto aplicada
 

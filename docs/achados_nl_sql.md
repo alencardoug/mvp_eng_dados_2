@@ -469,7 +469,8 @@ inventário.
   ramo `bloco-5r` (16/11/2026), o gerador garante os dois desfechos em qualquer fator e semente — o sorteio
   só cede quando os pedidos em aberto que restam são tantos quantos os desfechos que faltam, e `orders`
   tem piso de oito linhas, com dois pedidos em aberto garantidos (Q54) —, e a invariante 19 exige os três
-  resultados em todo perfil. No perfil do legado muda uma linha (uma
+  resultados em todo perfil. No armazém, depois do ciclo de 17/11/2026, os dois desfechos e a transação `pending` estão
+  presentes nas duas origens (varejo 74 e 61, legado 1 e 1). No perfil do legado muda uma linha (uma
   autorização passa de aprovada a pendente); no varejo, nenhuma.
 
 ### F30 — A limpeza do legado trata a validade da reserva como fato consumado · **Gravidade: média**
@@ -483,8 +484,9 @@ inventário.
   legado perderia as reservas mais recentes.
 - **Aqui**, pela decisão do Owner (Q48 do plano da base dos consumidores): a coluna entra nas `promessas`
   do catálogo de falhas (`legacy/catalogo.yml`, versão 10), como `carts.expires_at`; os modelos de limpeza
-  são regenerados dele. O lote de hoje não tem o caso: o `make dbt-build` de 16/11/2026 retratou a captura
-  corrente sob a versão 10 com o mesmo resultado linha a linha; o lote novo chega com o ciclo do Bloco 5R.
+  são regenerados dele. O `make dbt-build` de 16/11/2026 retratou a captura de então sob a versão 10 com o mesmo
+  resultado linha a linha; o lote novo (`9ecb9fe1…`) chegou com o ciclo do Bloco 5R, em 17/11/2026, tratado sob a
+  versão 10, e a reserva que vence depois do corte não é mais rejeitada.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 

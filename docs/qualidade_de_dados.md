@@ -261,11 +261,11 @@ quarentena a explica (§5): a 17, só com um evento `resolved` rejeitado do cham
 da reserva não tem item nenhum daquele SKU; a 20, no par com movimento rejeitado — a mais larga das três, e
 cada par exonerado se confere um a um no ciclo.
 
-**Sobre o dado de antes do ciclo do Bloco 5R elas falham por desenho**, e por isso vivem no ramo
-`bloco-5r` até o ciclo. Medido no armazém em 16/11/2026, antes dele: a 16 acusa 13 remessas; a 17, 14
-reaberturas sem resolução e 13 chamados encerrados sem o evento; a 20, 1.792 ajustes no varejo e 59 no
-legado — os números dos achados. **O resultado sobre o dado novo está pendente**, e é critério de
-conclusão do bloco.
+**Sobre o dado de antes do ciclo do Bloco 5R elas falhavam por desenho** — medido em 16/11/2026: a 16 acusava 13
+remessas; a 17, 14 reaberturas sem resolução e 13 chamados encerrados sem o evento; a 20, 1.792 ajustes no varejo
+e 59 no legado, os números dos achados. **Sobre o dado regerado, em 17/11/2026, as seis passam**, e as exceções do
+legado exoneraram um só par, o da abertura rejeitada (o plano da base dos consumidores, Bloco 5R, "O ciclo, feito
+em 17/11/2026"). Entraram no `main` com o ciclo.
 
 
 ---

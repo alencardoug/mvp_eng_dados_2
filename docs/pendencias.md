@@ -12,9 +12,9 @@
 |---|---|
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
-| Verificações e trabalho adiados | 6 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026; V6, o Python que aborta no desligamento do pipeline do *streaming*, registrada em 17/11/2026) |
+| Verificações e trabalho adiados | 7 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V4, a correção-relâmpago do gerador de estoque, registrada em 14/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026; V6, o Python que aborta no desligamento do pipeline do *streaming*, registrada em 17/11/2026; V7, a restauração que não registra o tratamento na época que abre, registrada em 17/11/2026) |
 | Decisões pendentes | 3 (D63 e D64, levantadas pela validação do material de estudo em 04/10/2026; D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2` e a D66 na fase da base dos consumidores (§2) |
-| Última revisão | 17/11/2026 — V4 medida no armazém e as 3 linhas restantes explicadas; V6 registrada; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Última revisão | 17/11/2026 — V4 medida no armazém e as 3 linhas restantes explicadas; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -207,11 +207,14 @@ fechar). Os achados, cada um no seu dono:
   `main`, sem *worktree*: declarativo do dbt, revisão integral do Owner, catraca ajustada na mesma
   entrega. A revisão do plano pelo codex2 (RVG-1-01 a RVG-1-03) pede antes uma forma de declarar
   texto próprio na ponte do legado e trata à parte os campos de *snapshot*. Junto, a pergunta das
-  três colunas em português de `trusted.legacy_order_totals_divergence`.
+  três colunas em português de `trusted.legacy_order_totals_divergence`. **Feito na fase da base dos
+  consumidores** (14 e 15/11/2026): o G06 no Bloco 3 e as colunas em português pela Q6 — Consumidores §5, as
+  linhas `feita`; o que sobra da V2 é o `airbyte_internal` e o que vive no `gdados`.
 - **G07 a G10** são requisitos do portal (a linhagem nativa com exceções por coluna, a D66 exibida
   como está, a procedência dos artefatos, o pacote de metadados) e vivem no `gdados`, não aqui.
 
-**O alvo de exportação para o portal** — decidido na D91 (§2); a implementação vem *depois do M6*.
+**O alvo de exportação para o portal** — decidido na D91 (§2); **implementado** no Bloco 4 da fase da base dos
+consumidores, o [pacote de metadados](pacote_de_metadados.md).
 
 ### V3 — o que o fechamento da Etapa 13 deixa (registrada em 13/11/2026)
 
@@ -287,7 +290,7 @@ correção-relâmpago, nenhuma linha de giro indefinido na P11 simulada; a invar
 [Modelo de Dados §4](modelo_de_dados.md#4-invariantes-de-negócio) a guarda. No armazém, só depois do
 ciclo; a V4 fecha com a medida dele. **Medido no armazém depois do ciclo (17/11/2026):** nenhum ajuste criado
 para cobrir uma saída, nas duas origens (a guarda `invariante_20_saida_com_lastro_desde_a_abertura` passa); a
-P11 tem 6.626 linhas, **3** com giro indefinido (eram 1.216 de 6.990). **As 3 estão explicadas** (medido em
+P11 tem 6.626 linhas, **3** com giro indefinido (eram 1.216 de 6.990; consulta e saída em `data/medicoes/bloco5r_ciclo/pos_p11_agregados.*`, fora do Git). **As 3 estão explicadas** (medido em
 17/11/2026, só leitura): são o SKU-0000030 no CD São Paulo, em 2024-T3, 2025-T1 e 2025-T2 — o par armazém 1 ×
 variante 30, que a view junta pelo nome nas duas origens. No legado, a abertura desse par (`+101`) foi para a
 quarentena por `NUM_AMBIGUOUS` (`"101 caixas"`, falha deliberada do catálogo), e sem ela o saldo médio do
@@ -303,7 +306,7 @@ mostra giro mediano de cerca de 0,01 por trimestre, em qualquer das formas medid
 de 10 a 400 unidades por par, compras de 40 a 500 — é muito maior que a venda, de 1 a 3 unidades por
 item. O giro é definido e coerente com o livro; não é realista para varejo. A medida é da simulação, no
 varejo. **No armazém, depois do ciclo do Bloco 5R (17/11/2026):** mediana 0,02 e p90 0,49 nas 6.626 linhas
-da P11, as duas origens juntas.
+da P11, as duas origens juntas (consulta e saída em `data/medicoes/bloco5r_ciclo/pos_p11_agregados.*`, fora do Git).
 
 Corrigir é mudar declaração em várias tabelas (`geracao.yml`: abertura, compras, as referências que
 delas dependem), com a sua revisão integral, e regerar as duas origens. Decidido em 16/11/2026 (Q47 do
@@ -325,6 +328,18 @@ encerra antes de o ramo de alertas drenar).
 
 *Efeito de não decidir:* um arquivo de núcleo a cada encerramento do pipeline, e um código de saída que não é o
 do encerramento limpo para quem chamar o `make stream-run` direto.
+
+### V7 — a restauração não registra o tratamento na época que abre (registrada em 17/11/2026)
+
+**Pergunta:** quando acrescentar o registro? O `make recovery-restore` abre uma época nova do livro retido antes
+da captura dele (H8), e o passo 8 constrói a quarentena dessa captura (`dbt-rebuild` e `check`), mas não chama o
+`make ledger-treatment`. No ciclo do Bloco 5R a época 4 ficou sem o registro do tratamento da captura 76 até a
+revisão do fechamento apontar (RVFC-1-02); foi registrado depois, enquanto ainda era o corrente. Se outra captura
+ou outro tratamento o substituir antes do registro, a fatia dele fica sem explicação na T3 — a lacuna da época 2,
+que a Q51 aceitou como exceção.
+
+*Efeito de não decidir:* depois de cada restauração, o operador precisa lembrar do `make ledger-treatment` antes
+de qualquer outra captura ou *build*.
 
 ## 1.1 Decididas e implementadas
 

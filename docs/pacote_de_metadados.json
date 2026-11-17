@@ -94470,6 +94470,13 @@
       "objects": null,
       "state": "deferred",
       "title": "o Python aborta no desligamento do pipeline do *streaming* (registrada em 17/11/2026)"
+    },
+    {
+      "anchor": "docs/pendencias.md#v7--a-restauração-não-registra-o-tratamento-na-época-que-abre-registrada-em-17112026",
+      "id": "V7",
+      "objects": null,
+      "state": "deferred",
+      "title": "a restauração não registra o tratamento na época que abre (registrada em 17/11/2026)"
     }
   ],
   "provenance": {
@@ -94907,7 +94914,7 @@
       "tests/test_verificador_adr.py",
       "tests/test_vigencia_em_utc.py"
     ],
-    "inputs_sha256": "15b7a57feeeba4b6f0a7c8ca396e7fc29224d8915f734654697233d7be07a07d",
+    "inputs_sha256": "400fbc0bba0fdae25cfb747e14c8dbdfbce56ca4abdb08e7f81d5cf5ab02da6d",
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {
