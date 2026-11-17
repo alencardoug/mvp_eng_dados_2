@@ -345,7 +345,7 @@ em três lotes e **aceita pelo Owner em 05/11/2026**.*
 *Aceita pelo Owner em 13/11/2026, **com ressalvas**, depois de duas rodadas de revisão por outro
 agente (a segunda sem bloqueante): quatro critérios ficam parciais e não se completam mais, porque a
 infraestrutura saiu na mesma janela — o custo real entra quando o faturamento fechar, sem reabrir o
-aceite. A matriz contra o medido é o [plano da Etapa 13 §11.1](../PLANO_etapa_13.md#111-os-critérios-do-m6-contra-o-medido);
+aceite (lido em 16/11/2026: [Registro §61](registro_fase_gcp.md#61-o-custo-real-lido-no-faturamento-16112026)). A matriz contra o medido é o [plano da Etapa 13 §11.1](../PLANO_etapa_13.md#111-os-critérios-do-m6-contra-o-medido);
 o relato, o [Registro da fase GCP](registro_fase_gcp.md).*
 
 | | |

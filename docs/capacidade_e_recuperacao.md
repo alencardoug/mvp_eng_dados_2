@@ -13,7 +13,7 @@
 | Critério de dimensionamento | **Cobertura**, não volume — [ADR-0014](adr/0014-volume-por-proporcoes-e-fator-de-escala.md) |
 | Abrangência | `source_db` + `legacy_db` + `warehouse_db` + ponto de recuperação |
 | Versão | 2.18 |
-| Situação | Medições históricas até a Etapa 9 preservadas; o ciclo do zero medido no B5 (§2.12) e a regeneração da v1.1.0 (§2.13); o ponto de recuperação **entregue em 25/09/2026**, substituído pelo da v1.1.0 em 04/11/2026, cada um restaurado de ponta a ponta antes da promoção (§3) |
+| Situação | Medições históricas até a Etapa 9 preservadas; o ciclo do zero medido no B5 (§2.12), a regeneração da v1.1.0 (§2.13) e a do Bloco 5R (§2.15); o ponto de recuperação **entregue em 25/09/2026**, substituído pelo da v1.1.0 em 04/11/2026 e pelo do Bloco 5R em 17/11/2026, cada um restaurado de ponta a ponta antes da promoção (§3) |
 | Última revisão | 16/11/2026 — §2.14, o custo real da Etapa 13, lido no faturamento; 07/11/2026 — §2.14, a estimativa da janela da Etapa 13 |
 
 ---
@@ -620,6 +620,32 @@ Nos dois projetos, os créditos ("outras economias") cobrem o bruto inteiro: **l
 tributo. Fora da estimativa: Dataplex (R$ 25,15) e Cloud Monitoring (R$ 8,73), que ela não listava. A
 atribuição do Compute Engine aos nós do GKE é inferência pelo nome do serviço, sem leitura por SKU.
 
+### 2.15 A regeneração do Bloco 5R, medida — 17/11/2026
+
+A segunda regeneração das duas origens com a memória do armazém mantida, pelo roteiro da v1.1.0 com a
+adaptação do [plano da base dos consumidores](../PLANO_base_dos_consumidores.md) (Bloco 5R). O registro de
+cada linha é o diário `data/medicoes/diario_bloco5r.md`, fora do Git; as durações, do medidor (`make medir`,
+os registros `data/medicoes/2026-11-17T*.json`), com o Airbyte ou o *streaming* de pé, nunca os dois.
+
+| Linha | O que | Duração | Saída |
+|---|---|---|---|
+| C2 | `sync-airbyte RESET=1`, 247.395 linhas | 3m 23s | 0 |
+| C3 | cenário de *streaming*, 12.711 eventos até o corte | 1m 25s | 0 |
+| D2 | `sync-legacy`, a captura 70 | 1m 58s | 0 |
+| D3 | `dbt-build RESET=1` | 3m 42s | 2 (um teste; a Q62) |
+| D3 | `dbt-build`, depois da Q62 | 3m 30s | 0 |
+| E9 | `sync-airbyte` incremental, 26.523 linhas; `dbt-build` | 1m 54s; 3m 23s | 0 |
+| F1 | `check` | 18m 41s | 0 |
+| F3 | a DAG de ponta a ponta, 16 tarefas | 11m 57s | 0 (a 1ª tentativa, sem as credenciais do Airbyte, saiu 2 em 39 s) |
+| F4 | `dbt-build` do *commit* limpo | 4m 35s | 0 |
+| G7 | `recovery-restore`, os nove passos | 35m 48s | 0 |
+
+Do primeiro comando da fase A ao fim da G11: 00:37 a 05:14 UTC, com as confirmações do Owner, um reparo do nó do
+Airbyte e as conferências entre as linhas. A restauração levou quase o dobro da da v1.1.0 (19m 51s, §2.13): o
+passo 8 agora roda o `check` inteiro, com 1.734 testes Python contra 1.079 lá.
+
+---
+
 ## 3. Ponto único de recuperação
 
 O projeto mantém **um único pacote *last known good***: as duas fontes e a memória do armazém, em
@@ -642,6 +668,14 @@ promoção remove o aprovado anterior: o do B5 em `~/mvp_ed1-recovery-20260925T1
 `~/mvp_ed1-recovery-pre-v1.1.0` (`33d6451`, `2026-11-04T06:30:16Z`, conferido contra os bancos e
 nunca restaurado), que guarda o estado anterior a ela. Os três foram conferidos por *checksum* depois
 da promoção.
+
+**Substituído em 17/11/2026 pelo pacote do Bloco 5R**, depois da segunda regeneração (§2.15): corte
+`2026-11-17T04:30:57Z`, *commit* `4137dc7`, manifesto com SHA-256 `696cc005…`, já com o cursor do produtor (que
+recomeçou do zero no ciclo). Restaurado pelos nove passos por cima do ambiente povoado, em 35m 48s, e só então
+promovido. A segunda cópia está em `~/mvp_ed1-recovery-bloco5r`; o **corte de recuo** do ciclo, em
+`~/mvp_ed1-recovery-pre-bloco5r` (`f9f74e2`, `2026-11-17T00:38:48Z`, conferido contra os bancos e nunca
+restaurado). O aprovado da v1.1.0 saiu de `data/recovery` e fica em `~/mvp_ed1-recovery-v1.1.0`. As cinco
+retenções foram conferidas por *checksum* depois da promoção.
 
 ### 3.1 Conteúdo do pacote
 

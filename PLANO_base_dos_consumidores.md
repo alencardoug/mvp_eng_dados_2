@@ -1470,6 +1470,26 @@ ENFORCED` nunca foram aplicadas no BigQuery nesta fase. Para o `nl_sql`, o efeit
 continua sendo medição dele, no GCP dele. Declara também, conforme a Q9, quantas das 16 views foram
 auditadas, e quais.
 
+#### O fechamento, em 17/11/2026 (proposto ao aceite do Owner)
+
+- **`make check` verde** em `4137dc7`, no passo 8 da restauração do ciclo: `PASS=1079`, 1.734 testes Python,
+  19 pulados, cada um com o motivo; catálogo, dicionário, linhagem e pacote regenerados na mesma sequência; o
+  armazém com a procedência `verified`.
+- **A revisão por outro agente, por bloco:** rodadas 1 a 59 do §9 — os Blocos 0 a 6, a L5, a Q6, o desenho e a
+  implementação do Bloco 5R e a adaptação do ciclo —, cada revisão fechada sem achado aberto. Nenhuma revisão
+  cobre o fechamento em si: é a rodada que este texto pede antes da *tag*.
+- **As 16 views auditadas** — todas — contra referências independentes (Bloco 1b, `tests/auditoria/`): a auditoria
+  terminou em `4da9e60`, com a P13 depois da D66, e roda a cada `make check`; passou de novo sobre o dado
+  regenerado.
+- **Não provado:** o BigQuery (L9) — as descrições curtas e as *constraints* `NOT ENFORCED` nunca foram aplicadas
+  lá, e o efeito no Gemini do `nl_sql` é medição dele; o "antes" das 16 views na regeneração (Consumidores §5,
+  reconstruível do corte da A3); as exceções de quarentena das guardas 17 e 20 contra um lote que as exercite de
+  verdade (só um par exonerado neste); o retry que reconstrói uma dimensão e o órfão no armazém real (Bloco 6).
+- **Fora desta fase, nas Pendências:** a V4 medida, com 3 linhas de giro indefinido ainda sem explicação; a V5
+  (o giro baixo do dado sintético); a V1 a V3; a D43, a D63 e a D64. O que o ciclo levantou e ficou sem registro:
+  o aborto do Python no desligamento do pipeline (diário, E8), não documentado.
+- **A nota de versão** é a seção "Status" do README, e a *tag* `v2.1.0` (Q5) marca o *commit* que o Owner aceitar.
+
 ---
 
 ## 4. O que já foi conferido para escrever este plano (sem efeito)

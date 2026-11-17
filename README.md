@@ -24,10 +24,10 @@ Faker → PostgreSQL → Airbyte → dbt → datamart → consumption     (batch
 
 | | |
 |---|---|
-| **Estado** | Continuação do `mvp_eng_dados_1` desde 13/11/2026 ([D92](docs/pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026)). Fase local concluída: `v1.0.0`, em 04/10/2026, e a versão de manutenção `v1.1.0`, em 05/11/2026. A fase GCP (Etapa 13, M6) foi autorizada em 06/11/2026, desmontada em 13/11/2026 e **aceita com ressalvas** no mesmo dia; o custo real entra quando o faturamento fechar — o estado é do [Plano](docs/plano_de_desenvolvimento.md), e o processo, do [Registro da fase GCP](docs/registro_fase_gcp.md) |
+| **Estado** | Continuação do `mvp_eng_dados_1` desde 13/11/2026 ([D92](docs/pendencias.md#d92--o-projeto-continua-no-mvp_eng_dados_2-e-o-mvp_eng_dados_1-fica-travado-decidida-em-13112026)). Fase local concluída: `v1.0.0`, em 04/10/2026, e a versão de manutenção `v1.1.0`, em 05/11/2026. A fase GCP (Etapa 13, M6) foi autorizada em 06/11/2026, desmontada em 13/11/2026 e **aceita com ressalvas** no mesmo dia, com o custo real lido em 16/11/2026 — o estado é do [Plano](docs/plano_de_desenvolvimento.md), e o processo, do [Registro da fase GCP](docs/registro_fase_gcp.md). Depois dela, a fase da base dos consumidores (13 a 17/11/2026), com a `v2.1.0` proposta ao aceite do Owner — o [plano dela](PLANO_base_dos_consumidores.md) |
 | **Stack** | PostgreSQL · Airbyte (em Kubernetes local) · dbt · Airflow · Debezium sobre Kafka Connect · Redpanda · Apache Beam · Terraform · Docker · Python com SQLAlchemy e Alembic |
 | **Escopo** | Na `v1.1.0`: 40 tabelas de origem e uma origem legada defeituosa de propósito; nove camadas no armazém; 10 fatos, 15 dimensões e 16 views de consumo, uma por pergunta de negócio |
-| **Qualidade** | No aceite da `v1.1.0` (05/11/2026): `make check` verde com `PASS=907` e 1.079 testes Python; reconciliação em toda fronteira entre camadas; toda coluna classificada por sensibilidade, conferida por igualdade a cada `make check`. O medido de cada etapa está no [Plano](docs/plano_de_desenvolvimento.md) |
+| **Qualidade** | No fim da fase da base dos consumidores (17/11/2026): `make check` verde com `PASS=1079` e 1.734 testes Python, e o armazém com a procedência `verified`. No aceite da `v1.1.0` (05/11/2026): `PASS=907` e 1.079 testes Python; reconciliação em toda fronteira entre camadas; toda coluna classificada por sensibilidade, conferida por igualdade a cada `make check`. O medido de cada etapa está no [Plano](docs/plano_de_desenvolvimento.md) |
 | **Processo** | 33 dias e 306 *commits* do primeiro *commit* à `v1.0.0`; as Etapas 10 a 12 revisadas por um segundo agente, em rodadas até não restar achado |
 | **Reprodutível** | O ciclo inteiro refeito num clone novo e medido passo a passo, e um ponto único de recuperação restaurado de ponta a ponta |
 
@@ -130,7 +130,7 @@ Contexto, alternativas e consequências de cada uma em [`docs/adr/`](docs/adr/).
 **A fase local está concluída: o M5 fechou em 04/10/2026, com a *tag* `v1.0.0`.** A Etapa 13 —
 replicação no GCP com Terraform, o M6 — foi autorizada pelo Owner em 06/11/2026, executada numa janela
 de sete dias e desmontada em 13/11/2026, quando o Owner a **aceitou com ressalvas**: quatro critérios
-ficam parciais, e o custo real entra quando o faturamento fechar. O estado dela é do
+ficam parciais; o custo real foi lido no faturamento em 16/11/2026 ([Registro §61](docs/registro_fase_gcp.md#61-o-custo-real-lido-no-faturamento-16112026)). O estado dela é do
 [Plano](docs/plano_de_desenvolvimento.md), e o processo, passo a passo, do
 [Registro da fase GCP](docs/registro_fase_gcp.md).
 
@@ -144,6 +144,19 @@ memória do armazém num pacote com manifesto — foi restaurado sobre o ambient
 com o *re-snapshot* do CDC ([Capacidade §3](docs/capacidade_e_recuperacao.md#3-ponto-único-de-recuperação)).
 No aceite, depois de quatro rodadas de revisão final por outro agente: `make check` verde com
 `PASS=905` e 637 testes Python, e o histórico inteiro sem segredo não tratado.
+
+**A fase da base dos consumidores fecha em 17/11/2026, com a `v2.1.0` proposta ao aceite do Owner**
+([plano](PLANO_base_dos_consumidores.md)). Ela corrige aqui o que os três projetos que leem este repositório —
+o portal `gdados`, o `nl_sql` e a vitrine `bi-como-codigo` — mostraram que faltava: os números de três views e a
+auditoria das 16 contra referências independentes; as descrições, o grão e os textos que o BigQuery corta; o
+significado de cada valor categórico e as regras das métricas, declarados uma vez e publicados no
+[pacote de metadados](docs/pacote_de_metadados.md) que o `gdados` lê; a procedência do armazém, que diz qual
+*commit* o construiu ([ADR-0054](docs/adr/0054-procedencia-do-armazem-no-log-de-execucao.md)); as chaves de
+`analytics` como *constraints* ([ADR-0056](docs/adr/0056-chaves-declaradas-em-analytics.md)); e o gerador, que
+contradizia esses significados em seis pontos, corrigido e aplicado às duas origens numa regeneração com a
+memória do armazém mantida ([Capacidade §2.15](docs/capacidade_e_recuperacao.md#215-a-regeneração-do-bloco-5r-medida--17112026)).
+O que mudou para quem consome está em [Consumidores §5](docs/consumidores.md#5-o-que-mudou-para-quem-consome),
+e o *commit* a fixar, no §6. Não provado: o efeito no BigQuery, que está desmontado.
 
 Os marcos de M0 a M5, os critérios de cada etapa e o que foi medido em cada uma estão no
 [Plano de Desenvolvimento](docs/plano_de_desenvolvimento.md); o que está aberto, nas
