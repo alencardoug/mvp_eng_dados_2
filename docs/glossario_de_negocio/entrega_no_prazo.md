@@ -38,6 +38,14 @@ coluna é medir contra o último `update`.
 **Por que a devolvida conta.** Ela registra `delivered` e depois `returned`: a
 devolução não desfaz a entrega, é fato posterior, contado à parte.
 
+**Atrasada é o complemento, entre as entregues.** A remessa **atrasada** é a
+entregue cuja chegada passou da promessa (`late_count`): entregue e no prazo, ou
+entregue e atrasada — a em trânsito não é nem uma coisa nem outra, porque ainda
+não chegou. O **atraso** é contado em dias, da promessa até a chegada
+(`delivery_delay_days`, em fração de dia; negativo na que chegou adiantada), e a
+média dele (`avg_delay_days_when_late`) é tomada **só sobre as atrasadas**: diz de
+quanto foi o atraso de quem atrasou, não o desvio médio de todas as entregas.
+
 <!-- gerado a partir dos modelos; não editar à mão -->
 **Como as views o contam** (gerado de `docs/glossario_de_negocio/metricas.yml`; a definição e o porquê ficam no texto acima):
 

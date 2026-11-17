@@ -105,6 +105,24 @@ def test_a_versao_curta_da_receita_leva_a_regra_do_pedido_realizado() -> None:
     assert MARCA not in texto
 
 
+GLOSSARIO = RAIZ / "docs" / "glossario_de_negocio"
+
+
+def test_a_versao_curta_da_taxa_de_conversao_leva_as_tres_regras() -> None:
+    """Q59: a descrição da P07 no BigQuery é o texto curto, e ele leva o que muda o número.
+
+    Lido do glossário, a fonte do bloco `docs`, e não do *manifest*: a guarda vale antes do *build*.
+    O prefixo é o da descrição da view em `consumption` (`P07 — …`).
+    """
+    fonte = (GLOSSARIO / "taxa_de_conversao.md").read_text(encoding="utf-8")
+    bloco = fonte.split("{% docs cart_conversion_rate %}")[1].split("{% enddocs %}")[0]
+    assert MARCA in bloco
+    curto = " ".join(bloco.split(MARCA)[0].split())
+    assert len("P07 — Conversão de carrinho em pedido. " + curto) <= LIMITE
+    for trecho in ("Não aditiva", "mês em que foi **criado**", "**aberto dentro do prazo** fica fora do denominador"):
+        assert trecho in curto, trecho
+
+
 @pytest.mark.parametrize(
     ("coluna", "trechos"),
     [

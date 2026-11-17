@@ -247,6 +247,7 @@
       "minuend": null,
       "note": null,
       "numerator": "net_revenue_amount",
+      "on_zero_denominator": "returns_null",
       "round": 2,
       "scale": null,
       "source": null,
@@ -274,6 +275,7 @@
       "minuend": null,
       "note": null,
       "numerator": null,
+      "on_zero_denominator": null,
       "round": null,
       "scale": null,
       "source": {
@@ -345,6 +347,7 @@
       "minuend": null,
       "note": "contagem distinta de pedido",
       "numerator": null,
+      "on_zero_denominator": null,
       "round": null,
       "scale": null,
       "source": {

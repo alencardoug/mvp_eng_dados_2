@@ -258,3 +258,70 @@ def test_regra_que_muda_o_numero_muda_o_pacote(mudar) -> None:
     alterado = copy.deepcopy(DOC)
     mudar(alterado)
     assert metrics.view_rules(alterado) != metrics.view_rules(DOC)
+
+
+# ── Q60: a regra do pedido realizado, escrita à mão e declarada, dizem o mesmo ──
+
+#: O nome com que o glossário escreve cada estado do pedido — os sete, para que um estado indevido na
+#: enumeração seja reconhecido e recusado, e não ignorado. É a tradução, não outra declaração da regra.
+_ESTADO_EM_PORTUGUES = {"pending": "pendente", "paid": "pago", "picking": "em separação", "shipped": "enviado",
+                        "delivered": "entregue", "returned": "devolvido", "cancelled": "cancelado"}
+
+
+def _enumeracao(lista: str) -> set[str]:
+    """Os estados de uma enumeração `a, b, c ou d`, termo a termo e inteiros — `reenviado` não é
+    `enviado`. Termo que não é nome de estado nenhum é devolvido como está, e a comparação o acusa."""
+    termos = [t.strip(" .`") for parte in lista.split(",") for t in parte.split(" ou ")]
+    nomes = {v: k for k, v in _ESTADO_EM_PORTUGUES.items()}
+    return {nomes.get(t, f"?{t}") for t in termos if t}
+
+
+def _enumeracao_da_frase(frase: str) -> set[str]:
+    """A lista entre parênteses da frase à mão, até o `;`: `(pago, …, entregue ou devolvido; …)`."""
+    return _enumeracao(frase.split("(", 1)[1].split(";", 1)[0].split(")", 1)[0])
+
+
+def _enumeracao_do_rotulo(rotulo: str) -> set[str]:
+    """A lista depois do travessão do rótulo do filtro: `Só pedido realizado — pago, …, devolvido.`"""
+    return _enumeracao(rotulo.split("—", 1)[1])
+
+
+def test_o_pedido_realizado_diz_o_mesmo_a_mao_no_filtro_e_no_modelo() -> None:
+    """Q60: a frase à mão do texto curto da receita, o rótulo do filtro `realised_order` e o
+    `is_realised` de `trusted.orders` enumeram os mesmos estados — os mesmos, e nenhum a mais."""
+    import pathlib
+    import re
+
+    raiz = pathlib.Path(__file__).resolve().parents[1]
+    sql = (raiz / "dbt" / "models" / "trusted" / "orders.sql").read_text(encoding="utf-8")
+    lista = re.search(r"p\.order_status in \(([^)]*)\)\s*as is_realised", sql)
+    assert lista, "is_realised mudou de forma: atualize a guarda"
+    no_modelo = {e.strip(" '") for e in lista.group(1).split(",")}
+
+    receita = (raiz / "docs" / "glossario_de_negocio" / "receita_liquida.md").read_text(encoding="utf-8")
+    curto = receita.split("<!-- bigquery: fim do texto curto -->")[0]
+    frase = " ".join(curto.split("**Só pedido realizado conta**")[1].split("\n\n")[0].split())
+    rotulo = metrics.load_catalog()["filters"]["realised_order"]["label"]
+
+    assert no_modelo == {"paid", "picking", "shipped", "delivered", "returned"}
+    assert _enumeracao_da_frase(frase) == no_modelo, frase
+    assert _enumeracao_do_rotulo(rotulo) == no_modelo, rotulo
+
+
+@pytest.mark.parametrize(
+    "frase",
+    [
+        pytest.param("o que chegou a ser pago (pago, em separação, enviado ou entregue; `x`)", id="um-a-menos"),
+        pytest.param("o que chegou a ser pago (pago, em separação, reenviado, entregue ou devolvido; `x`)",
+                     id="substring-de-um-estado"),
+        pytest.param("o que chegou a ser pago (pago, em separação, enviado, entregue, cancelado ou devolvido; `x`)",
+                     id="estado-indevido-a-mais"),
+        pytest.param("o que chegou a ser pago (pago, em separação, enviado, entregue, devolvido ou estornado; `x`)",
+                     id="termo-que-nao-e-estado"),
+    ],
+)
+def test_a_guarda_do_pedido_realizado_acusa_a_enumeracao_errada(frase: str) -> None:
+    """Contraprova (RVB5RI-3-01): o estado a menos, a substring, o estado indevido e o termo estranho."""
+    assert _enumeracao_da_frase(frase) != {"paid", "picking", "shipped", "delivered", "returned"}
+    rotulo = "Só pedido realizado — " + frase.split("(", 1)[1].split(";")[0] + "."
+    assert _enumeracao_do_rotulo(rotulo) != {"paid", "picking", "shipped", "delivered", "returned"}

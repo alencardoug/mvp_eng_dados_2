@@ -9,10 +9,13 @@
   abandonados), pela data de **criação** do carrinho.
 - **Implementado em:** view `cart_conversion_rate_by_channel`.
 - **Relacionado:** carrinho abandonado, ticket médio.
+- **Não aditiva:** taxas não se somam entre meses ou canais. O carrinho conta no mês
+  em que foi **criado**, não no da conversão, e o **aberto dentro do prazo** fica fora
+  do denominador.
 
 <!-- bigquery: fim do texto curto -->
 
-**É medida não aditiva**, pelo mesmo motivo do ticket médio: taxas não se somam. A view entrega
+**Por que não aditiva.** Pelo mesmo motivo do ticket médio: taxas não se somam. A view entrega
 numerador e denominador ao lado do resultado.
 
 **O carrinho é contado no mês em que foi criado**, não no mês em que converteu. Um carrinho aberto

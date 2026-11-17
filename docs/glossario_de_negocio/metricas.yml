@@ -360,21 +360,21 @@ metrics:
     numerator: net_revenue_amount
     denominator: order_count
     round: 2
-    zero_denominator: "null"
+    on_zero_denominator: returns_null
   discount_share_pct:
     kind: ratio
     numerator: discount_amount
     denominator: gross_revenue_amount
     scale: 100
     round: 2
-    zero_denominator: "null"
+    on_zero_denominator: returns_null
   cart_conversion_rate_pct:
     kind: ratio
     numerator: converted_cart_count
     denominator: closed_cart_count
     scale: 100
     round: 2
-    zero_denominator: "null"
+    on_zero_denominator: returns_null
   gross_profit_amount:
     kind: difference
     minuend: net_revenue_amount
@@ -385,27 +385,27 @@ metrics:
     denominator: net_revenue_amount
     scale: 100
     round: 2
-    zero_denominator: "null"
+    on_zero_denominator: returns_null
   on_time_rate:
     kind: ratio
     numerator: on_time_count
     denominator: delivered_count
     round: 4
-    zero_denominator: "null"
+    on_zero_denominator: returns_null
   tickets_per_hundred_orders:
     kind: ratio
     numerator: ticket_count
     denominator: channel_order_count
     scale: 100
     round: 4
-    zero_denominator: "null"
+    on_zero_denominator: returns_null
   refund_rate_pct:
     kind: ratio
     numerator: refunded_amount
     denominator: captured_amount
     scale: 100
     round: 2
-    zero_denominator: "null"
+    on_zero_denominator: returns_null
 
 concepts:
   receita_liquida.md: [gross_revenue_amount, discount_amount, net_revenue_amount]

@@ -75,8 +75,10 @@ def load_catalog(caminho: pathlib.Path = CATALOG, conteudo: str | None = None) -
         for parte in partes:
             if metrica.get(parte) not in doc["measures"] and metrica.get(parte) not in doc["metrics"]:
                 raise ValueError(f"{caminho}: métrica `{nome}`: `{parte}` não é medida nem métrica")
-        if metrica["kind"] == "ratio" and metrica.get("zero_denominator") != "null":
-            raise ValueError(f"{caminho}: métrica `{nome}`: o denominador zero dá nulo (`zero_denominator: \"null\"`)")
+        if metrica["kind"] == "ratio" and metrica.get("on_zero_denominator") != "returns_null":
+            raise ValueError(f"{caminho}: métrica `{nome}`: o denominador zero dá nulo (`on_zero_denominator: returns_null`)")
+        if "zero_denominator" in metrica:
+            raise ValueError(f"{caminho}: métrica `{nome}`: `zero_denominator` saiu da declaração; é `on_zero_denominator` (Q61)")
     for nome, view in doc["views"].items():
         _conferir_view(caminho, doc, nome, view)
     # O conceito do glossário e as medidas e métricas que ele explica (Q31): a regra vira trecho gerado no `.md`.
@@ -567,7 +569,8 @@ def package_fields(doc: dict | None = None) -> tuple[dict, dict]:
                 publicada[alvo].append({"column": f"consumption.{nome_view}.{coluna}",
                                         "additivity": additivity(doc, view, coluna)})
     vazio = dict.fromkeys(("source", "aggregate", "expression", "identity", "where", "filters", "cast",
-                           "numerator", "denominator", "minuend", "subtrahend", "scale", "round", "zero_denominator"))
+                           "numerator", "denominator", "minuend", "subtrahend", "scale", "round", "zero_denominator",
+                           "on_zero_denominator"))
     saida = {}
     for nome, m in doc["measures"].items():
         saida[nome] = {**vazio, "kind": "measure", "additivity": m["additivity"], "note": m.get("note"),
@@ -577,7 +580,10 @@ def package_fields(doc: dict | None = None) -> tuple[dict, dict]:
     for nome, m in doc["metrics"].items():
         saida[nome] = {**vazio, "kind": m["kind"], "additivity": _aditividade_da_metrica(doc, nome), "note": None,
                        **{k: m.get(k) for k in ("numerator", "denominator", "minuend", "subtrahend", "scale", "round",
-                                                "zero_denominator")}}
+                                                "on_zero_denominator")},
+                       # O campo antigo, só por compatibilidade com o formato 1 (Q61): o texto `"null"` dizia o
+                       # mesmo que `returns_null`, e se confundia com o `null` de "não se aplica".
+                       "zero_denominator": "null" if m.get("on_zero_denominator") == "returns_null" else None}
     for nome, entrada in saida.items():
         entrada["columns"] = sorted(publicada[nome], key=lambda x: x["column"])
     return saida, filtros
