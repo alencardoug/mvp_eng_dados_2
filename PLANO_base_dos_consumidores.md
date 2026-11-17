@@ -1208,6 +1208,28 @@ zero, sem cursor trazido (Q52); as guardas fora da árvore até a D2, no disco a
 (Q53). **Continuam com ele, no momento de cada uma:** a autorização da regeneração (P5), a da janela de
 restauração (G6) e a confirmação antes de cada comando destrutivo.
 
+#### O ciclo, feito em 17/11/2026
+
+Rodou de 00:37 a 05:14 UTC, linha a linha pela adaptação acima, com a autorização do Owner (P5 e G6) e a confirmação
+dele antes de cada comando destrutivo. O registro inteiro — comando, saída, oráculo e desvio de cada linha — é o
+diário `data/medicoes/diario_bloco5r.md`, fora do Git, com as saídas em `data/medicoes/bloco5r_ciclo/`. O que ele
+prova, contra o critério de conclusão abaixo:
+
+- as seis guardas (invariantes 15 a 20) passam no armazém, nas duas origens; as exceções de quarentena exoneraram um
+  só par, do legado, com motivo pertinente (a abertura rejeitada);
+- a prova da Q37: o `RESET=1` com as chaves do Bloco 6, 26 PKs e 58 FKs instaladas, `tests/test_chaves.py` sem pulo;
+- a memória do legado contida (D4 e F6), com 67 chaves na memória de exclusão, o calculado antes; as sondas do H5;
+  os quatro zeros em C4 e E10; a DAG de ponta a ponta na primeira tentativa; o `make check` inteiro;
+- a procedência `verified` do build do commit limpo (`33dc10e1-…`, `b3212a4`); o pacote de recuperação refeito,
+  restaurado e promovido, com as cinco retenções íntegras;
+- a V4: 3 linhas de giro indefinido na P11, eram 1.216.
+
+O que saiu do roteiro, e está no diário: o nó do Airbyte não subia (dois registros órfãos de 09/11 no `containerd`,
+reparados com a autorização do Owner); a Q62, na D3; e três erros meus de operação, sem efeito no dado — o
+`pgrep` do preflight casando com o texto da própria chamada, o Airflow retomado sem as credenciais do Airbyte, um
+argumento errado na G4. **Fica para depois do ciclo:** os avisos aos consumidores, a entrada do ramo no `main` e o
+fechamento da fase. O "antes" das 16 views em Consumidores §5 está como não medido, reconstruível do corte da A3.
+
 **O que muda para quem consome.** Todas as 16 views mudam de valor: a correção do F24 muda quem compra e o que
 se vende, e daí todo o resto. Antes de regerar, um aviso fora do Git aos dois consumidores (`bi-como-codigo` e
 `gdados`), como os de 15/11. Depois, em Consumidores §5, uma linha `feita` por view, com o caso de antes e de
@@ -1709,8 +1731,10 @@ A do [`CLAUDE.md` §7](CLAUDE.md#7-definição-de-pronto), por bloco. O que muda
 6. Rodada 2 de perguntas (Q5 a Q7); Blocos 5 e 6, com os ADRs. Dentro do Bloco 5, pela rodada 7
    (Q21 a Q29): o catálogo dos domínios; a revisão do Bloco 5R por outro agente; as ligações e as guardas da
    Parte A que valem no dado de hoje; a Parte B; depois, o Bloco 6.
-7. O Bloco 5R, num ramo: o código, as invariantes e as guardas da fila inteira, a forma da V4 e o mapa do F22
-   com o Owner, a adaptação do ciclo revisada; o ciclo; as ligações medidas de novo sobre o dado novo.
+7. ~~O Bloco 5R, num ramo: o código, as invariantes e as guardas da fila inteira, a forma da V4 e o mapa do F22
+   com o Owner, a adaptação do ciclo revisada; o ciclo; as ligações medidas de novo sobre o dado novo.~~
+   (feito em 17/11/2026: Bloco 5R, "O ciclo, feito em 17/11/2026"; as ligações, pelas guardas da Parte A no
+   `make check` do ciclo)
 8. Fechamento.
 
 **Estimativa:** não há. O G06 sozinho foi estimado em 2 a 3 h de escrita mais a revisão do Owner
