@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 17/11/2026. As rodadas 1 a 3 de revisão foram aplicadas (§7). Falta: a rodada 4 e as respostas do Owner (§5). Nada foi executado |
+| Estado | **Proposto** em 17/11/2026. As rodadas 1 a 4 de revisão foram aplicadas (§7). Falta: a rodada 5 e as respostas do Owner (§5). Nada foi executado |
 | Origem | Pedido do Owner, 17/11/2026, depois de ler o que os três consumidores anotaram sobre a `v2.1.0`: "tomar todas as soluções mais robustas, mesmo que inclua regenerar bases e ADR [...] Reabre, resolve e fecha". Na mesma conversa, o Owner incluiu a V5 (a regeneração adiada pela Q47), a V6, a V7, a D63 e a D64 |
 | Base | `4d6f797`, sobre a `v2.1.0` (`eb11709`) |
 | Entradas lidas | `gdados/docs/alinhamento_entre_projetos.md` §7; `nl_sql/PENDENCIAS.md` item 9 e o parecer de 17/11/2026; `bi-como-codigo/docs/upstream_questions.md` UQ-16 a UQ-20, todos em 17/11/2026 |
@@ -86,8 +86,23 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
     tardios: a confirmação leva a contagem acumulada do par, e o par fecha quando ela iguala a esperada. Com
     alerta, a confirmação só conta depois da entrega bem-sucedida. Confirmar só a última janela não basta, e
     também não basta a última janela de cada chave;
-  - **a contraprova:** a última janela confirmada e um par anterior retido. A espera continua e, no fim do prazo,
-    falha.
+  - **o recorte da execução** (RVRB-4-01). O ramo de alertas só recebe os movimentos que o *sink* inseriu nesta
+    execução, os `novos` do `INSERT ... ON CONFLICT DO NOTHING ... RETURNING` (`sink.py:187–203`,
+    `pipeline.py:174–180,296–314`). O que já estava no destino entra só na semente de saldo
+    (`pipeline.py:199–221`), sem painel nem confirmação. Então a expectativa é o conjunto **inserido por esta
+    execução**, inclusive os do *snapshot* e os tardios, identificado pela execução. O *sink* registra os
+    inseridos, numa marca no destino ou no próprio registro de confirmação. Se for uma coluna nova em
+    `raw.inventory_movements_stream`, é mudança de esquema e entra na revisão integral do declarativo. Uma linha
+    de base por `event_sequence` lida no início só serve se a equivalência for mostrada. As
+    confirmações levam a mesma marca. A prova de que a origem inteira chegou ao destino até o corte continua
+    separada, no `stream-wait`;
+  - **as contraprovas:**
+    - a última janela confirmada e um par anterior retido: a espera continua e, no fim do prazo, falha;
+    - o destino já preenchido: os eventos antigos não pedem painel novo, todos os novos pedem confirmação, e
+      retransmitir os antigos não muda a expectativa;
+  - **atraso além da tolerância** (1.200 s, `pipeline.py:314–332`): o Beam descarta a janela expirada, a
+    contribuição confirmada falta, e a espera falha pelo prazo. O evento nunca é tirado da expectativa para dar
+    verde.
 
   O meio da confirmação (contador do Beam, registro em arquivo ou mensagem) é escolhido no desenho, com medida.
   **Se pedir um destino durável novo, como um tópico, volta ao Owner** antes de ser implementado (`CLAUDE.md` §5).
@@ -132,7 +147,9 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
        legado, a ausência explicada pela quarentena corrente com o código intacto passa. Os casos não
        demonstráveis são inventariados a partir do dado observado, e você aprova uma **lista explícita de
        exceções desta geração**, declarada e revisada por inteiro. A guarda **falha** para qualquer caso fora da
-       lista. Cada exceção tem a identidade do movimento, o `source_id`, a captura, o catálogo e a impressão do
+       lista. A lista é uma declaração versionada (um *seed* em `dbt/seeds/`, como `order_status_transitions`),
+       lida só pela guarda. O diário guarda a evidência, mas não substitui a declaração, e nada é inserido à mão
+       no banco. Cada exceção tem a identidade do movimento, o `source_id`, a captura, o catálogo e a impressão do
        tratamento, e a evidência fica congelada no diário. A lista é refeita a cada regeneração. Ela não
        recupera o código destruído, não lê o manifesto de injeção e não muda a classificação. É um aceite de
        qualidade limitado, não um vínculo explicado. Nada sai do dado. A consulta 4 do BI (`q_p08_november.sql`) **não** serve de contraprova:
@@ -404,4 +421,16 @@ a Q71 e a atribuição F31 × V5 estão corretos. **Aplicada em 17/11/2026:**
 |---|---|---|
 | RVRB-3-01 | bloqueante | Bloco 1, D63: a espera pela cobertura de todos os pares (chave, janela) do corte, pela contagem esperada calculada do livro, inclusive janelas anteriores e painéis tardios, e a contraprova do par retido |
 | RVRB-3-02 | ajuste | Bloco 2, item 4, e Q72: a opção (d), uma lista de exceções desta geração aprovada pelo Owner, com reprovação de caso novo, agora a recomendada; a parada dela na adaptação do ciclo |
+
+### Rodada 4 — codex2, sobre `118b2b3` (17/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_plano_r4.md`, fora do Git. **Conclusão do Codex:** nada bloqueia
+o Bloco 0. RVRB-3-02 está resolvido, e a (d) da Q72 cabe num *seed* versionado. RVRB-3-01 está resolvido em
+parte: a atribuição às janelas é reproduzível do livro (60 s, alinhadas à época Unix, por `occurred_at`), as
+duplicatas não entram na expectativa, e o atraso além da tolerância dá falha pelo prazo. **Aplicada em
+17/11/2026:**
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVRB-4-01 | bloqueante | Bloco 1, D63: a expectativa é o inserido por esta execução, com marca do *sink*; a contraprova do destino preenchido; o atraso além da tolerância. Bloco 2, Q72 (d): a lista num *seed* versionado |
 
