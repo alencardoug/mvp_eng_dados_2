@@ -46,7 +46,7 @@ import xml.etree.ElementTree as ET
 
 import yaml
 
-from mvp_ed1.models import lineage, metrics, sensitivity
+from mvp_ed1.models import data_types, lineage, metrics, sensitivity
 
 ROOT = sensitivity.ROOT
 DBT = sensitivity.DBT
@@ -94,7 +94,9 @@ AMBIENTES = [
     {"id": "mapa_de_paridade", "title": "Mapa de paridade local ↔ GCP", "repository": "mvp_eng_dados_2", "path": "docs/arquitetura.md#5-mapa-de-paridade-local--gcp", "delivery": "read_by_commit", "commit": None, "frozen_at": None, "note": None},
     {"id": "arquitetura", "title": "Arquitetura", "repository": "mvp_eng_dados_2", "path": "docs/arquitetura.md", "delivery": "read_by_commit", "commit": None, "frozen_at": None, "note": None},
     {"id": "modelo_de_dados", "title": "Modelo de dados", "repository": "mvp_eng_dados_2", "path": "docs/modelo_de_dados.md", "delivery": "read_by_commit", "commit": None, "frozen_at": None, "note": None},
-    {"id": "registro_fase_gcp", "title": "Registro da fase GCP", "repository": "mvp_eng_dados_2", "path": "docs/registro_fase_gcp.md", "delivery": "read_by_commit", "commit": None, "frozen_at": "2026-11-13", "note": "Processo da Etapa 13; o custo real entra quando o faturamento fechar."},
+    {"id": "registro_fase_gcp", "title": "Registro da fase GCP", "repository": "mvp_eng_dados_2", "path": "docs/registro_fase_gcp.md", "delivery": "read_by_commit", "commit": None, "frozen_at": "2026-11-13", "note": "Processo da Etapa 13. O custo real foi lido no faturamento em 16/11/2026 (§61), e o valor está em `custo_gcp`."},
+    # O custo real (F33): o portal lê o valor daqui, e não da nota acima.
+    {"id": "custo_gcp", "title": "Custo da fase GCP: a estimativa e o real", "repository": "mvp_eng_dados_2", "path": "docs/capacidade_e_recuperacao.md#214-a-estimativa-da-janela-da-etapa-13--07112026", "delivery": "read_by_commit", "commit": None, "frozen_at": None, "note": "O real lido no faturamento em 16/11/2026, ao lado da estimativa de 07/11/2026."},
     {"id": "evidencias_gcp", "title": "Evidências coletadas no GCP antes do desmonte", "repository": "mvp_eng_dados_1", "path": "data/medicoes/etapa_13/evidencias/", "delivery": "not_available", "commit": None, "frozen_at": "2026-11-13", "note": "Fora do Git (L10); se entram, e sanitizadas como, é decisão pendente."},
 ]
 
@@ -222,6 +224,16 @@ def _grao(descricao: str | None) -> str | None:
     return _texto(descricao[len("**Grão:"):].split("**", 1)[0])
 
 
+def _chaves(manifest: dict) -> dict[str, dict]:
+    """`relação → PK e FKs` de `analytics`, pela regra que as instala (F34; `data_types.declared_*`)."""
+    modelos = data_types.analytics_models(manifest)
+    rid = lambda nome: f"{modelos[nome]['schema']}.{modelos[nome].get('alias') or nome}"
+    saida = {rid(n): {"primary_key": colunas, "foreign_keys": []} for n, colunas in data_types.declared_primary_keys(manifest).items()}
+    for tabela, coluna, pai, coluna_pai in sorted(data_types.declared_foreign_keys(manifest)):
+        saida[rid(tabela)]["foreign_keys"].append({"column": coluna, "references_relation": rid(pai), "references_column": coluna_pai})
+    return saida
+
+
 def _relacoes(manifest: dict) -> dict:
     saida = {}
     for no in manifest["nodes"].values():
@@ -246,6 +258,10 @@ def _relacoes(manifest: dict) -> dict:
             "grants_select": sorted(((meta.get("grants") or {}).get("select")) or []),
             "columns": {c: _coluna(v) for c, v in fonte["columns"].items()},
         }
+    # As chaves só existem onde a macro as instala; nas outras relações, nenhuma declarada.
+    chaves = _chaves(manifest)
+    for rid, relacao in saida.items():
+        relacao.update(chaves.get(rid, {"primary_key": [], "foreign_keys": []}))
     return dict(sorted(saida.items()))
 
 
@@ -406,11 +422,33 @@ def _testes(manifest: dict, run: dict) -> dict:
             estado = {"success": "pass"}.get(r["status"], r["status"])
             resultado = {"status": estado, "executed_at": _instante_execucao(r.get("timing") or []),
                          "invocation_id": invocacao, "same_invocation_as_manifest": mesma}
+        destino, coluna_destino = (None, None)
+        if nome_teste == "relationships" and not unitario:
+            kw = no["test_metadata"]["kwargs"]
+            destino, coluna_destino = _destino(manifest, kw.get("to"), no["unique_id"]), kw.get("field")
         saida[no["unique_id"]] = {
             "kind": "unit_test" if unitario else "data_test", "test": nome_teste, "relation": alvo,
             "column": no.get("column_name"), "declared_in": "dbt/" + no["original_file_path"], "result": resultado,
+            "references_relation": destino, "references_column": coluna_destino,
         }
     return dict(sorted(saida.items()))
+
+
+_REF = re.compile(r"""^\s*ref\(\s*['"]([a-z0-9_]+)['"]\s*\)\s*$""")
+_SOURCE = re.compile(r"""^\s*source\(\s*['"]([a-z0-9_]+)['"]\s*,\s*['"]([a-z0-9_]+)['"]\s*\)\s*$""")
+
+
+def _destino(manifest: dict, to: str | None, teste: str) -> str:
+    """A relação que uma `relationships` referencia (F34), resolvida no *manifest*; o que não resolve é recusa."""
+    if (m := _REF.match(to or "")):
+        nos = [n for n in manifest["nodes"].values() if n["resource_type"] in ("model", "seed", "snapshot") and n["name"] == m[1]]
+        if len(nos) == 1:
+            return f"{nos[0]['schema']}.{nos[0].get('alias') or nos[0]['name']}"
+    elif (m := _SOURCE.match(to or "")):
+        fontes = [f for f in manifest["sources"].values() if f["source_name"] == m[1] and f["name"] == m[2]]
+        if len(fontes) == 1:
+            return f"{fontes[0]['schema']}.{fontes[0].get('identifier') or fontes[0]['name']}"
+    raise SystemExit(f"{teste}: o destino `{to}` da `relationships` não resolve a uma relação — nenhum pacote é escrito")
 
 
 def _esquema_do_modelo(manifest: dict, modelo: str) -> str:
@@ -427,10 +465,44 @@ def _alvo(manifest: dict, teste: dict) -> str | None:
     return f"{pai['schema']}.{pai.get('alias') or pai.get('identifier') or pai['name']}"
 
 
-def _auditorias(resultado: dict) -> dict:
-    return {f"consumption.{v}": {"status": "audited", "commit": resultado["commit"], "criteria": resultado["criteria"],
-                                 "reference": linha["reference"], "findings": linha["findings"]}
-            for v, linha in sorted(resultado["views"].items())}
+#: As verificações da auditoria (UQ-19): a da referência de cada view e, onde `resultado.yml` a declara, a da
+#: população. A população é um caso do `pytest` (em `checks`) ou um teste singular do dbt (`dbt/tests/`, em
+#: `tests`, como a da P13). O nome do caso é o da parametrização de `tests/test_auditoria_das_views.py`, e
+#: `tests/test_pacote_gerado.py` confere que cada id é um caso coletado.
+VERIFICACAO_DA_REFERENCIA = "tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia[{}]"
+VERIFICACAO_DA_POPULACAO = "tests/test_auditoria_das_views.py::test_a_populacao_confere_com_a_camada_responsavel[{}]"
+
+
+def verificacoes_da_auditoria(linha: dict, view: str, manifest: dict) -> tuple[list[str], list[str]]:
+    """`(ids em checks, ids em tests)` das verificações de uma view auditada."""
+    populacao = linha.get("population") or []
+    populacao = [populacao] if isinstance(populacao, str) else populacao       # a P15 declara duas
+    casos = [VERIFICACAO_DA_REFERENCIA.format(view)]
+    testes = []
+    for caminho in populacao:
+        if caminho.startswith("dbt/tests/"):
+            achados = [n["unique_id"] for n in manifest["nodes"].values()
+                       if n["resource_type"] == "test" and "dbt/" + n["original_file_path"] == caminho]
+            if len(achados) != 1:
+                raise SystemExit(f"view_audits: `{view}` declara a população `{caminho}`, que não é um teste do dbt — nenhum pacote é escrito")
+            testes += achados
+        else:
+            casos.append(VERIFICACAO_DA_POPULACAO.format(pathlib.PurePosixPath(caminho).stem))
+    return casos, testes
+
+
+def _auditorias(resultado: dict, checks: dict, manifest: dict) -> dict:
+    saida = {}
+    for v, linha in sorted(resultado["views"].items()):
+        casos, testes = verificacoes_da_auditoria(linha, v, manifest)
+        # Sem JUnit (o primeiro `make catalog` da sequência), `checks` sai vazio e os ids ficam sem resultado;
+        # com ele, id que não é caso da suíte é recusa: o portal leria um resultado que não existe.
+        if checks and (faltam := [i for i in casos if i not in checks]):
+            raise SystemExit(f"view_audits: `{v}` cita verificações que o JUnit não tem ({faltam}) — nenhum pacote é escrito")
+        saida[f"consumption.{v}"] = {"status": "audited", "commit": resultado["commit"], "criteria": resultado["criteria"],
+                                     "reference": linha["reference"], "findings": linha["findings"],
+                                     "checks": casos, "data_tests": testes}
+    return saida
 
 
 def _resumo(modulo: pathlib.Path) -> str | None:
@@ -606,7 +678,7 @@ def montar(manifest: dict, derivacao, run: dict, junit: pathlib.Path = JUNIT, le
         "view_rules": metrics.view_rules(),
         "description_gaps": _faltas(relacoes),
         "tests": _testes(manifest, run),
-        "view_audits": _auditorias(yaml.safe_load(RESULTADO.read_text(encoding="utf-8"))),
+        "view_audits": _auditorias(yaml.safe_load(RESULTADO.read_text(encoding="utf-8")), checks, manifest),
         "environments": AMBIENTES,
         "checks": checks,
         "open_items": _abertos(PENDENCIAS.read_text(encoding="utf-8")),

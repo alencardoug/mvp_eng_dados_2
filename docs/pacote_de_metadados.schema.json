@@ -374,7 +374,9 @@
         "meta",
         "columns",
         "grain",
-        "grants_select"
+        "grants_select",
+        "primary_key",
+        "foreign_keys"
       ],
       "properties": {
         "schema": {
@@ -425,6 +427,22 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "primary_key": {
+          "description": "As colunas da chave primária declarada (constraints: primary_key no .yml), na ordem das colunas: a regra que dbt/macros/chaves.sql instala no banco (ADR-0056). Só analytics declara; lista vazia nas outras relações.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "uniqueItems": true
+        },
+        "foreign_keys": {
+          "description": "As chaves estrangeiras que a macro instala: cada relationships de um modelo de analytics para outro, em ordem de coluna. Lista vazia fora de analytics; o destino de toda relationships, de qualquer camada, está em tests.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/foreign_key"
+          }
         }
       }
     },
@@ -648,7 +666,9 @@
         "relation",
         "column",
         "declared_in",
-        "result"
+        "result",
+        "references_relation",
+        "references_column"
       ],
       "properties": {
         "kind": {
@@ -732,8 +752,55 @@
               }
             }
           ]
+        },
+        "references_relation": {
+          "description": "Na relationships, a relação referenciada (o `to` resolvido no manifest); null nos outros testes.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/relation_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "references_column": {
+          "description": "Na relationships, a coluna referenciada (o `field`); null nos outros testes.",
+          "$ref": "#/$defs/text_or_null"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "test": {
+                "const": "relationships"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "references_relation": {
+                "$ref": "#/$defs/relation_id"
+              },
+              "references_column": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "references_relation": {
+                "type": "null"
+              },
+              "references_column": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "view_audit": {
       "type": "object",
@@ -743,7 +810,9 @@
         "commit",
         "criteria",
         "reference",
-        "findings"
+        "findings",
+        "checks",
+        "data_tests"
       ],
       "properties": {
         "status": {
@@ -781,6 +850,24 @@
             "type": "string",
             "pattern": "^F[0-9]+$"
           }
+        },
+        "checks": {
+          "description": "Os ids, em checks, dos casos do pytest que sustentam a auditoria: a comparação com a referência e, onde declarada, a população. De lá vêm o resultado e a data da execução sobre o dado.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "data_tests": {
+          "description": "Os ids, em tests, dos testes do dbt que sustentam a auditoria (a população declarada como teste singular, como a da P13). Lista vazia quando nenhum.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^test\\.[a-z0-9_]+\\."
+          },
+          "uniqueItems": true
         }
       },
       "allOf": [
@@ -802,6 +889,12 @@
               },
               "reference": {
                 "type": "null"
+              },
+              "checks": {
+                "maxItems": 0
+              },
+              "data_tests": {
+                "maxItems": 0
               }
             }
           }
@@ -826,6 +919,9 @@
               "reference": {
                 "type": "string",
                 "minLength": 1
+              },
+              "checks": {
+                "minItems": 1
               }
             }
           }
@@ -852,6 +948,9 @@
                 "minLength": 1
               },
               "findings": {
+                "minItems": 1
+              },
+              "checks": {
                 "minItems": 1
               }
             }
@@ -2001,6 +2100,28 @@
           "sources": {
             "maxItems": 0
           }
+        }
+      }
+    },
+    "foreign_key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "references_relation",
+        "references_column"
+      ],
+      "properties": {
+        "column": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "references_relation": {
+          "$ref": "#/$defs/relation_id"
+        },
+        "references_column": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
         }
       }
     }

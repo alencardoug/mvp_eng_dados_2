@@ -25,6 +25,8 @@ EXEMPLO = RAIZ / "docs/pacote_de_metadados.exemplo.json"
 TESTE = "test.mvp_ed1.not_null_fact_sales_order_item_net_revenue_amount.744c563ed6"
 VIEW = "consumption.average_order_value_by_channel_and_segment"
 CHECK = "tests/test_acesso.py::test_o_declarado_e_a_politica_da_governanca"
+FATO = "analytics.fact_sales_order_item"
+RELACIONAMENTO = "test.mvp_ed1.relationships_fact_sales_order_item_brand_key__brand_key__ref_dim_brand_.32a8287d35"
 
 
 def _carregar(caminho: pathlib.Path) -> dict:
@@ -61,7 +63,8 @@ def test_a_linhagem_do_pacote_e_o_formato_do_exportador(validador) -> None:
 
 
 def test_uma_auditoria_completa_passa(validador, exemplo) -> None:
-    """A condição do estado `audited` não recusa o caso legítimo: commit, os três critérios e a referência."""
+    """A condição do estado `audited` não recusa o caso legítimo: commit, os três critérios, a referência e
+    as verificações em `checks` (UQ-19)."""
     auditada = _com(
         exemplo,
         {
@@ -70,6 +73,8 @@ def test_uma_auditoria_completa_passa(validador, exemplo) -> None:
             "criteria": ["non_additivity", "time_dependent_balance", "truncated_population"],
             "reference": "tests/referencia.py",
             "findings": [],
+            "checks": ["tests/test_referencia.py::test_a_view_confere[x]"],
+            "data_tests": [],
         },
         "view_audits",
         VIEW,
@@ -255,6 +260,27 @@ def _com(dado: dict, valor, *caminho: str) -> dict:
             ),
             id="auditada-com-referencia-vazia",
         ),
+        # F34: as chaves e o destino das `relationships`.
+        pytest.param(lambda e: _sem(e, "relations", FATO, "primary_key"), id="relacao-sem-a-pk"),
+        pytest.param(lambda e: _com(e, None, "relations", VIEW, "foreign_keys"), id="fks-nulas-em-vez-de-lista"),
+        pytest.param(lambda e: _sem(e, "relations", FATO, "foreign_keys", 0, "references_column"), id="fk-sem-a-coluna-referenciada"),
+        pytest.param(lambda e: _com(e, "dim_brand", "relations", FATO, "foreign_keys", 0, "references_relation"), id="fk-sem-o-schema"),
+        pytest.param(lambda e: _com(e, None, "tests", RELACIONAMENTO, "references_relation"), id="relationships-sem-destino"),
+        pytest.param(lambda e: _com(e, "analytics.dim_brand", "tests", TESTE, "references_relation"), id="outro-teste-com-destino"),
+        pytest.param(lambda e: _sem(e, "tests", TESTE, "references_column"), id="teste-com-destino-omitido"),
+        # UQ-19: a auditada aponta as verificações; a não auditada, nenhuma.
+        pytest.param(
+            lambda e: _com(
+                e,
+                {"status": "audited", "commit": "abc1234", "criteria": ["non_additivity", "time_dependent_balance", "truncated_population"],
+                 "reference": "tests/referencia.py", "findings": [], "checks": [], "data_tests": []},
+                "view_audits",
+                VIEW,
+            ),
+            id="auditada-sem-verificacao",
+        ),
+        pytest.param(lambda e: _com(e, ["tests/x.py::test_y"], "view_audits", VIEW, "checks"), id="nao-auditada-com-verificacao"),
+        pytest.param(lambda e: _sem(e, "view_audits", VIEW, "data_tests"), id="auditoria-sem-os-testes-do-dbt"),
     ],
 )
 def test_o_esquema_recusa_o_exemplo_alterado(validador, exemplo, alterar) -> None:

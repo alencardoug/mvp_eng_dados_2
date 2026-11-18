@@ -98,17 +98,27 @@
       "delivery": "read_by_commit",
       "frozen_at": "2026-11-13",
       "id": "registro_fase_gcp",
-      "note": "Processo da Etapa 13; o custo real entra quando o faturamento fechar.",
+      "note": "Processo da Etapa 13. O custo real foi lido no faturamento em 16/11/2026 (§61), e o valor está em `custo_gcp`.",
       "path": "docs/registro_fase_gcp.md",
       "repository": "mvp_eng_dados_2",
       "title": "Registro da fase GCP"
     },
     {
       "commit": null,
+      "delivery": "read_by_commit",
+      "frozen_at": null,
+      "id": "custo_gcp",
+      "note": "O real lido no faturamento em 16/11/2026, ao lado da estimativa de 07/11/2026.",
+      "path": "docs/capacidade_e_recuperacao.md#214-a-estimativa-da-janela-da-etapa-13--07112026",
+      "repository": "mvp_eng_dados_2",
+      "title": "Custo da fase GCP: a estimativa e o real"
+    },
+    {
+      "commit": null,
       "delivery": "not_available",
       "frozen_at": "2026-11-13",
       "id": "evidencias_gcp",
-      "note": "Fora do Git (L10); o que entra, e sanitizado como, se decide no Bloco 4.",
+      "note": "Fora do Git (L10); se entram, e sanitizadas como, é decisão pendente.",
       "path": "data/medicoes/etapa_13/evidencias/",
       "repository": "mvp_eng_dados_1",
       "title": "Evidências coletadas no GCP antes do desmonte"
@@ -478,6 +488,18 @@
         }
       },
       "description": "**Grão: uma linha de item de pedido.** Um SKU comprado em um pedido. Medidas todas aditivas; valores de nível de pedido não estão aqui, porque somá-los no grão de item multiplicaria o frete pelo número de itens.\n",
+      "foreign_keys": [
+        {
+          "column": "brand_key",
+          "references_column": "brand_key",
+          "references_relation": "analytics.dim_brand"
+        },
+        {
+          "column": "category_key",
+          "references_column": "category_key",
+          "references_relation": "analytics.dim_category"
+        }
+      ],
       "grain": "uma linha de item de pedido.",
       "grants_select": [
         "transformer"
@@ -492,6 +514,9 @@
         ]
       },
       "name": "fact_sales_order_item",
+      "primary_key": [
+        "order_item_key"
+      ],
       "resource_type": "model",
       "schema": "analytics"
     },
@@ -516,6 +541,7 @@
         }
       },
       "description": "P02 — Ticket médio por canal e segmento. **Ticket médio** é a receita líquida dividida pelo número de pedidos distintos do mesmo recorte.\n\n- **Cálculo:** `net_revenue_amount / order_count`, **recalculado a cada recorte**.\n- **Implementado em:** view `average_order_value_by_channel_and_segment`.\n- **Relacionado:** receita líquida, recorrência de compra.\n\n**É medida não aditiva, e isso tem consequência prática.** A média das médias mensais não é a média\ndo ano: doze meses de tamanhos diferentes não se somam e dividem por doze. Por isso a view entrega\n`net_revenue_amount` e `order_count` **ao lado** do resultado — quem reagregar por trimestre soma os\ndois e divide de novo, em vez de somar ticket médio com ticket médio.\n\nO denominador é o **pedido**, não o item: um pedido de cinco itens conta uma vez.",
+      "foreign_keys": [],
       "grain": null,
       "grants_select": [
         "analyst",
@@ -531,6 +557,7 @@
         ]
       },
       "name": "average_order_value_by_channel_and_segment",
+      "primary_key": [],
       "resource_type": "model",
       "schema": "consumption"
     },
@@ -546,6 +573,7 @@
         }
       },
       "description": null,
+      "foreign_keys": [],
       "grain": null,
       "grants_select": [
         "transformer"
@@ -563,12 +591,14 @@
         ]
       },
       "name": "order_items",
+      "primary_key": [],
       "resource_type": "source",
       "schema": "raw"
     },
     "trusted.carriers": {
       "columns": {},
       "description": null,
+      "foreign_keys": [],
       "grain": null,
       "grants_select": [
         "transformer"
@@ -583,6 +613,7 @@
         ]
       },
       "name": "carriers",
+      "primary_key": [],
       "resource_type": "model",
       "schema": "trusted"
     }
@@ -592,6 +623,8 @@
       "column": "net_revenue_amount",
       "declared_in": "dbt/models/analytics/_analytics__models.yml",
       "kind": "data_test",
+      "references_column": null,
+      "references_relation": null,
       "relation": "analytics.fact_sales_order_item",
       "result": {
         "executed_at": "2026-11-13T22:23:20.783828Z",
@@ -600,12 +633,29 @@
         "status": "pass"
       },
       "test": "not_null"
+    },
+    "test.mvp_ed1.relationships_fact_sales_order_item_brand_key__brand_key__ref_dim_brand_.32a8287d35": {
+      "column": "brand_key",
+      "declared_in": "dbt/models/analytics/_analytics__models.yml",
+      "kind": "data_test",
+      "references_column": "brand_key",
+      "references_relation": "analytics.dim_brand",
+      "relation": "analytics.fact_sales_order_item",
+      "result": {
+        "executed_at": "2026-11-13T22:23:20.783828Z",
+        "invocation_id": "8eeff407-6cfc-4fe6-84b4-db55e8b12c92",
+        "same_invocation_as_manifest": true,
+        "status": "pass"
+      },
+      "test": "relationships"
     }
   },
   "view_audits": {
     "consumption.average_order_value_by_channel_and_segment": {
+      "checks": [],
       "commit": null,
       "criteria": [],
+      "data_tests": [],
       "findings": [],
       "reference": null,
       "status": "not_audited"

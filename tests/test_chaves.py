@@ -32,21 +32,9 @@ def _testes(manifest: dict, nome: str) -> list[dict]:
             if t["resource_type"] == "test" and (t.get("test_metadata") or {}).get("name") == nome]
 
 
-def declared_fks(manifest: dict) -> set[tuple[str, str, str, str]]:
-    """(tabela, coluna, apontada, coluna apontada) de cada `relationships` de `analytics` — o que a macro instala."""
-    modelos = dt.analytics_models(manifest)
-    saida = set()
-    for t in _testes(manifest, "relationships"):
-        filho = manifest["nodes"].get(t.get("attached_node") or "", {})
-        if filho.get("name") in modelos:
-            kw = t["test_metadata"]["kwargs"]
-            saida.add((filho["name"], t["column_name"], kw["to"].split("'")[1], kw["field"]))
-    return saida
-
-
-def declared_pks(manifest: dict) -> dict[str, list[str]]:
-    return {nome: [c for c, v in no["columns"].items() if any(k["type"] == "primary_key" for k in v.get("constraints") or [])]
-            for nome, no in dt.analytics_models(manifest).items()}
+#: A regra da macro, no código que o pacote de metadados também usa (F34): uma só.
+declared_fks = dt.declared_foreign_keys
+declared_pks = dt.declared_primary_keys
 
 
 # ── Sem banco ───────────────────────────────────────────────────────────────────
@@ -161,6 +149,21 @@ def test_a_guarda_das_chaves_aponta_a_duplicata_o_outro_schema_e_a_falta() -> No
     assert _desvios_das_chaves([l if l is not uma else (*l[:3], "outro_schema", *l[4:]) for l in exatas], manifest) != []
     assert _desvios_das_chaves([l for l in exatas if l is not uma], manifest) != []
     assert _desvios_das_chaves([l if l is not uma else (*l[:6], False) for l in exatas], manifest) != []
+
+
+def test_o_pacote_traz_as_chaves_que_a_macro_instala() -> None:
+    """F34: as PKs e FKs de `relations` são as da regra que as instala, e nenhuma relação fora de `analytics` traz
+    chave. O armazém é conferido contra a mesma regra abaixo: o pacote e o banco saem da mesma declaração."""
+    from mvp_ed1.models import pacote
+    manifest = _manifest()
+    gerado = json.loads(pacote.PACOTE.read_text(encoding="utf-8"))["relations"]
+    pks = {r.split(".", 1)[1]: v["primary_key"] for r, v in gerado.items() if v["primary_key"]}
+    fks = {(r.split(".", 1)[1], f["column"], f["references_relation"].split(".", 1)[1], f["references_column"])
+           for r, v in gerado.items() for f in v["foreign_keys"]}
+    assert pks == declared_pks(manifest) and len(pks) == MODELOS
+    assert fks == declared_fks(manifest) and len(fks) == FKS
+    assert [r for r, v in gerado.items() if (v["primary_key"] or v["foreign_keys"]) and not r.startswith("analytics.")] == []
+    assert {f["references_relation"].split(".")[0] for v in gerado.values() for f in v["foreign_keys"]} == {"analytics"}
 
 
 # ── No armazém ──────────────────────────────────────────────────────────────────

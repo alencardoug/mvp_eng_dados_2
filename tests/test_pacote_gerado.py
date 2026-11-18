@@ -542,3 +542,17 @@ def test_o_esquema_so_aceita_verified_com_a_execucao_inteira(gerado) -> None:
     sem_motivo = _minimo(base)
     sem_motivo["provenance"]["warehouse"].update(status="not_verified", reason=None)
     assert pacote.validar(sem_motivo)
+
+
+def test_a_auditoria_aponta_verificacoes_que_existem(gerado) -> None:
+    """UQ-19: cada id de `view_audits.*.checks` é um caso coletado de `tests/test_auditoria_das_views.py`, e cada
+    id de `data_tests` é um teste do pacote. Sem banco: a coleta só lê a parametrização."""
+    saida = subprocess.run([sys.executable, "-m", "pytest", "--co", "-q", "-p", "no:cacheprovider", "tests/test_auditoria_das_views.py"],
+                           cwd=RAIZ, capture_output=True, text=True, check=True).stdout
+    coletados = {linha.strip() for linha in saida.splitlines() if "::" in linha}
+    auditadas = {v: a for v, a in gerado["view_audits"].items() if a["status"] == "audited"}
+    assert len(auditadas) == 16
+    assert {v: sorted(set(a["checks"]) - coletados) for v, a in auditadas.items() if set(a["checks"]) - coletados} == {}
+    assert {v: a["data_tests"] for v, a in auditadas.items() if set(a["data_tests"]) - set(gerado["tests"])} == {}
+    # A referência de cada view está entre as verificações dela, com o nome da parametrização.
+    assert [v for v, a in auditadas.items() if pacote.VERIFICACAO_DA_REFERENCIA.format(v.split(".", 1)[1]) not in a["checks"]] == []

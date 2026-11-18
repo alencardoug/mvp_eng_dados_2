@@ -99,6 +99,33 @@ def primary_keys(manifest: dict) -> dict[str, str]:
     return saida
 
 
+# ── As chaves declaradas, pela regra da macro ───────────────────────────────────
+# A mesma regra de `dbt/macros/chaves.sql::_chaves_declaradas`, que as instala no banco: a PK pela
+# `constraints: primary_key` da coluna, e a FK pela `relationships` de um modelo de `analytics` para outro.
+# O pacote de metadados publica estas (F34), e `tests/test_chaves.py` confere que o armazém tem exatamente
+# elas — o pacote e o banco saem da mesma declaração, e nada se infere pelo nome.
+
+def declared_primary_keys(manifest: dict) -> dict[str, list[str]]:
+    """`modelo → colunas da PK`, na ordem das colunas do modelo."""
+    return {nome: [c for c, v in no["columns"].items() if any(k["type"] == "primary_key" for k in v.get("constraints") or [])]
+            for nome, no in analytics_models(manifest).items()}
+
+
+def declared_foreign_keys(manifest: dict) -> set[tuple[str, str, str, str]]:
+    """`(tabela, coluna, apontada, coluna apontada)` de cada `relationships` de `analytics` para `analytics`."""
+    modelos = analytics_models(manifest)
+    saida = set()
+    for t in manifest["nodes"].values():
+        if t["resource_type"] != "test" or (t.get("test_metadata") or {}).get("name") != "relationships":
+            continue
+        filho = manifest["nodes"].get(t.get("attached_node") or "", {})
+        kw = t["test_metadata"]["kwargs"]
+        alvo = (kw.get("to") or "").split("'")
+        if filho.get("name") in modelos and len(alvo) == 3 and alvo[1] in modelos:
+            saida.add((filho["name"], t["column_name"], alvo[1], kw["field"]))
+    return saida
+
+
 def type_drift(calculado: dict[str, dict[str, str]], manifest: dict) -> list[str]:
     """O que o contrato não pega: a coluna cujo tipo calculado (com os modificadores) não é o declarado.
 
