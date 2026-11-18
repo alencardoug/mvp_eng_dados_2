@@ -13,8 +13,8 @@
 > registro conta a história e aponta para eles; não repete as regras.
 >
 > Rótulos: **[medido]** tem saída de comando ou página oficial por trás; **[estimado]** não.
-> Horários em America/Sao_Paulo. O identificador da conta de faturamento aparece mascarado
-> (`0199D3-…`); o projeto é `mvp-ed1-gcp`.
+> Horários em America/Sao_Paulo. O identificador da conta de faturamento aparece como marcador
+> (`<conta de faturamento>`), e os projetos sem relação com este, ligados a ela, como `<projeto alheio N>`; o projeto é `mvp-ed1-gcp`.
 
 | Campo | Informação |
 |---|---|
@@ -121,7 +121,7 @@ Em custo [estimado, conversa de 15/09], a nativa sairia ~10× mais barata ligada
 
 ```
 $ gcloud projects create mvp-ed1-gcp --labels=projeto=mvp-ed1,etapa=13,desmontar-ate=2026-11-12
-$ gcloud billing projects link mvp-ed1-gcp --billing-account=0199D3-…
+$ gcloud billing projects link mvp-ed1-gcp --billing-account=<conta de faturamento>
 billingEnabled: true
 ```
 
@@ -1100,7 +1100,7 @@ alvo do `make` expôs quatro defeitos, nenhum visível na leitura da ordem.
    enquanto acha que o Cloud SQL a usa, o que dura além da exclusão da instância, e o *peering*
    que sobra impede apagar a VPC. O provider 8.10 tem `deletion_policy = "REMOVE_PEERING"` para isso
    (descrição do esquema do provider): recusada a exclusão, o *peering* sai da rede no lugar dela.
-4. **O `gcloud` desta máquina aponta para outro projeto.** O `core/project` é o `analisador-de-risco`.
+4. **O `gcloud` desta máquina aponta para outro projeto.** O `core/project` é o `<projeto alheio 1>`.
    O primeiro `gcloud asset search-all-resources` faturou a cota nele e falhou com
    `SERVICE_DISABLED`. Os alvos existentes passavam `--project`, mas os comandos de cota por
    projeto (`asset`, `billing budgets`) seguem o `core/project`. Todo alvo `gcp-*` agora carrega o
@@ -1963,8 +1963,8 @@ passo 3 não roda.
 
 **O diagnóstico** (11:31–11:35) [medido, só leituras]:
 
-- `gcloud billing projects describe mvp-ed1-gcp`: `billingEnabled: true`, conta `0199D3-…`;
-- `gcloud billing accounts describe 0199D3-…`: **`open: false`** — a conta de faturamento está
+- `gcloud billing projects describe mvp-ed1-gcp`: `billingEnabled: true`, conta `<conta de faturamento>`;
+- `gcloud billing accounts describe <conta de faturamento>`: **`open: false`** — a conta de faturamento está
   fechada. O vínculo do projeto continua de pé, mas as APIs pagas já recusam;
 - `gcloud secrets describe` repetido: o mesmo `BILLING_DISABLED`;
 - projeto `ACTIVE`; Cloud SQL `mvp-ed1-origens` ainda `RUNNABLE`;
@@ -1986,9 +1986,9 @@ grava o binário e sai com erro (falha na receita antiga, passa na nova).
 pé. Se a conta continuar fechada, o que o Google faz com os recursos do projeto e em que prazo não foi
 verificado [a medir]. Depende do Owner: abrir a conta na consola, ver o motivo e reabrir.
 
-**A causa, por eliminação (antes das 11:58)** [medido, menos o que está marcado]. A conta `0199D3-…` é a única
-de faturamento, e os cinco projetos ligados a ela (`analisador-de-risco`, `mvp-ed1-gcp`,
-`da-voz-ao-produto`, `customer-care-prod`, `mvp-ed1-estudo`) ficaram sem as APIs pagas. A hipótese
+**A causa, por eliminação (antes das 11:58)** [medido, menos o que está marcado]. A conta `<conta de faturamento>` é a única
+de faturamento, e os cinco projetos ligados a ela (`<projeto alheio 1>`, `mvp-ed1-gcp`,
+`<projeto alheio 2>`, `<projeto alheio 3>`, `mvp-ed1-estudo`) ficaram sem as APIs pagas. A hipótese
 do Owner, o `unlink` do "My First Project" (§42), não fecha conta, e a cronologia também a descarta:
 depois do `unlink`, em 08/11, o `link` do `mvp-ed1-estudo` foi aceito, e em 09/11, às 11:30, o
 `apply` do Cloud SQL criou os segredos. A conta fechou depois disso. A causa provável é o fim da
@@ -1999,8 +1999,8 @@ crédito [a medir na consola: a faixa da página da conta diz qual].
 funcionar; os créditos continuam, e ele decidiu seguir com a janela. Conferido: `open: True`, o
 Secret Manager volta a responder, e os orçamentos de pé — `mvp-ed1 Etapa 13` (R$ 400) e `mvp-ed1-estudo` (R$ 180),
 ambos com `EXCLUDE_ALL_CREDITS`. A conversão vale para a conta inteira: nos outros três projetos, só
-serviços do Cloud Run sem instância mínima e *buckets* (`analisador-de-risco`, `da-voz-ao-produto`,
-`customer-care-prod`), nada que cobre parado.
+serviços do Cloud Run sem instância mínima e *buckets* (`<projeto alheio 1>`, `<projeto alheio 2>`,
+`<projeto alheio 3>`), nada que cobre parado.
 
 **A conta continua na avaliação gratuita** [lido pelo Owner na consola, 12:16]: a faixa mostra o
 crédito restante, **6 dias restantes** e o botão "Fazer upgrade", que o Owner **não** clicou e não

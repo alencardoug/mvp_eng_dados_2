@@ -57,7 +57,7 @@ O que a Free Trial muda **[medido, 06/11/2026]**:
 | Fato | Fonte | Efeito no plano |
 |---|---|---|
 | Sem aumento de cota; sem GPU, Windows, Marketplace | [free-cloud-features](https://docs.cloud.google.com/free/docs/free-cloud-features) | Airbyte por Helm, não Marketplace; o dimensionamento cabe na cota que existe |
-| Cota `CPUS_ALL_REGIONS` = 32 e `IN_USE_ADDRESSES` = 8 **em outro projeto** da conta | `gcloud compute project-info describe --project analisador-de-risco` | **não prova** a cota do projeto novo: lida no G0, e o dimensionamento da §8 é conferido contra ela |
+| Cota `CPUS_ALL_REGIONS` = 32 e `IN_USE_ADDRESSES` = 8 **em outro projeto** da conta | `gcloud compute project-info describe --project <projeto alheio 1>` | **não prova** a cota do projeto novo: lida no G0, e o dimensionamento da §8 é conferido contra ela |
 | Fim da avaliação: recursos parados, 30 dias de carência, depois apagados | idem | rede de segurança contra cobrança, **não** é o desmonte |
 | O crédito não paga a API do Gemini | idem | o Gemini como verificador não consome o crédito |
 | Nove projetos na mesma conta de faturamento, um deles o `bi-como-codigo`, com recursos de 06/11 | `gcloud projects list`; `~/Projetos/_gcp_resources_20261106_bi_como_codigo/` | o crédito é da conta; os outros projetos **não** entram no desmonte deste plano, mas o fim da avaliação os atinge também — fica registrado para o Owner |
