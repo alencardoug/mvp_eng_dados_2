@@ -80,6 +80,7 @@ opera (`make`). Um consumidor que lê o armazém entra pelo próprio login, hoje
   novo ganha ID de F14 em diante nos Achados e uma linha no plano, com o bloco de destino.
 - **Saída.** Este documento. Quando a mudança é urgente, sai também um aviso fora do Git
   (`data/medicoes/base_consumidores/avisos/`) que aponta para cá. O aviso nunca é a única fonte.
+- **Caixa de correio entre projetos.** Desde 18/11/2026, este repositório e o `gdados` têm um `alinhamento.md` local na raiz, fora do Git, onde a sessão de um projeto deixa aviso para a do outro; o `CLAUDE.md` o carrega no início da sessão, e quem lê atua e apaga. Avisos ao `gdados` podem ir para lá, além da pasta de avisos.
 
 ---
 
@@ -165,7 +166,7 @@ aqui como `prevista` antes do *commit* que a faz.
 
 ## 7. O GCP
 
-**Nenhum recurso novo no GCP**, em nenhum projeto (decisão do Owner em 14/11/2026). O ambiente da
+**Nenhum recurso novo no GCP**, em nenhum projeto (decisão do Owner em 14/11/2026, Q14). **Uma exceção**, aprovada pelo Owner na sessão do `gdados` em 18/11/2026: o projeto "Extras", criado por ele para hospedar o portal do `gdados` (`governadados.web.app`), **sem conta de faturamento** (Firebase no plano Spark). Ele não é deste projeto e não recebe nada daqui além do que o portal já lê. A Q14 continua valendo para o resto. O ambiente da
 Etapa 13 foi destruído em 13/11/2026 e é evidência **datada e congelada**: as declarações
 (`terraform/`, o mapa de paridade) e o [Registro da fase GCP](registro_fase_gcp.md) estão aqui; as
 evidências coletadas antes do desmonte estão fora do Git, no `mvp_eng_dados_1` (L10, Bloco 4). O custo
