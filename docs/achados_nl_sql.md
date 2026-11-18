@@ -15,7 +15,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 17/11/2026 (F31 a F34, dos consumidores na `v2.1.0`, com destino no [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 18/11/2026 (F35, achado deste projeto no Bloco 3 do [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (F31 a F34, dos consumidores na `v2.1.0`, com destino no [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -537,6 +537,21 @@ de cada um está no [plano da reabertura](../PLANO_reabertura_da_base.md), que d
 - **Efeito:** a página de estrutura do `gdados` não desenha o diagrama entidade-relacionamento.
 - **Aqui:** `relations.*.primary_key` e `relations.*.foreign_keys`, derivados pela mesma regra que instala as
   chaves (`dbt/macros/chaves.sql`), e o destino em cada `relationships`. Campos novos, formato 1. Plano, Bloco 4.
+
+### F35 — A quarentena das entregas não guarda a origem · **Gravidade: média**
+
+- **Origem:** este projeto, na validação do Bloco 3 do [plano da reabertura](../PLANO_reabertura_da_base.md)
+  (18/11/2026). Não veio de consumidor; entra aqui porque é o registro dos achados da fase.
+- **Evidência:** `quarantine.rejected_shipment_deliveries` lê `trusted.shipments`, que empilha as duas origens,
+  e não leva `source_system`. O `shipment_id` se repete entre elas. Na `v2.1.0`, a tabela tem uma linha, a
+  remessa 45, que só se sabe ser do legado cruzando com `trusted.shipments` (consulta só leitura, 18/11/2026).
+  O teste `entrega_projetada_tem_evento_no_livro` já contornava isso lendo `trusted.shipments` "porque ela não
+  guarda a origem" (Q62 do [plano da base dos consumidores](../PLANO_base_dos_consumidores.md)).
+- **Efeito:** quem audita a quarentena não sabe de que origem é a remessa rejeitada, e a linha do legado e a do
+  varejo com o mesmo `shipment_id` seriam indistinguíveis.
+- **Aqui:** a coluna `source_system` na relação, com unicidade em `(source_system, shipment_id)`, como as
+  outras relações de duas origens ([ADR-0039](adr/0039-alcance-da-procedencia.md): `source_system` em toda tabela que recebe registros de mais de um sistema). Mudança de esquema, anunciada em
+  Consumidores §5. Plano, Bloco 3.
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
