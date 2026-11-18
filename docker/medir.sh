@@ -285,10 +285,10 @@ FILHOS=()
 # **O grupo sumir não é encerramento limpo** (V6). No ciclo de 17/11/2026 o
 # Python abortava *depois* da mensagem de encerramento — "Fatal Python error:
 # _enter_buffered_busy", "Abortado (arquivo core criado)" — e o medidor dizia
-# `limpo`, porque só olhava se o grupo existia. O código vem do `wait` sobre o
-# líder do grupo, que é filho deste shell. Ainda não muda o código da medição:
-# até a causa da V6 ser medida, reprovar aqui faria a restauração falhar no
-# passo 7 nas vezes em que o aborto acontece. Fica escrito no registro.
+# `limpo`, porque só olhava se o grupo existia. A causa foi medida e corrigida
+# (`streaming/cli.py`, `_sair_sem_finalizar`), e desde então `com_erro`
+# **reprova a medição**: encerramento limpo é código 0, e o passo 7 da
+# restauração para se a V6 voltar.
 #
 # O código não é o do líder do grupo: o SIGINT vai ao grupo inteiro, e o `make`
 # que embrulha o pipeline sai pelo sinal mesmo quando o Python termina com 0
@@ -322,6 +322,7 @@ _encerrar_filhos() {
 			else
 				echo "[medir] grupo $pgid encerrou em ${esperou}s com o código ${saida:-desconhecido} — não é encerramento limpo (V6)"
 				[ "$ENCERRAMENTO" = forcado ] || ENCERRAMENTO=com_erro
+				[ "$CODIGO" -ne 0 ] || CODIGO=1
 			fi
 		fi
 	done

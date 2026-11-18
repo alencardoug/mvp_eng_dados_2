@@ -210,11 +210,47 @@ def comando_pipeline(args) -> int:
         executar(fluxo, execucao_dir=args.execucao)
     except KeyboardInterrupt:
         print("\npipeline interrompido. O offset confirmado retoma de onde parou.")
-        _threads_no_encerramento()
+        _sair_sem_finalizar(_threads_no_encerramento())
     return 0
 
 
-def _threads_no_encerramento() -> None:
+#: Quanto o encerramento espera as *threads daemon* do Beam terminarem, em segundos, somadas.
+PRAZO_DAS_THREADS = 10.0
+
+
+def _sair_sem_finalizar(vivas, *, prazo_s: float = PRAZO_DAS_THREADS, sair=None) -> None:
+    """A correção da V6, pela causa medida em 17/11/2026 (`medir CENARIO=streaming`, sem produtor).
+
+    No SIGINT, onze *threads daemon* do Beam continuam vivas — os leitores gRPC e o *worker* LOOPBACK do
+    Prism, que roda neste processo —, e escrevem *tracebacks* de "Socket closed" no `stderr` enquanto o
+    Prism é destruído. O interpretador começava a desligar com uma delas segurando a trava do `stderr`, e
+    abortava: "Fatal Python error: _enter_buffered_busy", código 134, núcleo gravado.
+
+    Daí a ordem: esperar as *threads* com prazo, esvaziar `stdout`, `stderr` e os *handlers* de log, e sair
+    com `os._exit(0)`, que não passa pela finalização. Nada se perde: o *sink* grava cada lote numa
+    transação e confirma o *offset* depois dela, cada alerta é entregue antes da confirmação do painel,
+    e o `with beam.Pipeline` já saiu.
+    """
+    import os as _os
+    import time as _time
+
+    fim = _time.monotonic() + prazo_s
+    for thread in vivas:
+        thread.join(max(0.0, fim - _time.monotonic()))
+    restantes = [t.name for t in vivas if t.is_alive()]
+    if restantes:
+        LOG.info("V6: %d thread(s) ainda vivas depois de %.0fs; saindo sem finalizar: %s",
+                 len(restantes), prazo_s, ", ".join(restantes))
+    logging.shutdown()
+    for fluxo in (sys.stdout, sys.stderr):
+        try:
+            fluxo.flush()
+        except Exception:  # noqa: BLE001 — sair é o que importa aqui
+            pass
+    (sair or _os._exit)(0)
+
+
+def _threads_no_encerramento() -> list:
     """A medida da V6: o que fica vivo quando o *pipeline* devolve o controle.
 
     No ciclo de 17/11/2026 o Python abortava depois da mensagem acima, ao desligar o interpretador,
@@ -228,6 +264,7 @@ def _threads_no_encerramento() -> None:
         "V6: %d thread(s) vivas no encerramento%s", len(vivas),
         (": " + ", ".join(f"{t.name}{' [daemon]' if t.daemon else ''}" for t in vivas)) if vivas else "",
     )
+    return vivas
 
 
 # ── Fim declarado para o caminho quente ─────────────────────────────────────

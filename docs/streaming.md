@@ -90,6 +90,16 @@ Quatro ressalvas que não devem ser confundidas com limitações do desenho:
   `UPDATE` e `DELETE` no fluxo indicam defeito na origem, não evento de negócio: o conector é
   configurado para inserções e qualquer outra operação capturada deve **falhar o pipeline**, não
   ser processada em silêncio.
+- **O encerramento sai sem finalizar o interpretador**
+  ([V6](pendencias.md#v6--o-python-aborta-no-desligamento-do-pipeline-do-streaming-registrada-em-17112026)).
+  O *worker* do Prism roda no processo do Python, e no SIGINT onze *threads daemon* dele
+  continuam vivas, escrevendo *tracebacks* de gRPC enquanto o Prism é destruído. Ao finalizar com
+  uma delas segurando o `stderr`, o Python abortava com código 134. Foi assim em duas das três
+  paradas do ciclo de 17/11/2026 (C3 e E8) e na medição sem produtor de 18/11/2026 que mediu a
+  causa. Agora a CLI espera essas *threads* por até 10 s, esvazia as saídas e sai por
+  `os._exit(0)`. Sete delas nunca terminam, então o encerramento custa esses 10 s. Depois da
+  correção, quatro medições seguidas sem produtor saíram com código 0. O código de saída do Python
+  vai para o diretório da execução, e o medidor reprova o encerramento que não for limpo.
 
 ---
 

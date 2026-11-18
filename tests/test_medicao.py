@@ -20,6 +20,7 @@ import pathlib
 import re
 import subprocess
 import textwrap
+import types
 
 import pytest
 
@@ -535,7 +536,7 @@ CENARIO_OK = textwrap.dedent(
     stream-up:
     \t@echo subiu
     stream-run:
-    \t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600
+    \t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; trap : INT; sleep 600; mkdir -p '$(EXECUCAO)' && echo 0 > '$(EXECUCAO)/codigo_de_saida'
     stream-produce:
     \t@echo "produzi $(LIMITE)" > produziu
     stream-corte:
@@ -644,7 +645,7 @@ def test_o_pipeline_lancado_encerra_pelo_sigint_e_nao_pelo_prazo(tmp_path):
     que nasce assim não instala o `KeyboardInterrupt`: o pipeline não saía no
     SIGINT e só morria no SIGKILL do prazo — com o medidor dizendo 0.
     """
-    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600',
+    makefile = CENARIO_OK.replace("\t@echo $$$$ > pipeline.pid; echo \"$(EXECUCAO)\" > execucao_do_pipeline; trap : INT; sleep 600; mkdir -p '$(EXECUCAO)' && echo 0 > '$(EXECUCAO)/codigo_de_saida'",
                                   RECEITA_DO_STREAM_RUN.format(comando="python3 pipeline.py"))
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
     (trabalho / "pipeline.py").write_text(PIPELINE_PYTHON, encoding="utf-8")
@@ -667,7 +668,7 @@ def test_o_aborto_depois_da_mensagem_nao_e_encerramento_limpo(tmp_path):
     medidor dizia `limpo` porque o grupo tinha sumido. Agora o código do pipeline decide."""
     abortar = PIPELINE_PYTHON.replace('Path("interrompido").write_text("sim")',
                                       'Path("interrompido").write_text("sim"); import os; os.abort()')
-    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600',
+    makefile = CENARIO_OK.replace("\t@echo $$$$ > pipeline.pid; echo \"$(EXECUCAO)\" > execucao_do_pipeline; trap : INT; sleep 600; mkdir -p '$(EXECUCAO)' && echo 0 > '$(EXECUCAO)/codigo_de_saida'",
                                   RECEITA_DO_STREAM_RUN.format(comando="python3 pipeline.py"))
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
     (trabalho / "pipeline.py").write_text(abortar, encoding="utf-8")
@@ -681,13 +682,13 @@ def test_o_aborto_depois_da_mensagem_nao_e_encerramento_limpo(tmp_path):
     registro = _registro(tmp_path)
     assert registro["encerramento"] == "com_erro" and registro["codigo_do_pipeline"] == 134, registro
     assert "não é encerramento limpo (V6)" in r.stdout
-    # Ainda não reprova a medição: até a causa ser medida, reprovar faria a restauração falhar no passo 7.
-    assert r.returncode == 0, r.stdout + r.stderr
+    # Com a causa corrigida, encerramento que não é limpo reprova a medição (e o passo 7 da restauração).
+    assert r.returncode != 0, r.stdout + r.stderr
 
 
 def test_encerramento_forcado_fica_no_registro(tmp_path):
     """O que só sai por SIGKILL não fechou o que abriu — e o registro diz isso."""
-    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600', "\t@trap '' INT; sleep 600")
+    makefile = CENARIO_OK.replace("\t@echo $$$$ > pipeline.pid; echo \"$(EXECUCAO)\" > execucao_do_pipeline; trap : INT; sleep 600; mkdir -p '$(EXECUCAO)' && echo 0 > '$(EXECUCAO)/codigo_de_saida'", "\t@trap '' INT; sleep 600")
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
     ambiente["MEDIR_PRAZO_ENCERRAMENTO"] = "2"
 
@@ -703,7 +704,7 @@ def test_encerramento_forcado_fica_no_registro(tmp_path):
 def test_cenario_propaga_a_falha_de_quem_morre(tmp_path):
     """Pipeline que não sobe é falha da medição, não uma medição de zero."""
     makefile = CENARIO_OK.replace(
-        '\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600', "\t@exit 1"
+        "\t@echo $$$$ > pipeline.pid; echo \"$(EXECUCAO)\" > execucao_do_pipeline; trap : INT; sleep 600; mkdir -p '$(EXECUCAO)' && echo 0 > '$(EXECUCAO)/codigo_de_saida'", "\t@exit 1"
     )
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
 
@@ -898,3 +899,57 @@ def test_livro_que_ainda_nao_existe_e_livro_vazio(monkeypatch):
 
     assert (f.origem, f.livro, f.faltam) == (2, 0, 2)
     assert not f.alcancado
+
+
+# ── V6: o encerramento sai sem finalizar o interpretador ────────────────────
+
+
+def test_o_sigint_sai_com_zero_sem_finalizar_e_depois_de_esvaziar(monkeypatch):
+    """V6: o interpretador abortava ao finalizar com uma thread daemon do Beam segurando o `stderr`.
+    No SIGINT a CLI espera as threads com prazo, esvazia as saídas e sai por `os._exit(0)`."""
+    import threading
+
+    from mvp_ed1.streaming import cli
+
+    ordem = []
+    presa = threading.Event()
+    viva = threading.Thread(target=presa.wait, daemon=True, name="leitor_grpc_simulado")
+    viva.start()
+    monkeypatch.setattr(cli.logging, "shutdown", lambda: ordem.append("logging"))
+    try:
+        cli._sair_sem_finalizar([viva], prazo_s=0.2, sair=lambda codigo: ordem.append(("saiu", codigo)))
+    finally:
+        presa.set()
+        viva.join()
+
+    assert ordem == ["logging", ("saiu", 0)]
+
+
+def test_a_thread_que_termina_dentro_do_prazo_e_esperada(monkeypatch):
+    import threading
+    import time
+
+    from mvp_ed1.streaming import cli
+
+    terminou = []
+    curta = threading.Thread(target=lambda: (time.sleep(0.1), terminou.append(True)), daemon=True)
+    curta.start()
+    monkeypatch.setattr(cli.logging, "shutdown", lambda: None)
+    cli._sair_sem_finalizar([curta], prazo_s=5, sair=lambda _: None)
+
+    assert terminou == [True]
+
+
+def test_o_comando_do_pipeline_sai_pelo_caminho_sem_finalizar_no_sigint(monkeypatch):
+    from mvp_ed1.streaming import cli, pipeline
+
+    def interrompido(*_a, **_k):
+        raise KeyboardInterrupt
+
+    saidas = []
+    monkeypatch.setattr(pipeline, "executar", interrompido)
+    monkeypatch.setattr(cli, "_sair_sem_finalizar", lambda vivas: saidas.append(vivas))
+
+    cli.comando_pipeline(types.SimpleNamespace(execucao=None))
+
+    assert len(saidas) == 1
