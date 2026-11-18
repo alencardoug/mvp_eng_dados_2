@@ -603,3 +603,11 @@ declaração é bloqueante. **Aplicada em 18/11/2026**, no `descricoes.patch` re
 | RVB3-1-02 | bloqueante | `product_skus`: o valor atual, uma linha por SKU e origem; `dim_product` lê as versões de `scd_product` e tem o grão da versão |
 | RVB3-1-03 | bloqueante | `customers`: o ativo conta de `as_of_date`, e a recorrência, da primeira compra |
 | RVB3-1-04 | ajuste | Bloco 3: o "Falta" deixa de listar a correção das guardas, que está no *patch* e foi aceita pelo Owner |
+
+### Bloco 3 — rodada 2 do codex2, sobre `eecbc91` (18/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_bloco3_r2.md`, fora do Git. **Nenhum achado novo, e nada bloqueia o
+Bloco 4.** Os três textos da rodada 1 foram corrigidos sem divergência nova, o RVB3-1-04 foi tratado, e a forma
+do F35 preserva a identidade da remessa com a origem, sem mudar os valores nem a regra da Q62. Os SHA-256 dos
+três *patches* foram conferidos de forma independente. **O Bloco 3 está fechado**, fora da árvore até o passo 4
+do Bloco 5.
