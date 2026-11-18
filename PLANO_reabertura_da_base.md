@@ -748,3 +748,16 @@ A sessão do `gdados` deixou no `alinhamento.md`, fora do Git, um aviso aprovado
   este e o prefixo da conta de faturamento viraram marcadores. Ficam `mvp-ed1-gcp` e `mvp-ed1-estudo`. O
   histórico do Git ainda tem os nomes; a próxima *tag* mostra o texto limpo.
 - **Item 3**, a caixa de correio como canal: registrada em Consumidores §4.
+
+### O fechamento (18/11/2026)
+
+- `make check` verde (`PASS=1091`, 1.824 testes; 1.827 depois do Bloco 6). Catálogo, dicionário, linhagem e pacote
+  regenerados. Procedência `verified`, a do estado restaurado (`1c82c211`, de `7e5065a`), lida com o *login* de
+  leitura.
+- Revisão por outro agente em cada bloco, na adaptação do ciclo (três rodadas) e no fechamento (uma rodada, com
+  um ajuste aplicado).
+- O aceite e a *tag* **`v2.2.0`** em `f5a5173`, publicada, por delegação do Owner (18/11/2026).
+- Os avisos aos três consumidores, fora do Git, para o Owner levar:
+  `data/medicoes/base_consumidores/avisos/aviso_{bi_como_codigo,gdados,nl_sql}_20261118.md`.
+- **Fica aberto:** o F36, para uma fase própria com ADR. Continuam não provados o BigQuery (L9) e, na base
+  publicada, o *streaming* vivo, provado sobre a base descartada.
