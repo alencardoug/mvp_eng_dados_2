@@ -318,6 +318,28 @@ composto, e a suíte *offline* tem as mesmas 3 falhas esperadas (`validacao.md`)
    `relationships` cujo `to` é um modelo de `analytics`. Cada teste `relationships` do pacote ganha o destino
    (`to` e `field`). Um teste guarda que o pacote traz as mesmas PKs e FKs que a macro instala.
 
+**Feito em 18/11/2026, na árvore** (`198315c`). O Bloco 4 não toca `dbt/`, e o carimbo prende só os insumos do
+dbt. Por isso o pacote se regenera sobre o *manifest* da `v2.1.0` (`make catalog → make test → make catalog`):
+- **F34:** `relations.*.primary_key` e `foreign_keys` saem de `data_types.declared_primary_keys` e
+  `declared_foreign_keys`, a regra da macro, agora num só lugar, que `tests/test_chaves.py` também usa. Deu **26
+  PKs e 58 FKs**, e só `analytics` tem chave. Os **76** `relationships` têm `references_relation` e
+  `references_column`, 58 em `analytics` e 18 em `staging`. Um destino que não resolve é recusa;
+- **UQ-19:** `view_audits.*.checks` (26 casos do `pytest`: as 16 referências e as 10 populações) e
+  `data_tests` (1: a população da P13 é o teste singular `p13_conta_toda_remessa_entregue`, e o resultado dela
+  está em `tests`, não em `checks`). O campo `data_tests` não estava no plano; ele nasceu porque a guarda do
+  gerador recusou o id da P13 em `checks`, e a linha `prevista` de Consumidores §5 foi atualizada. Um id que o
+  JUnit não tem é recusa;
+- **UQ-18:** a especificação diz que a chave de uma view é `grain` + `identity` de `view_rules`, e que
+  `relations.*.grain` é `null` nas views de propósito. `tests/test_chave_das_views.py` confere no armazém: as 16
+  views, **0 combinações repetidas** (medido antes, só leitura);
+- **F33:** a nota de `registro_fase_gcp` aponta o custo lido em 16/11/2026, e a entrada nova `custo_gcp` aponta a
+  Capacidade §2.14;
+- **o resultado:** `make test` deu 1.814 passados e 19 pulados (todos com `GCP_TESTES=1`), e o `check-offline`
+  passou. No pacote, as únicas mudanças são os campos novos e os 29 casos novos em `checks`, nenhum com falha. Os
+  três *patches* fora da árvore continuam aplicando em sequência sobre `198315c`.
+
+As linhas `prevista` do F34 e do UQ-19 passam a `feita` só depois do *build* do ciclo, com o `invocation_id`.
+
 ### Bloco 5 — o ciclo
 
 Mesma forma do ciclo do Bloco 5R, com um diário próprio (`data/medicoes/diario_reabertura.md`).
