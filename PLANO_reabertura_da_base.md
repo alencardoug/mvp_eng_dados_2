@@ -191,6 +191,23 @@ ONLY`. Consultas e saídas ficam em `data/medicoes/reabertura/bloco2/`, fora do 
 - **Nenhum caso não demonstrável** na `v2.1.0`, ou seja, a lista da Q72 (d) estaria vazia. A medida se repete
   depois da carga regenerada, porque a injeção muda com o lote.
 
+**Item 3, a V5 medida em memória em 18/11/2026,** pela P11 simulada com a regra do ADR-0052. O *script* é
+`data/medicoes/reabertura/bloco2/v5_formas.py`, sobre a medida da V4; as saídas ficam ao lado, fora do Git. Todas
+as formas mantêm o lastro da V4: nenhuma saída sem estoque.
+
+| Forma | Varejo: mediana / p90 | Legado: mediana / p90 | Estoque no fim (varejo) |
+|---|---|---|---|
+| Hoje (`v2.1.0`) | 0,01 / 0,43 | 0,02 / 0,44 | 704.762 |
+| Escala ×0,1 / ×0,02 | 0,13 / 0,70 e 0,34 / 1,00 | 0,15 / 0,81 e 0,36 / 0,93 | 70.848 e 24.529 |
+| Demanda, de 30 a 180 dias, folga 1,5 | 0,35 a 0,39 / 1,08 a 1,18 | 0,38 a 0,40 / 1,01 a 1,15 | cerca de 20.000 |
+| Demanda, 30 dias, folga 1,0 | 0,77 / 3,41, com 22 linhas indefinidas | — | 10.580 |
+| **Demanda, 60 dias, folga 1,2 (Q73)** | **0,47 / 1,34**, 1 indefinida em 5.560 | **0,50 / 1,21**, 0 em 277 | 15.224 |
+
+A venda é esparsa: 12.224 unidades em 2.926 pares no varejo, cerca de 0,4 unidade por par e trimestre. Por isso
+a forma pela demanda satura perto de 0,4 com a folga de 1,5. A medida é aproximada, porque refaz só as
+quantidades dos movimentos e não as ordens nem os recebimentos. A implementação refaz os dois, e a guarda da
+faixa (Q67) é medida de novo em memória antes do ciclo e no armazém depois dele.
+
 ### Bloco 3 — as descrições das relações (F32)
 
 1. Descrever as 123 relações **no dono declarativo de cada grupo**, nunca no derivado (RVRB-1-05):
@@ -377,18 +394,19 @@ não seja ambígua.
 
 ### Respostas do Owner (17/11/2026)
 
-A Q64 foi respondida antes, pela forma (e). As Q65 a Q72 foram respondidas nesta data, todas pela recomendação:
+A Q64 foi respondida antes, pela forma (e). As Q65 a Q72 foram respondidas em 17/11/2026, todas pela recomendação. A Q73 e a faixa da Q67 vieram em 18/11/2026, com a medida da V5:
 
 | # | Resposta |
 |---|---|
 | Q64 | **(e)**: o exercício antes da regeneração, a publicação sem produtor e as guardas no estado publicado |
 | Q65 | **(a)**, na forma do Bloco 1: a confirmação por janela concluída, a entrega confirmada e a espera pelo que a execução inseriu |
 | Q66 | **(a)**: a chave em base64 seguro para URL nos dois lugares, com teste, e a troca ao recriar o Airflow |
-| Q67 | **(a)**: uma faixa declarada para a mediana trimestral da P11, fixada pelo Owner depois da medida em memória |
+| Q67 | **(a)**, fixada em 18/11/2026 depois da medida em memória: a mediana trimestral do giro da P11 entre **0,30 e 0,80**, em cada origem |
 | Q68 | **Sim**: o antes → depois das 16 views, medido e publicado por view |
 | Q69 | **`v2.2.0`** |
 | Q70 | **Corrigir e guardar** com teste a ordem por data |
 | Q71 | **(a)**: o cursor guardado com SHA-256 no diário e removido antes de embalar o estado final |
+| Q73 | **Pela demanda** (18/11/2026): cada compra cobre as saídas do par nos 60 dias seguintes, a abertura cobre os primeiros 60 dias, e a folga do lastro cai de 1,5 para 1,2 (medida abaixo, Bloco 2) |
 | Q72 | **(d)**: a lista de exceções do legado desta geração, num *seed* versionado aprovado pelo Owner, e caso novo reprova o `check` |
 
 ---
