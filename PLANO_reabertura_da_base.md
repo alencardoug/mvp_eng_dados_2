@@ -256,6 +256,32 @@ descartadas foram dividir o bloco, deixando o código na árvore e os `.yml` no 
 sincronia do gerador acusam a diferença, e uma *branch* sem *merge*, porque cada *commit* nasceria com o
 `check-offline` vermelho.
 
+**Feito em 18/11/2026,** fora da árvore. O *patch* aplica depois do das guardas. A validação e os
+SHA-256 estão em `data/medicoes/reabertura/bloco3/validacao.md`, e os textos para a revisão em
+`descricoes_para_revisao.md`, ao lado:
+- **`raw` (37):** o `table_meta` abre a descrição da tabela. As 7 que já tinham nota (o papel da réplica, o
+  ADR) a mantêm depois dele. Na tabela, o espelho é **conferido, não escrito**: `descriptions.table_texts`
+  dá o começo esperado, e a falta ou a divergência é problema da derivação, que reprova o `--check` com o
+  texto na mensagem. A nota é de quem a revisa, e um `table_meta` que mudar pede que alguém a releia
+  junto. O grão é o da origem: medido só leitura, `raw` tem uma linha por `id` nas 5 tabelas conferidas,
+  nos três modos do Airbyte;
+- **`raw_legacy` (40):** um molde no gerador (`descriptions.legacy_relation_text`). O texto é a relação
+  retida (ocorrência física por captura, valores como texto, defeitos preservados, retenção permanente), e
+  a entidade de origem vem só como referência, "o grão não é o da entidade de origem";
+- **as 53 escritas à mão:** 18 foram promovidas do `_derived.yml` ao `.yml` à mão, com as colunas como a
+  derivação as escreve, e os dois `_derived.yml` saíram porque ficaram vazios. Os 29 de `trusted` declaram
+  o grão com `source_system`, porque todos empilham as duas origens. A exceção é `geographies`, que é
+  distinta por país, UF e cidade;
+- **a guarda** `test_relacoes_sem_descricao_por_camada_no_teto`, com teto zero, sobre o banco. O controle
+  positivo, com o manifesto da base, reprova nomeando as 123.
+
+**Correção no *patch* das guardas do Bloco 2,** achada pela suíte do *worktree*: a guarda
+`f31_nenhum_movimento_depois_do_corte` chama `meia_noite`, e o contador de `test_vigencia_em_utc` passa de
+18 a 19. O *patch* passou a levar a atualização do contador. A versão aprovada ficou guardada ao lado.
+
+**Falta:** a revisão integral do Owner (item 3) e a correção do *patch* das guardas. A observação sobre a
+falta de `source_system` em `quarantine.rejected_shipment_deliveries` foi levada ao Owner.
+
 ### Bloco 4 — o pacote (F33, UQ-18, UQ-19, F34)
 
 1. **F33:** a nota de `registro_fase_gcp` atualizada, e uma entrada nova em `environments` para a Capacidade
