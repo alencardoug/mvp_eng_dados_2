@@ -516,7 +516,7 @@ A Q64 foi respondida antes, pela forma (e). As Q65 a Q72 foram respondidas em 17
 | Q71 | **(a)**: o cursor guardado com SHA-256 no diário e removido antes de embalar o estado final |
 | Q73 | **Pela demanda** (18/11/2026): cada compra cobre as saídas do par nos 60 dias seguintes, a abertura cobre os primeiros 60 dias, e a folga do lastro cai de 1,5 para 1,2 (medida abaixo, Bloco 2) |
 | Q72 | **(d)**: a lista de exceções do legado desta geração, num *seed* versionado aprovado pelo Owner, e caso novo reprova o `check` |
-| Q74 | **Pendente** (18/11/2026): aceitar na T3 as 26 remoções de `inventory_movements` que a regeneração faz no legado, medidas em memória (zero reaparições; a memória de exclusão passa de 67 a 93 chaves). A recomendação é aceitar, porque é a consequência da V5. Proposta e medida na adaptação do ciclo (`data/medicoes/diario_reabertura.md`, §3) |
+| Q74 | **Aceita pelo Owner em 18/11/2026**: aceitar na T3 as 26 remoções de `inventory_movements` que a regeneração faz no legado, medidas em memória (zero reaparições; a memória de exclusão passa de 67 a 93 chaves). A recomendação é aceitar, porque é a consequência da V5. Proposta e medida na adaptação do ciclo (`data/medicoes/diario_reabertura.md`, §3) |
 
 ---
 
