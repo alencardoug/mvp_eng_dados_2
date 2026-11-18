@@ -657,3 +657,24 @@ manifesto, o carimbo e o pacote concordam. **Aplicada em 18/11/2026:**
 | RVRB4-1-01 | ajuste | Bloco 4: a discriminação dos 19 pulados, 16 de GCP e 3 locais, que não rodaram |
 
 **O Bloco 4 está fechado.**
+
+### Bloco 5 — a adaptação do ciclo, rodadas 1 a 3 do codex2 (18/11/2026)
+
+Relatórios: `data/medicoes/reabertura/codex2_adaptacao_r1.md` a `_r3.md`, fora do Git. A adaptação está em
+`data/medicoes/diario_reabertura.md`, na revisão 4.
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVAC-1-01 | bloqueante | N e K medidos depois da E4; K = C0 + N nas esperas, na E6, na E10 e na B2; a fase (ii) espera 2.200 + N |
+| RVAC-1-02 | bloqueante | D5: `residuo_zero.py` reconstrói os saldos de `analytics` pelas dimensões, contra a origem no varejo e contra o livro apto no legado |
+| RVAC-1-03 | bloqueante | G7b: a T3, a procedência e o catálogo depois da restauração, antes da promoção |
+| RVAC-1-04 | bloqueante | E5b (a parcela quente da P12) e E7 (as transições de alerta) antes da B1; o que não ocorrer volta ao Owner |
+| RVAC-1-05 | ajuste | `q72.sql` com o recorte do tratamento corrente |
+| RVAC-1-06 | ajuste | Com a lista da Q72 não vazia, parada antes da F3 |
+| RVAC-1-07 | ajuste | O oráculo do corte de recuo separa as fontes da memória |
+| RVAC-2-01 | bloqueante | A base dos alertas na E2b, delimitada por *offset* (`alertas_delimitados.py`) |
+| RVAC-2-02 | ajuste | G7b com o `HEAD` que executou a G7; G7c fecha o *diff* de execução |
+| RVAC-2-03 | ajuste | E5b: a localidade só nas colunas de saldo; a parcela quente pelas colunas do caminho quente |
+| RVAC-3-01 | ajuste | O leitor de alertas reprova também por erro de leitura |
+
+**A rodada 3 não achou bloqueio técnico** para iniciar o ciclo com a Q74 respondida e o Owner presente.
