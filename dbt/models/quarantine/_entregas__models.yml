@@ -9,10 +9,20 @@ models:
       correspondente no livro (ADR-0034): não são contadas como entregues nem descartadas em silêncio. É
       destino, não passagem. O teste `entrega_projetada_tem_evento_no_livro` acusa cada uma, salvo a do
       legado cujo evento `delivered` está na quarentena do tratamento corrente (Q62). Uma linha por
-      remessa rejeitada de `trusted.shipments`, com o código e o motivo da rejeição.
+      remessa rejeitada de `trusted.shipments` e origem (`source_system`, F35), com o código e o motivo
+      da rejeição.
     meta:
       domain: logistica
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, shipment_id]
     columns:
+      - name: source_system
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
       - name: shipment_id
         description: "Identificador da remessa na origem, gerado pelo banco transacional."
         meta:

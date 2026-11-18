@@ -16,8 +16,13 @@
 -- ([Origem Legada §3.1](../../../docs/origem_legada.md)) — `UPPER_SNAKE`, estável
 -- e nunca reaproveitado —, ainda que a origem aqui seja outra. Um segundo
 -- vocabulário de motivos seria duas linguagens para a mesma auditoria.
+--
+-- A origem vem junto (F35, ADR-0039): `trusted.shipments` empilha as duas, e o
+-- `shipment_id` se repete entre elas. Sem `source_system`, a remessa 45 do
+-- legado, que esteve aqui na `v2.1.0`, era indistinguível da 45 do varejo.
 
 select
+    source_system,
     shipment_id,
     shipment_code,
     order_id,

@@ -25,8 +25,8 @@
 -- rejeitado não explica nada; no varejo não há exceção.
 --
 -- Lê a mesma definição do modelo de rejeição (`is_delivery_unbacked`, em
--- `trusted.shipments`) e não a tabela da quarentena, porque ela não guarda a
--- origem, e o `shipment_id` se repete entre as duas.
+-- `trusted.shipments`), e não a cópia que a quarentena guarda: o que se confere
+-- é a regra. A quarentena guarda a origem desde o F35.
 
 with sem_evento as (
 
