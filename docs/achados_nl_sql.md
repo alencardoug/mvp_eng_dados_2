@@ -1,8 +1,10 @@
 # Achados do nl_sql
 
-> **O que vive aqui:** o que o **banco de provas NL→SQL** (projeto apartado `nl_sql`) descobriu e
-> mudou, desde que clonou a informação deste projeto, escrito para ser **replicado aqui**, com o
-> desvio de cada um. Primeiro as **falhas** deste projeto que o teste revelou; depois as
+> **O que vive aqui:** os achados sobre este projeto, numerados F1, F2, …, com o desvio de cada um. Os
+> primeiros vieram do **banco de provas NL→SQL** (projeto apartado `nl_sql`), que deu nome a este
+> documento. Depois vieram os outros consumidores (`bi-como-codigo` e `gdados`, Consumidores §4) e as
+> revisões deste projeto: os F17 a F30, o F35 e o F36 foram achados aqui. O nome do arquivo fica, porque
+> os links o citam. Primeiro as **falhas** deste projeto que o teste revelou; depois as
 > **melhorias** de governança que o `nl_sql` construiu; por fim o **registro** cronológico.
 >
 > **O que não vive aqui:** o desenho do teste, as perguntas, o gabarito e os resultados das
@@ -15,7 +17,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 18/11/2026 (F35, achado deste projeto no Bloco 3 do [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (F31 a F34, dos consumidores na `v2.1.0`, com destino no [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 18/11/2026 (F36, do antes → depois do ciclo; o cabeçalho passa a dizer que os achados vêm também dos outros consumidores e deste projeto); 18/11/2026 (F35, achado deste projeto no Bloco 3 do [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (F31 a F34, dos consumidores na `v2.1.0`, com destino no [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -552,6 +554,22 @@ de cada um está no [plano da reabertura](../PLANO_reabertura_da_base.md), que d
 - **Aqui:** a coluna `source_system` na relação, com unicidade em `(source_system, shipment_id)`, como as
   outras relações de duas origens ([ADR-0039](adr/0039-alcance-da-procedencia.md): `source_system` em toda tabela que recebe registros de mais de um sistema). Mudança de esquema, anunciada em
   Consumidores §5. Plano, Bloco 3.
+
+### F36 — O ponto de reposição fixo deixa de distinguir com o estoque da V5 · **Gravidade: média**
+
+- **Origem:** este projeto, no antes → depois do ciclo da reabertura (linha H2 do diário, 18/11/2026).
+- **Evidência:** a P12 (`skus_below_reorder_point`) compara o disponível com um ponto de reposição fixo, 25
+  unidades (`reorder_point_units`, igual para todo par). A V5 dimensionou a compra e a abertura pela venda de
+  60 dias, e a venda é esparsa (cerca de 0,4 unidade por par e trimestre; Plano da reabertura, Bloco 2). Depois
+  do ciclo, a mediana do disponível na P12 é 1 unidade, e **2.868 dos 3.046 pares (94%)** estão abaixo do ponto,
+  410 sem estoque. Na `v2.1.0` eram 571 linhas, 80 sem estoque. O limiar do alerta de estoque baixo do
+  *streaming* é o mesmo, 25 (`streaming/fluxo.yml`).
+- **Efeito:** a P12 responde "quase tudo" e deixa de separar o SKU que precisa de reposição do que não precisa.
+  O dado é coerente com a regra; a regra é que não acompanhou a V5.
+- **Aqui:** o ponto de reposição derivado da demanda de cada par (a demanda no prazo de reposição, mais uma
+  margem), declarado no glossário e no `.yml`, com o alerta do *streaming* lendo a mesma regra. Muda uma regra de
+  negócio publicada, então pede ADR e uma fase própria, com o antes → depois medido. Não entra nesta fase
+  (decidido por delegação do Owner, 18/11/2026).
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
