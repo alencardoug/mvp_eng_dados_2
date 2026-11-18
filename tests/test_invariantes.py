@@ -455,6 +455,41 @@ def test_20_stock_is_backed_from_the_opening(request, config, profile) -> None:
     )
 
 
+
+@pytest.mark.parametrize("profile", PROFILES)
+def test_v5_stock_follows_the_sales(request, profile) -> None:
+    """V5 (Q73 do plano da reabertura): compra e abertura cobrem a venda, e o estoque não se acumula.
+
+    Até 17/11/2026 o estoque terminava 57 vezes a venda do período no varejo (704.762 unidades contra
+    12.224 vendidas) e o giro mediano da P11 era 0,01. Com a compra pela demanda, 1,3 vez. O oráculo é o
+    teto de três vezes: pega a volta do sorteio sem relação com a venda, e não depende do número exato.
+    """
+    data = request.getfixturevalue(profile)
+    vendido = -sum(m["quantity_delta"] for m in data["inventory_movements"] if m["movement_type"] == "sale_dispatch")
+    no_fim = sum(m["quantity_delta"] for m in data["inventory_movements"])
+    assert vendido > 0
+    assert no_fim <= 3 * vendido, f"estoque no fim {no_fim} contra {vendido} unidades vendidas"
+
+
+@pytest.mark.parametrize("profile", PROFILES)
+def test_v5_every_receipt_carries_stock_and_partial_stays_below(request, profile) -> None:
+    """Com o pedido pela demanda, o pedido pode ser pequeno: cada lote ainda recebe ao menos uma unidade,
+    o recebimento parcial fica abaixo do pedido, e o comum o fecha exatamente (invariante 6)."""
+    data = request.getfixturevalue(profile)
+    pedido = {i["id"]: i["quantity_ordered"] for i in data["purchase_order_items"]}
+    ordem_do_item = {i["id"]: i["purchase_order_id"] for i in data["purchase_order_items"]}
+    destino = {o["id"]: o["__destino"] for o in data["purchase_orders"]}
+    recebido: dict[int, int] = defaultdict(int)
+    for item in data["goods_receipt_items"]:
+        assert item["quantity_received"] >= 1, item
+        recebido[item["purchase_order_item_id"]] += item["quantity_received"]
+    assert recebido
+    for item_id, quantidade in recebido.items():
+        if destino[ordem_do_item[item_id]] == "partially_received":
+            assert quantidade < pedido[item_id]
+        else:
+            assert quantidade == pedido[item_id]
+
 # ── As garantias em fator pequeno (revisão da implementação, RVB5RI-1-01 a 03) ──
 #
 # Os três perfis acima não chegam perto do piso das tabelas, e era ali que a

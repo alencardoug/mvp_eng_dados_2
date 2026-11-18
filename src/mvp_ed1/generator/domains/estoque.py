@@ -63,7 +63,7 @@ def _montar(motor: Motor, dados: Dataset) -> list[dict]:
     variantes = dados["product_variants"]
 
     movimentos: list[dict] = []
-    movimentos += _estoque_inicial(motor, fonte, processo, armazens_ids, variantes)
+    movimentos += _estoque_inicial(motor, fonte, processo, armazens_ids, variantes, demanda_por_par(dados))
     movimentos += _entradas_de_compra(motor, dados)
     movimentos += _saidas_de_venda(motor, dados)
     movimentos += _devolucoes_de_cliente(motor, dados)
@@ -111,20 +111,42 @@ def _evento(
     }
 
 
-def _estoque_inicial(motor, fonte, processo, armazens_ids, variantes) -> list[dict]:
+def demanda_por_par(dados: Dataset) -> dict[tuple[int, int], list[tuple[dt.datetime, int]]]:
+    """A venda de cada par armazém × SKU: o instante e a quantidade de cada saída por venda.
+
+    São as mesmas saídas que `_saidas_de_venda` põe no livro — a remessa despachada, no armazém dela —,
+    e é por elas que a compra e a abertura se dimensionam (V5).
+    """
+    demanda: dict[tuple[int, int], list[tuple[dt.datetime, int]]] = {}
+    for item in dados["shipment_items"]:
+        if item["__remessa"]["status"] in DESPACHADAS:
+            demanda.setdefault((item["__warehouse_id"], item["__product_variant_id"]), []).append(
+                (item["created_at"], item["quantity"]))
+    return demanda
+
+
+def _estoque_inicial(motor, fonte, processo, armazens_ids, variantes, demanda) -> list[dict]:
     """Formação do estoque inicial — Geração de Dados §3, passo 4.
 
     Sem ele o saldo cobriria só os pares que passaram por recebimento de
     compra, e a cobertura de `inventory_balances` ficaria na metade da
     proporção declarada: 1.520 itens recebidos não estocam 2.500 pares.
+
+    A quantidade é a venda do par nos primeiros `cobertura_da_abertura_dias` do período, e uma unidade
+    no par sem venda nesse intervalo (V5; Q73). Até 17/11/2026 era um sorteio de 10 a 400.
     """
     pares = [(a, v["id"], v) for a in armazens_ids for v in variantes]
     quantos = round(len(pares) * processo["cobertura_de_saldo"])
     escolhidos = sorted(fonte.amostra(range(len(pares)), quantos))
+    ate = motor.inicio + dt.timedelta(days=processo["cobertura_da_abertura_dias"])
+
+    def abertura(armazem: int, sku: int) -> int:
+        return max(1, sum(q for quando, q in demanda.get((armazem, sku), ()) if motor.inicio <= quando <= ate))
+
     return [
         _evento(
             "adjustment_in", "adjustment", _ABERTURA,
-            pares[i][0], pares[i][1], fonte.inteiro(10, 400), motor.inicio,
+            pares[i][0], pares[i][1], abertura(pares[i][0], pares[i][1]), motor.inicio,
             custo=pares[i][2]["__custo"],
             metadados=dict(_METADADOS_DA_ABERTURA),
         )

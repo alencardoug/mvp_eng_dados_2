@@ -59,6 +59,8 @@ PASSOS: tuple[Passo, ...] = (
     # 6. Pagamentos e remessas.
     ("pagamentos: fluxo financeiro", pagamentos.fluxo),
     ("logística: remessas e entregas", logistica.remessas),
+    # A compra se dimensiona pela venda que cobre (V5): só agora a venda despachada existe.
+    ("compras: quantidades pela demanda", compras.dimensionar_pela_demanda),
     # 7. Livro de estoque, reservas e saldo — depende de tudo que o move.
     ("estoque: livro, reservas e saldo", estoque.livro),
     # 8. Atendimento, pendurado nos fatos já existentes.

@@ -301,9 +301,16 @@ tabelas:
     origem: processo
     processo:
       itens_por_ordem: [1, 8]
-      # Compra entra em lote e venda sai em unidades: é essa assimetria que
-      # mantém o saldo positivo sem precisar de conserto.
-      quantidade_por_item: [40, 500]
+      # A quantidade pedida é a venda que o item vai cobrir (V5; Q73 do plano da
+      # reabertura): as saídas por venda do par — o armazém que recebe × o SKU —
+      # nos dias seguintes a cada recebimento do item. Até 17/11/2026 era um
+      # sorteio de 40 a 500 sem relação com a venda, que dá de 1 a 3 unidades por
+      # item: o estoque terminava 50 vezes maior que a venda do período, e o giro
+      # mediano da P11 era 0,01 por trimestre (Pendências, V5). O pedido nunca é
+      # menor que um por lote, e dois por lote na ordem parcialmente recebida,
+      # para que cada recebimento leve ao menos uma unidade e o parcial fique
+      # abaixo do pedido (invariante 6).
+      cobertura_da_compra_dias: 60
 
   goods_receipts:
     referencia: 3800
@@ -495,12 +502,19 @@ tabelas:
       # itens recebidos não conseguem estocar 2.500 pares distintos. Abaixo de
       # 1 porque recebimento, transferência e ajuste também abrem pares novos.
       cobertura_de_saldo: 0.70
+      # A quantidade da abertura do par é a venda dele nos primeiros dias do
+      # período (V5; Q73). Até 17/11/2026, um sorteio de 10 a 400 no código.
+      cobertura_da_abertura_dias: 60
       # O par que tem saída sem lastro abre o período com estoque: a maior
       # falta acumulada dele, mais esta folga (V4 das Pendências; Q26 e Q42 do
       # plano da base dos consumidores). Substitui o ajuste de entrada que o
       # gerador criava um minuto antes de cada saída descoberta. Com folga
       # zero, o par zera no fim do dia e o giro do trimestre fica indefinido.
-      folga_da_abertura: 0.5
+      # 0,2 desde a V5 (Q73): com a compra e a abertura pela venda, a folga de
+      # 0,5 segurava o giro mediano perto de 0,36; com 0,2, 0,47 no varejo e 0,50
+      # no legado, medido em memória em 18/11/2026; com zero, 22 linhas da P11
+      # ficavam com giro indefinido.
+      folga_da_abertura: 0.2
       # Movimentos que não vêm de compra nem de venda, em fração do total.
       transferencias: 0.05
       ajustes: 0.05

@@ -108,7 +108,10 @@ A ordem respeita as dependências referenciais e a causalidade dos eventos:
    ([invariante 14](modelo_de_dados.md#4-invariantes-de-negócio)): é o único passo que volta a uma
    tabela já gerada, porque só depois da venda se sabe quando ela foi.
 6. **Pagamentos, transações e reembolsos**, seguindo o estado de cada pedido.
-7. **Remessas, itens de remessa e eventos de entrega.**
+7. **Remessas, itens de remessa e eventos de entrega** — e, logo depois delas, a quantidade de cada
+   item de compra, que cobre a venda despachada do par nos dias seguintes ao recebimento: o passo 4
+   monta as ordens e os recebimentos, e só aqui a venda existe (V5). É o segundo passo que volta a
+   tabelas já geradas.
 8. **Livro de estoque, reservas e saldo** — nesta ordem, e depois de tudo que move estoque.
 9. **Chamados de atendimento**, vinculados a fatos já existentes.
 
@@ -291,9 +294,13 @@ do cadastro existe antes das vendas e não é derivado delas: é a venda que o r
   aberto vai para os carrinhos, e o total de reservas se mantém.
 - **O código do adquirente** é escolhido pelo resultado da transação; só o motivo da recusa é
   sorteado, pelos pesos declarados.
-- **O estoque de abertura** do par armazém × SKU é dimensionado pela demanda: o par que teria uma
-  saída sem lastro abre o período com a maior falta acumulada dele, mais a folga declarada. Nenhum
-  ajuste é criado para cobrir uma saída.
+- **O estoque de abertura** do par armazém × SKU é dimensionado pela demanda: a venda dele nos
+  primeiros dias do período, e o par que ainda teria uma saída sem lastro abre com a maior falta
+  acumulada dele, mais a folga declarada. Nenhum ajuste é criado para cobrir uma saída.
+- **A compra cobre a venda** (V5). A quantidade de cada item de compra é a venda do par nos dias
+  seguintes ao recebimento, e não um sorteio. O estoque acompanha a venda em qualquer fator e
+  semente, e o giro da P11 tem nível de varejo: a mediana trimestral, que era 0,01, ficou em 0,46 no
+  varejo e 0,48 no legado, medida em memória em 18/11/2026.
 - **A cobertura que não depende da semente.** Onde um valor de enumeração nasce de sorteio sobre
   poucas linhas — a reabertura do chamado, o extravio, a autorização pendente e a aprovada sem
   captura, os motivos de recusa —, o gerador o garante por construção, como o
