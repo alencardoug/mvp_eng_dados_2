@@ -817,12 +817,12 @@ quando ao menos uma das suas origens é fonte; *só de seed* quando nenhuma é f
 | Camada | Colunas | De fonte | Só de seed | Só geradas |
 |---|---:|---:|---:|---:|
 | `staging` | 1114 | 1026 | 0 | 88 |
-| `trusted` | 1069 | 972 | 15 | 82 |
+| `trusted` | 1075 | 972 | 21 | 82 |
 | `analytics` | 513 | 418 | 10 | 85 |
 | `consumption` | 188 | 117 | 9 | 62 |
-| `quarantine` | 26 | 16 | 0 | 10 |
+| `quarantine` | 27 | 16 | 0 | 11 |
 | `snapshots` | 109 | 86 | 0 | 23 |
-| **total** | **3019** | **2635** | **34** | **350** |
+| **total** | **3026** | **2635** | **40** | **351** |
 
 ### 3.3 Origem de cada coluna de `consumption`
 
