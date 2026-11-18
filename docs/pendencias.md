@@ -317,6 +317,11 @@ na quarentena por `NUM_AMBIGUOUS` (`"101 caixas"`, falha deliberada do catálogo
 
 **Fechada em 17/11/2026**, por delegação do Owner no aceite da `v2.1.0`: a V4 está resolvida no que pedia.
 
+**Nota de 18/11/2026 (UQ-17 do BI):** depois da regeneração da reabertura, o par armazém 1 × variante 30 do
+legado não diverge mais (a conferência de resíduo zero, D5 do diário do ciclo), e a P11 tem 1 linha de giro
+indefinido em 5.775: o SKU-0000306 no CD Recife, em 2024-T3, com saldo médio zero no trimestre. A citação na P12
+que a UQ-17 pedia era condicionada a o par continuar igual, e não se aplica.
+
 *Efeito de não decidir:* o giro indefinido nesses pares, declarado na view e no glossário.
 
 As três questões que a revisão da Etapa 10 levantou — D33, D34 e D35 — foram decididas em
