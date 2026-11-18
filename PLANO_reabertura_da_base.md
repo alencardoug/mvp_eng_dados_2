@@ -342,6 +342,17 @@ As linhas `prevista` do F34 e do UQ-19 passam a `feita` só depois do *build* do
 
 ### Bloco 5 — o ciclo
 
+**A adaptação, proposta em 18/11/2026,** está em `data/medicoes/diario_reabertura.md`, fora do Git (o Owner:
+"preparar e parar"). Ela traz:
+- o estado de partida, medido;
+- os parâmetros (`LIMITE` 2.200, `QUANTAS` 250, o prazo de 900 s da D63, a geração do `MAINT`);
+- a H2 desta geração, medida em memória: 26 remoções no legado e zero reaparições, que viram a Q74;
+- o corte de recuo sobre `4137dc7`, o cursor na B6 e as três fases das guardas;
+- a parada da Q72 e os oráculos linha a linha;
+- dois *scripts* só leitura, `capturar_views.py` e `residuo_zero.py`, ensaiados sobre o estado de partida.
+
+O ciclo começa com a revisão da adaptação sem bloqueio, a Q74 respondida e o Owner presente para os `FORCE`.
+
 Mesma forma do ciclo do Bloco 5R, com um diário próprio (`data/medicoes/diario_reabertura.md`).
 
 **Dois `FORCE` diferentes** (RVRB-1-01). Um é a **autorização de descarte**: o `stream-down FORCE=1` apaga os
@@ -505,6 +516,7 @@ A Q64 foi respondida antes, pela forma (e). As Q65 a Q72 foram respondidas em 17
 | Q71 | **(a)**: o cursor guardado com SHA-256 no diário e removido antes de embalar o estado final |
 | Q73 | **Pela demanda** (18/11/2026): cada compra cobre as saídas do par nos 60 dias seguintes, a abertura cobre os primeiros 60 dias, e a folga do lastro cai de 1,5 para 1,2 (medida abaixo, Bloco 2) |
 | Q72 | **(d)**: a lista de exceções do legado desta geração, num *seed* versionado aprovado pelo Owner, e caso novo reprova o `check` |
+| Q74 | **Pendente** (18/11/2026): aceitar na T3 as 26 remoções de `inventory_movements` que a regeneração faz no legado, medidas em memória (zero reaparições; a memória de exclusão passa de 67 a 93 chaves). A recomendação é aceitar, porque é a consequência da V5. Proposta e medida na adaptação do ciclo (`data/medicoes/diario_reabertura.md`, §3) |
 
 ---
 
