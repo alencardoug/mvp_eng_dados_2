@@ -175,6 +175,22 @@ Vem antes do ciclo, porque o ciclo passa por cada um destes itens e os mede.
    que a guarda acusa isso.
 6. A revisão integral do Owner sobre o declarativo: `geracao.yml`, a D93 (e o ADR, se houver) e as guardas.
 
+**Item 1, medido em 18/11/2026,** só leitura, sobre o armazém da `v2.1.0`, numa transação `REPEATABLE READ READ
+ONLY`. Consultas e saídas ficam em `data/medicoes/reabertura/bloco2/`, fora do Git.
+- **O alcance**, pelo `manifest.json`: as três entradas que o produtor alcança são `retail.inventory_movements`,
+  `retail.inventory_movements_stream` e `retail.inventory_balances`. Delas descendem `staging`, a `trusted`
+  (`inventory_movements` e `inventory_balances`), a `fact_inventory_movement` e três views: P08, P11 e P12. Os
+  movimentos alcançam 38 testes, e os saldos, 7.
+- **A regra 1** (movimento depois da `as_of_date`, pelo `occurred_at`) acha exatamente **2.200** na fato, todos do
+  varejo. É o N da E4 do diário do 5R. O destino quente e o `raw` do Airbyte têm os mesmos 2.200. O legado não
+  tem nenhum.
+- **A regra 2** (saída por venda sem a remessa dela, pelo `shipment_code` na mesma origem) acha:
+  - **984 no varejo**, todos depois do corte. É o número do BI, agora pelo vínculo certo;
+  - **13 no legado**, todos antes do corte. Os 13 têm a remessa na quarentena com o código intacto, rejeitada
+    em cascata porque o pedido dela foi rejeitado (`PARENT_REJECTED`; remessas 2, 16, 49, 110 e 111).
+- **Nenhum caso não demonstrável** na `v2.1.0`, ou seja, a lista da Q72 (d) estaria vazia. A medida se repete
+  depois da carga regenerada, porque a injeção muda com o lote.
+
 ### Bloco 3 — as descrições das relações (F32)
 
 1. Descrever as 123 relações **no dono declarativo de cada grupo**, nunca no derivado (RVRB-1-05):
