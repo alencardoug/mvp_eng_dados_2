@@ -1101,15 +1101,22 @@ def test_o_stream_run_guarda_o_codigo_do_python_sem_ignorar_o_sigint():
 
 
 
+K = "A" * 43 + "="  # 32 bytes zero: chave conhecida de teste, sintética
+
+
 @pytest.mark.parametrize("grafia", [
     pytest.param('"{chave}"', id="aspas-duplas"),
     pytest.param("'{chave}'", id="aspas-simples"),
     pytest.param("{chave} # a chave da maquina", id="comentario"),
     pytest.param("{padrao}", id="base64-padrao"),
+    pytest.param(' "{chave}"', id="espaco-antes-das-aspas"),
+    pytest.param('"' + "A" * 16 + "\\n" + "A" * 27 + '="', id="escape-dentro-das-aspas"),
+    pytest.param(K + "=", id="padding-a-mais"),
+    pytest.param(K + "#", id="cerquilha-colada"),
 ])
-def test_garantir_preserva_a_chave_valida_em_toda_grafia_que_o_compose_aceita(tmp_path, grafia):
-    """RVB1-1-01: a grafia crua com aspas ou comentário era recusada, e a chave válida era trocada —
-    tornando ilegível o que ela cifrou. O oráculo é o `Fernet` sobre o valor efetivo."""
+def test_garantir_nao_toca_grafia_que_nao_e_a_gerada(tmp_path, grafia):
+    """RVB1-1-01, RVB1-2-01 e 02: cada leitura errada da grafia trocava uma chave que o Compose e o
+    `Fernet` aceitam — tornando ilegível o que ela cifrou. Só a forma que o projeto gerava é trocada."""
     import base64
 
     from cryptography.fernet import Fernet
@@ -1129,16 +1136,27 @@ def test_garantir_preserva_a_chave_valida_em_toda_grafia_que_o_compose_aceita(tm
     assert r.stdout == "" and env.read_bytes() == antes
 
 
-def test_garantir_troca_a_invalida_mesmo_entre_aspas(tmp_path):
-    from cryptography.fernet import Fernet
-
+@pytest.mark.parametrize("conteudo", [
+    pytest.param(f'AIRFLOW_FERNET_KEY="{CHAVE_COMO_SENHA}"\n', id="a-gerada-entre-aspas"),
+    pytest.param(f"export AIRFLOW_FERNET_KEY={CHAVE_COMO_SENHA}\n", id="com-export"),
+    pytest.param(f"AIRFLOW_FERNET_KEY={CHAVE_COMO_SENHA}\nAIRFLOW_FERNET_KEY={CHAVE_COMO_SENHA}\n", id="duas-linhas"),
+])
+def test_forma_que_nao_e_a_gerada_avisa_e_nao_troca_nem_a_invalida(tmp_path, conteudo):
     env = tmp_path / ".env"
-    env.write_text(f'AIRFLOW_FERNET_KEY="{CHAVE_COMO_SENHA}"\n', encoding="utf-8")
+    env.write_text(conteudo, encoding="utf-8")
 
     r = _fernet("garantir", str(env))
 
-    assert r.returncode == 0 and "trocada" in r.stdout
-    Fernet(env.read_text(encoding="utf-8").strip().partition("=")[2])
+    assert r.returncode == 0 and r.stdout == "", r.stdout + r.stderr
+    assert "nada foi alterado" in r.stderr
+    assert env.read_text(encoding="utf-8") == conteudo
+
+
+def test_a_chave_canonica_nao_avisa(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text(f"AIRFLOW_FERNET_KEY={_fernet('gerar').stdout.strip()}\n", encoding="utf-8")
+    r = _fernet("garantir", str(env))
+    assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
 
 
 # ── V7: o registro do tratamento também depois do rebuild que falha (RVB1-1-03) ──
