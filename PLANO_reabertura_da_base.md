@@ -246,6 +246,16 @@ faixa (Q67) é medida de novo em memória antes do ciclo e no armazém depois de
 3. Revisão integral do Owner: é declarativo, e são até 123 textos. É o maior volume da fase (risco R14). As 70
    de `raw` e `raw_legacy` saem de textos que já existem na declaração, e a revisão confere o transporte.
 
+**O Bloco 3 fica fora da árvore até o *build* do ciclo** (Owner, 18/11/2026), pelo mesmo motivo das guardas do
+Bloco 2: as três formas de descrição escrevem em `dbt/` (o espelho de `sensitivity.main`, o gerador do legado e
+os `.yml` dos modelos), e o carimbo do pacote só se refaz com um `dbt-build`, proibido antes da regeneração. O
+*patch* é `data/medicoes/reabertura/bloco3/descricoes.patch` e leva também a guarda de teto zero. Antes de
+congelá-lo, ele é aplicado numa cópia de trabalho temporária, com a suíte offline (só o teste do carimbo pode
+reprovar) e o dbt compilado fora de `dbt/target`. O resultado fica ao lado do *patch*. As alternativas
+descartadas foram dividir o bloco, deixando o código na árvore e os `.yml` no *patch*, porque os testes de
+sincronia do gerador acusam a diferença, e uma *branch* sem *merge*, porque cada *commit* nasceria com o
+`check-offline` vermelho.
+
 ### Bloco 4 — o pacote (F33, UQ-18, UQ-19, F34)
 
 1. **F33:** a nota de `registro_fase_gcp` atualizada, e uma entrada nova em `environments` para a Capacidade
@@ -317,7 +327,8 @@ Uma subseção do diário, revisada pelo outro agente **antes** do primeiro desc
       e o oráculo das fontes (B5);
    4. `sync-airbyte RESET=1`: o `raw` relido da origem nova, com o cursor descartado (C2).
 4. **A publicação sem produtor:** o *snapshot* do CDC entrega o livro regenerado (C3) e os dois caminhos são
-   comparados (C4). Depois, a captura do legado, o `dbt-build RESET=1` (D3), que refaz o SCD e os incrementais,
+   comparados (C4). Depois, a captura do legado, os dois *patches* aplicados e commitados (as guardas do
+   Bloco 2 e as descrições do Bloco 3), o `dbt-build RESET=1` (D3), que refaz o SCD e os incrementais,
    as guardas na fase (iii), a procedência `verified`, o `check`, a DAG e a restauração (com a V7).
 5. **A conferência de resíduo zero**, antes do aceite. Nenhum movimento com `occurred_at` depois da `as_of_date`
    no destino quente, no `raw`, no *staging*, no `trusted` e na fato; os saldos de `analytics`, com a população
@@ -526,6 +537,8 @@ também conferiu, sem divergência:
 - o *patch* fora da árvore, compatível com a regra 3 até o ciclo.
 
 As lacunas de cobertura em fatores muito pequenos são as mesmas do gerador anterior, ou seja, não são regressão
-da V5. O único achado, RVB2-1-01, foi um ajuste de texto na Geração de Dados §3, e foi aplicado. **Falta a
-revisão integral do Owner** sobre o `geracao.yml` (`e237470`), o *patch* das guardas e a D93.
+da V5. O único achado, RVB2-1-01, foi um ajuste de texto na Geração de Dados §3, e foi aplicado.
+
+**Revisão integral do Owner feita em 18/11/2026, aprovada:** o `geracao.yml` (`e237470`), o *patch* das guardas e
+a D93. O Bloco 2 está fechado.
 
