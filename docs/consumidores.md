@@ -158,7 +158,8 @@ aqui como `prevista` antes do *commit* que a faz.
 | Fim da auditoria das 16 views (Bloco 1b, com a P13 depois da D66) | `4da9e60` | BI (N85: as etapas 2.4 a 2.10 fixam este) |
 | Primeira versão do pacote (Bloco 4) | `acb26d0` | `gdados`, BI |
 | Fim do ciclo do Bloco 5R: o dado regerado, as 16 views com o valor novo, o pacote com `on_zero_denominator` e a procedência verificada | `d40ec9d` | `gdados`, BI; o `nl_sql`, se reimportar |
-| `v2.1.0`, o fechamento da fase da base dos consumidores: o mesmo modelo e o mesmo dado de `d40ec9d`, com os documentos do fechamento e os itens em aberto do pacote atualizados (a V4 fechada; a V6 e a V7) | `eb11709` | `gdados`, BI — **o marco a preferir**; o `nl_sql`, se reimportar |
+| `v2.1.0`, o fechamento da fase da base dos consumidores: o mesmo modelo e o mesmo dado de `d40ec9d`, com os documentos do fechamento e os itens em aberto do pacote atualizados (a V4 fechada; a V6 e a V7) | `eb11709` | `gdados`, BI; o `nl_sql`, se reimportar |
+| `v2.2.0`, o fechamento da reabertura da base: o dado regerado sem o exercício de *streaming* (F31) e com a compra e o estoque pela venda (V5), as descrições das relações (F32), as chaves, o destino das `relationships` e as verificações da auditoria no pacote (F34, UQ-19), a origem na quarentena das entregas (F35) e a procedência verificada | Anunciado no aviso que acompanha a *tag* (o documento não cita o *commit* que o contém) | `gdados`, BI — **o marco a preferir**; o `nl_sql`, se reimportar |
 
 ---
 

@@ -69,3 +69,6 @@ dbt/target_gcp/
 
 # Estado de execução do produtor de streaming (Etapa 7) — não é código.
 .stream/
+
+# Caixa de correio entre projetos (local)
+/alinhamento.md
