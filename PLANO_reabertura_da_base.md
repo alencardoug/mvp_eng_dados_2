@@ -34,6 +34,7 @@ Pendências, ADR, especificação do pacote, Consumidores.
 | 14 | **A ordem das linhas de Consumidores §5:** a linha de 17/11 (`905ba9c`) vem antes da de 16/11 (`d4297ed`, `e1ac94f`) | `gdados`, §7 | Não | 6 |
 | 15 | **O cabeçalho dos Achados.** Ele diz que ali vive "o que o `nl_sql` descobriu", mas os F17 a F30 foram achados aqui | `nl_sql`, item 9 | Não | 6 |
 | 16 | **F34: o destino das chaves estrangeiras fora do pacote.** Em `eb11709`, os 76 testes `relationships` trazem a relação e a coluna testadas, mas não as referenciadas, e as 26 PKs e 58 FKs de `analytics` (ADR-0056) não estão no pacote. A página de estrutura do `gdados` precisa delas para o diagrama entidade-relacionamento | `gdados@52c4359`, §7 (entrou depois de `cc70fc6`) | Não | 4 |
+| 17 | **F35: a quarentena das entregas não guarda a origem.** `quarantine.rejected_shipment_deliveries` lê `trusted.shipments`, que empilha as duas origens, sem `source_system`, e o `shipment_id` se repete entre elas. Na `v2.1.0`, a remessa 45 do legado está lá e só se identifica cruzando com `trusted.shipments` | Este projeto, na validação do Bloco 3 (Owner, 18/11/2026: registrar e corrigir na melhor forma) | Sim, o esquema da relação | 3 e 5 |
 
 **Fica fora**, com o motivo:
 - **Trocar o código `GW-OK`:** mudaria o dado, e o significado já está declarado (`nl_sql`, item 9).
@@ -279,8 +280,27 @@ SHA-256 estão em `data/medicoes/reabertura/bloco3/validacao.md`, e os textos pa
 `f31_nenhum_movimento_depois_do_corte` chama `meia_noite`, e o contador de `test_vigencia_em_utc` passa de
 18 a 19. O *patch* passou a levar a atualização do contador. A versão aprovada ficou guardada ao lado.
 
-**Falta:** a revisão integral do Owner (item 3) e a correção do *patch* das guardas. A observação sobre a
-falta de `source_system` em `quarantine.rejected_shipment_deliveries` foi levada ao Owner.
+**O Owner, em 18/11/2026:** o Bloco 3 está aprovado sem a revisão integral, que ele declarou que não poderá
+fazer (item 3), e a correção do *patch* das guardas está aceita. A falta de `source_system` na quarentena das
+entregas virou o **F35**, para ser corrigida na melhor forma.
+
+**O F35, num *patch* próprio,** `bloco3/f35_quarentena_origem.patch`, que aplica depois do das descrições e vira
+o seu próprio *commit*:
+- a coluna `source_system`, a primeira, lida de `trusted.shipments`, com o texto da convenção, e a unicidade em
+  `(source_system, shipment_id)` (`dbt_utils.unique_combination_of_columns`, como nas dimensões). É o
+  ADR-0039: a origem existe em toda tabela que recebe registros de mais de um sistema;
+- a descrição da relação passa a dizer o grão com a origem;
+- o comentário de `entrega_projetada_tem_evento_no_livro`, que lia `trusted.shipments` "porque ela não guarda a
+  origem", passa a dizer que confere a regra e não a cópia. O teste não muda;
+- formas descartadas: prefixar o código com a origem, que mudaria a chave natural, e só documentar, que
+  deixaria a linha ambígua;
+- a linha `prevista` em Consumidores §5, porque é mudança de esquema numa relação publicada. Ela passa a
+  `feita` depois do *build* do ciclo.
+
+Validado sem `compile`. O `--check` da derivação rodou sobre uma cópia do manifesto compilado, só no
+*worktree*, com o `raw_code` do modelo e a coluna nova no SQL compilado. Deu 3.020 colunas e nenhum arquivo
+desatualizado, ou seja, a coluna escrita à mão é a que a derivação escreveria. O `parse` registra o teste
+composto, e a suíte *offline* tem as mesmas 3 falhas esperadas (`validacao.md`).
 
 ### Bloco 4 — o pacote (F33, UQ-18, UQ-19, F34)
 
@@ -353,8 +373,8 @@ Uma subseção do diário, revisada pelo outro agente **antes** do primeiro desc
       e o oráculo das fontes (B5);
    4. `sync-airbyte RESET=1`: o `raw` relido da origem nova, com o cursor descartado (C2).
 4. **A publicação sem produtor:** o *snapshot* do CDC entrega o livro regenerado (C3) e os dois caminhos são
-   comparados (C4). Depois, a captura do legado, os dois *patches* aplicados e commitados (as guardas do
-   Bloco 2 e as descrições do Bloco 3), o `dbt-build RESET=1` (D3), que refaz o SCD e os incrementais,
+   comparados (C4). Depois, a captura do legado, os três *patches* aplicados, um *commit* cada (as guardas
+   do Bloco 2, as descrições do Bloco 3 e o F35), o `dbt-build RESET=1` (D3), que refaz o SCD e os incrementais,
    as guardas na fase (iii), a procedência `verified`, o `check`, a DAG e a restauração (com a V7).
 5. **A conferência de resíduo zero**, antes do aceite. Nenhum movimento com `occurred_at` depois da `as_of_date`
    no destino quente, no `raw`, no *staging*, no `trusted` e na fato; os saldos de `analytics`, com a população
@@ -568,3 +588,18 @@ da V5. O único achado, RVB2-1-01, foi um ajuste de texto na Geração de Dados 
 **Revisão integral do Owner feita em 18/11/2026, aprovada:** o `geracao.yml` (`e237470`), o *patch* das guardas e
 a D93. O Bloco 2 está fechado.
 
+
+### Bloco 3 — rodada 1 do codex2, sobre os *patches* em `429d94b` (18/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_bloco3_r1.md`, fora do Git. O codex2 reconstruiu os dois *patches* só
+em memória e conferiu 130 textos mudados, 18 promoções sem nenhuma outra mudança nas entradas e nenhum SQL de
+modelo alterado. Conferiu também os 37 prefixos de `raw`, os 40 textos de `raw_legacy`, a guarda e a correção
+18 → 19. Pelo leitor do pacote, em memória, deu 0 lacunas de relação. Três textos estavam errados, e erro em
+declaração é bloqueante. **Aplicada em 18/11/2026**, no `descricoes.patch` regenerado:
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVB3-1-01 | bloqueante | `rejected_shipment_deliveries`: o teste acusa cada remessa, salvo a do legado explicada pela quarentena (Q62), e não "falha se ela deixar de estar vazia" |
+| RVB3-1-02 | bloqueante | `product_skus`: o valor atual, uma linha por SKU e origem; `dim_product` lê as versões de `scd_product` e tem o grão da versão |
+| RVB3-1-03 | bloqueante | `customers`: o ativo conta de `as_of_date`, e a recorrência, da primeira compra |
+| RVB3-1-04 | ajuste | Bloco 3: o "Falta" deixa de listar a correção das guardas, que está no *patch* e foi aceita pelo Owner |
