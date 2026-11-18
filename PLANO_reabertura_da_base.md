@@ -437,9 +437,55 @@ restauração a mais. Não é recomendada agora.
 
 Se a Q64 ficar com outra forma, os passos 2 a 4 voltam à ordem do Bloco 5R.
 
+**Executado em 18/11/2026, das 17:56 às 22:40 UTC.** O diário é `data/medicoes/diario_reabertura.md`, fora do
+Git, e as saídas estão em `data/medicoes/reabertura/ciclo/`. Todas as linhas bateram com o oráculo. Os desvios
+estão registrados no diário. Os principais resultados:
+- **Corte de recuo:** `~/mvp_ed1-recovery-pre-reabertura`, sobre `4137dc7`. As fontes são iguais às do aprovado,
+  e a memória tem a captura 76 a mais, explicada pelo livro.
+- **O exercício (fase E), com as quatro provas que a base publicada não dá:**
+  - N = 2.200 e K = 17.111;
+  - a drenagem da D63 confirmou 1.818 pares e 2.200 eventos;
+  - a parcela quente da P12: 275 chaves tocadas com o caminho quente, e 0 não tocadas mudaram de saldo;
+  - 179 alertas lidos por *offset*, com 77 aberturas e 102 normalizações;
+  - a V6 com código de saída 0;
+  - o *build* incremental com eventos vivos `PASS`;
+  - a fase (ii) das guardas: 4.400, 1.987 e 0,02.
+- **O descarte (B1 a B4), cada passo confirmado pelo Owner;** o cursor guardado e removido (Q71).
+- **A publicação:**
+  - K0 = 12.753;
+  - a captura J = 80;
+  - `dbt-build RESET=1` com `PASS=1091`: as três guardas passam na fase (iii), e a lista da Q72 ficou **vazia**;
+  - a memória com 93 chaves (Q74);
+  - o resíduo zero passa;
+  - a P11 com mediana 0,46.
+- **F0 a F6:** a suíte achou dois defeitos dos *patches*, a etiqueta `fronteira` na guarda da remessa e a
+  contraprova do canal, corrigidos antes dos *commits* `1ac1274`, `fbc3a0d`, `2fc15fd` e `a8da985`. O `make check`
+  passou. A DAG terminou com as 16 tarefas `success` (J2 = 82). A procedência ficou `verified` (`0e00ae47`, de
+  `a8da985`).
+- **O antes → depois (Q68):** 13 das 16 views idênticas. Mudam a P08, a P11 e a P12. A P12 mostrou o **F36**.
+- **G1 a G11:**
+  - o pacote `33961142…` sobre `7e5065a`, com o cursor ausente;
+  - a restauração com a V7, com a T3 da época 6 contida e a procedência `verified` sobre `7e5065a` (`1c82c211`);
+  - a promoção, autorizada por delegação do Owner;
+  - as sete retenções conferidas;
+  - o estado devolvido.
+
 ### Bloco 6 — os textos depois do ciclo
 
 UQ-17, UQ-20, a ordem de Consumidores §5 (Q70) e o cabeçalho dos Achados.
+
+**Feito em 18/11/2026** (`c1b27c2` a `6e14af5`):
+- **Consumidores §5:**
+  - as linhas `feita` da P08, da P11 e da P12, medidas view a view, e a das 13 views sem mudança (Q68);
+  - a do texto das 130 relações (F32);
+  - as três linhas de esquema anunciadas, agora `feita` (F34, UQ-19, F35);
+  - a UQ-20 nas 15 linhas "Não medido" do 5R: o depois capturado na A8, e o antes da P04, da P13, da P14 e da
+    P15 nos arquivos dos Blocos 1 e 1b;
+  - a ordem por data, guardada por `tests/test_consumidores.py`, que reprova a versão antiga (Q70).
+- **UQ-17:** a nota na V4. O par 1 × 30 não diverge mais, e a citação condicionada não se aplica.
+- **Os Achados:** o cabeçalho diz que os achados vêm também dos outros consumidores e deste projeto, e o F36 está
+  registrado, com a correção para uma fase própria (ADR), por delegação do Owner.
+- **O resultado:** 1.827 testes verdes.
 
 ### Fechamento
 
