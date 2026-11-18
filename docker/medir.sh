@@ -301,7 +301,12 @@ _encerrar_filhos() {
 	local pgid esperou
 	for pgid in "${FILHOS[@]:-}"; do
 		[ -z "$pgid" ] && continue
-		kill -0 -- "-$pgid" 2>/dev/null || continue
+		# Grupo que já saiu sozinho também tem desfecho (RVB1-1-02): o pipeline que termina com erro
+		# depois da sondagem inicial, com o livro e a drenagem já completos, passaria por sucesso.
+		if ! kill -0 -- "-$pgid" 2>/dev/null; then
+			_desfecho_do_pipeline "$pgid" "antes do encerramento"
+			continue
+		fi
 		echo "[medir] encerrando o que iniciei: grupo $pgid (SIGINT)"
 		kill -INT -- "-$pgid" 2>/dev/null
 		esperou=0
@@ -313,19 +318,25 @@ _encerrar_filhos() {
 			kill -KILL -- "-$pgid" 2>/dev/null
 			ENCERRAMENTO=forcado
 		else
-			local saida=""
-			[ -n "${EXECUCAO:-}" ] && [ -f "$EXECUCAO/codigo_de_saida" ] && saida=$(cat "$EXECUCAO/codigo_de_saida")
-			CODIGO_DO_PIPELINE=$saida
-			if [ "$saida" = 0 ]; then
-				echo "[medir] grupo $pgid encerrou limpo em ${esperou}s"
-				[ -n "$ENCERRAMENTO" ] || ENCERRAMENTO=limpo
-			else
-				echo "[medir] grupo $pgid encerrou em ${esperou}s com o código ${saida:-desconhecido} — não é encerramento limpo (V6)"
-				[ "$ENCERRAMENTO" = forcado ] || ENCERRAMENTO=com_erro
-				[ "$CODIGO" -ne 0 ] || CODIGO=1
-			fi
+			_desfecho_do_pipeline "$pgid" "em ${esperou}s"
 		fi
 	done
+}
+
+# O código do Python que a receita do `stream-run` guardou na execução: `limpo` só com 0. Sem o arquivo,
+# ou com outro código, é `com_erro` e reprova a medição.
+_desfecho_do_pipeline() {
+	local pgid="$1" quando="$2" saida=""
+	[ -n "${EXECUCAO:-}" ] && [ -f "$EXECUCAO/codigo_de_saida" ] && saida=$(cat "$EXECUCAO/codigo_de_saida")
+	CODIGO_DO_PIPELINE=$saida
+	if [ "$saida" = 0 ]; then
+		echo "[medir] grupo $pgid encerrou limpo $quando"
+		[ -n "$ENCERRAMENTO" ] || ENCERRAMENTO=limpo
+	else
+		echo "[medir] grupo $pgid encerrou $quando com o código ${saida:-desconhecido} — não é encerramento limpo (V6)"
+		[ "$ENCERRAMENTO" = forcado ] || ENCERRAMENTO=com_erro
+		[ "$CODIGO" -ne 0 ] || CODIGO=1
+	fi
 }
 
 # O fim é um só, para os dois desfechos: o registro sai também quando a

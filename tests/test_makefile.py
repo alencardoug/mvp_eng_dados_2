@@ -1098,3 +1098,69 @@ def test_o_stream_run_guarda_o_codigo_do_python_sem_ignorar_o_sigint():
     assert "trap : INT;" in receita
     assert "trap '' INT" not in receita and 'trap "" INT' not in receita
     assert "/codigo_de_saida'" in receita and "exit $$s" in receita
+
+
+
+@pytest.mark.parametrize("grafia", [
+    pytest.param('"{chave}"', id="aspas-duplas"),
+    pytest.param("'{chave}'", id="aspas-simples"),
+    pytest.param("{chave} # a chave da maquina", id="comentario"),
+    pytest.param("{padrao}", id="base64-padrao"),
+])
+def test_garantir_preserva_a_chave_valida_em_toda_grafia_que_o_compose_aceita(tmp_path, grafia):
+    """RVB1-1-01: a grafia crua com aspas ou comentário era recusada, e a chave válida era trocada —
+    tornando ilegível o que ela cifrou. O oráculo é o `Fernet` sobre o valor efetivo."""
+    import base64
+
+    from cryptography.fernet import Fernet
+
+    bruto = bytes(range(248, 256)) * 4                      # 32 bytes que dão `+` e `/` no alfabeto padrão
+    padrao = base64.b64encode(bruto).decode()
+    assert "+" in padrao or "/" in padrao
+    Fernet(padrao)                                           # o Airflow a aceita
+    chave = _fernet("gerar").stdout.strip()
+    env = tmp_path / ".env"
+    env.write_text(f"AIRFLOW_PORT=8081\nAIRFLOW_FERNET_KEY={grafia.format(chave=chave, padrao=padrao)}\n", encoding="utf-8")
+    antes = env.read_bytes()
+
+    r = _fernet("garantir", str(env))
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout == "" and env.read_bytes() == antes
+
+
+def test_garantir_troca_a_invalida_mesmo_entre_aspas(tmp_path):
+    from cryptography.fernet import Fernet
+
+    env = tmp_path / ".env"
+    env.write_text(f'AIRFLOW_FERNET_KEY="{CHAVE_COMO_SENHA}"\n', encoding="utf-8")
+
+    r = _fernet("garantir", str(env))
+
+    assert r.returncode == 0 and "trocada" in r.stdout
+    Fernet(env.read_text(encoding="utf-8").strip().partition("=")[2])
+
+
+# ── V7: o registro do tratamento também depois do rebuild que falha (RVB1-1-03) ──
+
+
+@pytest.mark.parametrize("dbt, codigo", [
+    pytest.param(None, 0, id="rebuild-passa"),
+    pytest.param(DBT_QUE_FALHA, 1, id="rebuild-falha"),
+])
+def test_o_rebuild_registra_o_tratamento_seja_qual_for_o_desfecho(tmp_path, dbt, codigo):
+    simulados = {".venv/bin/python": PYTHON_DO_DIGEST}
+    if dbt is not None:
+        simulados[".venv/bin/dbt"] = dbt
+    r, chamadas = _make(tmp_path, "dbt-rebuild", "TRATAMENTO=t.json", simulados=simulados)
+
+    assert (r.returncode != 0) == bool(codigo), r.stdout + r.stderr
+    dbt_ = next(i for i, c in enumerate(chamadas) if c.startswith("dbt build"))
+    registro = next(i for i, c in enumerate(chamadas) if "mvp_ed1.recovery.ledger treatment --name t.json" in c)
+    assert dbt_ < registro, chamadas
+
+
+def test_o_rebuild_sem_tratamento_nao_registra(tmp_path):
+    r, chamadas = _make(tmp_path, "dbt-rebuild", simulados={".venv/bin/python": PYTHON_DO_DIGEST})
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not any("recovery.ledger treatment" in c for c in chamadas), chamadas

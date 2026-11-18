@@ -298,10 +298,13 @@ def test_a_restauracao_registra_o_tratamento_da_epoca_que_abre() -> None:
     def onde(trecho: str) -> int:
         return next(i for i, l in enumerate(passos) if trecho in l)
 
-    registro = onde("ledger-treatment NOME=")
-    assert passos.index("$(LIVRO_LINHA_DE_BASE)") < onde("dbt-rebuild") < registro < onde("$(MAKE) --no-print-directory check")
-    assert "FORCE" not in passos[registro], "o registro não é descarte: não leva FORCE"
-    assert sum("ledger-treatment" in l for l in passos) == 1
+    # O registro vai dentro do rebuild, para sair também quando ele falha depois de materializar a
+    # quarentena (RVB1-1-03; o comportamento está em `test_makefile.py`).
+    rebuild = onde("dbt-rebuild")
+    assert "TRATAMENTO=recovery_restore_tratamento.json" in passos[rebuild]
+    assert passos.index("$(LIVRO_LINHA_DE_BASE)") < rebuild < onde("$(MAKE) --no-print-directory check")
+    assert "FORCE" not in passos[rebuild], "o registro não é descarte: não leva FORCE"
+    assert not any("ledger-treatment" in l for l in passos)
 
 @pytest.mark.integracao
 def test_o_registro_de_tratamento_da_a_fatia_da_quarentena(armazem) -> None:

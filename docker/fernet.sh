@@ -23,26 +23,42 @@ gerar() {
 	head -c 32 /dev/urandom | base64 | tr '+/' '-_'
 }
 
+# Válida é o que o `Fernet` do Airflow aceita: 32 bytes por `urlsafe_b64decode`, que também aceita o
+# alfabeto padrão (`+` e `/`) — medido na revisão do Bloco 1 (RVB1-1-01). Recusá-la a faria ser trocada.
 valida() {
 	local chave="$1"
-	[[ "$chave" =~ ^[A-Za-z0-9_-]{43}=$ ]] || return 1
+	[[ "$chave" =~ ^[A-Za-z0-9_+/-]{43}=$ ]] || return 1
 	local bytes
 	bytes=$(printf '%s' "$chave" | tr '_-' '/+' | base64 -d 2>/dev/null | wc -c) || return 1
 	[ "$bytes" -eq 32 ]
 }
 
+# O valor **efetivo** de uma linha `CHAVE=valor` de `.env`, como o Compose o lê (RVB1-1-01): entre aspas
+# duplas ou simples, o que está dentro; sem aspas, até um ` #` de comentário, sem os brancos das pontas.
+# Validar a grafia crua trocaria uma chave válida escrita entre aspas — e tornaria ilegível o que ela cifrou.
+efetivo() {
+	local cru="$1"
+	case "$cru" in
+		\"*\"*) cru="${cru#\"}"; printf '%s' "${cru%%\"*}" ;;
+		\'*\'*) cru="${cru#\'}"; printf '%s' "${cru%%\'*}" ;;
+		*) cru="${cru%% #*}"; cru="${cru%%	#*}"
+		   cru="${cru#"${cru%%[![:space:]]*}"}"; printf '%s' "${cru%"${cru##*[![:space:]]}"}" ;;
+	esac
+}
+
 garantir() {
 	local env="$1"
 	[ -f "$env" ] || { echo "fernet: $env não existe" >&2; return 1; }
-	local atual
-	atual=$(sed -n 's/^AIRFLOW_FERNET_KEY=//p' "$env" | tail -1)
+	local cru atual
+	cru=$(sed -n 's/^AIRFLOW_FERNET_KEY=//p' "$env" | tail -1)
+	atual=$(efetivo "$cru")
 	[ -n "$atual" ] || return 0
 	valida "$atual" && return 0
 	local nova
 	nova=$(gerar)
 	# A chave nova só tem `[A-Za-z0-9_=-]`: nenhum caractere especial para o `sed`.
 	sed -i "s|^AIRFLOW_FERNET_KEY=.*|AIRFLOW_FERNET_KEY=$nova|" "$env"
-	valida "$(sed -n 's/^AIRFLOW_FERNET_KEY=//p' "$env" | tail -1)" || {
+	valida "$(efetivo "$(sed -n 's/^AIRFLOW_FERNET_KEY=//p' "$env" | tail -1)")" || {
 		echo "fernet: a troca da chave em $env não conferiu" >&2; return 1; }
 	echo "AIRFLOW_FERNET_KEY inválida em $env (D64): trocada por uma chave Fernet válida. Nada cifrado se perde:"
 	echo "  com a chave antiga o Airflow não cifrava nada. Os contêineres do Airflow são recriados com a nova."
@@ -51,6 +67,7 @@ garantir() {
 case "${1:-}" in
 	gerar) gerar ;;
 	valida) valida "${2:?uso: fernet.sh valida <chave>}" ;;
+	efetivo) efetivo "${2-}" ;;
 	garantir) garantir "${2:?uso: fernet.sh garantir <arquivo .env>}" ;;
 	*) echo "uso: docker/fernet.sh gerar | valida <chave> | garantir <arquivo .env>" >&2; exit 2 ;;
 esac

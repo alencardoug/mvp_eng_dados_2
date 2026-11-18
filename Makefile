@@ -63,6 +63,10 @@ DBT := set -a; . ./.env; set +a; cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt
 # escreveu um manifest novo, `confirmar-insumos` mede de novo commit, sujeira e digest e só marca
 # `inputs_confirmed` se os três são os de antes. O `.env` já foi lido pelo `$(DBT)`, no mesmo shell.
 CARIMBO_ANTES := dig=$$(.venv/bin/python -m mvp_ed1.models.pacote --digest-do-dbt) || exit 1; ant=$$(.venv/bin/python -m mvp_ed1.models.pacote --invocacao-do-manifest) || exit 1; set -- $$(.venv/bin/python -m mvp_ed1.models.pacote --git-do-build) || exit 1; export MVP_GIT_COMMIT="$$1" MVP_GIT_TREE_DIRTY="$$2"
+# O registro do tratamento (T4) logo depois do dbt, **seja qual for o desfecho dele** (V7, RVB1-1-03):
+# um build que materializa a quarentena e falha depois deixaria a época sem o registro. O código que segue
+# é o do dbt quando ele falhou, e o do registro quando o dbt passou.
+REGISTRAR_TRATAMENTO = st_dbt=$$?; ( cd "$(CURDIR)" && set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.recovery.ledger treatment --name '$(TRATAMENTO)' ); st_reg=$$?; [ $$st_dbt -ne 0 ] || st_dbt=$$st_reg; ( exit $$st_dbt )
 CARIMBO_DEPOIS := st=$$?; cd "$(CURDIR)" && .venv/bin/python -m mvp_ed1.models.pacote --carimbar "$$dig" "$$ant"; inv=$$(.venv/bin/python -m mvp_ed1.models.pacote --invocacao-do-manifest); [ "$$inv" = "$$ant" ] || .venv/bin/python -m mvp_ed1.governance confirmar-insumos "$$inv" "$$MVP_GIT_COMMIT" "$$MVP_GIT_TREE_DIRTY" "$$dig"; exit $$st
 
 # Credenciais do Airbyte no momento da execução; nunca gravadas em arquivo.
@@ -814,11 +818,11 @@ recovery-restore: require-env require-venv ## A sequência de restauração, pas
 	@# O job é o desta execução, nunca o de uma anterior que tenha sobrado.
 	@rm -f "$(RECOVERY_JOB)"
 	@$(MAKE) --no-print-directory sync-legacy JOB_EM="$(RECOVERY_JOB)"
-	@$(MAKE) --no-print-directory dbt-rebuild
-	@# V7: a quarentena da captura acabou de ser construída, e a época aberta neste passo registra o
-	@# tratamento dela antes de qualquer outro *build*. Sem o registro, um tratamento que o substituísse
+	@# V7: o rebuild constrói a quarentena da captura, e a época aberta neste passo registra o tratamento
+	@# dela antes de qualquer outro *build* — também quando o rebuild falha depois de materializá-la
+	@# (RVB1-1-03), por isso o registro vai dentro dele. Sem o registro, um tratamento que o substituísse
 	@# deixaria a fatia sem explicação na T3. O nome é único porque cada restauração abre a sua época.
-	@$(MAKE) --no-print-directory ledger-treatment NOME=recovery_restore_tratamento.json
+	@$(MAKE) --no-print-directory dbt-rebuild TRATAMENTO=recovery_restore_tratamento.json
 	@$(MAKE) --no-print-directory check
 	@echo "── 9/9 oráculos explícitos ──"
 	@job=$$(cat "$(RECOVERY_JOB)" 2>/dev/null); [ -n "$$job" ] || { \
@@ -827,7 +831,7 @@ recovery-restore: require-env require-venv ## A sequência de restauração, pas
 		$(RECOVERY) --dir "$(RECOVERY_DIR)" conferir-restauracao --job "$$job"
 	@echo "recovery-restore: a sequência inteira passou. 'make recovery-promote' aprova o pacote."
 
-dbt-rebuild: require-env require-venv ## Reconstrói TUDO sem derrubar os snapshots — o alvo de uma restauração
+dbt-rebuild: require-env require-venv ## Reconstrói TUDO sem derrubar os snapshots — o alvo de uma restauração; TRATAMENTO=<nome> registra o tratamento depois, mesmo se falhar
 	@# A diferença para `dbt-build RESET=1` é uma linha e é o bloco inteiro:
 	@# aquele chama `dbt-drop-snapshots` antes do `--full-refresh`. Derrubar o
 	@# schema `snapshots` é certo depois de **regerar a origem** — as chaves
@@ -843,7 +847,7 @@ dbt-rebuild: require-env require-venv ## Reconstrói TUDO sem derrubar os snapsh
 	@# a impressão vigente. É o mecanismo que acumulou as 63.802 linhas.
 	@$(GARANTIR_LEITOR_NO_ENV)
 	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.governance garantir
-	@$(CARIMBO_ANTES); $(DBT) build --full-refresh $(DBT_ARGS); $(CARIMBO_DEPOIS)
+	@$(CARIMBO_ANTES); $(DBT) build --full-refresh $(DBT_ARGS); $(if $(TRATAMENTO),$(REGISTRAR_TRATAMENTO);) $(CARIMBO_DEPOIS)
 
 dbt-drop-snapshots: require-env require-venv ## DESTRÓI o histórico SCD; use depois de regerar a origem
 	@echo "descartando o schema 'snapshots' — o histórico SCD será refeito do zero"

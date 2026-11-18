@@ -762,8 +762,9 @@ confunde com uma restauração.
    pararia na memória que a restauração substituiu, e uma restauração repetida abre outra;
    reconstrói com `dbt-rebuild` — **nunca**
    `dbt-build RESET=1`, que derrubaria o histórico SCD que acabou de voltar —; registra na época aberta
-   o tratamento da captura que o *rebuild* acabou de construir (`ledger-treatment`, V7), antes de qualquer
-   outro *build*; e roda o `check`;
+   o tratamento da captura que o *rebuild* acabou de construir (`dbt-rebuild TRATAMENTO=`, V7), antes de
+   qualquer outro *build* e também quando o *rebuild* falha depois de materializar a quarentena; e roda o
+   `check`;
 9. confere os oráculos explícitos: as fontes iguais ao manifesto, a memória contida e intacta, a
    captura nova certificada acima da retida, a auditoria dela igual ao que a classificação rejeitou,
    a memória de exclusões renascida igual e o livro da origem inteiro e igual nos dois caminhos.

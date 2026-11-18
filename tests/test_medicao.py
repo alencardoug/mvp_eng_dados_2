@@ -953,3 +953,30 @@ def test_o_comando_do_pipeline_sai_pelo_caminho_sem_finalizar_no_sigint(monkeypa
     cli.comando_pipeline(types.SimpleNamespace(execucao=None))
 
     assert len(saidas) == 1
+
+
+def test_o_pipeline_que_morre_com_erro_depois_da_sondagem_reprova_a_medicao(tmp_path):
+    """RVB1-1-02: o grupo que já tinha saído era pulado no encerramento. Com o livro e a drenagem
+    completos, o pipeline que terminou com erro passava por sucesso, sem código no registro."""
+    makefile = CENARIO_OK.replace(
+        "\t@echo $$$$ > pipeline.pid; echo \"$(EXECUCAO)\" > execucao_do_pipeline; trap : INT; sleep 600; "
+        "mkdir -p '$(EXECUCAO)' && echo 0 > '$(EXECUCAO)/codigo_de_saida'",
+        "\t@echo $$$$ > pipeline.pid; sleep 2; mkdir -p '$(EXECUCAO)' && echo 1 > '$(EXECUCAO)/codigo_de_saida'; exit 1",
+    ).replace(
+        '\t@test -f esperou && echo "drenei $(EXECUCAO) ate $(ATE_SEQ) vigiando $(PID)" > drenou',
+        "\t@sleep 4; echo drenei > drenou",
+    )
+    assert makefile != CENARIO_OK
+    ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
+    (trabalho / "corte").write_text("7\n", encoding="utf-8")
+
+    r = subprocess.run(
+        [str(MEDIR), "--cenario", "streaming"],
+        cwd=trabalho, capture_output=True, text=True, env=ambiente, timeout=120,
+    )
+
+    assert (trabalho / "drenou").exists(), "as esperas passaram: o caso é exatamente o do achado"
+    assert r.returncode != 0, r.stdout + r.stderr
+    registro = _registro(tmp_path)
+    assert registro["codigo_do_pipeline"] == 1 and registro["encerramento"] == "com_erro", registro
+    assert "antes do encerramento" in r.stdout
