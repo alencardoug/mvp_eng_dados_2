@@ -334,7 +334,7 @@ dbt. Por isso o pacote se regenera sobre o *manifest* da `v2.1.0` (`make catalog
   views, **0 combinações repetidas** (medido antes, só leitura);
 - **F33:** a nota de `registro_fase_gcp` aponta o custo lido em 16/11/2026, e a entrada nova `custo_gcp` aponta a
   Capacidade §2.14;
-- **o resultado:** `make test` deu 1.814 passados e 19 pulados (todos com `GCP_TESTES=1`), e o `check-offline`
+- **o resultado:** `make test` deu 1.814 passados e 19 pulados. Dos pulados, 16 pedem `GCP_TESTES=1`, e 3 têm condição local: a carga em banco efêmero (`make test-carga`), o reprocessamento da fato (`FATO=1`) e a prova entre capturas, sem mutação no diário. Esses 3 não rodaram (RVRB4-1-01), e o `check-offline`
   passou. No pacote, as únicas mudanças são os campos novos e os 29 casos novos em `checks`, nenhum com falha. Os
   três *patches* fora da árvore continuam aplicando em sequência sobre `198315c`.
 
@@ -633,3 +633,15 @@ Bloco 4.** Os três textos da rodada 1 foram corrigidos sem divergência nova, o
 do F35 preserva a identidade da remessa com a origem, sem mudar os valores nem a regra da Q62. Os SHA-256 dos
 três *patches* foram conferidos de forma independente. **O Bloco 3 está fechado**, fora da árvore até o passo 4
 do Bloco 5.
+
+### Bloco 4 — rodada 1 do codex2, sobre `5656eb0` (18/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_bloco4_r1.md`, fora do Git. **Nada bloqueia o Bloco 5.** A publicação
+dos campos novos sobre os artefatos da `v2.1.0` é legítima sob o carimbo: os insumos do dbt não mudaram, e o
+manifesto, o carimbo e o pacote concordam. **Aplicada em 18/11/2026:**
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVRB4-1-01 | ajuste | Bloco 4: a discriminação dos 19 pulados, 16 de GCP e 3 locais, que não rodaram |
+
+**O Bloco 4 está fechado.**
