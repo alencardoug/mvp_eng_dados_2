@@ -115,3 +115,55 @@ seeds:
         description: "O que a categoria de chamado cobre."
         meta:
           sensitivity: public
+
+  - name: f31_legacy_sale_exceptions
+    meta:
+      domain: estoque
+    description: >
+      As saídas por venda do legado sem remessa que nenhuma junção explica, aceitas uma a uma
+      pelo Owner (Q72 (d) do plano da reabertura). A injeção de falhas pode destruir o código da
+      remessa — a 47 vira `N/A` e é rejeitada —, e o código original só existe no manifesto de
+      injeção, que é oráculo de teste e não dado. A guarda `f31_saida_por_venda_tem_remessa`
+      reprova toda venda sem remessa que não seja explicada pela quarentena corrente nem esteja
+      aqui. Cada linha traz a identidade do movimento e o recorte da captura e do tratamento em
+      que foi aceita, e a lista é refeita a cada regeneração. Vazia na `v2.1.0`: as 13 vendas do
+      legado sem remessa eram todas explicadas pela quarentena (medido em 18/11/2026).
+    config:
+      column_types:
+        movement_id: "{{ 'text' if target.type != 'bigquery' else 'string' }}"
+        source_id: "{{ 'text' if target.type != 'bigquery' else 'string' }}"
+        snapshot_id: "{{ 'bigint' if target.type != 'bigquery' else 'int64' }}"
+        catalog_version: "{{ 'integer' if target.type != 'bigquery' else 'int64' }}"
+        treatment_fingerprint: "{{ 'text' if target.type != 'bigquery' else 'string' }}"
+        reason: "{{ 'text' if target.type != 'bigquery' else 'string' }}"
+    columns:
+      - name: movement_id
+        description: "Identificador do movimento de saída por venda do legado aceito como exceção."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: source_id
+        description: "Código da remessa que o movimento cita e que não se encontra (o `source_id` do movimento)."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: snapshot_id
+        description: "Captura do legado em que a exceção foi medida e aceita."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: catalog_version
+        description: "Versão do catálogo de falhas do tratamento em que a exceção foi aceita."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: treatment_fingerprint
+        description: "Impressão digital do tratamento em que a exceção foi aceita; outra impressão não a reaproveita."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: reason
+        description: "Por que a venda não tem remessa demonstrável, como o Owner a aceitou."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]

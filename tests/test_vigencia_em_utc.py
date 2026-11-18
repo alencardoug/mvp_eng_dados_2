@@ -436,8 +436,9 @@ def test_a_guarda_acusa_cada_literal_atual_sem_o_offset_nas_duas_aspas() -> None
     for versao in (arquivos, simples):
         offsets = [(c, m.start()) for c, t in versao.items() for m in re.finditer(r" 00:00[-+]0[03]", t)]
         # 14 até a D76, que deu o fuso ao `hired_at` do membro desconhecido; 15 até as guardas das
-        # invariantes 15 e 20 (Bloco 5R): a 15 chama `meia_noite` uma vez, a 20 duas.
-        assert len(offsets) == 18
+        # invariantes 15 e 20 (Bloco 5R): a 15 chama `meia_noite` uma vez, a 20 duas; 18 até a guarda
+        # `f31_nenhum_movimento_depois_do_corte` (reabertura, Bloco 2), que a chama uma vez.
+        assert len(offsets) == 19
         for caminho, inicio in offsets:
             texto = versao[caminho]
             sem = texto[:inicio] + " 00:00" + texto[inicio + len(" 00:00-03"):]

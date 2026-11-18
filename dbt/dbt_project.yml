@@ -89,6 +89,13 @@ vars:
   # motivo: dois runtimes precisam do número e só um pode ser o dono.
   reorder_point_units: 25
 
+  # A faixa da mediana trimestral do giro na P11 publicada (V5; Q67 do plano da
+  # reabertura, fixada pelo Owner em 18/11/2026 depois da medida em memória:
+  # 0,47 no varejo e 0,50 no legado com a compra pela demanda; 0,01 antes). A
+  # guarda `v5_giro_mediano_dentro_da_faixa` reprova fora dela.
+  turnover_median_min: 0.30
+  turnover_median_max: 0.80
+
   # Margem de atraso da única fato incremental do projeto (ADR-0016). É o quanto
   # de atraso entre `occurred_at` e a carga o filtro tolera: evento mais velho
   # que isto não é recuperado pelo incremental, e depende do `--full-refresh`.
