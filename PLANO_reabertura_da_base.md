@@ -479,8 +479,9 @@ UQ-17, UQ-20, a ordem de Consumidores §5 (Q70) e o cabeçalho dos Achados.
   - as linhas `feita` da P08, da P11 e da P12, medidas view a view, e a das 13 views sem mudança (Q68);
   - a do texto das 130 relações (F32);
   - as três linhas de esquema anunciadas, agora `feita` (F34, UQ-19, F35);
-  - a UQ-20 nas 15 linhas "Não medido" do 5R: o depois capturado na A8, e o antes da P04, da P13, da P14 e da
-    P15 nos arquivos dos Blocos 1 e 1b;
+  - a UQ-20 nas 15 linhas "Não medido" do 5R: o depois capturado na A8, e o antes da P04, da P13 e da P14 nos
+    arquivos dos Blocos 1 e 1b. O da P15 é anterior ao F21 e fica declarado como parcial, e o estado exato
+    de antes do 5R segue reconstruível do corte (RVFR-1-01);
   - a ordem por data, guardada por `tests/test_consumidores.py`, que reprova a versão antiga (Q70).
 - **UQ-17:** a nota na V4. O par 1 × 30 não diverge mais, e a citação condicionada não se aplica.
 - **Os Achados:** o cabeçalho diz que os achados vêm também dos outros consumidores e deste projeto, e o F36 está
@@ -724,3 +725,13 @@ Relatórios: `data/medicoes/reabertura/codex2_adaptacao_r1.md` a `_r3.md`, fora 
 | RVAC-3-01 | ajuste | O leitor de alertas reprova também por erro de leitura |
 
 **A rodada 3 não achou bloqueio técnico** para iniciar o ciclo com a Q74 respondida e o Owner presente.
+
+### Fechamento — rodada 1 do codex2, sobre `6c149bb` (18/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_fechamento_r1.md`, fora do Git. **O ciclo executado está sustentado
+pelas evidências, e nada bloqueia a *tag*.** As falhas da D3 e da F0 foram registradas e recuperadas, sem
+inconsistência remanescente. O F36 está diagnosticado e adiado por delegação. **Aplicada em 18/11/2026:**
+
+| # | Veredito | Onde entrou |
+|---|---|---|
+| RVFR-1-01 | ajuste | Consumidores §5, a linha da P15 do 5R: o `f1_depois.csv` é posterior ao F1 e anterior ao F21, então o antes que ele dá é parcial; Bloco 6 |
