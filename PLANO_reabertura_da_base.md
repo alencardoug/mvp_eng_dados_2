@@ -735,3 +735,16 @@ inconsistência remanescente. O F36 está diagnosticado e adiado por delegação
 | # | Veredito | Onde entrou |
 |---|---|---|
 | RVFR-1-01 | ajuste | Consumidores §5, a linha da P15 do 5R: o `f1_depois.csv` é posterior ao F1 e anterior ao F21, então o antes que ele dá é parcial; Bloco 6 |
+
+### Depois da *tag*: o aviso do `gdados` na caixa de correio (18/11/2026)
+
+A sessão do `gdados` deixou no `alinhamento.md`, fora do Git, um aviso aprovado pelo Owner naquela sessão em
+18/11/2026. Atendido assim:
+- **Item 0**, a linha que carrega o `alinhamento.md` no `CLAUDE.md` e a entrada no `.gitignore`: revisadas e
+  commitadas. Por erro meu, elas entraram no *commit* `f5a5173`, o da *tag* `v2.2.0`, com a mensagem de outro
+  assunto: o `git commit -a` as levou junto. O conteúdo é o pedido. O histórico publicado não foi reescrito.
+- **Item 1**, a exceção à Q14: registrada em Consumidores §7.
+- **Item 2**, a sanitização: no Registro da fase GCP e no plano da Etapa 13, os três projetos sem relação com
+  este e o prefixo da conta de faturamento viraram marcadores. Ficam `mvp-ed1-gcp` e `mvp-ed1-estudo`. O
+  histórico do Git ainda tem os nomes; a próxima *tag* mostra o texto limpo.
+- **Item 3**, a caixa de correio como canal: registrada em Consumidores §4.
