@@ -210,7 +210,24 @@ def comando_pipeline(args) -> int:
         executar(fluxo, execucao_dir=args.execucao)
     except KeyboardInterrupt:
         print("\npipeline interrompido. O offset confirmado retoma de onde parou.")
+        _threads_no_encerramento()
     return 0
+
+
+def _threads_no_encerramento() -> None:
+    """A medida da V6: o que fica vivo quando o *pipeline* devolve o controle.
+
+    No ciclo de 17/11/2026 o Python abortava depois da mensagem acima, ao desligar o interpretador,
+    porque uma *thread daemon* segurava o `stderr` ("_enter_buffered_busy … possibly due to daemon
+    threads"). Antes de corrigir, mede-se quem é: o nome de cada *thread* ainda viva, e se é *daemon*.
+    """
+    import threading
+
+    vivas = [t for t in threading.enumerate() if t is not threading.main_thread()]
+    LOG.info(
+        "V6: %d thread(s) vivas no encerramento%s", len(vivas),
+        (": " + ", ".join(f"{t.name}{' [daemon]' if t.daemon else ''}" for t in vivas)) if vivas else "",
+    )
 
 
 # ── Fim declarado para o caminho quente ─────────────────────────────────────

@@ -691,7 +691,12 @@ stream-run: require-env ## Sobe o pipeline Beam (primeiro plano; Ctrl-C encerra)
 	@# Primeiro plano de propósito: job de streaming que sobe em segundo plano
 	@# e morre em silêncio é o pior modo de falha possível — o tópico enche, o
 	@# saldo congela e nada avisa.
-	@$(STREAM) pipeline $(if $(EXECUCAO),--execucao '$(EXECUCAO)')
+	@# O código de saída do Python fica em `<execução>/codigo_de_saida` (V6): o SIGINT vai ao grupo
+	@# inteiro, e o `make` sai pelo sinal mesmo quando o pipeline termina limpo. `trap :` e não
+	@# `trap ''`: o filho de um shell que **ignora** o SIGINT nasce ignorando, e o Python sem
+	@# `KeyboardInterrupt` só sairia pelo SIGKILL (RVE2-04).
+	@trap : INT; $(STREAM) pipeline $(if $(EXECUCAO),--execucao '$(EXECUCAO)'); s=$$?; \
+		$(if $(EXECUCAO),mkdir -p '$(EXECUCAO)' && echo $$s > '$(EXECUCAO)/codigo_de_saida';) exit $$s
 
 stream-produce: require-env ## Emite eventos novos no livro da origem; LIMITE=, SEED=
 	@$(STREAM) produzir $(if $(LIMITE),--limite $(LIMITE)) $(if $(SEED),--semente $(SEED))

@@ -48,6 +48,8 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 INTERVALO="${MEDIR_INTERVALO:-2}"
 DESTINO="${MEDIR_DIR:-$RAIZ/data/medicoes}"
+# Onde ficam os diretórios das execuções do pipeline (D63) e o código de saída dele (V6).
+EXECUCOES="${MEDIR_EXECUCOES:-$RAIZ/data/streaming/execucoes}"
 PRAZO_ENCERRAMENTO="${MEDIR_PRAZO_ENCERRAMENTO:-60}"
 
 _epoch() { date +%s; }
@@ -205,6 +207,7 @@ _escrever() {  # $1 = arquivo, resto vem das variáveis do processo
 		printf '  "codigo_de_saida": %d,\n' "$CODIGO"
 		printf '  "interrompido": %s,\n' "$INTERROMPIDO"
 		printf '  "encerramento": %s,\n' "$([ -n "$ENCERRAMENTO" ] && printf '"%s"' "$ENCERRAMENTO" || printf 'null')"
+		printf '  "codigo_do_pipeline": %s,\n' "${CODIGO_DO_PIPELINE:-null}"
 		printf '  "parametros": {"limite": %s, "corte": %s},\n' "${LIMITE:-null}" "${CORTE:-null}"
 		printf '  "estacao": {"disponivel_mb": %s, "de_pe": "%s", "loadavg": "%s"},\n' \
 			"$(_numero_ou_null "$MEM_INICIAL")" "$DE_PE" "$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null)"
@@ -273,11 +276,26 @@ _linha_da_tabela() {
 # encerrou. O `setsid` põe cada um num grupo próprio, e é o grupo que recebe o
 # sinal — o que também garante que nada de fora seja tocado.
 FILHOS=()
-# Como o que o medidor iniciou saiu: `limpo` pelo SIGINT, `forcado` quando só
+# Como o que o medidor iniciou saiu: `limpo` pelo SIGINT e com código 0;
+# `com_erro` quando saiu pelo SIGINT mas com outro código; `forcado` quando só
 # o SIGKILL resolveu. Vazio — `null` no registro — quando não havia o que
 # encerrar. Forçar não muda o código de saída, mas fica escrito (RVE2-04): um
 # pipeline que só sai por SIGKILL não fechou o que tinha aberto.
+#
+# **O grupo sumir não é encerramento limpo** (V6). No ciclo de 17/11/2026 o
+# Python abortava *depois* da mensagem de encerramento — "Fatal Python error:
+# _enter_buffered_busy", "Abortado (arquivo core criado)" — e o medidor dizia
+# `limpo`, porque só olhava se o grupo existia. O código vem do `wait` sobre o
+# líder do grupo, que é filho deste shell. Ainda não muda o código da medição:
+# até a causa da V6 ser medida, reprovar aqui faria a restauração falhar no
+# passo 7 nas vezes em que o aborto acontece. Fica escrito no registro.
+#
+# O código não é o do líder do grupo: o SIGINT vai ao grupo inteiro, e o `make`
+# que embrulha o pipeline sai pelo sinal mesmo quando o Python termina com 0
+# (medido no teste do medidor, 17/11/2026). Quem o guarda é a receita do
+# `stream-run`, em `<execução>/codigo_de_saida`.
 ENCERRAMENTO=""
+CODIGO_DO_PIPELINE=""
 
 _encerrar_filhos() {
 	local pgid esperou
@@ -295,8 +313,16 @@ _encerrar_filhos() {
 			kill -KILL -- "-$pgid" 2>/dev/null
 			ENCERRAMENTO=forcado
 		else
-			echo "[medir] grupo $pgid encerrou limpo em ${esperou}s"
-			[ "$ENCERRAMENTO" = forcado ] || ENCERRAMENTO=limpo
+			local saida=""
+			[ -n "${EXECUCAO:-}" ] && [ -f "$EXECUCAO/codigo_de_saida" ] && saida=$(cat "$EXECUCAO/codigo_de_saida")
+			CODIGO_DO_PIPELINE=$saida
+			if [ "$saida" = 0 ]; then
+				echo "[medir] grupo $pgid encerrou limpo em ${esperou}s"
+				[ -n "$ENCERRAMENTO" ] || ENCERRAMENTO=limpo
+			else
+				echo "[medir] grupo $pgid encerrou em ${esperou}s com o código ${saida:-desconhecido} — não é encerramento limpo (V6)"
+				[ "$ENCERRAMENTO" = forcado ] || ENCERRAMENTO=com_erro
+			fi
 		fi
 	done
 }
@@ -429,7 +455,7 @@ if [ -n "$CENARIO" ]; then
 			#     PID que `$!` anota — e que vira o grupo que se encerra.
 			#     A execução tem diretório próprio (D63): é onde o publicador
 			#     confirma os painéis, e o passo (5b) o lê.
-			EXECUCAO="$RAIZ/data/streaming/execucoes/medir_$(date -u +%Y%m%dT%H%M%SZ)_$$"
+			EXECUCAO="$EXECUCOES/medir_$(date -u +%Y%m%dT%H%M%SZ)_$$"
 			( trap - INT QUIT; exec setsid make --no-print-directory stream-run EXECUCAO="$EXECUCAO" ) &
 			BEAM=$!
 			FILHOS+=("$BEAM")

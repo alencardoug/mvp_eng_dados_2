@@ -54,6 +54,7 @@ def _ambiente(tmp_path: pathlib.Path, *, makefile: str) -> tuple[dict[str, str],
     ambiente = os.environ | {
         "PATH": f"{binario}:{os.environ['PATH']}",
         "MEDIR_DIR": str(destino),
+        "MEDIR_EXECUCOES": str(tmp_path / "execucoes"),
         "MEDIR_INTERVALO": "1",
         "MEDIR_PRAZO_ENCERRAMENTO": "5",
     }
@@ -630,6 +631,12 @@ PIPELINE_PYTHON = textwrap.dedent(
 )
 
 
+#: A forma da receita real do `stream-run` (V6): o código do Python vai para a execução.
+RECEITA_DO_STREAM_RUN = (
+    "\t@trap : INT; {comando}; s=$$?; mkdir -p '$(EXECUCAO)' && echo $$s > '$(EXECUCAO)/codigo_de_saida'; exit $$s"
+)
+
+
 def test_o_pipeline_lancado_encerra_pelo_sigint_e_nao_pelo_prazo(tmp_path):
     """RVE2-04, a sonda do revisor: o filho nascia com SIGINT **ignorado**.
 
@@ -637,7 +644,8 @@ def test_o_pipeline_lancado_encerra_pelo_sigint_e_nao_pelo_prazo(tmp_path):
     que nasce assim não instala o `KeyboardInterrupt`: o pipeline não saía no
     SIGINT e só morria no SIGKILL do prazo — com o medidor dizendo 0.
     """
-    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600', "\t@python3 pipeline.py")
+    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600',
+                                  RECEITA_DO_STREAM_RUN.format(comando="python3 pipeline.py"))
     ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
     (trabalho / "pipeline.py").write_text(PIPELINE_PYTHON, encoding="utf-8")
 
@@ -651,6 +659,30 @@ def test_o_pipeline_lancado_encerra_pelo_sigint_e_nao_pelo_prazo(tmp_path):
     assert (trabalho / "interrompido").exists(), "o KeyboardInterrupt precisa chegar ao pipeline"
     assert "SIGKILL" not in r.stdout
     assert _registro(tmp_path)["encerramento"] == "limpo"
+    assert _registro(tmp_path)["codigo_do_pipeline"] == 0
+
+
+def test_o_aborto_depois_da_mensagem_nao_e_encerramento_limpo(tmp_path):
+    """V6: no ciclo de 17/11/2026 o Python abortava ao desligar, depois da mensagem de encerramento, e o
+    medidor dizia `limpo` porque o grupo tinha sumido. Agora o código do pipeline decide."""
+    abortar = PIPELINE_PYTHON.replace('Path("interrompido").write_text("sim")',
+                                      'Path("interrompido").write_text("sim"); import os; os.abort()')
+    makefile = CENARIO_OK.replace('\t@echo $$$$ > pipeline.pid; echo "$(EXECUCAO)" > execucao_do_pipeline; sleep 600',
+                                  RECEITA_DO_STREAM_RUN.format(comando="python3 pipeline.py"))
+    ambiente, trabalho = _ambiente(tmp_path, makefile=makefile)
+    (trabalho / "pipeline.py").write_text(abortar, encoding="utf-8")
+
+    r = subprocess.run(
+        [str(MEDIR), "--cenario", "streaming"],
+        cwd=trabalho, capture_output=True, text=True, env=ambiente, timeout=120,
+    )
+
+    assert (trabalho / "interrompido").exists(), r.stdout + r.stderr
+    registro = _registro(tmp_path)
+    assert registro["encerramento"] == "com_erro" and registro["codigo_do_pipeline"] == 134, registro
+    assert "não é encerramento limpo (V6)" in r.stdout
+    # Ainda não reprova a medição: até a causa ser medida, reprovar faria a restauração falhar no passo 7.
+    assert r.returncode == 0, r.stdout + r.stderr
 
 
 def test_encerramento_forcado_fica_no_registro(tmp_path):
@@ -697,7 +729,7 @@ def test_o_ramo_de_alertas_drena_depois_do_livro_e_na_mesma_execucao(tmp_path):
 
     assert r.returncode == 0, r.stdout + r.stderr
     execucao = (trabalho / "execucao_do_pipeline").read_text(encoding="utf-8").strip()
-    assert "/data/streaming/execucoes/medir_" in execucao
+    assert execucao.startswith(str(tmp_path / "execucoes" / "medir_"))
     drenou = (trabalho / "drenou").read_text(encoding="utf-8")
     pid = (trabalho / "esperou").read_text(encoding="utf-8").split("vigiando ")[1].strip()
     assert drenou.strip() == f"drenei {execucao} ate 7 vigiando {pid}"

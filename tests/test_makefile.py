@@ -1085,3 +1085,16 @@ def test_o_makefile_gera_a_chave_fernet_pelo_script_e_a_confere_antes_de_subir()
     garantir = next(i for i, l in enumerate(receita) if "docker/fernet.sh garantir .env" in l)
     subida = next(i for i, l in enumerate(receita) if "up -d" in l)
     assert garantir < subida, receita
+
+
+# ── V6: o código de saída do pipeline, guardado pela receita ────────────────
+
+
+def test_o_stream_run_guarda_o_codigo_do_python_sem_ignorar_o_sigint():
+    """O `make` sai pelo SIGINT do grupo mesmo com o pipeline limpo: quem guarda o código é a receita.
+    `trap ''` faria o Python nascer ignorando o SIGINT, e ele só sairia pelo SIGKILL (RVE2-04)."""
+    receita = " ".join(_receitas((RAIZ / "Makefile").read_text(encoding="utf-8"))["stream-run"])
+
+    assert "trap : INT;" in receita
+    assert "trap '' INT" not in receita and 'trap "" INT' not in receita
+    assert "/codigo_de_saida'" in receita and "exit $$s" in receita
