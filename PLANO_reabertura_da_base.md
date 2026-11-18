@@ -203,6 +203,24 @@ as formas mantêm o lastro da V4: nenhuma saída sem estoque.
 | Demanda, 30 dias, folga 1,0 | 0,77 / 3,41, com 22 linhas indefinidas | — | 10.580 |
 | **Demanda, 60 dias, folga 1,2 (Q73)** | **0,47 / 1,34**, 1 indefinida em 5.560 | **0,50 / 1,21**, 0 em 277 | 15.224 |
 
+**Implementada em `e237470`**, como pós-passo do gerador depois das remessas (`compras.dimensionar_pela_demanda`).
+Ele mantém os sorteios de estrutura e refaz as quantidades da compra, o recebido, o total e o estado da ordem.
+Medida em memória sobre o gerador implementado: **varejo 0,46 / p90 1,28; legado 0,48 / p90 1,21**, nenhuma saída
+sem lastro, 1 linha indefinida em 5.560 (`v5_implementado_*.txt`).
+
+**As guardas ficam fora da árvore até o *build* do ciclo,** como no 5R: lá, as guardas ficaram "fora da árvore
+até a D2" e foram commitadas na F0. Os arquivos de `dbt/` são insumo do pacote, e o pacote só se regenera sobre
+o *manifest* de um `dbt-build`, que é proibido antes da regeneração (fase iii). O *patch* é
+`data/medicoes/reabertura/bloco2/guardas_dbt.patch`:
+- `f31_nenhum_movimento_depois_do_corte` e `f31_saida_por_venda_tem_remessa`;
+- o *seed* `f31_legacy_sale_exceptions`, vazio;
+- `v5_giro_mediano_dentro_da_faixa`;
+- as variáveis `turnover_median_min` e `_max`.
+
+**A fase (i)** foi medida em 18/11/2026. As guardas foram compiladas fora de `dbt/target`, e o SQL foi executado
+só para leitura sobre a `v2.1.0`, com o *seed* vazio no lugar (`fase_i_guardas.txt`): **2.200, 984 e 0,02**. As
+três reprovam, como devem. O *patch* entra na árvore no passo 4 do Bloco 5, antes do `dbt-build RESET=1`.
+
 A venda é esparsa: 12.224 unidades em 2.926 pares no varejo, cerca de 0,4 unidade por par e trimestre. Por isso
 a forma pela demanda satura perto de 0,4 com a folga de 1,5. A medida é aproximada, porque refaz só as
 quantidades dos movimentos e não as ordens nem os recebimentos. A implementação refaz os dois, e a guarda da
@@ -401,7 +419,7 @@ A Q64 foi respondida antes, pela forma (e). As Q65 a Q72 foram respondidas em 17
 | Q64 | **(e)**: o exercício antes da regeneração, a publicação sem produtor e as guardas no estado publicado |
 | Q65 | **(a)**, na forma do Bloco 1: a confirmação por janela concluída, a entrega confirmada e a espera pelo que a execução inseriu |
 | Q66 | **(a)**: a chave em base64 seguro para URL nos dois lugares, com teste, e a troca ao recriar o Airflow |
-| Q67 | **(a)**, fixada em 18/11/2026 depois da medida em memória: a mediana trimestral do giro da P11 entre **0,30 e 0,80**, em cada origem |
+| Q67 | **(a)**, fixada em 18/11/2026 depois da medida em memória: a mediana trimestral do giro da P11 entre **0,30 e 0,80**. A guarda mede a P11 publicada, com as duas origens juntas, porque a view não tem a origem; a medida em memória confere cada origem dentro da faixa |
 | Q68 | **Sim**: o antes → depois das 16 views, medido e publicado por view |
 | Q69 | **`v2.2.0`** |
 | Q70 | **Corrigir e guardar** com teste a ordem por data |
