@@ -118,6 +118,32 @@ def source_texts() -> dict[Leaf, str]:
     return textos
 
 
+def legacy_relation_text(tabela: str, entidade: str) -> str:
+    """A descrição de `raw_legacy.<tabela>`: a relação retida, e a entidade de origem só como referência (RVRB-2-03).
+
+    Copiar o `table_meta` descreveria errado a relação: "saldo atual de cada SKU por armazém" não é o grão
+    de `raw_legacy.inventory_balances`, que guarda cada ocorrência física de cada captura.
+    """
+    return (f"Capturas retidas de `{tabela}` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência "
+            "física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os "
+            "valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é "
+            f"permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “{entidade}”")
+
+
+def table_texts() -> dict[tuple[str, str], str]:
+    """O texto de cada tabela de `raw`, do caminho quente e de `raw_legacy`, do `table_meta` dos modelos SQLAlchemy (F32).
+
+    Em `raw` ele é o **começo** obrigatório da descrição da tabela em `_retail__sources.yml`, escrita à mão: a
+    réplica tem o grão da origem, e o que vem depois é a nota da réplica (o papel dela no caminho, o ADR). Em
+    `raw_legacy` é o texto inteiro, que o gerador escreve (`legacy/dbt.py::sources_yml`).
+    """
+    entidades = {table.name: table.info["description"].strip() for table in Base.metadata.tables.values()}
+    textos = {("raw", nome): texto for nome, texto in entidades.items()}
+    textos.update({("raw", sink): entidades[origem] for sink, origem in sensitivity.STREAM_SINKS.items()})
+    textos.update({("raw_legacy", nome): legacy_relation_text(nome, entidades[nome]) for nome in legacy_schema.tabelas()})
+    return textos
+
+
 # ── O que está escrito no disco ─────────────────────────────────────────────────
 
 @dataclass
@@ -128,6 +154,7 @@ class Entry:
     columns: dict[str, dict]
     meta: dict = field(default_factory=dict)    # o `meta` do modelo, para o domínio (`models/domains.py`)
     address: sensitivity.Address = ""           # onde a escrita a encontra no arquivo (`sensitivity._locate`)
+    description: str = ""                       # o texto da relação, cru, antes do `doc()` renderizado (F32)
 
 
 def _text(coluna: dict) -> str:
@@ -183,7 +210,7 @@ def disk_sources(documentos: list[tuple[pathlib.Path, dict]] | None = None) -> d
         for fonte in documento.get("sources") or []:
             for t in fonte.get("tables") or []:
                 saida[sensitivity.source_identity(fonte, t)] = Entry(caminho, _kind(caminho), {c["name"]: c for c in t.get("columns") or []},
-                                                                     address=(fonte["name"], t["name"]))
+                                                                     address=(fonte["name"], t["name"]), description=_text(t))
     return saida
 
 
@@ -195,7 +222,7 @@ def disk_entries(documentos: list[tuple[pathlib.Path, dict]] | None = None) -> d
         for chave in ("models", "snapshots", "seeds"):
             for e in documento.get(chave) or []:
                 meta = {**(e.get("meta") or {}), **((e.get("config") or {}).get("meta") or {})}
-                entradas[e["name"]] = Entry(caminho, tipo, {c["name"]: c for c in e.get("columns") or []}, meta, e["name"])
+                entradas[e["name"]] = Entry(caminho, tipo, {c["name"]: c for c in e.get("columns") or []}, meta, e["name"], _text(e))
     return entradas
 
 
@@ -240,7 +267,17 @@ def derive_texts(manifest: dict, derivation: sensitivity.Derivation,
 
     # O espelho de `raw` em _retail__sources.yml; a conferência do que o gerador escreveu para
     # `raw_legacy`; e o que as demais fontes (`governance`) declaram, como declaração.
+    tabelas = table_texts()
     for (schema, tabela), entrada in fontes.items():
+        # A relação (F32): em `raw`, o texto do `table_meta` abre a descrição escrita à mão, e a nota da
+        # réplica vem depois; em `raw_legacy`, o texto é o do gerador. Conferido, não escrito: a nota é de
+        # quem a revisa, e um `table_meta` que mudou pede que alguém releia a nota junto.
+        if (esperado := tabelas.get((schema, tabela))) is not None:
+            if schema == "raw" and not (_normal(entrada.description) or "").startswith(_normal(esperado)):
+                saida.problems.append(f"raw.{tabela}: a descrição da tabela em {entrada.path.name} tem de começar pelo "
+                                      f"texto do `table_meta` — {esperado!r} —, e a nota da réplica vem depois")
+            elif schema == "raw_legacy" and _normal(entrada.description) != _normal(esperado):
+                saida.problems.append(f"raw_legacy.{tabela}: a descrição da tabela não é a do gerador; rode `make legacy-models`")
         for nome, c in entrada.columns.items():
             esperado = saida.texts.get((schema, tabela, nome))
             if schema == "raw" and esperado and _text(c) != esperado:

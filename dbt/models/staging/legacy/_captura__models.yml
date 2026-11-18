@@ -4,6 +4,11 @@
 version: 2
 models:
   - name: legacy_selected_capture
+    description: >
+      A captura do legado que este *build* lê: a fixada na variável `legacy_snapshot_id`, para
+      reprocessar, ou a mais recente certificada, `complete` nas 40 tabelas em
+      `governance.legacy_captures` (ADR-0044). Uma linha só. Os testes `legacy_captura_existe` e
+      `legacy_captura_completa` conferem que ela existe e é íntegra.
     meta:
       domain: legado
     columns:

@@ -4,6 +4,12 @@
 version: 2
 models:
   - name: rejected_shipment_deliveries
+    description: >
+      Remessas que a origem diz entregues, com `delivered_at` preenchida, sem o evento `delivered`
+      correspondente no livro (ADR-0034): não são contadas como entregues nem descartadas em silêncio. É
+      destino, não passagem. O teste `entrega_projetada_tem_evento_no_livro` acusa cada uma, salvo a do
+      legado cujo evento `delivered` está na quarentena do tratamento corrente (Q62). Uma linha por
+      remessa rejeitada de `trusted.shipments`, com o código e o motivo da rejeição.
     meta:
       domain: logistica
     columns:

@@ -8,6 +8,11 @@ version: 2
 
 snapshots:
   - name: scd_coupon
+    description: >
+      Histórico dos atributos do cupom, SCD tipo 2 (ADR-0017): uma linha por versão de cada cupom de cada
+      origem (`source_system`). Uma versão nova abre quando muda uma das `check_cols` declaradas:
+      campanha, tipo e valor do desconto, piso do pedido, atividade e exclusão lógica (ADR-0029). Os
+      acumulados de resgate ficam congelados na versão.
     meta:
       domain: marketing
     columns:
@@ -147,6 +152,11 @@ snapshots:
           description_inherited: true
           sensitivity: internal
   - name: scd_customer
+    description: >
+      Histórico dos atributos do cliente, SCD tipo 2 (ADR-0017): uma linha por versão de cada cliente de
+      cada origem (`source_system`, ADR-0039). Uma versão nova abre quando muda segmento, estado do
+      relacionamento, cidade, UF ou exclusão lógica. Nome e documento não abrem versão: correção de
+      cadastro não é fato novo de negócio.
     meta:
       domain: clientes
     columns:
@@ -311,6 +321,10 @@ snapshots:
           description_inherited: true
           sensitivity: internal
   - name: scd_support_agent
+    description: >
+      Histórico dos atributos do agente de atendimento, SCD tipo 2 (ADR-0017): uma linha por versão de
+      cada agente de cada origem (`source_system`). Uma versão nova abre quando muda a equipe, a atividade
+      ou a exclusão lógica. Nome, e-mail e data de contratação não abrem versão.
     meta:
       domain: atendimento
     columns:
@@ -410,6 +424,10 @@ snapshots:
           description_inherited: true
           sensitivity: internal
   - name: scd_product
+    description: >
+      Histórico dos atributos do SKU, SCD tipo 2 (ADR-0017): uma linha por versão de cada SKU de cada
+      origem (`source_system`). Uma versão nova abre quando muda categoria, marca, estado do produto,
+      atividade do SKU ou exclusão lógica (ADR-0029).
     meta:
       domain: catalogo
     columns:

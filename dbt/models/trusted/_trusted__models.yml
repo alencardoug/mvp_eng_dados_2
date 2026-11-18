@@ -8,6 +8,10 @@ version: 2
 
 models:
   - name: campaigns
+    description: >
+      Campanhas das duas origens, com a vigência resolvida contra o “hoje” da simulação (`as_of_date`) e o
+      objetivo, que classifica o cupom numa análise. Uma linha por campanha de cada origem
+      (`source_system`).
     meta:
       domain: marketing
     columns:
@@ -81,6 +85,9 @@ models:
           sensitivity: internal
 
   - name: carriers
+    description: >
+      Transportadoras das duas origens, com a modalidade (`service_level`) que fixa a promessa de prazo da
+      entrega. Uma linha por transportadora de cada origem (`source_system`).
     meta:
       domain: logistica
     columns:
@@ -140,6 +147,11 @@ models:
           sensitivity: internal
 
   - name: cart_lifecycle_events
+    description: >
+      Eventos do ciclo de vida do carrinho, a abertura e o desfecho (ADR-0028). O carrinho ainda aberto
+      dentro do prazo tem só a abertura. Cada linha leva a data do evento e a da criação do carrinho, pela
+      qual as views agregam. Grão de `fact_cart_event`: até dois eventos por carrinho de cada origem
+      (`source_system`).
     meta:
       domain: vendas
     columns:
@@ -221,6 +233,10 @@ models:
           sensitivity: internal
 
   - name: carts
+    description: >
+      Carrinhos das duas origens, com a contagem e o valor dos itens pelo preço praticado quando cada item
+      entrou, que é o valor abandonado do Glossário de Negócio. Uma linha por carrinho de cada origem
+      (`source_system`).
     meta:
       domain: vendas
     columns:
@@ -314,6 +330,10 @@ models:
           sensitivity: internal
 
   - name: coupon_redemptions
+    description: >
+      Usos de cupom das duas origens, um por pedido, com os três sinalizadores que verificam a
+      elegibilidade de cada resgate (vigência, piso e teto; invariante 12). Grão de
+      `fact_coupon_redemption`: uma linha por resgate de cada origem (`source_system`).
     meta:
       domain: marketing
     columns:
@@ -439,6 +459,10 @@ models:
           sensitivity: internal
 
   - name: coupons
+    description: >
+      Cupons das duas origens, com a campanha que os emitiu e o uso acumulado contra o teto de resgates.
+      Nulo em `min_order_amount` é sem piso, e em `max_redemptions`, sem teto. Uma linha por cupom de cada
+      origem (`source_system`), com o valor atual; as versões estão em `snapshots.scd_coupon`.
     meta:
       domain: marketing
     columns:
@@ -553,6 +577,11 @@ models:
           sensitivity: internal
 
   - name: customers
+    description: >
+      Clientes das duas origens, com segmento, geografia principal e histórico de compra. Cliente ativo,
+      primeira compra e recorrência nascem aqui: o ativo pela janela contada de `as_of_date`, nunca do
+      relógio do banco, e a recorrência pela janela contada da primeira compra. Uma linha por cliente de
+      cada origem (`source_system`), com o valor atual; as versões estão em `snapshots.scd_customer`.
     meta:
       domain: clientes
     columns:
@@ -689,6 +718,10 @@ models:
           sensitivity: internal
 
   - name: inventory_movements
+    description: >
+      Livro de eventos de estoque das duas origens, com o valor de cada movimento. O custo do produto
+      vendido nasce aqui, pelo `unit_cost` registrado na saída (ADR-0030). Entrada e saída ficam em
+      colunas próprias, sempre positivas. Uma linha por movimento de cada origem (`source_system`).
     meta:
       domain: estoque
     columns:
@@ -825,6 +858,10 @@ models:
           sensitivity: internal
 
   - name: order_items
+    description: >
+      Itens de pedido das duas origens, com a receita líquida definida uma vez só: quantidade × preço
+      praticado, menos o desconto da linha, sem frete nem imposto. Grão de `fact_sales_order_item`: uma
+      linha por item de cada origem (`source_system`).
     meta:
       domain: vendas
     columns:
@@ -898,6 +935,10 @@ models:
           sensitivity: internal
 
   - name: order_status_events
+    description: >
+      Transições de estado do pedido das duas origens, com a posição de cada uma no caminho e o tempo que
+      o pedido passou no estado anterior. `from_status` nulo é a criação do pedido. Grão de
+      `fact_order_status_event`: uma linha por transição de cada origem (`source_system`).
     meta:
       domain: vendas
     columns:
@@ -980,6 +1021,10 @@ models:
           sensitivity: internal
 
   - name: orders
+    description: >
+      Pedidos das duas origens, com os agregados dos itens ao lado dos valores acordados na compra, que
+      não são recalculados: a diferença é teste, não correção. Uma linha por pedido de cada origem
+      (`source_system`).
     meta:
       domain: vendas
     columns:
@@ -1114,6 +1159,9 @@ models:
           sensitivity: internal
 
   - name: payment_methods
+    description: >
+      Meios de pagamento aceitos nas duas origens, sem nenhuma credencial, nem sintética. Uma linha por
+      meio de pagamento de cada origem (`source_system`).
     meta:
       domain: pagamentos
     columns:
@@ -1172,6 +1220,10 @@ models:
           sensitivity: internal
 
   - name: payment_transactions
+    description: >
+      Operações financeiras do pagamento das duas origens: autorização, captura, estorno e reembolso, como
+      registros imutáveis do que o adquirente respondeu, inclusive a captura que falhou. Grão de
+      `fact_payment_transaction`: uma linha por transação de cada origem (`source_system`).
     meta:
       domain: pagamentos
     columns:
@@ -1264,6 +1316,10 @@ models:
           sensitivity: internal
 
   - name: payments
+    description: >
+      Intenções de pagamento das duas origens, com os totais do que aconteceu com cada uma, que tornam
+      testáveis as invariantes 3 e 4 (capturado contra autorizado, reembolsado contra capturado). Uma
+      linha por pagamento de cada origem (`source_system`).
     meta:
       domain: pagamentos
     columns:
@@ -1387,6 +1443,10 @@ models:
           sensitivity: internal
 
   - name: product_skus
+    description: >
+      SKUs das duas origens, com produto, marca e a categoria achatada em até três níveis, no valor atual:
+      uma linha por SKU de cada origem (`source_system`). As versões ficam em `snapshots.scd_product`, de
+      onde `dim_product` lê, e por isso a dimensão tem o grão da versão, não o deste modelo.
     meta:
       domain: catalogo
     columns:
@@ -1523,6 +1583,10 @@ models:
           sensitivity: internal
 
   - name: purchase_order_items
+    description: >
+      Itens de ordem de compra das duas origens, com o que foi recebido em recebimentos concluídos: o
+      recebido não supera o solicitado (invariante 6). Uma linha por item de cada origem
+      (`source_system`).
     meta:
       domain: compras
     columns:
@@ -1606,6 +1670,9 @@ models:
           sensitivity: internal
 
   - name: purchase_orders
+    description: >
+      Cabeçalho das ordens de compra das duas origens, com os agregados dos seus itens. Uma linha por
+      ordem de cada origem (`source_system`).
     meta:
       domain: compras
     columns:
@@ -1699,6 +1766,10 @@ models:
           sensitivity: internal
 
   - name: refunds
+    description: >
+      Reembolsos das duas origens, ligados à transação de captura que revertem, contra a qual a invariante
+      4 se verifica, e ao pagamento e ao pedido que os originaram. Uma linha por reembolso de cada origem
+      (`source_system`).
     meta:
       domain: pagamentos
     columns:
@@ -1787,6 +1858,11 @@ models:
           sensitivity: internal
 
   - name: shipment_items
+    description: >
+      Itens de remessa das duas origens: quantas unidades de um item de pedido foram em cada caixa. O item
+      é repartido entre as remessas do pedido, nunca copiado (invariante 5), e o SKU vem do item de
+      pedido. Grão de `fact_shipment_item`: uma linha por item de remessa de cada origem
+      (`source_system`).
     meta:
       domain: logistica
     columns:
@@ -1851,6 +1927,10 @@ models:
           sensitivity: internal
 
   - name: shipments
+    description: >
+      Remessas das duas origens, com a data de entrega tirada do livro `delivery_events` (ADR-0034) e a
+      coluna da origem ao lado, como `delivered_at_projected`, só para conferência. Uma linha por remessa
+      de cada origem (`source_system`).
     meta:
       domain: logistica
     columns:
@@ -1995,6 +2075,10 @@ models:
           sensitivity: internal
 
   - name: support_agents
+    description: >
+      Agentes de atendimento das duas origens, com a carga atendida. A equipe (`agent_team`) classifica o
+      chamado numa análise, e é ela que faz a dimensão ser tipo 2. Uma linha por agente de cada origem
+      (`source_system`), com o valor atual; as versões estão em `snapshots.scd_support_agent`.
     meta:
       domain: atendimento
     columns:
@@ -2073,6 +2157,9 @@ models:
           sensitivity: internal
 
   - name: support_tickets
+    description: >
+      Chamados das duas origens, com o que o livro de eventos conta sobre cada um, como a contagem de
+      reaberturas, que o estado corrente esconde. Uma linha por chamado de cada origem (`source_system`).
     meta:
       domain: atendimento
     columns:
@@ -2222,6 +2309,10 @@ models:
           sensitivity: internal
 
   - name: ticket_events
+    description: >
+      Livro do chamado das duas origens, em seis tipos de evento, de `created` a `reopened`.
+      `support_agent_id` nulo é autor cliente, não dado faltando. Grão de `fact_support_ticket_event`: uma
+      linha por evento de cada origem (`source_system`).
     meta:
       domain: atendimento
     columns:
@@ -2303,6 +2394,10 @@ models:
           description_inherited: true
           sensitivity: internal
   - name: delivery_events
+    description: >
+      Livro da entrega das duas origens: o rastreamento da remessa e a **fonte** da data de entrega
+      realizada (ADR-0034). A devolução é registrada depois da entrega e não a apaga. Uma linha por evento
+      de entrega de cada origem (`source_system`).
     meta:
       domain: logistica
     columns:
@@ -2376,6 +2471,10 @@ models:
           sensitivity: internal
           description_inherited: true
   - name: inventory_balances
+    description: >
+      Saldo de estoque das duas origens: a projeção mantida pela origem ao lado do saldo reconstruído do
+      livro, no corte comum dos dois caminhos (ADR-0031), e as reservas. Um teste confere que a diferença
+      é zero. Uma linha por SKU e armazém de cada origem (`source_system`).
     meta:
       domain: estoque
     columns:
@@ -2459,6 +2558,241 @@ models:
           description_inherited: true
       - name: source_updated_at
         description: "Momento da última alteração; cursor da carga incremental (ADR-0015)."
+        meta:
+          sensitivity: internal
+          description_inherited: true
+
+  # ── Promovidos do `_derived.yml` para levar a descrição da relação (F32) ──────────
+  - name: geographies
+    description: >
+      Geografia conformada dos endereços de cliente das duas origens: país, UF, cidade e a região, que vem
+      do *seed* `brazilian_states`. Atende o endereço de entrega e a origem da remessa. Uma linha por
+      país, UF e cidade, sem a origem: a mesma cidade das duas origens é uma linha só.
+    meta:
+      domain: transversal
+    columns:
+      - name: country
+        description: País em código ISO de duas letras.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: state_code
+        description: Unidade federativa em sigla de duas letras.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: state_name
+        description: Nome da unidade federativa por extenso.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: region
+        description: Região do IBGE a que a unidade federativa pertence.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: city
+        description: Cidade; alimenta a dimensão de geografia.
+        meta:
+          sensitivity: public
+          description_inherited: true
+  - name: sales_channels
+    description: >
+      Canais de venda conformados das duas origens, um domínio fechado. O modelo existe para que
+      `analytics` leia sempre a camada anterior. Uma linha por canal de cada origem (`source_system`).
+    meta:
+      domain: vendas
+    columns:
+      - name: source_system
+        description: '{{ doc("source_system") }}'
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: sales_channel_id
+        description: Identificador do canal de venda na origem, gerado pelo banco transacional.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: sales_channel_code
+        description: Código estável do canal.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: sales_channel_name
+        description: Nome do canal de venda.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: channel_type
+        description: 'Natureza do canal: web, app ou store.'
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: is_active
+        description: Indica se o canal continua operando.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: is_deleted
+        description: '{{ doc("is_deleted") }}'
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_created_at
+        description: Momento de criação do registro na origem.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_updated_at
+        description: Momento da última alteração; cursor da carga incremental (ADR-0015).
+        meta:
+          sensitivity: internal
+          description_inherited: true
+  - name: suppliers
+    description: >
+      Fornecedores das duas origens. Uma linha por fornecedor de cada origem (`source_system`).
+    meta:
+      domain: compras
+    columns:
+      - name: source_system
+        description: '{{ doc("source_system") }}'
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: supplier_id
+        description: Identificador do fornecedor na origem, gerado pelo banco transacional.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: supplier_code
+        description: Chave natural do fornecedor na origem.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: supplier_legal_name
+        description: Razão social do fornecedor (sintética).
+        meta:
+          sensitivity: confidential
+          description_inherited: true
+      - name: supplier_trade_name
+        description: Nome fantasia do fornecedor.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: supplier_document
+        description: Documento de identificação do fornecedor (sintético).
+        meta:
+          sensitivity: confidential
+          description_inherited: true
+      - name: supplier_contact_email
+        description: E-mail de contato comercial (sintético).
+        meta:
+          sensitivity: personal
+          description_inherited: true
+      - name: supplier_country
+        description: País do fornecedor, em código ISO.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: payment_terms_days
+        description: Prazo de pagamento negociado, em dias.
+        meta:
+          sensitivity: confidential
+          description_inherited: true
+      - name: is_active
+        description: Indica se o fornecedor continua ativo.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: is_deleted
+        description: '{{ doc("is_deleted") }}'
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_created_at
+        description: Momento de criação do registro na origem.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_updated_at
+        description: Momento da última alteração; cursor da carga incremental (ADR-0015).
+        meta:
+          sensitivity: internal
+          description_inherited: true
+  - name: warehouses
+    description: >
+      Armazéns das duas origens, com a geografia conformada pela mesma regra do endereço do cliente, na
+      mesma `dim_geography`. Uma linha por armazém de cada origem (`source_system`).
+    meta:
+      domain: estoque
+    columns:
+      - name: source_system
+        description: '{{ doc("source_system") }}'
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: warehouse_id
+        description: Identificador do armazém na origem, gerado pelo banco transacional.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: warehouse_code
+        description: Código estável do armazém.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: warehouse_name
+        description: Nome do armazém.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: warehouse_city
+        description: Cidade do armazém.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: warehouse_state
+        description: Unidade federativa do armazém.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: warehouse_state_name
+        description: Nome da unidade federativa por extenso.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: warehouse_region
+        description: Região do IBGE a que a unidade federativa pertence.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: warehouse_country
+        description: País, em código ISO.
+        meta:
+          sensitivity: public
+          description_inherited: true
+      - name: capacity_units
+        description: Capacidade máxima em unidades.
+        meta:
+          sensitivity: confidential
+          description_inherited: true
+      - name: is_active
+        description: Indica se o armazém está operando.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: is_deleted
+        description: '{{ doc("is_deleted") }}'
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_created_at
+        description: Momento de criação do registro na origem.
+        meta:
+          sensitivity: internal
+          description_inherited: true
+      - name: source_updated_at
+        description: Momento da última alteração; cursor da carga incremental (ADR-0015).
         meta:
           sensitivity: internal
           description_inherited: true

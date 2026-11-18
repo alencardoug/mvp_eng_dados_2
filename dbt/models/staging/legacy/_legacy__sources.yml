@@ -29,6 +29,7 @@ sources:
     # promessa de atualidade a cobrar dela — ela é um sistema que ninguém mexe.
     tables:
       - name: brands
+        description: "Capturas retidas de `brands` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Marcas associadas aos produtos.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -83,6 +84,7 @@ sources:
             meta:
               sensitivity: internal
       - name: campaigns
+        description: "Capturas retidas de `campaigns` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Campanhas de marketing e seus períodos de vigência.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -149,6 +151,7 @@ sources:
             meta:
               sensitivity: internal
       - name: carriers
+        description: "Capturas retidas de `carriers` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Transportadoras sintéticas e suas modalidades.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -207,6 +210,7 @@ sources:
             meta:
               sensitivity: internal
       - name: customer_segments
+        description: "Capturas retidas de `customer_segments` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Segmentos comerciais associáveis ao cadastro do cliente.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -261,6 +265,7 @@ sources:
             meta:
               sensitivity: internal
       - name: payment_methods
+        description: "Capturas retidas de `payment_methods` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Tipos de pagamento aceitos, sem armazenar credenciais.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -315,6 +320,7 @@ sources:
             meta:
               sensitivity: internal
       - name: product_categories
+        description: "Capturas retidas de `product_categories` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Hierarquia de categorias e subcategorias do catálogo.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -373,6 +379,7 @@ sources:
             meta:
               sensitivity: internal
       - name: sales_channels
+        description: "Capturas retidas de `sales_channels` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Canais de venda como web, aplicativo e loja física.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -427,6 +434,7 @@ sources:
             meta:
               sensitivity: internal
       - name: suppliers
+        description: "Capturas retidas de `suppliers` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Cadastro sintético dos fornecedores.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -497,6 +505,7 @@ sources:
             meta:
               sensitivity: internal
       - name: support_agents
+        description: "Capturas retidas de `support_agents` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Agentes sintéticos e suas equipes de atendimento.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -563,6 +572,7 @@ sources:
             meta:
               sensitivity: internal
       - name: warehouses
+        description: "Capturas retidas de `warehouses` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Centros de distribuição ou locais de estoque.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -629,6 +639,7 @@ sources:
             meta:
               sensitivity: internal
       - name: coupons
+        description: "Capturas retidas de `coupons` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Cupons, regras de desconto e limites de utilização.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -703,6 +714,7 @@ sources:
             meta:
               sensitivity: internal
       - name: customers
+        description: "Capturas retidas de `customers` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Cadastro principal do cliente e estado do relacionamento.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -773,6 +785,7 @@ sources:
             meta:
               sensitivity: internal
       - name: price_lists
+        description: "Capturas retidas de `price_lists` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Listas de preço por canal, moeda e período de vigência.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -839,6 +852,7 @@ sources:
             meta:
               sensitivity: internal
       - name: products
+        description: "Capturas retidas de `products` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Produto conceitual vendido pelo marketplace.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -905,6 +919,7 @@ sources:
             meta:
               sensitivity: internal
       - name: purchase_orders
+        description: "Capturas retidas de `purchase_orders` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Cabeçalho das ordens de compra enviadas a fornecedores.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -971,6 +986,7 @@ sources:
             meta:
               sensitivity: internal
       - name: carts
+        description: "Capturas retidas de `carts` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Carrinhos abertos, convertidos, abandonados ou expirados.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1033,6 +1049,7 @@ sources:
             meta:
               sensitivity: internal
       - name: customer_addresses
+        description: "Capturas retidas de `customer_addresses` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Endereços de cobrança e entrega, com vigência e indicação de principal.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1123,6 +1140,7 @@ sources:
             meta:
               sensitivity: internal
       - name: customer_contacts
+        description: "Capturas retidas de `customer_contacts` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “E-mails e telefones sintéticos associados ao cliente.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1181,6 +1199,7 @@ sources:
             meta:
               sensitivity: internal
       - name: customer_preferences
+        description: "Capturas retidas de `customer_preferences` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Preferências de comunicação, idioma e consentimentos simulados.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1243,6 +1262,7 @@ sources:
             meta:
               sensitivity: internal
       - name: goods_receipts
+        description: "Capturas retidas de `goods_receipts` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Registro do recebimento físico de uma ordem de compra.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1301,6 +1321,7 @@ sources:
             meta:
               sensitivity: internal
       - name: product_variants
+        description: "Capturas retidas de `product_variants` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “SKUs e variações de tamanho, cor ou embalagem.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1371,6 +1392,7 @@ sources:
             meta:
               sensitivity: internal
       - name: cart_items
+        description: "Capturas retidas de `cart_items` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Produtos e quantidades incluídos nos carrinhos; maior tabela do projeto.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1429,6 +1451,7 @@ sources:
             meta:
               sensitivity: internal
       - name: inventory_balances
+        description: "Capturas retidas de `inventory_balances` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Saldo atual de cada SKU por armazém.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1487,6 +1510,7 @@ sources:
             meta:
               sensitivity: internal
       - name: inventory_movements
+        description: "Capturas retidas de `inventory_movements` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Livro append-only de entradas, saídas, ajustes e transferências.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1573,6 +1597,7 @@ sources:
             meta:
               sensitivity: internal
       - name: orders
+        description: "Capturas retidas de `orders` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Cabeçalho do pedido: cliente, canal, valores e estado atual.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1659,6 +1684,7 @@ sources:
             meta:
               sensitivity: internal
       - name: product_prices
+        description: "Capturas retidas de `product_prices` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Preço de cada SKU em uma lista e intervalo de vigência.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1717,6 +1743,7 @@ sources:
             meta:
               sensitivity: internal
       - name: purchase_order_items
+        description: "Capturas retidas de `purchase_order_items` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Produtos, quantidades e custos solicitados ao fornecedor.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1775,6 +1802,7 @@ sources:
             meta:
               sensitivity: internal
       - name: coupon_redemptions
+        description: "Capturas retidas de `coupon_redemptions` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Uso efetivo de cupons por cliente e pedido.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1825,6 +1853,7 @@ sources:
             meta:
               sensitivity: internal
       - name: goods_receipt_items
+        description: "Capturas retidas de `goods_receipt_items` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Quantidades efetivamente recebidas por item da ordem de compra.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1879,6 +1908,7 @@ sources:
             meta:
               sensitivity: internal
       - name: order_items
+        description: "Capturas retidas de `order_items` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Grão comercial do pedido: um SKU comprado em uma linha.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1945,6 +1975,7 @@ sources:
             meta:
               sensitivity: internal
       - name: order_status_history
+        description: "Capturas retidas de `order_status_history` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Histórico temporal das mudanças de estado do pedido.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -1995,6 +2026,7 @@ sources:
             meta:
               sensitivity: internal
       - name: payments
+        description: "Capturas retidas de `payments` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Intenção de pagamento associada ao pedido.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2069,6 +2101,7 @@ sources:
             meta:
               sensitivity: internal
       - name: shipments
+        description: "Capturas retidas de `shipments` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Remessas criadas para atender pedidos.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2147,6 +2180,7 @@ sources:
             meta:
               sensitivity: internal
       - name: stock_reservations
+        description: "Capturas retidas de `stock_reservations` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Reserva de quantidade para carrinhos ou pedidos.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2221,6 +2255,7 @@ sources:
             meta:
               sensitivity: internal
       - name: delivery_events
+        description: "Capturas retidas de `delivery_events` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Eventos de coleta, trânsito, tentativa e entrega.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2271,6 +2306,7 @@ sources:
             meta:
               sensitivity: internal
       - name: payment_transactions
+        description: "Capturas retidas de `payment_transactions` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Tentativas, autorizações, capturas e falhas do pagamento.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2329,6 +2365,7 @@ sources:
             meta:
               sensitivity: internal
       - name: shipment_items
+        description: "Capturas retidas de `shipment_items` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Quantidades de itens de pedido incluídas em cada remessa.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2379,6 +2416,7 @@ sources:
             meta:
               sensitivity: internal
       - name: support_tickets
+        description: "Capturas retidas de `support_tickets` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Solicitações associadas a clientes, pedidos ou entregas.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2461,6 +2499,7 @@ sources:
             meta:
               sensitivity: internal
       - name: refunds
+        description: "Capturas retidas de `refunds` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Reembolsos totais ou parciais de transações capturadas.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"
@@ -2523,6 +2562,7 @@ sources:
             meta:
               sensitivity: internal
       - name: ticket_events
+        description: "Capturas retidas de `ticket_events` da origem legada, por acréscimo (ADR-0037): uma linha por ocorrência física da linha do legado (`legacy_row_id`) em cada captura (o `sync_id` de `_airbyte_meta`), com os valores como texto e os defeitos preservados. Nenhuma captura sobrescreve outra, e a retenção é permanente. O grão não é o da entidade de origem, que a declaração descreve assim: “Interações, atribuições e mudanças de estado do chamado.”"
         columns:
           - name: _airbyte_raw_id
             description: "{{ doc(\"_airbyte_raw_id\") }}"

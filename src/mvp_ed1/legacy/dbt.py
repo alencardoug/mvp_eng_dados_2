@@ -353,17 +353,22 @@ def sources_yml() -> str:
     """
     import json
 
-    from mvp_ed1.models.descriptions import source_texts
+    from mvp_ed1.models.descriptions import source_texts, table_texts
     from mvp_ed1.models.sensitivity import source_leaves
 
     # Coluna a coluna, com a sensibilidade e a descrição declaradas nos modelos
     # SQLAlchemy — a mesma folha que a linhagem dos modelos usa
     # (`models/sensitivity.py`, `models/descriptions.py`) —, e o texto das
-    # colunas que o Airbyte e a identidade do legado acrescentam.
+    # colunas que o Airbyte e a identidade do legado acrescentam. A tabela leva
+    # a descrição da relação retida, com a entidade de origem só como referência
+    # (F32, RVRB-2-03): o pacote publica a descrição de cada tabela.
     _, niveis = source_leaves()
     textos = source_texts()
+    relacoes = table_texts()
     linhas = "\n".join(
-        f"      - name: {t}\n        columns:\n" + "\n".join(
+        f"      - name: {t}\n"
+        f"        description: {json.dumps(relacoes[('raw_legacy', t)], ensure_ascii=False)}\n"
+        "        columns:\n" + "\n".join(
             f"          - name: {c}\n"
             + (f"            description: {json.dumps(textos[(camada, tabela, c)], ensure_ascii=False)}\n" if (camada, tabela, c) in textos else "")
             + f"            meta:\n              sensitivity: {n}"

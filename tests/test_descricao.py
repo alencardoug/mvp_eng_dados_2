@@ -8,8 +8,8 @@ medição (M17 do plano do `bi-como-codigo`) achou 26 de 477 colunas descritas e
 (`models/descriptions.py`); o texto do que é calculado é escrito à mão, depois.
 
 A catraca conta **faltas**, não percentuais (N42): por camada, quantas colunas
-materializadas não têm descrição no manifest, e quantos objetos não têm `domain`
-e `owner`. O número tem de ser **igual** ao teto: uma coluna nova sem descrição
+materializadas não têm descrição no manifest, quantas relações não têm descrição
+(F32) e quantos objetos não têm `domain` e `owner`. O número tem de ser **igual** ao teto: uma coluna nova sem descrição
 falha, e uma melhora também falha até o teto baixar no mesmo commit — é isso que
 faz a catraca clicar. O inventário é o banco, como na de classificação: contar o
 `.yml` deixaria passar a coluna que ninguém declarou.
@@ -38,6 +38,15 @@ MANIFEST = sensitivity.MANIFEST
 #: calculam em `trusted`, `staging`, `quarantine` e nos *snapshots*; e as 39 da ponte do legado
 #: (B1 e B3) pela declaração do RVG-1-01 (`TEXTOS_DA_PONTE`). Zero em todas as camadas.
 TETO_SEM_DESCRICAO: dict[str, int] = {
+    "raw": 0, "raw_legacy": 0, "staging": 0, "trusted": 0, "analytics": 0,
+    "consumption": 0, "quarantine": 0, "snapshots": 0, "governance": 0,
+}
+
+#: Relações materializadas — tabela, view, fonte, seed e snapshot — sem descrição, por camada, contando
+#: também a que existe no banco sem declaração nenhum `.yml`. O F32 do plano da reabertura mediu 123 no
+#: pacote da `v2.1.0` (17/11/2026), e o Bloco 3 escreveu cada uma no dono declarativo dela: o
+#: `table_meta` em `raw` e `raw_legacy`, o `.yml` do modelo nas outras. Zero em todas as camadas.
+TETO_RELACOES_SEM_DESCRICAO: dict[str, int] = {
     "raw": 0, "raw_legacy": 0, "staging": 0, "trusted": 0, "analytics": 0,
     "consumption": 0, "quarantine": 0, "snapshots": 0, "governance": 0,
 }
@@ -91,6 +100,22 @@ def test_colunas_sem_descricao_por_camada_no_teto(manifest, colunas_materializad
     assert erros == [], "\n".join(e + (f"; p.ex. {exemplos[e.split(':')[0]][:5]}" if "acima" in e else "") for e in erros)
 
 
+def test_relacoes_sem_descricao_por_camada_no_teto(manifest, colunas_materializadas, record_property) -> None:
+    """F32: toda relação do armazém tem descrição; a que falta, ou que nenhum `.yml` declara, sai nomeada."""
+    relacoes = _relacoes(manifest)
+    sem: dict[str, list[str]] = defaultdict(list)
+    for schema, relacao in sorted({(s, t) for s, t, _ in colunas_materializadas}):
+        no = relacoes.get((schema, relacao))
+        if no is None:
+            sem[schema].append(f"{relacao} (sem declaração em `.yml` nenhum)")
+        elif not (no.get("description") or "").strip():
+            sem[schema].append(relacao)
+    for camada in CAMADAS:
+        record_property(f"undescribed_relations_{camada}", len(sem.get(camada, [])))
+    erros = _faltas({c: len(v) for c, v in sem.items()}, TETO_RELACOES_SEM_DESCRICAO, "relações sem descrição")
+    assert erros == [], "\n".join(e + (f": {', '.join(sem[e.split(':')[0]])}" if "acima" in e else "") for e in erros)
+
+
 def test_objetos_sem_dominio_ou_dono_por_camada_no_teto(manifest, colunas_materializadas) -> None:
     """Governança §5.1: `domain` e `owner` em todo modelo. Fontes ficam de fora — a regra é do modelo."""
     existentes = {(s, t) for s, t, _ in colunas_materializadas}
@@ -137,8 +162,11 @@ def test_contraprovas_no_manifest_real(manifest) -> None:
     for coluna in ponte.columns.values():
         (coluna.get("meta") or {}).pop("description_from", None)
     sem_declaracao = descriptions.derive_texts(manifest, derivacao, disco=disco)
-    assert ("trusted", "sales_channels", "sales_channel_name") not in sem_declaracao.texts
-    assert sem_declaracao.undescribed[("trusted", "sales_channels", "sales_channel_name")] == "upstream_blank"
+    # Desde o F32, `trusted.sales_channels` está num `.yml` à mão, com a marca de herdado: sem a declaração
+    # da ponte, a coluna deixa de herdar, e o texto que ficou no `.yml` é acusado — o `--check` reprova —,
+    # em vez de sumir calado do `_derived.yml`, como antes da promoção.
+    assert sem_declaracao.origin.get(("trusted", "sales_channels", "sales_channel_name")) != "inherited"
+    assert any(p.startswith("sales_channels.sales_channel_name: não transporta mais (upstream_blank)") for p in sem_declaracao.problems)
     assert any("sem `description_from`" in p for p in sem_declaracao.problems)
 
 

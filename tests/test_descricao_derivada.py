@@ -803,3 +803,59 @@ def test_os_yml_a_mao_que_citam_o_gerado_ao_lado_sao_a_mao() -> None:
                             ("legacy_selected_capture", "_captura__models.yml")):
         assert entradas[modelo].path.name == arquivo
         assert entradas[modelo].kind == "hand", modelo
+
+
+# ── A descrição da relação nas fontes (F32) ────────────────────────────────────
+
+ENTIDADE_ORDERS = Base.metadata.tables["oltp.orders"].info["description"].strip()
+
+
+def _problemas_de_tabela(textos: d.Texts) -> list[str]:
+    return [p for p in textos.problems if "descrição da tabela" in p]
+
+
+@pytest.mark.parametrize(("descricao", "aceita"), [
+    pytest.param(ENTIDADE_ORDERS, True, id="so-a-entidade"),
+    pytest.param(ENTIDADE_ORDERS + " Nota da réplica (ADR-0015).", True, id="entidade-e-nota"),
+    pytest.param(ENTIDADE_ORDERS.replace(" ", "\n  ") + "\n", True, id="dobrada-pelo-yaml"),
+    pytest.param("", False, id="vazia"),
+    pytest.param("Nota da réplica. " + ENTIDADE_ORDERS, False, id="nota-antes-da-entidade"),
+    pytest.param(ENTIDADE_ORDERS.removesuffix(".") + " de outro jeito.", False, id="entidade-reescrita"),
+])
+def test_a_tabela_de_raw_comeca_pelo_texto_do_table_meta(tmp_path, descricao, aceita) -> None:
+    """F32: a réplica tem o grão da origem; o `table_meta` abre a descrição, e a nota escrita à mão vem depois."""
+    fonte = d.Entry(tmp_path / "_retail__sources.yml", "hand", {}, address=("retail", "orders"), description=descricao)
+    textos = d.derive_texts({"nodes": {}}, s.Derivation(), disco={}, fontes={("raw", "orders"): fonte})
+    assert (_problemas_de_tabela(textos) == []) is aceita, textos.problems
+    if not aceita:
+        assert ENTIDADE_ORDERS in _problemas_de_tabela(textos)[0]      # a mensagem dá o texto esperado
+
+
+def test_a_tabela_de_raw_legacy_e_a_relacao_retida_com_a_entidade_so_como_referencia(tmp_path) -> None:
+    """RVRB-2-03: copiar o `table_meta` descreveria errado o grão; o texto é o do gerador, e outro é problema."""
+    entidade = Base.metadata.tables["oltp.inventory_balances"].info["description"].strip()
+    esperado = d.table_texts()[("raw_legacy", "inventory_balances")]
+    assert esperado.startswith("Capturas retidas de `inventory_balances` da origem legada")
+    assert "`legacy_row_id`" in esperado and esperado.endswith(f"“{entidade}”")
+    def textos(descricao: str) -> d.Texts:
+        fonte = d.Entry(tmp_path / "_legacy__sources.yml", "generator", {}, address=("legacy", "inventory_balances"), description=descricao)
+        return d.derive_texts({"nodes": {}}, s.Derivation(), disco={}, fontes={("raw_legacy", "inventory_balances"): fonte})
+    assert _problemas_de_tabela(textos(esperado)) == []
+    assert any("make legacy-models" in p for p in _problemas_de_tabela(textos(entidade)))
+
+
+def test_o_gerador_do_legado_escreve_a_descricao_de_cada_tabela() -> None:
+    from mvp_ed1.legacy import dbt as gerador
+    from mvp_ed1.legacy import schema as legado
+    fonte = next(f for f in yaml.safe_load(gerador.sources_yml())["sources"] if f["name"] == "legacy")
+    escritas = {t["name"]: t.get("description") for t in fonte["tables"]}
+    esperadas = d.table_texts()
+    assert {n: escritas.get(n) for n in legado.tabelas()} == {n: esperadas[("raw_legacy", n)] for n in legado.tabelas()}
+
+
+def test_as_tabelas_de_raw_e_raw_legacy_no_disco_seguem_a_regra() -> None:
+    """O `_retail__sources.yml` à mão e o `_legacy__sources.yml` gerado, como estão: 37 e 40 tabelas, nenhum problema."""
+    fontes = {k: e for k, e in d.disk_sources().items() if k[0] in ("raw", "raw_legacy")}
+    assert sum(k[0] == "raw" for k in fontes) == 37 and sum(k[0] == "raw_legacy" for k in fontes) == 40
+    textos = d.derive_texts({"nodes": {}}, s.Derivation(), disco={}, fontes=fontes)
+    assert _problemas_de_tabela(textos) == []
