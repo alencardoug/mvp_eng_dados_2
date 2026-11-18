@@ -105,13 +105,13 @@ A ordem respeita as dependências referenciais e a causalidade dos eventos:
 4. **Ordens de compra e recebimentos.**
 5. **Carrinhos, pedidos, itens e histórico de estado** — e, logo depois dos pedidos, o lançamento
    de cada produto vendido, que cai entre o início do período e a primeira venda dele
-   ([invariante 14](modelo_de_dados.md#4-invariantes-de-negócio)): é o único passo que volta a uma
-   tabela já gerada, porque só depois da venda se sabe quando ela foi.
+   ([invariante 14](modelo_de_dados.md#4-invariantes-de-negócio)): é um dos dois passos que voltam a
+   uma tabela já gerada (o outro é o dimensionamento da compra, no passo 7), porque só depois da venda
+   se sabe quando ela foi.
 6. **Pagamentos, transações e reembolsos**, seguindo o estado de cada pedido.
 7. **Remessas, itens de remessa e eventos de entrega** — e, logo depois delas, a quantidade de cada
    item de compra, que cobre a venda despachada do par nos dias seguintes ao recebimento: o passo 4
-   monta as ordens e os recebimentos, e só aqui a venda existe (V5). É o segundo passo que volta a
-   tabelas já geradas.
+   monta as ordens e os recebimentos, e só aqui a venda existe (V5).
 8. **Livro de estoque, reservas e saldo** — nesta ordem, e depois de tudo que move estoque.
 9. **Chamados de atendimento**, vinculados a fatos já existentes.
 

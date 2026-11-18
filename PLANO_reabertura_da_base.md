@@ -513,3 +513,19 @@ Bloco 0. O Bloco 5 espera só as respostas Q65 a Q72 e os pré-requisitos já de
 resolvido, e o conjunto inserido pode ser registrado sem coluna nova no destino quente. A frase do *seed* da Q72
 (d) está correta. **A revisão do plano está encerrada.**
 
+### Bloco 2 — rodada 1 do codex2, sobre `127c118` (18/11/2026)
+
+Relatório: `data/medicoes/reabertura/codex2_bloco2_r1.md`, fora do Git. **Nada bloqueia o Bloco 3.** O codex2
+reproduziu a P11 simulada sobre o gerador implementado (varejo 0,464 / p90 1,277; legado 0,476 / p90 1,211). Ele
+também conferiu, sem divergência:
+- a demanda contra o livro;
+- a invariante 6, a divisão dos lotes e as devoluções;
+- o determinismo;
+- o caminho do legado;
+- as guardas, com a sintaxe das três consultas validada nos dois dialetos;
+- o *patch* fora da árvore, compatível com a regra 3 até o ciclo.
+
+As lacunas de cobertura em fatores muito pequenos são as mesmas do gerador anterior, ou seja, não são regressão
+da V5. O único achado, RVB2-1-01, foi um ajuste de texto na Geração de Dados §3, e foi aplicado. **Falta a
+revisão integral do Owner** sobre o `geracao.yml` (`e237470`), o *patch* das guardas e a D93.
+
