@@ -81,13 +81,29 @@ vars:
   # bastante para não transformar uma semana fraca em ruptura iminente.
   cover_window_days: 90
 
-  # Ponto de reposição, em unidades, por par armazém/SKU (P12).
+  # O ponto de reposição de cada par armazém/SKU (ADR-0057, D94), publicado em
+  # `analytics.dim_sku_location` e lido pela P12 e pelo alerta do *streaming*:
   #
-  # **Espelho.** O dono do valor é `streaming/fluxo.yml`, que é quem alerta ao
-  # cruzá-lo; aqui está a cópia que o dbt consegue ler, e um teste do `pytest`
-  # confere que as duas concordam. Mesmo arranjo de `as_of_date`, pelo mesmo
-  # motivo: dois runtimes precisam do número e só um pode ser o dono.
-  reorder_point_units: 25
+  #   ponto = teto( venda dos últimos `reorder_demand_window_days` dias
+  #                 ÷ `reorder_demand_window_days`
+  #                 × (`reorder_lead_time_days` + `reorder_safety_days`) )
+  #
+  # **Dono.** Estes três valores, e só eles: o *streaming* não guarda limiar
+  # próprio, lê o ponto do armazém no lançamento. Até 18/11/2026 o ponto era
+  # 25 unidades fixas para todo par, com o `fluxo.yml` como dono e esta
+  # variável como espelho (F36).
+  #
+  # Prazo de reposição: a mediana medida do pedido ao primeiro recebimento,
+  # 28,4 dias em 1.116 itens do varejo (p10 6,4; p90 53,5), em 18/11/2026
+  # (`data/medicoes/ponto_de_reposicao/medida_adr/f36.sql`). Um prazo único: as
+  # medianas por fornecedor vão de 11 a 48 dias, e a escolha está no ADR-0057.
+  reorder_lead_time_days: 28
+  # Margem de segurança: metade do prazo.
+  reorder_safety_days: 14
+  # Janela da demanda do ponto: um ano, e não os 90 dias da cobertura. Par em
+  # ruptura não vende, e numa janela curta a ruptura longa teria ponto zero
+  # justamente quando mais precisa de reposição (ADR-0057).
+  reorder_demand_window_days: 365
 
   # A faixa da mediana trimestral do giro na P11 publicada (V5; Q67 do plano da
   # reabertura, fixada pelo Owner em 18/11/2026 depois da medida em memória:

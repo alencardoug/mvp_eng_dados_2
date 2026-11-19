@@ -101,7 +101,11 @@ esperado as (
       on  b.source_system = pos.source_system
      and b.warehouse_id = pos.warehouse_id
      and b.product_variant_id = pos.product_variant_id
-    where pos.quantity_on_hand - coalesce(b.quantity_reserved, 0) < {{ var("reorder_point_units") }}
+    left join {{ ref('dim_sku_location') }} sl
+      on  sl.source_system = pos.source_system
+     and sl.warehouse_natural_key = pos.warehouse_id
+     and sl.product_natural_key = pos.product_variant_id
+    where pos.quantity_on_hand - coalesce(b.quantity_reserved, 0) < coalesce(sl.reorder_point, 0)
 
 ),
 

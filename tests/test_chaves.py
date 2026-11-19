@@ -17,8 +17,9 @@ from sqlalchemy import create_engine, text
 from mvp_ed1.db import WAREHOUSE, database_url
 from mvp_ed1.models import data_types as dt
 
-#: O inventário medido no desenho (Bloco 6, "O que foi medido"): o oráculo das contagens.
-MODELOS, COLUNAS, FKS = 26, 513, 58
+#: O inventário medido no desenho (Bloco 6, "O que foi medido"): o oráculo das contagens. A
+#: `dim_sku_location` (ADR-0057, Q75) soma um modelo, 12 colunas e as FKs para o armazém e o produto.
+MODELOS, COLUNAS, FKS = 27, 525, 60
 
 
 def _manifest() -> dict:

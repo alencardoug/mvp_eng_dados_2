@@ -15,10 +15,10 @@ já colocado está fisicamente no armazém e não está à venda. Medir ruptura 
 saldo físico diria que há estoque quando não há nada que se possa vender, que é
 o erro que o conceito existe para evitar.
 
-**Ruptura e ponto de reposição são coisas diferentes.** O ponto de reposição é o
-aviso — o saldo caiu ao nível em que é hora de comprar; a ruptura é o dano — não
-há mais o que vender. Todo SKU em ruptura está abaixo do ponto de reposição; o
-contrário quase nunca é verdade, e é essa distância que dá tempo de reagir.
+**Ruptura e ponto de reposição são coisas diferentes.** O ponto é o aviso —
+hora de comprar; a ruptura é o dano — não há o que vender. Com o ponto pela
+demanda, o SKU que vende pouco pode romper no primeiro cruzamento, e o sem venda
+no ano tem ponto zero e fica fora da view mesmo zerado.
 
 {% enddocs %}
 

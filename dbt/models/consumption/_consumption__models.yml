@@ -999,7 +999,7 @@ models:
           sensitivity: internal
         data_type: bigint
       - name: reorder_point
-        description: "Não aditiva — ponto de reposição, em unidades: 25 para todo SKU (variável `reorder_point_units`)."
+        description: "Não aditiva — ponto de reposição do par, em unidades, derivado da demanda dele (`dim_sku_location`, ADR-0057); zero para o par sem venda na janela ou que só o caminho quente conhece."
         meta:
           sensitivity: internal
         data_type: integer

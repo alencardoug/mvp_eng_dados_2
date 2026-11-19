@@ -1489,6 +1489,118 @@ models:
           description_inherited: true
           sensitivity: internal
 
+  - name: dim_sku_location
+    meta:
+      domain: estoque
+    # O alerta do *streaming* lê o ponto de cada par no lançamento (ADR-0057, Q76): o `streamer` lê esta
+    # relação, e só ela, em `analytics`. A lista é a completa, como a da camada.
+    config:
+      grants:
+        select: [transformer, streamer]
+    description: >
+      **Grão: um par SKU × armazém por origem** — `(source_system, warehouse_natural_key,
+      product_natural_key)`, tipo 1, com o ponto de reposição derivado da demanda do par (ADR-0057). A
+      venda soma todas as versões do produto; a FK de produto é a da versão corrente. O valor é o do
+      último *build*: muda quando a fato muda.
+    columns:
+      - name: sku_location_key
+        data_type: text
+        constraints:
+          - type: primary_key
+        description: "Chave substituta do par: hash de `source_system`, do armazém e do SKU naturais (ADR-0017), estável quando o produto ganha versão nova."
+        meta:
+          sensitivity: internal
+        data_tests: [unique, not_null]
+      - name: source_system
+        data_type: text
+        description: "{{ doc(\"source_system\") }}"
+        meta:
+          description_inherited: true
+          sensitivity: internal
+          value_domain: source_system
+          values:
+            "legacy": "A origem antiga, o banco legado, tratado e empilhado aos dados principais."
+            "retail": "A origem transacional, o banco do marketplace. Airbyte e Beam transportam o mesmo `retail`."
+        data_tests:
+          - not_null:
+              config:
+                meta:
+                  value_domain: source_system
+          - accepted_values:
+              arguments:
+                values: ["legacy", "retail"]
+              config:
+                meta:
+                  value_domain: source_system
+      - name: warehouse_key
+        data_type: text
+        description: "Chave substituta do armazém: hash de `source_system` e `warehouse_id` (ADR-0017)."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_warehouse'), field: warehouse_key}
+      - name: product_key
+        data_type: text
+        description: "A versão **corrente** do SKU do par em `dim_product`; muda quando o produto ganha versão nova, e a chave do par não."
+        meta:
+          description_reason: "Aqui a chave aponta a versão corrente, e não a vigente no movimento, como na fato: o par é natural, e a FK é resolvida depois de agregar (Q75)."
+          sensitivity: internal
+        data_tests:
+          - not_null
+          - relationships: {to: ref('dim_product'), field: product_key}
+      - name: warehouse_natural_key
+        data_type: bigint
+        description: "Identificador do armazém na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: product_natural_key
+        data_type: bigint
+        description: "Identificador da variante do produto (o SKU) na origem, gerado pelo banco transacional."
+        meta:
+          description_inherited: true
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: demand_window_end_at
+        data_type: "{{ 'timestamp with time zone' if target.type != 'bigquery' else 'timestamp' }}"
+        description: "Fim da janela da demanda: o último movimento da fato no *build* (o lado frio, sem o caminho quente)."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: demand_window_days
+        data_type: integer
+        description: "Não aditiva — tamanho da janela da demanda, em dias (`reorder_demand_window_days`)."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: window_sold_units
+        data_type: integer
+        description: "Aditiva — unidades saídas por venda do par na janela da demanda, somadas através das versões do produto."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: lead_time_days
+        data_type: integer
+        description: "Não aditiva — prazo de reposição, em dias (`reorder_lead_time_days`): a mediana medida do pedido ao primeiro recebimento."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: safety_days
+        data_type: integer
+        description: "Não aditiva — margem de segurança, em dias (`reorder_safety_days`)."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+      - name: reorder_point
+        data_type: integer
+        description: "Não aditiva — ponto de reposição do par, em unidades: teto da venda da janela ÷ dias da janela × (prazo + margem). Zero para o par sem venda na janela (ADR-0057)."
+        meta:
+          sensitivity: internal
+        data_tests: [not_null]
+
   - name: dim_warehouse
     meta:
       domain: estoque
@@ -4718,3 +4830,60 @@ models:
         meta:
           description_inherited: true
           sensitivity: internal
+
+unit_tests:
+  - name: o_ponto_de_reposicao_segue_a_demanda_de_cada_par
+    description: >
+      ADR-0057, com janela de 365 dias, prazo de 28 e margem de 14 (42 dias). O último movimento da fato
+      é 01/09/2026. (retail, 1, 10) vendeu 9 na janela: teto(9 × 42 / 365) = 2. (retail, 1, 11) vendeu 1
+      na janela e 50 antes dela: ponto 1. (retail, 1, 12) só recebeu e transferiu, e transferência não é
+      venda: ponto 0. (retail, 1, 13) vendeu 4 na versão antiga e 5 na corrente: a venda soma as versões,
+      ponto 2, e a FK é a da versão corrente. (legacy, 1, 10) tem o mesmo id natural do varejo e é outro
+      par. (retail, 1, 14) não tem versão corrente e fica fora, como fica fora da P12.
+    model: dim_sku_location
+    overrides:
+      vars:
+        reorder_lead_time_days: 28
+        reorder_safety_days: 14
+        reorder_demand_window_days: 365
+    given:
+      - input: ref('fact_inventory_movement')
+        format: csv
+        rows: |
+          warehouse_key,product_key,source_system,is_sale,quantity_out,occurred_at
+          wr1,pr10,retail,true,4,2026-08-01 10:00:00+00
+          wr1,pr10,retail,true,5,2025-09-03 10:00:00+00
+          wr1,pr11,retail,true,1,2026-06-01 10:00:00+00
+          wr1,pr11,retail,true,50,2025-08-01 10:00:00+00
+          wr1,pr12,retail,false,0,2026-07-01 10:00:00+00
+          wr1,pr12,retail,false,3,2026-07-02 10:00:00+00
+          wr1,pr13a,retail,true,4,2026-01-10 10:00:00+00
+          wr1,pr13b,retail,true,5,2026-05-10 10:00:00+00
+          wl1,pl10,legacy,false,0,2026-09-01 00:00:00+00
+          wr1,pr14,retail,true,7,2026-08-15 10:00:00+00
+      - input: ref('dim_warehouse')
+        format: csv
+        rows: |
+          warehouse_key,source_system,warehouse_natural_key
+          wr1,retail,1
+          wl1,legacy,1
+      - input: ref('dim_product')
+        format: csv
+        rows: |
+          product_key,source_system,product_natural_key,is_current
+          pr10,retail,10,true
+          pr11,retail,11,true
+          pr12,retail,12,true
+          pr13a,retail,13,false
+          pr13b,retail,13,true
+          pl10,legacy,10,true
+          pr14,retail,14,false
+    expect:
+      format: csv
+      rows: |
+        source_system,warehouse_key,product_key,warehouse_natural_key,product_natural_key,window_sold_units,reorder_point
+        retail,wr1,pr10,1,10,9,2
+        retail,wr1,pr11,1,11,1,1
+        retail,wr1,pr12,1,12,0,0
+        retail,wr1,pr13b,1,13,9,2
+        legacy,wl1,pl10,1,10,0,0

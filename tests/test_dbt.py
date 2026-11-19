@@ -211,18 +211,20 @@ def test_o_destino_do_legado_nao_e_descartavel() -> None:
     assert _origem("legacy")["destino_descartavel"] is False
 
 
-def test_ponto_de_reposicao_do_dbt_bate_com_o_do_fluxo(projeto_dbt) -> None:
-    """O dono do valor é `streaming/fluxo.yml`; o dbt tem o espelho que ele lê.
+def test_o_ponto_de_reposicao_tem_um_dono_so(projeto_dbt) -> None:
+    """O ponto de reposição é do dbt; o `fluxo.yml` não guarda limiar próprio (ADR-0057).
 
-    Mesmo arranjo de `as_of_date`, pelo mesmo motivo: dois runtimes precisam do
-    número e só um pode ser o dono. Se divergirem, o pipeline alerta em um
-    limiar e a view P12 lista SKUs por outro — e as duas telas discordam sem que
-    nada falhe.
+    Até 18/11/2026 o dono era o `fluxo.yml`, com 25 unidades para todo par, e o dbt
+    tinha um espelho conferido por este arquivo. Com o ponto derivado da demanda de
+    cada par, o *streaming* lê o ponto do armazém no lançamento, e um limiar no
+    `fluxo.yml` seria um segundo dono, que voltaria a divergir em silêncio.
     """
     fluxo = _carregar(RAIZ / "streaming/fluxo.yml")
-    assert int(projeto_dbt["vars"]["reorder_point_units"]) == int(
-        fluxo["alerta"]["limiar_de_unidades"]
-    )
+    assert "limiar_de_unidades" not in fluxo["alerta"]
+    variaveis = projeto_dbt["vars"]
+    assert "reorder_point_units" not in variaveis
+    for nome in ("reorder_lead_time_days", "reorder_safety_days", "reorder_demand_window_days"):
+        assert isinstance(variaveis[nome], int) and variaveis[nome] > 0, nome
 
 
 def test_toda_pergunta_com_view_construida_existe_como_modelo() -> None:

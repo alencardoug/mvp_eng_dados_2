@@ -775,7 +775,7 @@ views:
       query: tests/auditoria/skus_below_reorder_point.sql
       reason: O saldo de agora é o do lote mais os deltas do caminho quente, e a demanda diária e a cobertura saem de janelas sobre o livro; nada disso é agregado de uma fonte.
     facts: [analytics.fact_inventory_movement]
-    dimensions: [analytics.dim_product, analytics.dim_warehouse]
+    dimensions: [analytics.dim_product, analytics.dim_sku_location, analytics.dim_warehouse]
     facts_note: "e os deltas que ela ainda não absorveu, pelo saldo de `trusted.inventory_balances`"
     columns:
       warehouse_name: grain

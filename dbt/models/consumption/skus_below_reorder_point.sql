@@ -129,7 +129,11 @@ select
     pos.stream_movement_count,
 
     -- ── Cobertura ───────────────────────────────────────────────────────────
-    cast({{ var("reorder_point_units") }} as integer)       as reorder_point,
+    -- O ponto do par, derivado da demanda dele (ADR-0057), e não mais 25 para
+    -- todo par. Vem do lado frio: anda a cada *build*, e o saldo, a cada evento.
+    -- Par que só o caminho quente conhece ainda não tem linha na dimensão, e o
+    -- ponto dele é zero: sem venda medida, não há o que repor.
+    coalesce(sl.reorder_point, 0)                           as reorder_point,
     -- **Ruptura**: saldo disponível zerado ou negativo — não há o que vender.
     (pos.quantity_on_hand - coalesce(b.quantity_reserved, 0)) <= 0 as is_stockout,
     round(pos.window_sold_units / cast({{ var("cover_window_days") }} as numeric), 3)
@@ -158,5 +162,9 @@ left join {{ ref('inventory_balances') }} b
   on  b.source_system = pos.source_system
  and b.warehouse_id = pos.warehouse_id
  and b.product_variant_id = pos.product_variant_id
-where pos.quantity_on_hand - coalesce(b.quantity_reserved, 0) < {{ var("reorder_point_units") }}
+left join {{ ref('dim_sku_location') }} sl
+  on  sl.source_system = pos.source_system
+ and sl.warehouse_natural_key = pos.warehouse_id
+ and sl.product_natural_key = pos.product_variant_id
+where pos.quantity_on_hand - coalesce(b.quantity_reserved, 0) < coalesce(sl.reorder_point, 0)
 order by days_of_cover nulls last, quantity_available

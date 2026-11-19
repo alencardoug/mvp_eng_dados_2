@@ -57,7 +57,10 @@ VIEWS = sorted(p.stem for p in (RAIZ / "dbt" / "models" / "consumption").glob("*
 def _variaveis() -> dict[str, int]:
     projeto = yaml.safe_load((RAIZ / "dbt" / "dbt_project.yml").read_text(encoding="utf-8"))
     return {
-        "ponto_de_reposicao": int(projeto["vars"]["reorder_point_units"]),
+        # O ponto de reposição da P12 (ADR-0057): a referência o calcula dos três parâmetros, sem ler o modelo.
+        "prazo_de_reposicao": int(projeto["vars"]["reorder_lead_time_days"]),
+        "margem_de_seguranca": int(projeto["vars"]["reorder_safety_days"]),
+        "janela_do_ponto": int(projeto["vars"]["reorder_demand_window_days"]),
         "janela_de_cobertura": int(projeto["vars"]["cover_window_days"]),
     }
 
