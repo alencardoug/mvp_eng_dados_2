@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Blocos 0 a 3 feitos (19/11/2026) e o Bloco 4 até as amostras; a revisão do fechamento sem bloqueante (§7); falta o *push*, a *tag* e os avisos; Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11) |
+| Estado | **Fechado** em 19/11/2026 com a *tag* `v2.3.0`, aceito por delegação do Owner. **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Blocos 0 a 3 feitos (19/11/2026) e o Bloco 4 até as amostras; a revisão do fechamento sem bloqueante (§7); Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11) |
 | Origem | O [F36](docs/achados_nl_sql.md#f36--o-ponto-de-reposição-fixo-deixa-de-distinguir-com-o-estoque-da-v5--gravidade-média), achado no ciclo da reabertura; a D94, decidida pelo Owner em 18/11/2026 ([ADR-0057](docs/adr/0057-ponto-de-reposicao-pela-demanda.md)); o pedido do Owner, na mesma conversa, de abrir a fase própria |
 | Base | `6e664c7`, sobre a `v2.2.0` (`f5a5173`) |
 | Consumidores durante a fase | O `gdados` recebeu o aviso da `v2.2.0` pela caixa de correio e segue contra ela. Os avisos da `v2.2.0` ao `bi-como-codigo` e ao `nl_sql` ficam **segurados** e saem no fim desta fase, um por consumidor, já com a *tag* nova (Owner, 18/11/2026). Nenhuma janela de leitura do armazém é aberta enquanto o ciclo do Bloco 3 durar |
@@ -518,5 +518,5 @@ documentais.
 | RVPRF-1-03 | O campo Estado ainda dizia que nada fora executado | ajuste | **Aceito.** Retirado |
 | RVPRF-1-04 | O mapa do README não citava as amostras, como o ADR-0058 pede | ajuste | **Aceito.** O arquivo e o esquema na linha do Pacote de Metadados |
 
-**Próximo:** o *push*, a *tag* (Q78: `v2.3.0`, pela recomendada, por delegação do Owner) e os avisos (item 6).
+**Q78, decidida por delegação do Owner (19/11/2026):** `v2.3.0`, a recomendada. O Owner autorizou nesta sessão o *push*, a *tag* e o aviso ao `gdados` pela caixa de correio; os avisos ao `bi-como-codigo` e ao `nl_sql` ficam em `data/medicoes/base_consumidores/avisos/` para ele levar (item 6).
 
