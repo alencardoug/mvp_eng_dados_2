@@ -67,6 +67,9 @@ EXCECOES: dict[tuple[str, str], dict[str, list[str]]] = {
                                         "update": ["transformer"]},
     # A procedência, que o BI lê pelo login de leitura na transação de captura (ADR-0054; Owner, 15/11/2026).
     ("governance", "warehouse_provenance"): {"select": ["analyst", "auditor", "transformer"]},
+    # O ponto de reposição de cada par, que o alerta do *streaming* lê no lançamento (ADR-0057, Q76): o
+    # `streamer` lê esta relação e nenhuma outra de `analytics`.
+    ("analytics", "dim_sku_location"): {"select": ["streamer", "transformer"]},
 }
 
 #: O que o `analyst` lê fora de `consumption`: só a view da procedência, nunca a tabela do log.
