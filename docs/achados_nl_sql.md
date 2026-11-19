@@ -561,7 +561,8 @@ de cada um está no [plano da reabertura](../PLANO_reabertura_da_base.md), que d
 - **Evidência:** a P12 (`skus_below_reorder_point`) compara o disponível com um ponto de reposição fixo, 25
   unidades (`reorder_point_units`, igual para todo par). A V5 dimensionou a compra e a abertura pela venda de
   60 dias, e a venda é esparsa (cerca de 0,4 unidade por par e trimestre; Plano da reabertura, Bloco 2). Depois
-  do ciclo, a mediana do disponível na P12 é 1 unidade, e **2.868 dos 3.046 pares (94%)** estão abaixo do ponto,
+  do ciclo, a mediana do disponível na P12 é 1 unidade, e **2.868 dos 3.047 pares (94%)** estão abaixo do ponto (até 18/11/2026 este texto dizia 3.046, que é a projeção de saldo,
+  sem o par legado (1, 12); a P12 a lê por *left join*, e o universo dela é o livro),
   410 sem estoque. Na `v2.1.0` eram 571 linhas, 80 sem estoque. O limiar do alerta de estoque baixo do
   *streaming* é o mesmo, 25 (`streaming/fluxo.yml`).
 - **Efeito:** a P12 responde "quase tudo" e deixa de separar o SKU que precisa de reposição do que não precisa.
