@@ -10,10 +10,10 @@
 
 | Campo | Informação |
 |---|---|
-| Versão | 2.26 |
+| Versão | 2.27 |
 | Situação | Vigente para a fase local |
 | Responsável | Líder de Governança |
-| Última revisão | 16/11/2026 — §6, a admissão de uma invocação de `analytics` de cada vez (ADR-0056); 15/11/2026 — §6, a procedência do armazém pelo log de execução (ADR-0054); §7, o `analyst` lê a view da procedência; 10/11/2026 — §5.2 alinhada às decisões D79 e D80 da Etapa 13; 05/11/2026 — §5.1: a coluna é achada pelo nome que o YAML lê, e todo conteúdo final é lido estrito antes de qualquer escrita; o domínio é escrito e conferido no `meta` efetivo; o limite do escritor em bloco (rodadas 11 e 12 do lote 3 da v1.1.0) |
+| Última revisão | 19/11/2026 — §7, o `streamer` lê o ponto de reposição em `analytics.dim_sku_location` (ADR-0057, Q76); §4, a concessão ao público anônimo mascara o pessoal (ADR-0058); 16/11/2026 — §6, a admissão de uma invocação de `analytics` de cada vez (ADR-0056); 15/11/2026 — §6, a procedência do armazém pelo log de execução (ADR-0054); §7, o `analyst` lê a view da procedência; 10/11/2026 — §5.2 alinhada às decisões D79 e D80 da Etapa 13; 05/11/2026 — §5.1: a coluna é achada pelo nome que o YAML lê, e todo conteúdo final é lido estrito antes de qualquer escrita; o domínio é escrito e conferido no `meta` efetivo; o limite do escritor em bloco (rodadas 11 e 12 do lote 3 da v1.1.0) |
 
 ---
 
@@ -77,6 +77,13 @@ valeria.
 
 É essa classificação que, na fase GCP, vira *policy tag* com o controle de acesso ligado — e a
 exposição passa a ser a concessão do IAM a cada grupo (§5.2).
+
+**A concessão ao público anônimo mascara o pessoal** ([ADR-0058](adr/0058-amostras-de-registros-para-o-publico.md)).
+As amostras de registros vão ao repositório público e ao site do portal: o leitor é qualquer pessoa, sem
+concessão nenhuma. Para esse público, todo valor `personal` sai como marcador, também dentro dos *payloads* do
+legado, porque o telefone e o endereço do gerador podem coincidir com os de uma pessoa real (§3). É uma decisão
+de concessão, e não uma reclassificação. O formato do arquivo está no
+[Pacote de Metadados §6](pacote_de_metadados.md#6-as-amostras-de-registros-arquivo-irmão).
 
 **A proibição de dados reais não é um nível.** Ela vive exclusivamente na
 [seção 3](#3-dados-não-permitidos) — repeti-la aqui criaria dois donos para a mesma regra (**P8**),

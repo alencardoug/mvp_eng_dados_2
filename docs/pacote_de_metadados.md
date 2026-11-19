@@ -26,6 +26,7 @@
 |---|---|---|
 | `docs/pacote_de_metadados.json` | O pacote. Gerado pelo `make catalog` e versionado; `tests/test_pacote_gerado.py` o confere no `check-offline` | 14/11/2026 |
 | `docs/pacote_de_metadados.schema.json` | O esquema do formato. O pacote se valida contra o esquema **do mesmo commit** | 14/11/2026 |
+| `docs/amostras_de_registros.json` e `.schema.json` | As amostras de registros, um arquivo irmão do pacote, com esquema próprio (§6) | Bloco 4 do [plano do ponto de reposição](../PLANO_ponto_de_reposicao.md) |
 | `docs/pacote_de_metadados.exemplo.json` | Um recorte ilustrativo, com valores copiados do *manifest* local de 13/11/2026 (`generated_at` 22:21:52Z, *invocation* `8eeff407…`). Não é regenerado e não substitui o pacote: os valores dele envelhecem com as correções dos Blocos 1 a 3. O `inputs_sha256` dele é um marcador (64 zeros) | 14/11/2026 |
 
 ---
@@ -163,3 +164,30 @@ Fica para campo novo, se um consumidor pedir:
 O formato está fixado aqui. Na geração ficam a lista exata de `provenance.inputs`, a lista final de
 `environments` e o desenho da procedência do armazém. Se algum deles pedir mudança de formato, ela
 entra por este documento e pelo esquema, com aviso aos consumidores.
+
+---
+
+## 6. As amostras de registros (arquivo irmão)
+
+Pedido pelo `gdados` (a D06 dele) e decidido pelo Owner na
+[D95](pendencias.md#d95--as-amostras-de-registros-para-o-portal-gdados-decidida-em-19112026)
+([ADR-0058](adr/0058-amostras-de-registros-para-o-publico.md) e as três retificações dele). Não é campo do pacote: o
+pacote é metadado e muda com a declaração; a amostra é dado e muda com o *build*.
+
+- **O que traz.** Até cinco linhas de cada relação do pacote da **mesma publicação**, com todas as colunas, na
+  ordem declarada; a contagem total da relação; a chave usada na ordem; as colunas mascaradas. O esquema é
+  [`amostras_de_registros.schema.json`](amostras_de_registros.schema.json), do mesmo *commit*.
+- **De qual *build*.** O cabeçalho traz `provenance` (só `verified` é exportado), `exported_at`, o ambiente e a
+  `as_of_date`. **A amostra retrata esse *build*, e não o armazém de cada momento**: é refeita a cada publicação e
+  pode divergir depois de outro *build* ou de uma restauração. Mostre a data e a procedência dela.
+- **A ordem.** A `primary_key`; senão o `grain` e a `identity` de `view_rules`; senão o teste de unicidade da
+  relação; senão todas as colunas, na ordem declarada. Nas relações do legado em que a linha carrega o próprio
+  defeito (a lista fechada do ADR-0058), as defeituosas vêm primeiro.
+- **A máscara.** Todo valor de coluna `personal` é o marcador `<personal>`; o nulo continua nulo. Nos *payloads*
+  JSON do legado a estrutura fica, e só as folhas `personal` da relação de origem viram marcador; origem ou forma
+  não resolvida vira marcador inteiro. O conteúdo que um defeito `TEXT_DELIMITER` desloca para uma coluna não
+  pessoal aparece como está, para mostrar o defeito (decisão do Owner, 19/11/2026).
+- **Como se gera e se confere.** `make amostras`, uma vez por publicação, do estado final; `make amostras-check`,
+  logo depois, refaz a exportação na mesma invocação e roda as provas da máscara (`tests/test_amostras.py`). O
+  `check-offline` valida o esquema, a cobertura e a máscara estrutural (`tests/test_amostras_publicadas.py`).
+

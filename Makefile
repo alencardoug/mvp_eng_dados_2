@@ -166,7 +166,7 @@ endef
 .PHONY: help env install up down reset ps logs psql-source psql-legacy psql-warehouse catalog-derivados \
         pgcli-source pgcli-legacy pgcli-warehouse \
         migrate migrate-down migrate-new migrate-status migrate-legacy migrate-legacy-down \
-        migrate-legacy-status migrate-legacy-new catalog seed-data seed-plan size-report test test-carga \
+        migrate-legacy-status migrate-legacy-new catalog amostras amostras-check seed-data seed-plan size-report test test-carga \
         tools airbyte-up airbyte-down airbyte-credentials airbyte-config airbyte-plan sync-airbyte \
         dbt-build dbt-drop-snapshots governance-abandonar airbyte-ativos dbt-test dbt-docs airflow-up airflow-down dag-run dag-status \
         stream-up stream-down stream-connector stream-status stream-run stream-produce \
@@ -881,6 +881,15 @@ dbt-docs: require-env require-venv docs-generate ## Gera e serve o catálogo com
 	@# usá-lo duas vezes na mesma linha fazia a segunda procurar `./.env` e `dbt/`
 	@# de dentro de `dbt/` — o catálogo saía, e o servidor não subia (B5, 25/09/2026).
 	@$(DBT) docs serve
+
+amostras: require-env require-venv ## Exporta docs/amostras_de_registros.json do armazém, com procedência verified (D95, ADR-0058)
+	@# Uma vez por publicação, do estado final, depois da restauração e da promoção; logo em seguida,
+	@# `make amostras-check`, na mesma invocação. A amostra é do *build* que cita (ADR-0058, retificações).
+	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.models.amostras
+
+amostras-check: require-env require-venv ## Confere as amostras contra o armazém, na invocação que o arquivo cita, e roda as provas da máscara
+	@set -a; . ./.env; set +a; .venv/bin/python -m mvp_ed1.models.amostras --conferir
+	@set -a; . ./.env; set +a; .venv/bin/pytest -q -rs tests/test_amostras.py
 
 test: require-venv ## Testes de código Python (pytest); CARGA=1 roda a carga em banco efêmero; FATO=1 inclui o teste que escreve na fato
 	@# Dois interruptores, de propósito. `CARGA=1` substitui a origem pela carga

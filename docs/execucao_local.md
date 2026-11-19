@@ -10,9 +10,9 @@
 | Campo | Informação |
 |---|---|
 | Interface | `Makefile` — a operação inteira acontece no terminal |
-| Versão | 1.19 |
+| Versão | 1.20 |
 | Situação | Operação da Etapa 12 (B0–B4) implementada; o ciclo da §3 está na ordem que o B5 executa e mede. Reconstrução com *streaming* conferida na D31 |
-| Última revisão | 16/11/2026 — a recusa da invocação sobreposta e a falha da instalação das chaves de `analytics` (ADR-0056); 04/11/2026 — os alvos da v1.1.0: medidas da geração, oráculo das origens e livro retido (ADR-0050) |
+| Última revisão | 19/11/2026 — o `stream-run` lê o ponto de reposição e o `CARGA_INICIAL=1` antes do primeiro *build* (ADR-0057, Q79); os alvos `amostras` e `amostras-check` (ADR-0058); 16/11/2026 — a recusa da invocação sobreposta e a falha da instalação das chaves de `analytics` (ADR-0056); 04/11/2026 — os alvos da v1.1.0: medidas da geração, oráculo das origens e livro retido (ADR-0050) |
 
 Este documento é, hoje, o **contrato** do que a execução local deve oferecer. Cada alvo é
 preenchido e conferido — executando-o — na etapa em que nasce, conforme o
@@ -235,6 +235,7 @@ origem e destinos; não contorne a falha enfraquecendo a imutabilidade ou editan
 | `make memory-oracle` | O oráculo da memória do legado, somente leitura, contra a época corrente do livro retido: capturas intactas e só com as transições do eng_dados, as certificadas medidas de novo, todo dado retido de uma tentativa do livro, a quarentena contida e as versões e exclusões iguais às da linha de base. `LIVRO_DE_CAPTURAS=` dá as certificadas que o diário espera; grava em `data/medicoes/v1_1_0/` e sai com 1 se algo falhar | v1.1.0 |
 | `make source-oracle MEDIDA=` | Lê `source_db` e `legacy_db` em sessão somente leitura contra uma medida: conteúdo por tabela, as colunas que o banco gera (`event_sequence` de 1 a n, `quantity_available`) e o legado com o diário de mutações do manifesto encadeado. `CALIBRACAO=1` exclui o que o produtor do *streaming* move — `inventory_balances` e o livro depois do `max_event_sequence` do pacote aprovado; `CALIBRACAO=geracao` corta o livro no fim da geração da medida, e exige que `data/source/geracao.json` seja o registro dela — para a origem que recebeu eventos do produtor depois da carga | v1.1.0 |
 | `make catalog` | Regenera dicionário, inventário de tabelas e diagrama ER dos modelos e da configuração, e a classificação de sensibilidade derivada nos `.yml` do dbt (precisa do `manifest` de um `make dbt-build` recente) | Etapa 3 · 11 |
+| `make amostras` / `amostras-check` | Exporta as amostras de registros do armazém, com procedência `verified`, e as confere na mesma invocação, com as provas da máscara ([Pacote de Metadados §6](pacote_de_metadados.md#6-as-amostras-de-registros-arquivo-irmão)). Uma vez por publicação, do estado final | Ponto de reposição |
 | `make dbt-drop-snapshots` | **Destrói** o histórico SCD; só depois de regerar a origem | Etapa 5 |
 | `make governance-abandonar INVOCACAO=…` | Marca **abandonada** uma execução aberta do log de execução, que bloqueia a procedência do armazém ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)). Ato do custodiante, depois de conferir que ela não escreve mais; nunca a dá por sucesso. A linha aberta e o motivo saem de `python -m mvp_ed1.governance procedencia` | L5 |
 | `make airbyte-ativos DESDE=…` | Lista os *jobs* do Airbyte local em curso, de qualquer conexão, e falha se houver algum — ou se a listagem, que traz os 100 mais recentes, não alcançar o instante `DESDE`. É a conferência antes de abandonar uma `airbyte_sync` aberta: o pedido que falhou sem prova de recusa deixa a linha sem `job_id` | L5 |

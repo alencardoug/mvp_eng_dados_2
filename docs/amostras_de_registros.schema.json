@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alencardoug/mvp_eng_dados_2/docs/amostras_de_registros.schema.json",
+  "title": "Amostras de registros do mvp_eng_dados_2, formato 1",
+  "description": "Até cinco linhas de cada relação do pacote de metadados da mesma publicação, com o campo personal mascarado (D95, ADR-0058 e as retificações dele). A amostra é do build que o cabeçalho cita. A especificação em prosa está em docs/pacote_de_metadados.md §6; vale o esquema do mesmo commit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "exported_at", "provenance", "environment", "as_of_date", "masking", "relations"],
+  "properties": {
+    "format": {"const": 1},
+    "exported_at": {"type": "string", "description": "Instante da exportação, com fuso."},
+    "provenance": {
+      "type": "object",
+      "description": "A linha de governance.warehouse_provenance no instante da exportação; só verified é exportado.",
+      "additionalProperties": false,
+      "required": ["status", "reason", "invocation_id", "built_from_commit", "built_at", "sequence"],
+      "properties": {
+        "status": {"const": "verified"},
+        "reason": {"type": ["string", "null"]},
+        "invocation_id": {"type": "string"},
+        "built_from_commit": {"type": "string"},
+        "built_at": {"type": "string"},
+        "sequence": {"type": "integer"}
+      }
+    },
+    "environment": {"type": "string"},
+    "as_of_date": {"type": ["string", "null"]},
+    "masking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["marker", "rule", "personal_columns"],
+      "properties": {
+        "marker": {"const": "<personal>"},
+        "rule": {"const": "ADR-0058"},
+        "personal_columns": {"type": "string"}
+      }
+    },
+    "relations": {
+      "type": "object",
+      "description": "Chave: schema.relação, o mesmo conjunto de relations do pacote da mesma publicação.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_count", "order", "columns", "masked_columns", "rows"],
+        "properties": {
+          "row_count": {"type": "integer", "minimum": 0},
+          "order": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["defect_first", "key"],
+            "properties": {
+              "defect_first": {"type": "boolean", "description": "Linhas com defeito registrado do legado antes (lista fechada do ADR-0058)."},
+              "key": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+            }
+          },
+          "columns": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+          "masked_columns": {"type": "array", "items": {"type": "string"}},
+          "rows": {"type": "array", "maxItems": 5, "items": {"type": "array"}}
+        }
+      }
+    }
+  }
+}
