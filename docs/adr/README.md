@@ -94,6 +94,7 @@ decisão.
 | [0055](0055-dominios-e-metricas-declarados-uma-vez.md) | Declarar uma vez os domínios de valores e as métricas, e derivar o resto | Aceita | Q3 e Q15 a Q18 do plano da base dos consumidores |
 | [0056](0056-chaves-declaradas-em-analytics.md) | Declarar as chaves de `analytics` com contrato, e manter as FKs fora da execução dos modelos | Aceita | Q4 e Q34 a Q38 do plano da base dos consumidores |
 | [0057](0057-ponto-de-reposicao-pela-demanda.md) | Derivar o ponto de reposição da demanda de cada par, com uma regra só para a P12 e o alerta | Aceita | D94 |
+| [0058](0058-amostras-de-registros-para-o-publico.md) | Publicar amostras de registros num arquivo próprio, com o campo pessoal mascarado para o público anônimo | Aceita | D95 |
 
 ---
 

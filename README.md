@@ -85,7 +85,7 @@ Cada assunto tem **um único dono documental**. Se a informação está em dois 
 | [Consumidores](docs/consumidores.md) | Quem lê este repositório (`nl_sql`, `gdados`, `bi-como-codigo`), como lê, como pede o banco, os canais e o que mudou para quem consome | Vigente — aberto em 14/11/2026; o marco a fixar é a `v2.1.0` (§6) |
 | [Pacote de Metadados](docs/pacote_de_metadados.md) | O contrato do pacote da D91 que os portais leem: formato, campos, regras, [esquema](docs/pacote_de_metadados.schema.json) e [exemplo](docs/pacote_de_metadados.exemplo.json) | Formato 1, gerado pelo `make catalog` desde 14/11/2026 |
 | [Pendências do Owner](docs/pendencias.md) | O que está parado esperando decisão sua, em ordem de urgência | Decisões: 1 pendente; verificações e trabalho: 6 adiadas, em 17/11/2026. Quais são, no cabeçalho das [Pendências](docs/pendencias.md) |
-| [Registro de Decisões](docs/adr/) | ADRs aceitos e decisões ainda pendentes | 57 aceitos, 1 pendente (D43, adiada) |
+| [Registro de Decisões](docs/adr/) | ADRs aceitos e decisões ainda pendentes | 58 aceitos, 1 pendente (D43, adiada) |
 | [Materialização no dbt](docs/materializacao.md) | Materializações, estratégias de incremental e o critério de robustez que escolhe entre elas | Vigente — base do [ADR-0016](docs/adr/0016-materializacao-por-camada.md) |
 | [Registro de Riscos](docs/riscos.md) | Riscos **R1**–**R14** e seus tratamentos | Vigente |
 | [Execução Local](docs/execucao_local.md) | Pré-requisitos e comandos de operação | Vigente |
@@ -128,7 +128,8 @@ também a remessa cujos itens foram rejeitados · **a procedência do armazém s
 coluna, no teste e no texto, com a métrica reproduzida só pela declaração · **as chaves de `analytics` são
 declaradas com contrato**: a PK no contrato, as FKs das `relationships` fora da execução dos modelos, e uma
 execução de `analytics` de cada vez · **o ponto de reposição é derivado da demanda de cada par**, por uma regra só,
-declarada no dbt e lida pela P12 e pelo alerta do *streaming*.
+declarada no dbt e lida pela P12 e pelo alerta do *streaming* · **as amostras de registros publicadas mascaram o
+campo pessoal** para o público anônimo, num arquivo próprio ao lado do pacote.
 
 Contexto, alternativas e consequências de cada uma em [`docs/adr/`](docs/adr/).
 

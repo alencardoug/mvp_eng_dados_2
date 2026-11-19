@@ -13,8 +13,8 @@
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
 | Verificações e trabalho adiados | 6 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026; V6, o Python que aborta no desligamento do pipeline do *streaming*, registrada em 17/11/2026; V7, a restauração que não registra o tratamento na época que abre, registrada em 17/11/2026) |
-| Decisões pendentes | 1 (D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D63 e a D64, levantadas em 04/10/2026, foram respondidas em 17/11/2026 e esperam a implementação na reabertura da base (§2). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2`, a D66 na fase da base dos consumidores, a D63, a D64 e a D93 na reabertura da base, e a D94 na abertura da fase do F36 (§2) |
-| Última revisão | 18/11/2026 — D94 levantada e decidida, na abertura da fase do F36 (ADR-0057); 17/11/2026 — a reabertura da base: D63 e D64 respondidas, V5 a V7 incluídas, D93 decidida (§2); 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Decisões pendentes | 1 (D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D63 e a D64, levantadas em 04/10/2026, foram respondidas em 17/11/2026 e esperam a implementação na reabertura da base (§2). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2`, a D66 na fase da base dos consumidores, a D63, a D64 e a D93 na reabertura da base, a D94 na abertura da fase do F36, e a D95 nela, a pedido do `gdados` (§2) |
+| Última revisão | 19/11/2026 — D95 levantada e decidida, a pedido do `gdados` (ADR-0058); 18/11/2026 — D94 levantada e decidida, na abertura da fase do F36 (ADR-0057); 17/11/2026 — a reabertura da base: D63 e D64 respondidas, V5 a V7 incluídas, D93 decidida (§2); 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -383,6 +383,18 @@ cada lote e estão no histórico em `28044c7^`, `20ea4f3^` e `4cf41ff^`.
 ---
 
 ## 2. Decisões já fechadas
+
+### D95 — as amostras de registros para o portal `gdados` (decidida em 19/11/2026)
+
+**Pergunta:** o `gdados` pediu, pela caixa de correio, em 18/11/2026 (a D06 dele), uma proposta de exportação das
+cinco primeiras linhas de cada relação, com todas as colunas, para o site público do portal. Em que forma, e com
+que tratamento do campo pessoal?
+
+**Decidida em 19/11/2026, pelo Owner, nas três alternativas recomendadas:** um arquivo próprio ao lado do pacote,
+`docs/amostras_de_registros.json`, com a procedência verificada; todo campo `personal` mascarado para o público
+anônimo, inclusive dentro dos *payloads* do legado, com o oráculo de que nenhum valor pessoal do armazém aparece
+no arquivo; e a exportação na fase do ponto de reposição, com a *tag* dela. Alternativas, medidas e custo aceito
+no [ADR-0058](adr/0058-amostras-de-registros-para-o-publico.md).
 
 ### D94 — o ponto de reposição passa a ser derivado da demanda de cada par (decidida em 18/11/2026)
 
