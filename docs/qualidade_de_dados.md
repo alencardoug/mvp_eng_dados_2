@@ -208,7 +208,7 @@ produz o dado — porque uma regra escrita em dois lugares só é útil enquanto
 | `support_categories` | As seis categorias de chamado, com nome e agrupamento | O `CHECK` de `support_tickets.category` no modelo transacional |
 | `brazilian_states` | As 27 UFs e a região de cada uma | — dado de referência externo, sem produtor no projeto |
 
-É o mesmo arranjo de `as_of_date` e do ponto de reposição, pelo mesmo motivo: dois lugares precisam
+É o mesmo arranjo de `as_of_date`, pelo mesmo motivo: dois lugares precisam
 do valor e só um pode ser o dono. A diferença é que aqui o segundo lugar é uma **regra**, não um
 número, e a divergência não apareceria como falha — apareceria como uma categoria sumindo do recorte
 sem que nada quebrasse.

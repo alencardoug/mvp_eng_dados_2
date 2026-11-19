@@ -12,9 +12,9 @@
 |---|---|
 | Escopo | Um único domínio: `inventory_movements` |
 | Decisões | [ADR-0006](adr/0006-streaming-de-estoque-com-cdc-e-beam.md) · [ADR-0019](adr/0019-saldo-em-deltas-com-entrega-idempotente.md) · [ADR-0020](adr/0020-debezium-sobre-kafka-connect.md) · [ADR-0031](adr/0031-aterrissagem-do-caminho-quente-em-raw.md) · [ADR-0032](adr/0032-fonte-python-no-lugar-do-kafkaio.md) |
-| Versão | 2.3 |
+| Versão | 2.4 |
 | Situação | **Em operação** desde a Etapa 7 — construído, medido e reconciliado; revalidado na regeneração da v1.1.0 (§7.3) |
-| Última revisão | 07/11/2026 — a captura da fase GCP pelo Debezium Server (ADR-0051) |
+| Última revisão | 19/11/2026 — §5, o limiar é o ponto de reposição de cada par, lido numa fotografia por execução, e o modo de carga (ADR-0057); 07/11/2026 — a captura da fase GCP pelo Debezium Server (ADR-0051) |
 
 ---
 
@@ -221,10 +221,26 @@ Três decisões de semântica que só aparecem construindo:
 - **Alerta nascido de painel atrasado é correção**, e vai marcado como tal: é uma janela já fechada
   sendo reaberta, não um fato novo. Quem consome o tópico precisa distinguir os dois casos.
 
-O limiar é parâmetro, e não coluna da origem: `inventory_balances` não tem ponto de reposição, e
-inventá-lo exigiria migração, regeração e um ADR que ninguém pediu. O valor vive em
-[`streaming/fluxo.yml`](../streaming/fluxo.yml), espelhado em `dbt_project.yml` para a view da P12 —
-com um teste do `pytest` conferindo que os dois concordam, pelo mesmo arranjo de `as_of_date`.
+**O limiar é o ponto de reposição de cada par**, derivado da demanda dele pelo dbt e publicado em
+`analytics.dim_sku_location` ([ADR-0057](adr/0057-ponto-de-reposicao-pela-demanda.md) e a retificação
+dele). O mesmo ponto vale para a view da P12, por construção. Até 18/11/2026 era 25 unidades para todo
+par, declarado no `fluxo.yml` e espelhado no dbt, e com o estoque dimensionado pela venda ele deixou de
+distinguir ([F36](achados_nl_sql.md#f36--o-ponto-de-reposição-fixo-deixa-de-distinguir-com-o-estoque-da-v5--gravidade-média)).
+
+- **Uma fotografia por execução.** O lançador lê o ponto de cada par do varejo uma vez, antes de o grafo
+  existir, guarda a leitura no diretório da execução (`ponto_de_reposicao.json`, com SHA-256) e a entrega
+  pelo construtor a todas as instâncias do acumulador (`streaming/ponto.py`). Ler no `setup` de cada
+  instância daria pontos diferentes a instâncias criadas antes e depois de um *build*. O ponto anda a cada
+  *build*, não a cada evento; o saldo anda a cada evento.
+- **O par fora da fotografia tem ponto zero**, mas a **relação ausente, ilegível ou vazia para o
+  lançamento**: um alerta avaliado contra ponto nenhum seria errado e calado.
+- **O modo de carga** (`CARGA_INICIAL=1`) é para o *snapshot* que roda antes do *build*: o passo 7 da
+  restauração e a primeira subida num ambiente novo, quando o modelo ainda não existe. Sem fotografia, um
+  painel ao vivo, inclusive misto, faz a execução falhar antes de qualquer travessia.
+- **A quantidade comparada é o saldo físico**, a soma dos deltas: o caminho quente não transporta
+  reservas. A P12 compara o disponível. O ponto é o mesmo; a população alertada e a da view não são.
+- A leitura usa a credencial de quem lança, como todo componente hoje (Governança §7). A concessão
+  `select` do `streamer` na relação declara a dependência.
 
 ### 5.1 Quando o ramo de alerta terminou
 

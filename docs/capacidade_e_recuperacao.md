@@ -12,9 +12,9 @@
 |---|---|
 | Critério de dimensionamento | **Cobertura**, não volume — [ADR-0014](adr/0014-volume-por-proporcoes-e-fator-de-escala.md) |
 | Abrangência | `source_db` + `legacy_db` + `warehouse_db` + ponto de recuperação |
-| Versão | 2.18 |
+| Versão | 2.19 |
 | Situação | Medições históricas até a Etapa 9 preservadas; o ciclo do zero medido no B5 (§2.12), a regeneração da v1.1.0 (§2.13) e a do Bloco 5R (§2.15); o ponto de recuperação **entregue em 25/09/2026**, substituído pelo da v1.1.0 em 04/11/2026 e pelo do Bloco 5R em 17/11/2026, cada um restaurado de ponta a ponta antes da promoção (§3) |
-| Última revisão | 16/11/2026 — §2.14, o custo real da Etapa 13, lido no faturamento; 07/11/2026 — §2.14, a estimativa da janela da Etapa 13 |
+| Última revisão | 19/11/2026 — §3.4, o passo 7 da restauração no modo de carga (ADR-0057, Q79); 16/11/2026 — §2.14, o custo real da Etapa 13, lido no faturamento; 07/11/2026 — §2.14, a estimativa da janela da Etapa 13 |
 
 ---
 
@@ -753,7 +753,8 @@ confunde com uma restauração.
 5. confere o conteúdo restaurado contra o manifesto — contagens, Alembic, versões, corte do livro,
    quarentena, SCD e capturas;
 6. devolve os artefatos de trabalho, e a ausência deles;
-7. refaz o *snapshot* do caminho quente;
+7. refaz o *snapshot* do caminho quente, no modo de carga (`CARGA_INICIAL=1`): o ponto de reposição ainda
+   não é o deste estado, e o *snapshot* não alerta ([ADR-0057](adr/0057-ponto-de-reposicao-pela-demanda.md));
 8. sobe o Airbyte e avança o contador de *jobs* para além da maior captura retida **antes** de
    qualquer disparo (D50); sincroniza a carga principal antes da legada, para que a guarda de
    identidade encontre o *job* novo na listagem; abre a época seguinte do livro retido da memória
