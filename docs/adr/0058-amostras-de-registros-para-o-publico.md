@@ -159,3 +159,10 @@ Ficam corrigidas aqui, sem alterar o texto anterior:
   Nas pontes `trusted.legado__*`, nos agregados por captura (presença, transições, removidos), nas relações que
   juntam as origens, nos *snapshots* e nas dimensões, **não há prioridade**: vale a chave. Os rejeitados nunca
   voltam para compor uma ponte. O empate se resolve pela chave declarada.
+
+## Terceira retificação de 19/11/2026
+
+A lista da prioridade do defeito, na segunda retificação, esqueceu `trusted.legacy_records`, que carrega os achados
+da própria linha (`value_findings`) e só tem o legado (RVPR-5-01 e RVPR-5-02 da rodada 5). Ela entra: a linha com
+`value_findings` não vazio vem primeiro. **A lista é fechada**: a prioridade vale só para as relações nomeadas ali e
+aqui, e toda outra relação segue a chave.

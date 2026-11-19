@@ -95414,7 +95414,7 @@
       "tests/test_verificador_adr.py",
       "tests/test_vigencia_em_utc.py"
     ],
-    "inputs_sha256": "82e2062dc0845a23a87feb689a0756d2994907648873d619a60efcc094b4001c",
+    "inputs_sha256": "941c7a2b9e481437c98078854aac34e483d115cebfc01e44107514db535912c3",
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {
