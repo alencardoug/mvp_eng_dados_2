@@ -306,7 +306,7 @@ estoque que nunca existiu.
 |---|---|
 | **Fato** | `fact_inventory_movement` — e os deltas que ela ainda não absorveu, pelo saldo de `trusted.inventory_balances` |
 | **Medidas** | `quantity_on_hand` (**semiaditiva**) · `quantity_reserved` (**semiaditiva**) · `quantity_available` (**semiaditiva**) · `quantity_from_batch` (**semiaditiva**) · `quantity_from_stream` (**semiaditiva**) · `stream_movement_count` (aditiva) · `reorder_point` (**não aditiva**) · `is_stockout` (**não aditiva**) · `daily_demand_units` (**não aditiva**) · `days_of_cover` (**não aditiva**) · `last_movement_at` (**não aditiva**) |
-| **Dimensões** | `dim_product` · `dim_warehouse` |
+| **Dimensões** | `dim_product` · `dim_sku_location` · `dim_warehouse` |
 | **View** | `skus_below_reorder_point` |
 
 **Conferida por referência** (gerado de `docs/glossario_de_negocio/metricas.yml`): `tests/test_auditoria_das_views.py::test_a_view_confere_com_a_referencia`, contra `tests/auditoria/skus_below_reorder_point.sql`. O saldo de agora é o do lote mais os deltas do caminho quente, e a demanda diária e a cobertura saem de janelas sobre o livro; nada disso é agregado de uma fonte.

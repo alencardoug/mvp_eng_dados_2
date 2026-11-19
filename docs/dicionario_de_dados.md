@@ -818,11 +818,11 @@ quando ao menos uma das suas origens é fonte; *só de seed* quando nenhuma é f
 |---|---:|---:|---:|---:|
 | `staging` | 1114 | 1026 | 0 | 88 |
 | `trusted` | 1075 | 972 | 21 | 82 |
-| `analytics` | 513 | 418 | 10 | 85 |
-| `consumption` | 188 | 117 | 9 | 62 |
+| `analytics` | 525 | 426 | 10 | 89 |
+| `consumption` | 188 | 118 | 9 | 61 |
 | `quarantine` | 27 | 16 | 0 | 11 |
 | `snapshots` | 109 | 86 | 0 | 23 |
-| **total** | **3026** | **2635** | **40** | **351** |
+| **total** | **3038** | **2644** | **40** | **354** |
 
 ### 3.3 Origem de cada coluna de `consumption`
 
@@ -1060,7 +1060,7 @@ de fora do repositório, com as folhas imediatas de cada coluna.
 | `quantity_from_batch` | `raw.inventory_movements.quantity_delta` · `raw.inventory_movements_stream.quantity_delta` · `raw_legacy.inventory_movements.quantity_delta` |
 | `quantity_from_stream` | `raw.inventory_movements.quantity_delta` · `raw.inventory_movements_stream.quantity_delta` · `raw_legacy.inventory_movements.quantity_delta` |
 | `stream_movement_count` | `consumption.skus_below_reorder_point.stream_movement_count` (gerada) |
-| `reorder_point` | `consumption.skus_below_reorder_point.reorder_point` (gerada) |
+| `reorder_point` | `raw.inventory_movements.{movement_type, occurred_at, quantity_delta}` · `raw.inventory_movements_stream.{movement_type, occurred_at, quantity_delta}` · `raw_legacy.inventory_movements.{movement_type, occurred_at, quantity_delta}` |
 | `is_stockout` | `raw.inventory_balances.quantity_reserved` · `raw.inventory_movements.quantity_delta` · `raw.inventory_movements_stream.quantity_delta` · `raw_legacy.inventory_balances.quantity_reserved` · `raw_legacy.inventory_movements.quantity_delta` |
 | `daily_demand_units` | `raw.inventory_movements.{movement_type, occurred_at, quantity_delta}` · `raw.inventory_movements_stream.{movement_type, occurred_at, quantity_delta}` · `raw_legacy.inventory_movements.{movement_type, occurred_at, quantity_delta}` |
 | `days_of_cover` | `raw.inventory_balances.quantity_reserved` · `raw.inventory_movements.{movement_type, occurred_at, quantity_delta}` · `raw.inventory_movements_stream.{movement_type, occurred_at, quantity_delta}` · `raw_legacy.inventory_balances.quantity_reserved` · `raw_legacy.inventory_movements.{movement_type, occurred_at, quantity_delta}` |
