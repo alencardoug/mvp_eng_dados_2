@@ -130,3 +130,32 @@ erradas ou incompletas, e o Owner decidiu, no mesmo dia, como tratar o legado de
 - **O nome.** Nas Consequências negativas, o nome está entre os valores que "não poderiam coincidir". Não é verdade:
   o gerador usa `faker: first_name` e `last_name`, sem marca de impossibilidade. Só o e-mail (`example.com`) e o
   documento (`-SIN`) têm essa garantia. A máscara já cobre o nome.
+
+## Segunda retificação de 19/11/2026
+
+A rodada 4 da revisão do plano (RVPR-4-01 a RVPR-4-04) mostrou que duas afirmações da retificação acima são falsas.
+Ficam corrigidas aqui, sem alterar o texto anterior:
+
+- **"A conferência [...] sobrevive ao `dbt-build` do `make check`"** é falso. O arquivo cobre todas as relações,
+  inclusive as de controle: cada *build* acrescenta uma linha a `governance.dbt_invocations` e muda a `sequence` da
+  procedência, e a restauração refaz capturas, a presença por captura e a auditoria da quarentena. Nenhuma regra de
+  "campos de execução" torna essa amostra invariante sem esconder dado. Por isso **a amostra é do *build* que ela
+  cita, e não do armazém de cada momento**, como os campos de execução do pacote:
+  - ela é exportada **uma vez por publicação**, do estado final, depois da restauração e da promoção, com a
+    procedência `verified`;
+  - `make amostras-check` compara o arquivo com uma exportação refeita em memória, **na mesma invocação** do
+    cabeçalho, sem nada ignorado; com outra invocação, ele recusa em vez de comparar;
+  - o `check-offline` valida o que não depende do armazém: o esquema, a cobertura igual ao conjunto de relações do
+    pacote e a máscara estrutural (toda célula de coluna `personal` é marcador ou nulo);
+  - a regra de ancestralidade sem mudança de código sai: com a amostra presa a uma invocação, ela não é necessária.
+- **"As linhas com defeito registrado [...] entram primeiro"** não dizia em quais relações, nem como achar o defeito.
+  A prioridade vale onde a linha carrega a própria evidência:
+  - `raw_legacy.*`: a linha da captura selecionada com achado na classificação do legado
+    (`trusted.legacy_classifications`), pela tabela e pelo `legacy_row_id`; as das capturas retidas vêm depois;
+  - `staging.stg_legacy__*`: a linha com `achados` não vazio ou com achado na classificação;
+  - `trusted.legacy_classifications` e `trusted.legacy_eligible_records`: a linha com achado próprio;
+  - `quarantine.rejected_legacy_records`: toda linha já é defeito, e vale a chave.
+
+  Nas pontes `trusted.legado__*`, nos agregados por captura (presença, transições, removidos), nas relações que
+  juntam as origens, nos *snapshots* e nas dimensões, **não há prioridade**: vale a chave. Os rejeitados nunca
+  voltam para compor uma ponte. O empate se resolve pela chave declarada.
