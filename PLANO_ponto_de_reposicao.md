@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 18/11/2026; rodadas 1 a 3 de revisão aplicadas (§7); Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
+| Estado | **Proposto** em 18/11/2026; rodadas 1 a 4 de revisão aplicadas (§7); Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
 | Origem | O [F36](docs/achados_nl_sql.md#f36--o-ponto-de-reposição-fixo-deixa-de-distinguir-com-o-estoque-da-v5--gravidade-média), achado no ciclo da reabertura; a D94, decidida pelo Owner em 18/11/2026 ([ADR-0057](docs/adr/0057-ponto-de-reposicao-pela-demanda.md)); o pedido do Owner, na mesma conversa, de abrir a fase própria |
 | Base | `6e664c7`, sobre a `v2.2.0` (`f5a5173`) |
 | Consumidores durante a fase | O `gdados` recebeu o aviso da `v2.2.0` pela caixa de correio e segue contra ela. Os avisos da `v2.2.0` ao `bi-como-codigo` e ao `nl_sql` ficam **segurados** e saem no fim desta fase, um por consumidor, já com a *tag* nova (Owner, 18/11/2026). Nenhuma janela de leitura do armazém é aberta enquanto o ciclo do Bloco 3 durar |
@@ -27,7 +27,7 @@ Consumidores e os Achados.
 | 8 | **Os documentos do ADR-0057**: glossário (cobertura, ruptura e perguntas de negócio), `metricas.yml`, o `.yml` de `consumption` e de `analytics`, Streaming, Qualidade de Dados e Governança §7; e, pelo modo de carga, Execução Local §3 (linha 10) e §3.2 (passo 4), e Capacidade §3.4, a restauração | Não | 1 e 4 |
 | 9 | **O ciclo** (Q77): a prova do *streaming* ao vivo com o limiar por par, o antes → depois das 16 views medido e a base publicada sem os eventos do exercício (D93) | Sim, descartado e refeito | 3 |
 | 10 | **A entrega:** Consumidores §5 e §6, os Achados, o pacote, a *tag* (Q78) e os avisos aos três consumidores | Não | 4 |
-| 11 | **As amostras de registros** (D95, [ADR-0058](docs/adr/0058-amostras-de-registros-para-o-publico.md) e a retificação dele): `make amostras`, o exportador de `docs/amostras_de_registros.json`, e o esquema JSON dele. **Recusa** procedência que não seja `verified`. **Cobre** o conjunto de relações do pacote da mesma publicação (283 previstas). **Ordena** pela chave declarada, com o *fallback* até todas as colunas; nas relações do legado, as linhas com defeito registrado (classificação do legado ou manifesto de injeção) vêm primeiro. **Mascara** as colunas `personal` e, nos *payloads*, as folhas `personal` da relação de origem (dependência declarada em `stg_legacy__*`; `source_table` em `trusted.legacy_*` e na quarentena; coleções linha a linha; `findings` pelo `column`); origem ou forma não resolvida vira marcador inteiro; o conteúdo deslocado pelo defeito aparece como está (Owner, 19/11/2026). `make amostras-check`, só leitura: refaz a exportação em memória e compara, sem os campos de execução, e exige que o *commit* do *build* registrado seja ancestral do atual sem mudança em `dbt/`, `src/` ou nas declarações desde então. **As provas:** por ocorrência, com o esperado calculado à parte do exportador; a varredura dos valores pessoais fortes, com os curtos fora e a exceção do deslocado listada do manifesto; contraprovas de vazamento deliberado, de coincidência curta legítima, de JSON escapado e do caso `support_agents` linha 2. Os documentos do ADR-0058 | Não | 1 e 4 |
+| 11 | **As amostras de registros** (D95, [ADR-0058](docs/adr/0058-amostras-de-registros-para-o-publico.md) e a retificação dele): `make amostras`, o exportador de `docs/amostras_de_registros.json`, e o esquema JSON dele. **Recusa** procedência que não seja `verified`. **Cobre** o conjunto de relações do pacote da mesma publicação (283 previstas). **Ordena** pela chave declarada, com o *fallback* até todas as colunas; nas relações em que a linha carrega a própria evidência de defeito (`raw_legacy.*`, `stg_legacy__*`, `legacy_classifications`, `legacy_eligible_records`), as defeituosas vêm primeiro, pelo predicado da segunda retificação do ADR-0058; nas pontes, agregados, *snapshots*, dimensões e relações que juntam as origens, só a chave. **Mascara** as colunas `personal` e, nos *payloads*, as folhas `personal` da relação de origem (dependência declarada em `stg_legacy__*`; `source_table` em `trusted.legacy_*` e na quarentena; coleções linha a linha; `findings` pelo `column`); origem ou forma não resolvida vira marcador inteiro; o conteúdo deslocado pelo defeito aparece como está (Owner, 19/11/2026). **A amostra é do *build* que ela cita** (RVPR-4-01): `make amostras-check`, só leitura, refaz a exportação em memória **na mesma invocação** do cabeçalho e compara tudo, sem campo ignorado; com outra invocação, recusa. O `check-offline` valida o esquema, a cobertura igual ao conjunto de relações do pacote e a máscara estrutural. **As provas:** por ocorrência, com o esperado calculado à parte do exportador; a varredura dos valores pessoais fortes, com os curtos fora e a exceção do deslocado listada do manifesto; contraprovas de vazamento deliberado, de coincidência curta legítima, de JSON escapado e do caso `support_agents` linha 2. Os documentos do ADR-0058 | Não | 1 e 4 |
 
 **Fica fora**, com o motivo:
 - **A posição de estoque com o pedido em aberto** (`quantity_outstanding`): o ADR-0057 a deixou de fora. A P12
@@ -158,17 +158,15 @@ leitura do ponto pelo lançador do Dataflow no BigQuery não é exercitada (L9).
    *commit* (RVPR-1-08).
 2. **Achados**: o F36 com o que foi feito.
 3. **O pacote** regenerado (`make catalog`), com o carimbo de execução em *commit* próprio.
-4. **As amostras** (item 11), em ordem (RVPR-3-03). O exportador e os testes dele, com *fixtures*, entram nos
-   *commits* da D′; a guarda que exige o arquivo **não**, porque o arquivo ainda não existe e não pode nascer de
-   um *build* com a árvore suja. Depois do `check` da linha D, com a árvore limpa e a procedência `verified`:
-   1. `make amostras`, e as provas da máscara sobre o arquivo;
-   2. um *commit* com o arquivo e a entrada de `make amostras-check` no `make check` e da validação offline do
-      esquema e da máscara no `check-offline`;
-   3. `make check` de novo: o `dbt-build` dele troca a invocação, e a conferência passa porque ignora os campos
-      de execução;
-   4. depois da restauração (G), `make amostras-check`; se o conteúdo mudar, nova exportação em *commit* próprio,
-      só com o arquivo, como o diff de execução do pacote (G7c da reabertura);
-   5. a `prevista` do arquivo em Consumidores §5 passa a `feita`.
+4. **As amostras** (item 11), em ordem (RVPR-3-03, RVPR-4-01, RVPR-4-02). O exportador, a conferência e os testes
+   deles, com *fixtures*, entram nos *commits* da D′. **O arquivo só nasce depois da G**, do estado final restaurado e
+   promovido, com a árvore limpa e a procedência `verified`, para nenhum `check` interno da restauração encontrá-lo:
+   1. `make amostras` e, na mesma invocação, `make amostras-check` e as provas da máscara;
+   2. um *commit* com o arquivo e a validação offline dele no `check-offline`; ele não toca `dbt/`, `src/` nem os
+      insumos do pacote, e por isso não pede *build* novo;
+   3. a `prevista` do arquivo em Consumidores §5 passa a `feita`.
+   Uma restauração futura não reprova por causa do arquivo: ele continua a amostra do *build* que cita, e a
+   publicação seguinte o refaz.
 5. **A revisão do fechamento** por outro agente; depois o *push* e a *tag* (Q78).
 6. **Os avisos**, em `data/medicoes/base_consumidores/avisos/`:
    - `bi-como-codigo` e `nl_sql`: um aviso só cada, da `v2.1.0` à *tag* nova. Ele cita os avisos de 18/11/2026,
@@ -376,3 +374,17 @@ bloqueantes nas amostras (item 11).
 | RVPR-3-04 | 282 é a medida de partida; a entrega terá 283 | ajuste | **Aceito.** A cobertura é o conjunto do pacote da mesma publicação, com igualdade exigida; retificação do ADR-0058 e a `prevista` de Consumidores ajustadas |
 | RVPR-3-05 | O ADR-0058 ainda atribuía máscara às *policy tags* | ajuste | **Aceito.** Corrigido na retificação; a resposta ao `gdados` remete a ela |
 | RVPR-3-06 | O nome não tem garantia de não coincidir | ajuste | **Aceito.** Corrigido na retificação; a máscara já o cobria |
+
+### Rodada 4 — codex2, sobre `98a0910` (19/11/2026)
+
+Parecer em `data/medicoes/ponto_de_reposicao/codex2_plano_r4.md` (fora do Git). A decisão do Owner sobre o legado
+está registrada fielmente, e a exposição medida se sustenta: o revisor percorreu os 108 achados e os 25 códigos do
+manifesto, e só o `support_agents` linha 2 leva dado pessoal para coluna não pessoal. O portão do Bloco 1 continua
+sem bloqueio fora do item 11.
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVPR-4-01 | A conferência por reexportação não sobrevive ao `check`: o *build* muda o log e a procedência, que estão na amostra | bloqueante | **Aceito.** A amostra passa a ser do *build* que cita: conferida integralmente na mesma invocação, logo depois da exportação; o `check-offline` valida esquema, cobertura e máscara estrutural. Segunda retificação do ADR-0058 |
+| RVPR-4-02 | O `check` interno da restauração encontraria a amostra desatualizada, e a ordem da primeira publicação era ambígua | bloqueante | **Aceito.** O arquivo só nasce depois da G, do estado final (Bloco 4, item 4), e não é conferido contra o armazém fora da invocação dele |
+| RVPR-4-03 | A prioridade do defeito não estava resolvida por família de relação | ajuste | **Aceito.** O predicado por família está na segunda retificação: prioridade só onde a linha carrega a própria evidência; nas pontes, agregados, *snapshots*, dimensões e mistas, só a chave |
+| RVPR-4-04 | A regra de ancestralidade não definia os caminhos | ajuste | **Aceito, por remoção.** Com a amostra presa a uma invocação, a regra deixa de ser necessária e sai |
