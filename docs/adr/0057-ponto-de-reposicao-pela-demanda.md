@@ -17,7 +17,7 @@ do Beam. O próprio `fluxo.yml` justificava o número único: a origem não tem 
 "exigiria um ADR que ninguém pediu".
 
 A V5 da reabertura passou a dimensionar a compra e a abertura do estoque pela venda, e a venda é esparsa. Depois do
-ciclo de 18/11/2026, **2.868 dos 3.046 pares (94%)** ficaram abaixo dos 25, e 410 em ruptura. A P12 passou a
+ciclo de 18/11/2026, **2.868 dos 3.047 pares (94%)** ficaram abaixo dos 25, e 410 em ruptura. A P12 passou a
 responder "quase tudo". O dado é coerente com a regra. Foi a regra que não acompanhou a V5 (**F36**).
 
 Medido no armazém em 18/11/2026, só leitura, sobre o estado da `v2.2.0`, para escolher a regra:
@@ -26,7 +26,10 @@ Medido no armazém em 18/11/2026, só leitura, sobre o estado da `v2.2.0`, para 
   recebimento (`analytics.fact_purchase_order_item`), tem mediana de **28 dias** nos 1.116 itens do varejo, com
   p10 de 6 e p90 de 53 dias. Por fornecedor, as medianas vão de 11 a 48 dias, em 30 fornecedores. O prometido
   (`expected_at − ordered_at`) tem mediana de 26 dias.
-- **Demanda.** Só 578 dos ~3.047 pares venderam nos 90 dias da janela de cobertura (`cover_window_days`). No ano,
+- **Os pares.** São 3.047 no livro (a fato). A projeção de saldo (`trusted.inventory_balances`) tem 3.046: falta o
+  par legado (1, 12), cuja abertura foi rejeitada (`NUM_OUT_OF_RANGE`). A P12 a lê por *left join*, então o
+  universo dela é 3.047. Hoje cada SKU tem uma versão só em `dim_product`.
+- **Demanda.** Só 578 dos 3.047 pares venderam nos 90 dias da janela de cobertura (`cover_window_days`). No ano,
   a venda mediana dos pares que venderam é de 3 unidades, com p90 de 5 e máximo de 11.
 - **Demanda censurada.** Par em ruptura não vende. Das 410 rupturas, 341 não tiveram venda nos 90 dias, e um
   ponto calculado nessa janela seria zero justamente para elas.
@@ -45,7 +48,7 @@ Medido no armazém em 18/11/2026, só leitura, sobre o estado da `v2.2.0`, para 
 | **Janela própria de 365 dias para a demanda do ponto** (a escolhida) | Atravessa a ruptura: o par que vendeu no ano e está zerado continua com ponto positivo | Uma variável a mais; o ponto reage devagar a uma mudança de demanda |
 | A janela da cobertura, 90 dias | Uma variável só | A ruptura longa some da P12 justamente quando mais precisa de reposição: ~158 pares, sem 341 rupturas |
 | 90 dias com piso de 1 unidade | Toda ruptura entra | Inclui 30 pares que nunca venderam; mistura "precisa repor" com "está zerado": ~499 pares |
-| **O *streaming* lê o ponto de cada par do armazém** (a escolhida) | Uma regra, um dono (o dbt); o alerta e a P12 usam o mesmo ponto por construção; usa o caminho que a semeadura do saldo já tem | O ponto fica fixo durante a execução do Beam; refazer a prova do *streaming* ao vivo |
+| **O *streaming* lê o ponto de cada par do armazém** (a escolhida) | Uma regra, um dono (o dbt); o alerta e a P12 usam o mesmo ponto por construção | O ponto fica fixo durante a execução do Beam; refazer a prova do *streaming* ao vivo |
 | O *streaming* mantém os 25 fixos | Nenhuma mudança no Beam | A P12 e o alerta passam a discordar sobre o que é estoque baixo: defeito novo, só que conhecido |
 | O Beam calcula a demanda sozinho | Independente do armazém | Duas implementações da mesma regra, que podem divergir (`CLAUDE.md` §5: o que se revisa é a declaração) |
 
@@ -68,8 +71,9 @@ margem de segurança = 14 dias  (metade do prazo)
   publicado por um modelo dbt no grão do par (origem, armazém, SKU). A P12 o lê em vez da constante, e mantém o
   saldo de agora, frio mais quente, como hoje. Quem não está no modelo, por exemplo um par visto só pelo fluxo,
   tem ponto zero.
-- **O alerta do *streaming*** lê o ponto de cada par do armazém ao subir o *pipeline*, pelo mesmo caminho da
-  semeadura do saldo, e o mantém fixo durante a execução. A travessia continua a mesma: abre ao cruzar o ponto
+- **O alerta do *streaming*** lê o ponto de cada par do armazém **no lançamento** do *pipeline*: uma fotografia só,
+  identificada e guardada com a execução, levada a todas as instâncias do ramo de alerta e fixa enquanto a execução
+  durar. Não é lida no `setup` de cada instância, porque instâncias criadas depois de um *build* leriam outro ponto. A travessia continua a mesma: abre ao cruzar o ponto
   para baixo e normaliza ao voltar.
 - **O dono muda.** Prazo, margem e janela passam a ser variáveis do dbt (`dbt_project.yml`), com a origem da
   medida no comentário. Saem a `reorder_point_units` e o `alerta.limiar_de_unidades`, e com eles o espelho e o
@@ -106,8 +110,9 @@ outro agente antes de executar.
     (**P5**).
 - **Paridade com o GCP:**
   - o modelo do ponto é um modelo dbt como os outros, materializado no BigQuery pelo mesmo projeto;
-  - o `nuvem.Semear` do Dataflow, que já lê o saldo do BigQuery, passa a ler também o ponto de cada par, como
-    entrada do *setup*. Nada disso é exercitado nesta fase: o GCP está desmontado (L9).
+  - o lançador do Dataflow lê a fotografia do ponto no BigQuery e a leva no grafo do *job*, como o local leva a
+    dele; a leitura no BigQuery vem da concessão do dbt (`grants_no_bigquery`). Nada disso é exercitado nesta
+    fase: o GCP está desmontado (L9).
 - **Documentos a atualizar** (com a implementação, na fase do F36):
   - o glossário de negócio: [cobertura de estoque](../glossario_de_negocio/cobertura_de_estoque.md),
     [ruptura de estoque](../glossario_de_negocio/ruptura_de_estoque.md) e
