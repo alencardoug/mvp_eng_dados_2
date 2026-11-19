@@ -188,7 +188,8 @@ def _rodar(eventos_por_watermark, diretorio, limiar=10, semente=None, pontos=Non
     with TestPipeline(options=pipeline.opcoes()) as p:
         novos = p | corrente
         pipeline.ramo_de_alerta(novos, fluxo, INICIO, semear=lambda _: [(w, v, s) for (w, v), s in (semente or {}).items()],
-                                publicar=beam.ParDo(_publicador(diretorio)), fotografia=fotografia)
+                                publicar=beam.ParDo(_publicador(diretorio)), fotografia=fotografia,
+                                registro=str(diretorio))
     return fluxo.processamento.janela_segundos
 
 
@@ -230,6 +231,51 @@ def test_o_limiar_e_o_ponto_de_cada_par(tmp_path):
            semente={(1, 1): 25, (2, 2): 25, (3, 3): 25})
     assert sorted((l["warehouse_id"], l["alerta"]) for l in _confirmacoes(tmp_path)) == [
         (1, True), (2, False), (3, False)]
+
+
+def test_a_confirmacao_e_a_fonte_por_painel_do_oraculo(tmp_path):
+    """Plano do F36, Bloco 2: a confirmação leva os movimentos do painel, o delta, o saldo antes e depois e
+    o ponto do painel ao vivo, e com eles o oráculo confere o painel contra o destino e recalcula cada
+    travessia sem ler o acumulador.
+
+    (1, 1) tem ponto 10 e semente 25: −20 abre (25 → 5), +3 fica abaixo (5 → 8), +4 normaliza (8 → 12).
+    (2, 2) só tem *snapshot*: o painel constrói o saldo, não é avaliado e não leva ponto.
+    """
+    eventos = [
+        (30, [_evento(1, 2, 2, 50, 5, snapshot=True)]),
+        (100, [_evento(2, 1, 1, -20, 61)]),
+        (160, [_evento(3, 1, 1, 3, 125)]),
+        (220, [_evento(4, 1, 1, 4, 185)]),
+    ]
+    _rodar(eventos, tmp_path, pontos={(1, 1): 10}, semente={(1, 1): 25})
+    linhas = _confirmacoes(tmp_path)
+
+    snapshot = [l for l in linhas if l["warehouse_id"] == 2]
+    assert [(l["movimentos"], l["ao_vivo"], l["limiar"], l["quantity_before"], l["quantity_on_hand"]) for l in snapshot] == [
+        ([1], 0, None, 0, 50)]
+
+    vivos = sorted((l for l in linhas if l["warehouse_id"] == 1), key=lambda l: l["janela_inicio"])
+    assert [(l["movimentos"], l["delta"], l["quantity_before"], l["quantity_on_hand"], l["limiar"]) for l in vivos] == [
+        ([2], -20, 25, 5, 10), ([3], 3, 5, 8, 10), ([4], 4, 8, 12, 10)]
+    for l in vivos:
+        assert l["quantity_on_hand"] == l["quantity_before"] + l["delta"]
+        cruza = (l["quantity_before"] >= l["limiar"] > l["quantity_on_hand"]
+                 or l["quantity_before"] < l["limiar"] <= l["quantity_on_hand"])
+        assert l["alerta"] is cruza
+    assert [l["alerta"] for l in vivos] == [True, False, True]
+
+    # A composição registrada na saída da janela, antes do saldo, é a mesma que a confirmação declara.
+    registrados = sorted((json.loads(l) for f in tmp_path.glob("paineis-*.jsonl") for l in f.read_text().splitlines()),
+                         key=lambda r: (r["warehouse_id"], r["janela_inicio"]))
+    campos = ("warehouse_id", "product_variant_id", "janela_inicio", "indice_do_painel", "movimentos", "delta",
+              "eventos", "ao_vivo")
+    confirmados = sorted(({k: l[k] for k in campos} for l in linhas), key=lambda r: (r["warehouse_id"], r["janela_inicio"]))
+    assert registrados == confirmados and len(registrados) == 4
+
+    # A ordem de entrada no acumulador, por par, antes do saldo: (1, 1) recebeu os três painéis em sequência.
+    entradas = [json.loads(l) for f in tmp_path.glob("entradas-*.jsonl") for l in f.read_text().splitlines()]
+    assert sorted((e["warehouse_id"], e["ordem"], e["movimentos"]) for e in entradas) == [
+        (1, 1, [2]), (1, 2, [3]), (1, 3, [4]), (2, 1, [1])]
 
 
 def test_na_carga_o_snapshot_passa_e_confirma(tmp_path):

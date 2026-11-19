@@ -95,8 +95,9 @@ class DeduplicarPorChave(beam.DoFn):
         visto.clear()
 
 
-def somar_deltas(valores: Iterable[tuple[int, int, int]]) -> tuple[int, int, int]:
-    """Soma o delta da janela, conta quantos eventos vieram ao vivo e quantos vieram ao todo.
+def somar_deltas(valores: Iterable[tuple[int, int, int, tuple]]) -> tuple[int, int, int, tuple]:
+    """Soma o delta da janela, conta quantos eventos vieram ao vivo e quantos vieram ao todo, e junta os
+    `movement_id` deles.
 
     O total é o que a confirmação do painel leva (D63, `drenagem.py`): a espera do medidor fecha um par
     quando a soma dos seus painéis iguala o que o *sink* gravou nesta execução.
@@ -105,13 +106,19 @@ def somar_deltas(valores: Iterable[tuple[int, int, int]]) -> tuple[int, int, int
     tanto sobre os valores originais quanto sobre resultados parciais, e um
     combinador cuja saída não serve de entrada quebra no primeiro agrupamento
     dividido — em silêncio, e só em volume.
+
+    Os `movement_id` são a composição do painel, para o oráculo do alerta (plano do F36, Bloco 2): com eles,
+    o delta, a contagem e a classificação de cada painel se conferem evento a evento contra o destino. A
+    janela de um par tem poucos eventos, e a lista ordenada mantém a saída determinística.
     """
     delta = ao_vivo = eventos = 0
-    for parcial_delta, parcial_ao_vivo, parcial_eventos in valores:
+    movimentos: list = []
+    for parcial_delta, parcial_ao_vivo, parcial_eventos, parcial_movimentos in valores:
         delta += parcial_delta
         ao_vivo += parcial_ao_vivo
         eventos += parcial_eventos
-    return delta, ao_vivo, eventos
+        movimentos.extend(parcial_movimentos)
+    return delta, ao_vivo, eventos, tuple(sorted(movimentos))
 
 
 class _AnotarJanela(beam.DoFn):
@@ -120,24 +127,48 @@ class _AnotarJanela(beam.DoFn):
     Depois do rejanelamento para o global, `WindowParam` e `PaneInfoParam`
     passam a descrever a janela nova. O que interessa — de qual janela de
     evento veio, e se o painel foi **atrasado** — precisa viajar no valor.
+
+    Com `registro` (o diretório da execução local), escreve também a composição de cada painel como a
+    janela o emitiu (`drenagem.composicao`), antes do saldo e do alerta: é a âncora com que o oráculo do
+    alerta confere a composição que a confirmação declara (plano do F36, Bloco 2). Na nuvem não há registro.
     """
+
+    def __init__(self, registro: str | None = None):
+        self._registro = registro
+        self._escritor = None
+
+    def setup(self):
+        if self._registro is not None:
+            from mvp_ed1.streaming.drenagem import Confirmador
+
+            self._escritor = Confirmador(self._registro, prefixo="paineis")
+
+    def teardown(self):
+        if self._escritor is not None:
+            self._escritor.fechar()
 
     def process(
         self,
-        elemento: tuple[tuple[int, int], tuple[int, int, int]],
+        elemento: tuple[tuple[int, int], tuple[int, int, int, tuple]],
         janela=beam.DoFn.WindowParam,
         painel=beam.DoFn.PaneInfoParam,
     ) -> Iterable[tuple[tuple[int, int], dict[str, Any]]]:
-        chave, (delta, ao_vivo, eventos) = elemento
-        yield chave, {
+        chave, (delta, ao_vivo, eventos, movimentos) = elemento
+        valor = {
             "delta": delta,
             "ao_vivo": ao_vivo,
             "eventos": eventos,
+            "movimentos": list(movimentos),
             "janela_inicio": janela.start.to_utc_datetime(),
             "janela_fim": janela.end.to_utc_datetime(),
             "atrasado": painel.timing == PaneInfoTiming.LATE,
             "indice_do_painel": painel.index,
         }
+        if self._escritor is not None:
+            from mvp_ed1.streaming.drenagem import composicao
+
+            self._escritor.escrever(composicao(valor, chave))
+        yield chave, valor
 
 
 class AcumularSaldoEAlertar(beam.DoFn):
@@ -163,9 +194,17 @@ class AcumularSaldoEAlertar(beam.DoFn):
     """
 
     SALDO = userstate.ReadModifyWriteStateSpec("saldo", VarIntCoder())
+    #: A ordem em que os painéis de cada par entram aqui, contada antes do saldo (plano do F36, Bloco 2).
+    ORDEM = userstate.ReadModifyWriteStateSpec("ordem", VarIntCoder())
 
-    def __init__(self, fotografia: ponto_de_reposicao.Fotografia, destino, inicio: dt.datetime, semear=None):
+    def __init__(self, fotografia: ponto_de_reposicao.Fotografia, destino, inicio: dt.datetime, semear=None,
+                 registro: str | None = None):
         self._fotografia = fotografia
+        #: Com o diretório da execução local, a entrada de cada painel é registrada (`entradas-*.jsonl`) com a
+        #: ordem dele no par, **antes** da aritmética do saldo e da decisão do alerta: é com ela que o oráculo
+        #: refaz o saldo de cada painel na ordem em que esta execução os processou (RVPB2-4-01).
+        self._registro = registro
+        self._entradas = None
         self._destino = destino
         #: O corte da semente: o instante em que o *pipeline* foi **construído**, não o do
         #: `setup` (D62). O `setup` roda quando o primeiro painel chega, e a gravação da
@@ -177,6 +216,10 @@ class AcumularSaldoEAlertar(beam.DoFn):
         self._semente: dict[tuple[int, int], int] = {}
         self.alertas = beam.metrics.Metrics.counter("streaming", "alertas_emitidos")
         self.correcoes = beam.metrics.Metrics.counter("streaming", "janelas_corrigidas")
+
+    def teardown(self):
+        if self._entradas is not None:
+            self._entradas.fechar()
 
     def setup(self):
         """Semeia o saldo a partir dos deltas já duráveis no destino.
@@ -197,6 +240,10 @@ class AcumularSaldoEAlertar(beam.DoFn):
         estado entre execuções, e o Dataflow persiste. Semear do destino faz o
         mesmo código dar o mesmo resultado nos dois, que é o ponto do **P4**.
         """
+        if self._registro is not None:
+            from mvp_ed1.streaming.drenagem import Confirmador
+
+            self._entradas = Confirmador(self._registro, prefixo="entradas")
         if self._semear is not None:
             linhas = self._semear(self._inicio)
             self._semente = {(w, v): int(s) for w, v, s in linhas}
@@ -227,8 +274,17 @@ class AcumularSaldoEAlertar(beam.DoFn):
         self,
         elemento: tuple[tuple[int, int], dict[str, Any]],
         saldo=beam.DoFn.StateParam(SALDO),
+        ordem=beam.DoFn.StateParam(ORDEM),
     ) -> Iterable[dict[str, Any]]:
         (armazem, sku), painel = elemento
+        # A ordem do painel no par, antes de qualquer conta: um pacote reexecutado volta com o estado de antes
+        # e regrava a mesma linha, idêntica; uma aplicação nova ganha o número seguinte.
+        posicao = (ordem.read() or 0) + 1
+        ordem.write(posicao)
+        if self._entradas is not None:
+            from mvp_ed1.streaming.drenagem import entrada
+
+            self._entradas.escrever(entrada(painel, (armazem, sku), posicao))
         gravado = saldo.read()
         anterior = self._semente.get((armazem, sku), 0) if gravado is None else gravado
         atual = anterior + painel["delta"]
@@ -249,6 +305,15 @@ class AcumularSaldoEAlertar(beam.DoFn):
             "indice_do_painel": painel["indice_do_painel"],
             "eventos": painel["eventos"],
             "atrasado": painel["atrasado"],
+            # A fonte por painel do oráculo do alerta (plano do F36, Bloco 2): os movimentos que compõem o
+            # painel, o delta, o saldo antes e depois e, no painel ao vivo, o ponto com que a travessia foi
+            # avaliada. Sem eles a confirmação diz só se houve alerta, e não deixa recalcular se devia haver.
+            "movimentos": painel["movimentos"],
+            "delta": painel["delta"],
+            "ao_vivo": painel["ao_vivo"],
+            "quantity_before": anterior,
+            "quantity_on_hand": atual,
+            "limiar": None,
             "alerta": None,
         }
         if not painel["ao_vivo"]:
@@ -258,6 +323,7 @@ class AcumularSaldoEAlertar(beam.DoFn):
         # O ponto do par. Na carga, `ponto()` levanta: o painel ao vivo, inclusive misto, reprova a execução
         # aqui, antes da travessia e antes de o painel seguir para a confirmação (Q79).
         limiar = self._fotografia.ponto(armazem, sku)
+        concluido["limiar"] = limiar
 
         # Travessia, não nível: alertar a cada evento enquanto abaixo do limiar
         # afogaria o tópico. O que interessa é a borda — e a volta também, para
@@ -290,7 +356,7 @@ class AcumularSaldoEAlertar(beam.DoFn):
 
 
 def ramo_de_alerta(novos: beam.PCollection, fluxo: Fluxo, inicio: dt.datetime, semear, publicar,
-                   fotografia: ponto_de_reposicao.Fotografia) -> beam.PCollection:
+                   fotografia: ponto_de_reposicao.Fotografia, registro: str | None = None) -> beam.PCollection:
     """O ramo 2: janela por tempo de evento, saldo, travessia e publicação (Streaming §3 e §5).
 
     Função, e não `PTransform` composto: os rótulos ficam no nível de cima do grafo, onde o
@@ -315,13 +381,13 @@ def ramo_de_alerta(novos: beam.PCollection, fluxo: Fluxo, inicio: dt.datetime, s
         | "ChavearPorArmazemESku" >> beam.Map(
             lambda e: (
                 (e["warehouse_id"], e["product_variant_id"]),
-                (e["quantity_delta"], 0 if e.get("_do_snapshot") else 1, 1),
+                (e["quantity_delta"], 0 if e.get("_do_snapshot") else 1, 1, (e["movement_id"],)),
             )
         )
         | "SomarDeltaDaJanela" >> beam.CombinePerKey(somar_deltas)
         # A mesma dica da deduplicação, pelo mesmo motivo: a chave do passo com estado logo abaixo.
         # Sem ela o Beam caía no codificador genérico e avisava (visto no `validar` do Dataflow, G2.3).
-        | "AnotarJanela" >> beam.ParDo(_AnotarJanela()).with_output_types(
+        | "AnotarJanela" >> beam.ParDo(_AnotarJanela(registro)).with_output_types(
             tuple[tuple[int, int], dict[str, Any]]
         )
         # Saldo é acumulado: estado por janela zeraria a cada minuto.
@@ -330,7 +396,7 @@ def ramo_de_alerta(novos: beam.PCollection, fluxo: Fluxo, inicio: dt.datetime, s
             trigger=trigger.Repeatedly(trigger.AfterCount(1)),
             accumulation_mode=trigger.AccumulationMode.DISCARDING,
         )
-        | "AcumularSaldo" >> beam.ParDo(AcumularSaldoEAlertar(fotografia, fluxo.destino, inicio, semear))
+        | "AcumularSaldo" >> beam.ParDo(AcumularSaldoEAlertar(fotografia, fluxo.destino, inicio, semear, registro))
         | "PublicarAlerta" >> publicar
     )
 
@@ -389,7 +455,8 @@ def construir(p: beam.Pipeline, fluxo: Fluxo, *, fotografia: ponto_de_reposicao.
     novos = unicos | "GravarDeltas" >> gravar
 
     # ── Ramo 2: saldo por tempo de evento e alerta (Streaming §3 e §5) ──────
-    alertas = ramo_de_alerta(novos, fluxo, inicio, semear, publicar, fotografia)
+    alertas = ramo_de_alerta(novos, fluxo, inicio, semear, publicar, fotografia,
+                             registro=str(execucao.diretorio) if execucao is not None else None)
 
     return {"eventos": eventos, "unicos": unicos, "novos": novos, "alertas": alertas}
 

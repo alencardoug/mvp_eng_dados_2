@@ -255,7 +255,14 @@ terminou. O que prova, desde então (`streaming/drenagem.py`):
   em que o *pipeline* foi construído — o mesmo corte da semente da D62;
 - **todo painel concluído é confirmado** pelo publicador, com a contagem dos seus eventos, também
   o painel sem alerta. Com alerta, a confirmação só sai depois de o transporte confirmar a entrega,
-  e a entrega que falha para o *pipeline*;
+  e a entrega que falha para o *pipeline*. Ela leva também os movimentos que compõem o painel, o
+  delta, o saldo antes e depois dele e, no painel ao vivo, o ponto de reposição com que foi avaliado:
+  com eles, cada painel se confere contra o destino e cada travessia pode ser recalculada fora do
+  acumulador. A composição de cada painel também é registrada na saída da janela, antes do saldo
+  (`paineis-*.jsonl`), e a entrada de cada painel no acumulador, com a ordem dele no par, antes da
+  conta (`entradas-*.jsonl`): a confirmação tem de bater com a primeira, e o saldo refeito na ordem
+  da segunda tem de dar o que ela declara ([ADR-0057](adr/0057-ponto-de-reposicao-pela-demanda.md)). A
+  espera não os lê;
 - **`make stream-drain` espera a cobertura do que esta execução gravou.** O ramo de alerta só recebe
   o que o destino deixou entrar agora: o que já estava lá entra na semente, sem painel. A expectativa
   é, por armazém × SKU e janela, a contagem das linhas com `_stream_extracted_at` a partir daquele

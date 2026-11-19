@@ -19,7 +19,9 @@ só na semente do saldo, sem painel. Então:
 * **a confirmação** é escrita pelo publicador, por painel, depois de o alerta do painel (se houver) ter
   a entrega confirmada pelo transporte. Painel sem alerta também confirma, porque zero alerta é resultado
   legítimo. Ela leva a contagem de eventos do painel, e um par fecha quando a soma dos seus painéis
-  (painéis atrasados incluídos, cada um contado uma vez pelo índice) iguala a esperada.
+  (painéis atrasados incluídos, cada um contado uma vez pelo índice) iguala a esperada. A confirmação
+  leva também os `movement_id` do painel, o delta, o saldo antes e depois dele e o ponto com que o painel ao vivo foi
+  avaliado: é a fonte por painel do oráculo do alerta (plano do F36, Bloco 2), que a drenagem não lê.
 
 Prazo esgotado é falha, nunca encerramento limpo. Um evento além do atraso tolerado é descartado pelo Beam
 sem painel, e o par dele não fecha: a espera falha pelo prazo, e o evento nunca sai da expectativa.
@@ -114,14 +116,60 @@ def confirmacao(painel: Mapping[str, Any], chave: tuple[int, int]) -> dict[str, 
         "eventos": painel["eventos"],
         "atrasado": painel["atrasado"],
         "alerta": painel.get("alerta") is not None,
+        # Para o oráculo do alerta, não para a drenagem: a espera só lê a contagem.
+        "movimentos": painel.get("movimentos"),
+        "delta": painel.get("delta"),
+        "ao_vivo": painel.get("ao_vivo"),
+        "quantity_before": painel.get("quantity_before"),
+        "quantity_on_hand": painel.get("quantity_on_hand"),
+        "limiar": painel.get("limiar"),
+    }
+
+
+def composicao(painel: Mapping[str, Any], chave: tuple[int, int]) -> dict[str, Any]:
+    """A composição do painel como a janela a emitiu, antes do saldo e do alerta (plano do F36, Bloco 2).
+
+    É o registro independente com que o oráculo do alerta confere a composição que a confirmação declara:
+    um painel fundido, dividido ou com movimento transferido depois da janela não bate com ele. A
+    drenagem não o lê.
+    """
+    return {
+        "warehouse_id": chave[0],
+        "product_variant_id": chave[1],
+        "janela_inicio": _utc(painel["janela_inicio"]).isoformat(),
+        "indice_do_painel": painel["indice_do_painel"],
+        "movimentos": list(painel["movimentos"]),
+        "delta": painel["delta"],
+        "eventos": painel["eventos"],
+        "ao_vivo": painel["ao_vivo"],
+    }
+
+
+def entrada(painel: Mapping[str, Any], chave: tuple[int, int], ordem: int) -> dict[str, Any]:
+    """A entrada do painel no acumulador, com a ordem dele no par, antes do saldo (plano do F36, Bloco 2).
+
+    Com ela, o oráculo do alerta refaz o saldo de cada painel desde a semente na ordem em que esta execução os
+    processou, e não numa ordem qualquer possível. A drenagem não a lê.
+    """
+    return {
+        "warehouse_id": chave[0],
+        "product_variant_id": chave[1],
+        "janela_inicio": _utc(painel["janela_inicio"]).isoformat(),
+        "indice_do_painel": painel["indice_do_painel"],
+        "ordem": ordem,
+        "movimentos": list(painel["movimentos"]),
     }
 
 
 class Confirmador:
-    """Um arquivo por instância do publicador: duas instâncias nunca escrevem no mesmo arquivo."""
+    """Um arquivo por instância do escritor: duas instâncias nunca escrevem no mesmo arquivo.
 
-    def __init__(self, diretorio: str | os.PathLike):
-        self._caminho = pathlib.Path(diretorio) / f"confirmacoes-{uuid.uuid4().hex}.jsonl"
+    `prefixo` separa as confirmações do publicador (`confirmacoes-*`, as da D63) dos registros que a espera não
+    lê: a composição na saída da janela (`paineis-*`) e a entrada no acumulador, com a ordem (`entradas-*`).
+    """
+
+    def __init__(self, diretorio: str | os.PathLike, prefixo: str = "confirmacoes"):
+        self._caminho = pathlib.Path(diretorio) / f"{prefixo}-{uuid.uuid4().hex}.jsonl"
         self._arquivo = None
 
     def escrever(self, linha: Mapping[str, Any]) -> None:
