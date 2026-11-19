@@ -45,7 +45,7 @@ Medido no armazém em 18/11/2026, só leitura, sobre o estado da `v2.2.0`, para 
 | **Janela própria de 365 dias para a demanda do ponto** (a escolhida) | Atravessa a ruptura: o par que vendeu no ano e está zerado continua com ponto positivo | Uma variável a mais; o ponto reage devagar a uma mudança de demanda |
 | A janela da cobertura, 90 dias | Uma variável só | A ruptura longa some da P12 justamente quando mais precisa de reposição: ~158 pares, sem 341 rupturas |
 | 90 dias com piso de 1 unidade | Toda ruptura entra | Inclui 30 pares que nunca venderam; mistura "precisa repor" com "está zerado": ~499 pares |
-| **O *streaming* lê o ponto de cada par do armazém** (a escolhida) | Uma regra, um dono (o dbt); o alerta e a P12 concordam por construção; usa o caminho que a semeadura do saldo já tem | O ponto fica fixo durante a execução do Beam; refazer a prova do *streaming* ao vivo |
+| **O *streaming* lê o ponto de cada par do armazém** (a escolhida) | Uma regra, um dono (o dbt); o alerta e a P12 usam o mesmo ponto por construção; usa o caminho que a semeadura do saldo já tem | O ponto fica fixo durante a execução do Beam; refazer a prova do *streaming* ao vivo |
 | O *streaming* mantém os 25 fixos | Nenhuma mudança no Beam | A P12 e o alerta passam a discordar sobre o que é estoque baixo: defeito novo, só que conhecido |
 | O Beam calcula a demanda sozinho | Independente do armazém | Duas implementações da mesma regra, que podem divergir (`CLAUDE.md` §5: o que se revisa é a declaração) |
 
@@ -86,7 +86,7 @@ outro agente antes de executar.
 - **Positivas:**
   - a P12 volta a separar: medido em leitura, **~213 pares (7%)** contra 2.868 (94%) com o ponto fixo. Todas as
     rupturas com venda no ano entram;
-  - a P12 e o alerta passam a ter, por construção, a mesma definição de estoque baixo;
+  - a P12 e o alerta passam a usar, por construção, o mesmo ponto de cada par;
   - o ponto passa a ser uma coluna com regra declarada no glossário, e não uma constante sem origem;
   - a regra acompanha o dado: se a demanda engrossar, o ponto sobe sozinho.
 - **Negativas:**
@@ -97,6 +97,9 @@ outro agente antes de executar.
   - o ponto atrasa uma execução do dbt: a venda que chega pelo caminho quente muda o saldo na hora, mas só muda o
     ponto quando a fato a absorver. Uma subida do Beam também o congela até a próxima;
   - um prazo único ignora a diferença entre fornecedores (de 11 a 48 dias de mediana);
+  - **o ponto é o mesmo, a quantidade comparada não.** A P12 compara o disponível (saldo menos reservas); o alerta
+    compara o saldo físico, a soma dos deltas, porque o caminho quente não transporta reservas. É assim desde que o
+    alerta existe, e não muda aqui: um par com reserva pode estar na P12 sem ter alertado;
   - muda uma regra de negócio publicada: os consumidores recebem o antes → depois da P12 e do alerta, e a prova do
     *streaming* ao vivo precisa ser refeita, com o custo de memória da troca de ambiente (R11);
   - os números acima são medida de leitura sobre a `v2.2.0`, e não o resultado da view: o ciclo da fase remede
