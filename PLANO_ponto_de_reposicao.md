@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Blocos 0 a 2 feitos (19/11/2026), o ciclo a começar; Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
+| Estado | **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Blocos 0 a 3 feitos (19/11/2026) e o Bloco 4 até as amostras; falta a revisão do fechamento, o *push*, a *tag* e os avisos; Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
 | Origem | O [F36](docs/achados_nl_sql.md#f36--o-ponto-de-reposição-fixo-deixa-de-distinguir-com-o-estoque-da-v5--gravidade-média), achado no ciclo da reabertura; a D94, decidida pelo Owner em 18/11/2026 ([ADR-0057](docs/adr/0057-ponto-de-reposicao-pela-demanda.md)); o pedido do Owner, na mesma conversa, de abrir a fase própria |
 | Base | `6e664c7`, sobre a `v2.2.0` (`f5a5173`) |
 | Consumidores durante a fase | O `gdados` recebeu o aviso da `v2.2.0` pela caixa de correio e segue contra ela. Os avisos da `v2.2.0` ao `bi-como-codigo` e ao `nl_sql` ficam **segurados** e saem no fim desta fase, um por consumidor, já com a *tag* nova (Owner, 18/11/2026). Nenhuma janela de leitura do armazém é aberta enquanto o ciclo do Bloco 3 durar |
@@ -184,6 +184,31 @@ partida; o `geracao.json` ganha carimbo novo, e isso não conta como diferença.
    (RVPR-1-02): roda no modo da Q79. Depois, a T3 na época nova, a promoção (confirmada pelo Owner), as
    retenções conferidas e o estado devolvido.
 
+**Feito em 19/11/2026, das 14:40 às 17:33 UTC,** pelo diário (`data/medicoes/diario_ponto_de_reposicao.md`, seção "A
+execução"; saídas em `data/medicoes/ponto_de_reposicao/ciclo/`, fora do Git). Os `FORCE` de descarte, o `RESET`, a
+restauração e a promoção, por delegação do Owner; o *preflight* de memória não recusou nenhuma vez. Os oráculos:
+- **A:** o corte de recuo reempacotado em `7e5065a` (`~/mvp_ed1-recovery-pre-f36`), as fontes iguais às do aprovado e
+  os acréscimos da memória explicados pela captura 85; as 16 views iguais às da `v2.2.0`; as guardas na fase (i) com
+  0, 0 e 0,46; a época 7 aberta;
+- **D′:** os sete *patches* e a sequência da F0 (o *build* `PASS=1109`, o `make test` com 1.864 passando, o pacote com
+  283 relações), e os sete *commits* por assunto, de `edf564a` a `9c553bc`. O modelo materializado igual ao do Bloco 1
+  (3.047 pares; a P12 com 213). Uma correção do declarativo: a descrição de `product_key` na `dim_sku_location` ficou
+  própria, com `description_reason`, porque a herdada perdia que a chave é a da versão corrente;
+- **E:** N = 2.200, K = 14.953; a fotografia lida do armazém real (2.930 pares, o SHA-256 igual ao da leitura só
+  leitura); a entrega viva, a drenagem da D63, a parcela quente da P12 (o ponto igual em toda chave comum; a mudança
+  só nos pares tocados), as 250 duplicatas barradas, e **o oráculo do alerta por painel passando: 306 travessias,
+  cada uma com exatamente um alerta no ponto do par** (291 de ponto 1, 5 de ponto 2, 10 de ponto 0); o *build*
+  incremental `PASS=1106`, com as três guardas excluídas e medidas à parte (2.200 = N; 811 = os `sale_dispatch` de N;
+  a V5 passando, 0,51); os dois caminhos iguais;
+- **B, C e D:** o descarte, as origens regeneradas iguais à medida de partida (40 + 40 `equal`), o *snapshot* no modo
+  da Q79 (nenhum painel ao vivo), o *build* publicado `PASS=1109` com as guardas na fase (iii), a T3 com 93 chaves e
+  sem remoção aceita, **o resíduo zero com a saída idêntica à da partida**, o `check`, a DAG real com as 16 tarefas
+  `success` e a procedência `verified` de `9c553bc` (o *commit* de execução `bcc2d5c`);
+- **H:** **o depois igual ao validado na D′ nas 16 views; contra o antes, só a P12 muda, de 2.868 para 213**, com os
+  grupos explicados (Consumidores §5);
+- **G:** a restauração com a V7, o passo 7 no modo de carga, a captura 94, a T3 na época 8, a procedência `verified`
+  de `bcc2d5c` (o *commit* de execução `59882cd`), a promoção e as nove retenções conferidas.
+
 #### O que a base publicada não prova
 
 Como na reabertura: a entrega de eventos vivos, as transições de alerta, a parcela quente da P12 e o avanço
@@ -208,6 +233,10 @@ leitura do ponto pelo lançador do Dataflow no BigQuery não é exercitada (L9).
    3. a `prevista` do arquivo em Consumidores §5 passa a `feita`.
    Uma restauração futura não reprova por causa do arquivo: ele continua a amostra do *build* que cita, e a
    publicação seguinte o refaz.
+
+   **Feito em 19/11/2026:** o arquivo exportado do estado restaurado e promovido (283 relações, invocação
+   `1cb3cd4e…`), conferido na mesma invocação, com as provas da máscara; o 06 e o pacote refeitos por `catalog`,
+   `test` (1.870 passando) e `catalog`, em `a0529e4`; a `prevista` passou a `feita`.
 5. **A revisão do fechamento** por outro agente; depois o *push* e a *tag* (Q78).
 6. **Os avisos**, em `data/medicoes/base_consumidores/avisos/`:
    - `bi-como-codigo` e `nl_sql`: um aviso só cada, da `v2.1.0` à *tag* nova. Ele cita os avisos de 18/11/2026,
@@ -471,5 +500,7 @@ linha, no fim da adaptação do diário.
 
 A quinta rodada não achou nada.
 
-**Próximo:** o Bloco 3, o ciclo, pela linha A do diário.
+**Feitos em 19/11/2026:** o Bloco 3 (o ciclo) e, do Bloco 4, os itens 1 a 4 (Consumidores §5 e §6, os Achados, o
+pacote e as amostras). **Próximo:** a revisão do fechamento (item 5), depois o *push*, a *tag* (Q78: `v2.3.0`, pela
+recomendada, por delegação do Owner) e os avisos (item 6).
 

@@ -17,7 +17,7 @@
 | Origem do clone | Dados, `esquema.json` e gabarito do BigQuery `mvp-ed1-gcp` (`analytics`, views `consumption`), em 11/11/2026; dbt de `analytics`, glossário de negócio e modelo de dados deste repositório no commit `cbc5271`, em 12/11/2026 |
 | Relação | O `nl_sql` é **dono da própria governança** e não recebe as mudanças daqui. Este documento é a via de volta: o que vale a pena trazer para cá |
 | Como manter | Cada melhoria ou falha nova no `nl_sql` ganha uma entrada aqui, no mesmo dia, com o commit do `nl_sql` que a contém |
-| Última atualização | 18/11/2026 (F36 decidido: D94, ADR-0057); 18/11/2026 (F36, do antes → depois do ciclo; o cabeçalho passa a dizer que os achados vêm também dos outros consumidores e deste projeto); 18/11/2026 (F35, achado deste projeto no Bloco 3 do [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (F31 a F34, dos consumidores na `v2.1.0`, com destino no [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
+| Última atualização | 19/11/2026 (F36 feito, com o antes → depois medido); 18/11/2026 (F36 decidido: D94, ADR-0057); 18/11/2026 (F36, do antes → depois do ciclo; o cabeçalho passa a dizer que os achados vêm também dos outros consumidores e deste projeto); 18/11/2026 (F35, achado deste projeto no Bloco 3 do [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (F31 a F34, dos consumidores na `v2.1.0`, com destino no [plano da reabertura](../PLANO_reabertura_da_base.md)); 17/11/2026 (o `nl_sql` registra o aviso da `v2.1.0`: a reimportação fica para decisão do Owner; o ciclo do Bloco 5R: F22 e F24 a F27 conferidos no armazém); 16/11/2026 (F30, da validade da reserva no legado; F29, da cobertura da autorização pendente; as correções do F22 e do F24 a F27 no ramo do Bloco 5R); 15/11/2026 (F28, da aditividade declarada; F27, da revisão do Bloco 5R; F24 a F26, os significados do Bloco 5 medidos contra o dado; F22 e F23, achados ao desenhar o Bloco 5); 14/11/2026 (`nl_sql@ce09526`; F17 a F20 da auditoria das views daqui) |
 
 ---
 
@@ -575,6 +575,13 @@ de cada um está no [plano da reabertura](../PLANO_reabertura_da_base.md), que d
   ponto pela venda de 365 dias, com prazo de 28 dias e margem de 14, e o *streaming* lendo o ponto do armazém. A
   implementação é a fase do F36. Medido em leitura: ~213 pares abaixo (7%), que, com este dado, são as rupturas
   com venda no ano.
+- **Feito (19/11/2026):** o [plano do ponto de reposição](../PLANO_ponto_de_reposicao.md), com o ciclo da
+  reabertura (Q77). O ponto mora em `analytics.dim_sku_location` (Q75), a P12 o lê, e o alerta do *streaming* usa o
+  do par, lido do armazém no lançamento. **Medido no ciclo:** a P12 publicada passa de **2.868 a 213** linhas, todas
+  em ruptura com venda no ano (Consumidores §5), e as outras 15 views não mudam; o ponto é 0 em 1.387 pares, 1 em
+  1.637 e 2 em 23. Ao vivo, sobre o estado descartado depois, 2.200 eventos deram 306 travessias, cada uma com um
+  alerta no ponto do par (291 de ponto 1, 5 de ponto 2, 10 de ponto 0). Continua o que o ADR-0057 aceitou: com
+  este dado, "abaixo do ponto" coincide com "em ruptura".
 
 ## 2. Melhorias de governança do `nl_sql` replicáveis aqui
 
