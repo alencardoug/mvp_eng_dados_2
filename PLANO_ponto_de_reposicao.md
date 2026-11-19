@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Blocos 0 a 3 feitos (19/11/2026) e o Bloco 4 até as amostras; falta a revisão do fechamento, o *push*, a *tag* e os avisos; Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
+| Estado | **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Blocos 0 a 3 feitos (19/11/2026) e o Bloco 4 até as amostras; a revisão do fechamento sem bloqueante (§7); falta o *push*, a *tag* e os avisos; Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11) |
 | Origem | O [F36](docs/achados_nl_sql.md#f36--o-ponto-de-reposição-fixo-deixa-de-distinguir-com-o-estoque-da-v5--gravidade-média), achado no ciclo da reabertura; a D94, decidida pelo Owner em 18/11/2026 ([ADR-0057](docs/adr/0057-ponto-de-reposicao-pela-demanda.md)); o pedido do Owner, na mesma conversa, de abrir a fase própria |
 | Base | `6e664c7`, sobre a `v2.2.0` (`f5a5173`) |
 | Consumidores durante a fase | O `gdados` recebeu o aviso da `v2.2.0` pela caixa de correio e segue contra ela. Os avisos da `v2.2.0` ao `bi-como-codigo` e ao `nl_sql` ficam **segurados** e saem no fim desta fase, um por consumidor, já com a *tag* nova (Owner, 18/11/2026). Nenhuma janela de leitura do armazém é aberta enquanto o ciclo do Bloco 3 durar |
@@ -167,7 +167,8 @@ partida; o `geracao.json` ganha carimbo novo, e isso não conta como diferença.
      cima, tem exatamente um alerta, e nenhum alerta existe sem travessia. Oscilação dentro de um painel não
      conta;
    - pelo menos uma abertura e uma normalização. Zero reprova a linha, porque nada teria sido exercitado. O
-     número é medido, não previsto: com pontos de 0 a 2, só pares de ponto 1 ou 2 podem abrir, e aumentar o
+     número é medido, não previsto: com pontos de 0 a 2, os pares de ponto 1 ou 2 abrem quando o saldo cai
+     abaixo do ponto, e os de ponto 0 só quando o saldo físico passa de 0 a negativo (RVPB2-1-04); aumentar o
      `LIMITE` não garante abertura. Se der zero, a linha para e a saída vai ao Owner.
 4. **B — o descarte**: `stream-down FORCE=1`, `stream-reset-sink FORCE=1`, `seed-data FORCE=1` e
    `seed-legacy FORCE=1`, cada um confirmado pelo Owner; o oráculo das fontes contra a medida de partida (40
@@ -501,6 +502,21 @@ linha, no fim da adaptação do diário.
 A quinta rodada não achou nada.
 
 **Feitos em 19/11/2026:** o Bloco 3 (o ciclo) e, do Bloco 4, os itens 1 a 4 (Consumidores §5 e §6, os Achados, o
-pacote e as amostras). **Próximo:** a revisão do fechamento (item 5), depois o *push*, a *tag* (Q78: `v2.3.0`, pela
-recomendada, por delegação do Owner) e os avisos (item 6).
+pacote e as amostras).
+
+### Fechamento — rodada 1 do Codex conta 1, sobre `7cc4a62` (19/11/2026)
+
+Parecer em `data/medicoes/ponto_de_reposicao/codex1_fechamento_r1.md` (fora do Git): **sem bloqueante para o *push* e a
+*tag***; os *commits* correspondem aos *patches* revisados com as correções que o diário declara, os números do
+fechamento conferem com as saídas do ciclo, e nenhum segredo nem valor pessoal fora da exceção decidida. Quatro ajustes
+documentais.
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVPRF-1-01 | Consumidores §5 dizia "acima do ponto do par" para os 2.458 que saem da P12; há pares com o disponível igual ao ponto | ajuste | **Aceito.** "Igual ou acima"; o filtro é estrito (`<`) |
+| RVPRF-1-02 | A linha E do Bloco 3 ainda dizia que só pares de ponto 1 ou 2 abrem | ajuste | **Aceito.** O ponto 0 abre quando o saldo físico passa de 0 a negativo |
+| RVPRF-1-03 | O campo Estado ainda dizia que nada fora executado | ajuste | **Aceito.** Retirado |
+| RVPRF-1-04 | O mapa do README não citava as amostras, como o ADR-0058 pede | ajuste | **Aceito.** O arquivo e o esquema na linha do Pacote de Metadados |
+
+**Próximo:** o *push*, a *tag* (Q78: `v2.3.0`, pela recomendada, por delegação do Owner) e os avisos (item 6).
 
