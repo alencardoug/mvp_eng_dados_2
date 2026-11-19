@@ -1,7 +1,7 @@
 """Carga do artefato declarativo do fluxo de streaming.
 
 Mesmo contrato do gerador: a declaração é lida e **conferida** antes de o
-pipeline subir. Janela maior que o atraso tolerado, limiar negativo, tópico sem
+pipeline subir. Janela maior que o atraso tolerado, ponto sem relação, tópico sem
 nome — tudo isso para aqui, e não trinta segundos depois com um pipeline que já
 consumiu offset e não pode voltar atrás.
 """
@@ -55,6 +55,19 @@ class Destino:
 
 
 @dataclass(frozen=True)
+class PontoDeReposicao:
+    """Onde o lançador lê o ponto de reposição de cada par (ADR-0057). A regra é do dbt."""
+
+    schema: str
+    tabela: str
+    origem: str
+
+    @property
+    def qualificado(self) -> str:
+        return f"{self.schema}.{self.tabela}"
+
+
+@dataclass(frozen=True)
 class Produtor:
     teto_de_eventos: int
     eventos_por_rajada: tuple[int, int]
@@ -80,7 +93,7 @@ class Nuvem:
 class Fluxo:
     transporte: Transporte
     processamento: Processamento
-    limiar_de_unidades: int
+    ponto_de_reposicao: PontoDeReposicao
     destino: Destino
     produtor: Produtor
     #: Ausente numa declaração sem a seção `nuvem` — a fase local não precisa dela.
@@ -113,7 +126,7 @@ def carregar(arquivo: Path = ARQUIVO) -> Fluxo:
     t, p, d, pr = bruto["transporte"], bruto["processamento"], bruto["destino"], bruto["produtor"]
 
     # O ambiente sobrepõe o endereço do transporte, e só ele: dentro de um
-    # contêiner o Redpanda não atende em `localhost`. Janela, atraso e limiar
+    # contêiner o Redpanda não atende em `localhost`. Janela, atraso e ponto
     # **não** são sobreponíveis por variável — são decisão declarada, e
     # decisão que se muda por variável de ambiente não se revisa.
     bootstrap = os.environ.get("REDPANDA_BOOTSTRAP", t["bootstrap"])
@@ -147,9 +160,14 @@ def carregar(arquivo: Path = ARQUIVO) -> Fluxo:
         if nuvem.fragmentos_de_escrita < 1:
             raise DeclaracaoInvalida("nuvem.fragmentos_de_escrita: precisa ser ao menos 1")
 
-    limiar = int(bruto["alerta"]["limiar_de_unidades"])
-    if limiar < 0:
-        raise DeclaracaoInvalida("alerta.limiar_de_unidades: não pode ser negativo")
+    a = bruto["alerta"]
+    if "limiar_de_unidades" in a:
+        # O dono do ponto é o dbt (ADR-0057). Um limiar aqui seria um segundo dono, ignorado em silêncio.
+        raise DeclaracaoInvalida("alerta.limiar_de_unidades: o ponto de reposição é do dbt (ADR-0057)")
+    pr_ = a.get("ponto_de_reposicao") or {}
+    if not all(pr_.get(c) for c in ("schema", "tabela", "origem")):
+        raise DeclaracaoInvalida("alerta.ponto_de_reposicao: precisa de schema, tabela e origem")
+    ponto = PontoDeReposicao(schema=pr_["schema"], tabela=pr_["tabela"], origem=pr_["origem"])
 
     return Fluxo(
         transporte=Transporte(
@@ -160,7 +178,7 @@ def carregar(arquivo: Path = ARQUIVO) -> Fluxo:
             espera_por_mensagem_segundos=float(t["espera_por_mensagem_segundos"]),
         ),
         processamento=processamento,
-        limiar_de_unidades=limiar,
+        ponto_de_reposicao=ponto,
         destino=Destino(
             schema=d["schema"], tabela=d["tabela"], lote_de_escrita=int(d["lote_de_escrita"]),
         ),

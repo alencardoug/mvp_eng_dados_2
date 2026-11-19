@@ -438,8 +438,8 @@ require-kubectl:
 preflight: ## Diz se cabe subir um subconjunto; ALVO=airbyte|airflow|streaming|trabalho
 	@docker/preflight.sh $(ALVO)
 
-medir: ## Mede um alvo: ALVO= [ATE=<alvo de espera>], ou CENARIO=streaming [LIMITE=n]
-	@$(MEDIR) $(if $(CENARIO),--cenario $(CENARIO) $(if $(LIMITE),--limite $(LIMITE)),$(ALVO) $(if $(ATE),--ate $(ATE)))
+medir: ## Mede um alvo: ALVO= [ATE=<alvo de espera>], ou CENARIO=streaming [LIMITE=n | CARGA_INICIAL=1]
+	@$(MEDIR) $(if $(CENARIO),--cenario $(CENARIO) $(if $(LIMITE),--limite $(LIMITE)) $(if $(filter 1,$(CARGA_INICIAL)),--carga-inicial),$(ALVO) $(if $(ATE),--ate $(ATE)))
 
 # ── Pausa e retomada ────────────────────────────────────────────────────────
 # Devolver memória à máquina sem desmontar nada. `airbyte-down` é
@@ -691,7 +691,7 @@ stream-connector: require-env ## Aplica as declarações de streaming/connectors
 stream-status: require-env ## Estado do conector Debezium e das tarefas
 	@$(STREAM) status
 
-stream-run: require-env ## Sobe o pipeline Beam (primeiro plano; Ctrl-C encerra); EXECUCAO= o diretório da execução
+stream-run: require-env ## Sobe o pipeline Beam (primeiro plano; Ctrl-C encerra); EXECUCAO= o diretório da execução; CARGA_INICIAL=1 sem o ponto de reposição (Q79)
 	@# Primeiro plano de propósito: job de streaming que sobe em segundo plano
 	@# e morre em silêncio é o pior modo de falha possível — o tópico enche, o
 	@# saldo congela e nada avisa.
@@ -699,7 +699,10 @@ stream-run: require-env ## Sobe o pipeline Beam (primeiro plano; Ctrl-C encerra)
 	@# inteiro, e o `make` sai pelo sinal mesmo quando o pipeline termina limpo. `trap :` e não
 	@# `trap ''`: o filho de um shell que **ignora** o SIGINT nasce ignorando, e o Python sem
 	@# `KeyboardInterrupt` só sairia pelo SIGKILL (RVE2-04).
-	@trap : INT; $(STREAM) pipeline $(if $(EXECUCAO),--execucao '$(EXECUCAO)'); s=$$?; \
+	@# `CARGA_INICIAL=1` (Q79): o snapshot antes do *build*, sem a fotografia do ponto de reposição; um painel ao
+	@# vivo reprova a execução. Só quem roda antes do *build* o pede: o passo 7 da restauração e a
+	@# publicação sem produtor. Sem ele, a relação do ponto ausente faz o lançamento falhar (ADR-0057).
+	@trap : INT; $(STREAM) pipeline $(if $(EXECUCAO),--execucao '$(EXECUCAO)') $(if $(filter 1,$(CARGA_INICIAL)),--carga-inicial); s=$$?; \
 		$(if $(EXECUCAO),mkdir -p '$(EXECUCAO)' && echo $$s > '$(EXECUCAO)/codigo_de_saida';) exit $$s
 
 stream-produce: require-env ## Emite eventos novos no livro da origem; LIMITE=, SEED=
@@ -800,7 +803,8 @@ recovery-restore: require-env require-venv ## A sequência de restauração, pas
 	@echo "── 6/9 devolvendo os artefatos de trabalho ──"
 	@$(RECOVERY) --dir "$(RECOVERY_DIR)" restore-artefatos
 	@echo "── 7/9 novo snapshot do caminho quente ──"
-	@$(MAKE) --no-print-directory medir CENARIO=streaming FORCE=
+	@# No modo de carga (Q79): o *build* vem no passo 8, e o ponto de reposição ainda não é o deste estado.
+	@$(MAKE) --no-print-directory medir CENARIO=streaming FORCE= CARGA_INICIAL=1
 	@echo "── 8/9 reconstruindo sem apagar o que acabou de voltar ──"
 	@$(MAKE) --no-print-directory airbyte-up FORCE=
 	@# D50: num Airbyte novo o contador de jobs recomeça em 1, abaixo das

@@ -84,11 +84,14 @@ def executar(terraform: dict[str, Any], pacote: str, *, validar: bool):
     import apache_beam as beam
 
     from mvp_ed1.streaming import config as cfg
-    from mvp_ed1.streaming.pipeline import construir, opcoes
+    from mvp_ed1.streaming.pipeline import construir, ler_fotografia, opcoes
 
     fluxo = cfg.carregar()
+    # A fotografia do ponto é lida aqui, no lançador, e viaja no grafo do *job* (ADR-0057): o *worker*
+    # reiniciado recebe a mesma, e um relançamento é outra execução, com outra fotografia.
+    fotografia = ler_fotografia(fluxo, nuvem=True)
     p = beam.Pipeline(options=opcoes(argumentos(terraform, pacote, validar=validar)))
-    construir(p, fluxo, nuvem=True)
+    construir(p, fluxo, fotografia=fotografia, nuvem=True)
     # Sem `with`: num *job* de *streaming* ele esperaria o fim, que não vem. O `run` volta assim que
     # o Dataflow aceita o *job*; quem o acompanha é a consola, e quem o encerra é o `gcp-dataflow-parar`.
     return p.run()

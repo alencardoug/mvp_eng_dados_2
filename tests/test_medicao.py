@@ -950,7 +950,7 @@ def test_o_comando_do_pipeline_sai_pelo_caminho_sem_finalizar_no_sigint(monkeypa
     monkeypatch.setattr(pipeline, "executar", interrompido)
     monkeypatch.setattr(cli, "_sair_sem_finalizar", lambda vivas: saidas.append(vivas))
 
-    cli.comando_pipeline(types.SimpleNamespace(execucao=None))
+    cli.comando_pipeline(types.SimpleNamespace(execucao=None, carga=False))
 
     assert len(saidas) == 1
 

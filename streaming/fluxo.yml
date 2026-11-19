@@ -63,13 +63,18 @@ processamento:
 
 # ── Ramificação de alerta (Streaming §5) ────────────────────────────────────
 alerta:
-  # Limiar de estoque baixo, em unidades, por par armazém/SKU.
+  # O limiar de estoque baixo é o ponto de reposição de cada par armazém/SKU,
+  # derivado da demanda dele pelo dbt (ADR-0057, D94). Este arquivo diz só
+  # **onde** lê-lo; a regra e os parâmetros são do `dbt_project.yml`. O lançador
+  # lê uma fotografia por execução e a guarda com ela (`streaming/ponto.py`).
   #
-  # É parâmetro e não coluna da origem de propósito: `inventory_balances` não
-  # tem ponto de reposição, e inventá-lo exigiria migração, regeração e um ADR
-  # que ninguém pediu. Ponto de reposição por SKU é assunto de um WMS, e entra
-  # se e quando houver um.
-  limiar_de_unidades: 25
+  # Até 18/11/2026 o limiar era 25 unidades para todo par, declarado aqui, com
+  # o dbt como espelho (F36).
+  ponto_de_reposicao:
+    schema: analytics
+    tabela: dim_sku_location
+    # O caminho quente só transporta o varejo (Origem Legada §6).
+    origem: retail
 
 # ── Destino (ADR-0019, ADR-0031) ────────────────────────────────────────────
 destino:
@@ -118,7 +123,7 @@ produtor:
 # ── Fase GCP (Etapa 13, G2.3; ADR-0051, D75, D78) ───────────────────────────
 # O mesmo fluxo, com o transporte e o destino da nuvem: o Debezium Server publica no
 # tópico do Pub/Sub de mesmo nome do Kafka local, e o Beam lê pela assinatura `beam`
-# (`terraform/armazenamento.tf`). Janela, atraso, limiar e destino são os de cima.
+# (`terraform/armazenamento.tf`). Janela, atraso, ponto de reposição e destino são os de cima.
 nuvem:
   assinatura_de_eventos: mvp.oltp.inventory_movements.beam
   topico_de_alertas: mvp.alerts.inventory_low_stock

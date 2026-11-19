@@ -171,14 +171,14 @@ def comando_alertas(args) -> int:
     aberturas = [a for a in alertas if a["motivo"] == "abertura"]
     correcoes = [a for a in alertas if a.get("correcao_de_evento_atrasado")]
     print(f"tópico {fluxo.transporte.topico_de_alertas}: {len(alertas)} alertas")
-    print(f"  aberturas (cruzaram o limiar de {fluxo.limiar_de_unidades} para baixo): {len(aberturas)}")
+    print(f"  aberturas (cruzaram o ponto de reposição do par para baixo): {len(aberturas)}")
     print(f"  normalizações (voltaram acima): {len(alertas) - len(aberturas)}")
     print(f"  correções de evento atrasado: {len(correcoes)}")
     for a in alertas[: args.mostrar]:
         marca = " [correção de atraso]" if a.get("correcao_de_evento_atrasado") else ""
         print(
             f"  {a['motivo']:13} armazém {a['warehouse_id']} SKU {a['product_variant_id']:4} "
-            f"saldo {a['quantity_before']} -> {a['quantity_on_hand']}{marca}"
+            f"saldo {a['quantity_before']} -> {a['quantity_on_hand']} (ponto {a.get('limiar')}){marca}"
         )
     return 0
 
@@ -207,7 +207,7 @@ def comando_pipeline(args) -> int:
 
     fluxo = cfg.carregar()
     try:
-        executar(fluxo, execucao_dir=args.execucao)
+        executar(fluxo, execucao_dir=args.execucao, carga=args.carga)
     except KeyboardInterrupt:
         print("\npipeline interrompido. O offset confirmado retoma de onde parou.")
         _sair_sem_finalizar(_threads_no_encerramento())
@@ -393,6 +393,9 @@ def main(argv: list[str] | None = None) -> int:
     pl = sub.add_parser("pipeline", help="sobe o pipeline Beam")
     pl.add_argument("--execucao", default=None,
                     help="diretório da execução (D63); sem ele, um novo em data/streaming/execucoes/")
+    pl.add_argument("--carga-inicial", dest="carga", action="store_true",
+                    help="sem a fotografia do ponto de reposição, para o snapshot antes do build (Q79); "
+                         "um painel ao vivo faz a execução falhar")
     pl.set_defaults(func=comando_pipeline)
 
     sub.add_parser(

@@ -48,7 +48,9 @@ def _mensagem(movement_id: str, ocorreu: dt.datetime, delta: int, *, op: str = "
     return json.dumps(corpo).encode(), {"occurred_at": corpo["occurred_at"]}
 
 
-#: O par armazém/SKU dos movimentos publicados e o limiar do `fluxo.yml` que eles cruzam.
+#: O par armazém/SKU dos movimentos publicados e o ponto de reposição que eles cruzam. A prova leva a
+#: própria fotografia (ADR-0057): ela exercita transporte, escrita, deduplicação e alerta, e não a
+#: derivação do ponto nem a leitura dele no BigQuery, que ficam não provadas (L9).
 PAR, LIMIAR = (1, 2), 25
 #: As aberturas que os quatro movimentos publicados podem dar, em qualquer ordem de painel.
 TRAVESSIAS = frozenset((antes, depois) for antes in range(LIMIAR, 31) for depois in (23, 24)
@@ -133,8 +135,11 @@ def main(argv: list[str] | None = None) -> int:
         nuvem.escrever_lote(bq, fluxo.destino, [decodificar(corpo)])
         time.sleep(1)  # o `_stream_extracted_at` da semente fica antes do instante do `setup`
 
+        from mvp_ed1.streaming import ponto as ponto_de_reposicao
+
+        fotografia = ponto_de_reposicao.de_linhas([(*PAR, LIMIAR)], "prova_quente", dt.datetime.now(dt.timezone.utc))
         p = beam.Pipeline(options=opcoes())
-        construir(p, fluxo, nuvem=True)
+        construir(p, fluxo, fotografia=fotografia, nuvem=True)
         resultado = p.run()
         time.sleep(20)  # o leitor do Pub/Sub precisa estar puxando antes da publicação
 

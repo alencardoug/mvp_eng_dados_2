@@ -89,7 +89,7 @@ Airbyte e *streaming* são automáticas (seção 5).
 | 7 | `make sync-airbyte` | Sincroniza a origem principal: `oltp` → `raw` | Etapa 5 |
 | 8 | `make sync-legacy` | Captura o legado em `raw_legacy` e a **certifica** em `governance.legacy_captures` (duas fases, [ADR-0044](adr/0044-certificar-cada-captura-do-legado-por-conteudo.md)); cada execução acrescenta uma captura e a registra no livro retido, que precisa de época corrente ([Origem Legada §4.3](origem_legada.md#43-o-livro-retido-da-memória-v110)) | Etapa 10 · v1.1.0 |
 | 9 | `make stream-up` | Sobe Redpanda e Kafka Connect e aplica o conector Debezium; pausa o Airbyte | Etapa 7 |
-| 10 | `make stream-run` | Sobe o *pipeline* Beam — **primeiro plano**, noutro terminal | Etapa 7 |
+| 10 | `make stream-run` | Sobe o *pipeline* Beam — **primeiro plano**, noutro terminal. Lê o ponto de reposição de `analytics.dim_sku_location` no lançamento e para sem ele; antes do primeiro `dbt-build`, `CARGA_INICIAL=1` sobe sem o ponto, e um evento ao vivo reprova a execução ([ADR-0057](adr/0057-ponto-de-reposicao-pela-demanda.md)) | Etapa 7 · ponto de reposição |
 | 11 | `make stream-wait ATE_SEQ=<corte>` e `make stream-drain ATE_SEQ=<corte>` | Espera o livro quente alcançar a origem; o corte é o que `make stream-corte` imprime. Depois, espera o ramo de alertas confirmar cada painel do que esta execução gravou (D63). Só então `Ctrl-C` no `stream-run` | Etapa 12 · reabertura |
 | 12 | `make airbyte-up` | Retoma o Airbyte; pausa o *streaming* | Etapa 5 · 12 |
 | 13 | `make dbt-build` | O primeiro *build* completo: modelos, testes de dados e reconciliações | Etapa 5 |
@@ -174,8 +174,11 @@ Airbyte conserva o erro. O decodificador também recusa `TRUNCATE`; não faça a
    ```bash
    make sync-airbyte RESET=1
    make stream-up
-   make stream-run
+   make stream-run CARGA_INICIAL=1
    ```
+
+   `CARGA_INICIAL=1` porque o ponto de reposição de `analytics.dim_sku_location` ainda é o do estado
+   anterior: o *snapshot* constrói o saldo sem avaliar alerta, e um evento ao vivo reprova a execução.
 
    A sincronização espera reset e carga terminarem. Acompanhe `stream-run` em terminal próprio e
    espere o novo snapshot alcançar a origem. Compare **chaves e todas as colunas de negócio**
@@ -713,7 +716,11 @@ Duas causas, e as duas são comportamento correto:
 2. **Nada cruzou o limiar.** O alerta é borda, não nível: só a travessia emite. Confira com
    `make stream-alerts`, que resume aberturas e normalizações, e produza mais eventos com
    `make stream-produce`. No B5, 200 eventos não cruzaram o limiar em saldo nenhum; 2.200
-   produziram 11 alertas.
+   produziram 11 alertas. Desde o ponto de reposição por par (ADR-0057), o limiar é o ponto de
+   cada par, e com a venda esparsa ele é 0, 1 ou 2. O de ponto 0 também abre, quando o saldo
+   físico passa de 0 a negativo; o produtor limita a saída pelo disponível, e isso restringe o
+   caso, sem mudar a regra. O ponto de cada par está na fotografia da execução,
+   `ponto_de_reposicao.json`.
 
 ### `make stream-down` sem `FORCE=1` deixa o slot de replicação para trás
 

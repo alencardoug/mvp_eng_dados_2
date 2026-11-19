@@ -318,7 +318,7 @@ são *roles* do PostgreSQL; na fase GCP, contas de serviço e grupos IAM por dat
 |---|---|---|---|
 | `ingestor` | `raw`, `raw_legacy`, `governance` | as próprias | Conta de serviço do Airbyte |
 | `transformer` | `staging`, `trusted`, `analytics`, `consumption`, `quarantine`, `snapshots` | camadas anteriores | Conta de serviço do dbt |
-| `streamer` | `raw.inventory_movements_stream` | a própria | Conta de serviço do Dataflow |
+| `streamer` | `raw.inventory_movements_stream` | a própria, e `analytics.dim_sku_location`, o ponto de reposição que o alerta usa ([ADR-0057](adr/0057-ponto-de-reposicao-pela-demanda.md)) | Conta de serviço do Dataflow |
 | `analyst` | — | `consumption`, e em `governance` só a *view* `warehouse_provenance`, que o BI lê na transação de captura ([ADR-0054](adr/0054-procedencia-do-armazem-no-log-de-execucao.md)) | Grupo IAM no dataset das views |
 | `auditor` | — | `quarantine`, `governance` | Grupo IAM de auditoria |
 

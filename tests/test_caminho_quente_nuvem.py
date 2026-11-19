@@ -121,8 +121,10 @@ def test_o_grafo_da_nuvem_monta_sem_rodar(monkeypatch):
     from mvp_ed1.streaming.pipeline import construir, opcoes
 
     monkeypatch.setenv("GCP_PROJECT_ID", "projeto-de-teste")
+    from mvp_ed1.streaming import ponto
+
     p = beam.Pipeline(options=opcoes())  # montado e nunca rodado: nada sai da máquina
-    colecoes = construir(p, carregar(), nuvem=True)
+    colecoes = construir(p, carregar(), fotografia=ponto.carga(), nuvem=True)
     assert set(colecoes) == {"eventos", "unicos", "novos", "alertas"}
     nomes = {t.full_label for t in p.transforms_stack[0].parts}
     assert {"LerDoTransporte", "GravarDeltas", "AcumularSaldo", "PublicarAlerta"} <= nomes

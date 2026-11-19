@@ -34,13 +34,14 @@ from apache_beam.transforms.timeutil import TimeDomain
 from apache_beam.utils.timestamp import Duration
 from apache_beam.utils.windowed_value import PaneInfoTiming
 
+from mvp_ed1.streaming import ponto as ponto_de_reposicao
 from mvp_ed1.streaming.config import Fluxo
 from mvp_ed1.streaming.sink import GravarEventos
 from mvp_ed1.streaming.transport import LerDoTransporte, PublicarAlerta
 
 LOG = logging.getLogger(__name__)
 
-#: Motivos de alerta. `abertura` é a travessia do limiar para baixo;
+#: Motivos de alerta. `abertura` é a travessia do ponto de reposição do par para baixo;
 #: `normalizacao` é a volta. As duas são emitidas: um alerta que nunca se
 #: fecha vira ruído, e quem consome o tópico precisa saber que passou.
 ABERTURA = "abertura"
@@ -140,7 +141,11 @@ class _AnotarJanela(beam.DoFn):
 
 
 class AcumularSaldoEAlertar(beam.DoFn):
-    """Saldo corrente por armazém/SKU e travessia do limiar.
+    """Saldo corrente por armazém/SKU e travessia do ponto de reposição do par.
+
+    **O limiar é o ponto de cada par**, da fotografia que o lançador leu (`streaming/ponto.py`,
+    ADR-0057): a mesma para todas as instâncias, fixa durante a execução. Numa execução de **carga**
+    não há fotografia, e um painel ao vivo faz a execução falhar antes de qualquer travessia (Q79).
 
     O estado é global por chave, não por janela: saldo é acumulado, e estado
     por janela zeraria a cada minuto. O rejanelamento para o global logo antes
@@ -159,8 +164,8 @@ class AcumularSaldoEAlertar(beam.DoFn):
 
     SALDO = userstate.ReadModifyWriteStateSpec("saldo", VarIntCoder())
 
-    def __init__(self, limiar: int, destino, inicio: dt.datetime, semear=None):
-        self._limiar = limiar
+    def __init__(self, fotografia: ponto_de_reposicao.Fotografia, destino, inicio: dt.datetime, semear=None):
+        self._fotografia = fotografia
         self._destino = destino
         #: O corte da semente: o instante em que o *pipeline* foi **construído**, não o do
         #: `setup` (D62). O `setup` roda quando o primeiro painel chega, e a gravação da
@@ -250,12 +255,16 @@ class AcumularSaldoEAlertar(beam.DoFn):
             yield concluido
             return
 
+        # O ponto do par. Na carga, `ponto()` levanta: o painel ao vivo, inclusive misto, reprova a execução
+        # aqui, antes da travessia e antes de o painel seguir para a confirmação (Q79).
+        limiar = self._fotografia.ponto(armazem, sku)
+
         # Travessia, não nível: alertar a cada evento enquanto abaixo do limiar
         # afogaria o tópico. O que interessa é a borda — e a volta também, para
         # que quem consome saiba que o alerta se fechou.
-        if anterior >= self._limiar > atual:
+        if anterior >= limiar > atual:
             motivo = ABERTURA
-        elif anterior < self._limiar <= atual:
+        elif anterior < limiar <= atual:
             motivo = NORMALIZACAO
         else:
             yield concluido
@@ -268,7 +277,7 @@ class AcumularSaldoEAlertar(beam.DoFn):
             "product_variant_id": sku,
             "quantity_on_hand": atual,
             "quantity_before": anterior,
-            "limiar": self._limiar,
+            "limiar": limiar,
             "delta_da_janela": painel["delta"],
             "janela_inicio": painel["janela_inicio"],
             "janela_fim": painel["janela_fim"],
@@ -280,7 +289,8 @@ class AcumularSaldoEAlertar(beam.DoFn):
         yield concluido
 
 
-def ramo_de_alerta(novos: beam.PCollection, fluxo: Fluxo, inicio: dt.datetime, semear, publicar) -> beam.PCollection:
+def ramo_de_alerta(novos: beam.PCollection, fluxo: Fluxo, inicio: dt.datetime, semear, publicar,
+                   fotografia: ponto_de_reposicao.Fotografia) -> beam.PCollection:
     """O ramo 2: janela por tempo de evento, saldo, travessia e publicação (Streaming §3 e §5).
 
     Função, e não `PTransform` composto: os rótulos ficam no nível de cima do grafo, onde o
@@ -320,12 +330,13 @@ def ramo_de_alerta(novos: beam.PCollection, fluxo: Fluxo, inicio: dt.datetime, s
             trigger=trigger.Repeatedly(trigger.AfterCount(1)),
             accumulation_mode=trigger.AccumulationMode.DISCARDING,
         )
-        | "AcumularSaldo" >> beam.ParDo(AcumularSaldoEAlertar(fluxo.limiar_de_unidades, fluxo.destino, inicio, semear))
+        | "AcumularSaldo" >> beam.ParDo(AcumularSaldoEAlertar(fotografia, fluxo.destino, inicio, semear))
         | "PublicarAlerta" >> publicar
     )
 
 
-def construir(p: beam.Pipeline, fluxo: Fluxo, *, nuvem: bool = False, execucao=None) -> dict[str, beam.PCollection]:
+def construir(p: beam.Pipeline, fluxo: Fluxo, *, fotografia: ponto_de_reposicao.Fotografia, nuvem: bool = False,
+              execucao=None) -> dict[str, beam.PCollection]:
     """Monta o grafo e devolve as coleções nomeadas, para teste e diagnóstico.
 
     `nuvem` troca três peças e só elas (Etapa 13, G2.3): a leitura vem do Pub/Sub,
@@ -378,7 +389,7 @@ def construir(p: beam.Pipeline, fluxo: Fluxo, *, nuvem: bool = False, execucao=N
     novos = unicos | "GravarDeltas" >> gravar
 
     # ── Ramo 2: saldo por tempo de evento e alerta (Streaming §3 e §5) ──────
-    alertas = ramo_de_alerta(novos, fluxo, inicio, semear, publicar)
+    alertas = ramo_de_alerta(novos, fluxo, inicio, semear, publicar, fotografia)
 
     return {"eventos": eventos, "unicos": unicos, "novos": novos, "alertas": alertas}
 
@@ -403,26 +414,43 @@ def opcoes(extras: list[str] | None = None) -> PipelineOptions:
     return op
 
 
+def ler_fotografia(fluxo: Fluxo, *, nuvem: bool = False, carga: bool = False) -> ponto_de_reposicao.Fotografia:
+    """A fotografia do ponto, lida pelo lançador (ADR-0057). `carga` dispensa a leitura (Q79)."""
+    if carga:
+        return ponto_de_reposicao.carga()
+    ponto = fluxo.ponto_de_reposicao
+    if nuvem:
+        from mvp_ed1.streaming import nuvem as gcp
+
+        return gcp.ler_fotografia(ponto)
+    return ponto_de_reposicao.ler_local(ponto.qualificado, ponto.origem)
+
+
 def executar(fluxo: Fluxo, extras: list[str] | None = None, *, nuvem: bool = False,
-             execucao_dir: str | None = None) -> None:
+             execucao_dir: str | None = None, carga: bool = False) -> None:
     """Sobe o pipeline e o mantém consumindo até ser interrompido.
 
     Localmente, registra a execução (`drenagem.Execucao`): o diretório onde o publicador confirma os
-    painéis e o corte com que a espera do medidor separa o que esta execução gravou (D63).
+    painéis e o corte com que a espera do medidor separa o que esta execução gravou (D63). É lá também
+    que fica a fotografia do ponto de reposição, lida antes de o grafo existir.
     """
+    fotografia = ler_fotografia(fluxo, nuvem=nuvem, carga=carga)
     execucao = None
     if not nuvem:
         from mvp_ed1.streaming import drenagem
 
         execucao = drenagem.Execucao.abrir(fluxo.processamento.janela_segundos, execucao_dir)
+        fotografia.guardar(execucao.diretorio)
         LOG.info("execução registrada em %s (corte %s)", execucao.diretorio, execucao.inicio.isoformat())
     LOG.info(
-        "pipeline: janela=%ss atraso_tolerado=%ss folga=%ss limiar=%s destino=%s",
+        "pipeline: janela=%ss atraso_tolerado=%ss folga=%ss ponto=%s (%s pares, sha256 %s) destino=%s",
         fluxo.processamento.janela_segundos,
         fluxo.processamento.atraso_tolerado_segundos,
         fluxo.processamento.folga_do_watermark_segundos,
-        fluxo.limiar_de_unidades,
+        fotografia.modo,
+        len(fotografia.pontos),
+        fotografia.sha256[:12] if not fotografia.carga else "-",
         fluxo.destino.qualificado,
     )
     with beam.Pipeline(options=opcoes(extras)) as p:
-        construir(p, fluxo, nuvem=nuvem, execucao=execucao)
+        construir(p, fluxo, fotografia=fotografia, nuvem=nuvem, execucao=execucao)

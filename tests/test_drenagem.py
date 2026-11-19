@@ -164,13 +164,20 @@ def _evento(seq, armazem, sku, delta, segundos, snapshot=False):
             "occurred_at": instante, "_do_snapshot": snapshot}
 
 
-def _rodar(eventos_por_watermark, diretorio, limiar=10, semente=None):
-    """O ramo 2 inteiro — janela, gatilho, saldo, alerta, publicação — sobre um `TestStream`."""
-    from mvp_ed1.streaming import config
+def _rodar(eventos_por_watermark, diretorio, limiar=10, semente=None, pontos=None, fotografia=None):
+    """O ramo 2 inteiro — janela, gatilho, saldo, alerta, publicação — sobre um `TestStream`.
 
-    import dataclasses
+    O ponto de reposição vem de uma fotografia (ADR-0057). Sem `pontos`, todo par dos eventos tem o
+    mesmo `limiar`; com `pontos`, só os pares dados têm ponto, e os outros têm zero.
+    """
+    from mvp_ed1.streaming import config, ponto
 
-    fluxo = dataclasses.replace(config.carregar(), limiar_de_unidades=limiar)
+    fluxo = config.carregar()
+    if fotografia is None:
+        if pontos is None:
+            pontos = {(e["warehouse_id"], e["product_variant_id"]): limiar
+                      for _, eventos in eventos_por_watermark for e in eventos}
+        fotografia = ponto.de_linhas([(w, v, p) for (w, v), p in pontos.items()], "teste", INICIO)
     corrente = TestStream()
     for watermark, eventos in eventos_por_watermark:
         if eventos:
@@ -180,8 +187,8 @@ def _rodar(eventos_por_watermark, diretorio, limiar=10, semente=None):
     corrente = corrente.advance_watermark_to_infinity()
     with TestPipeline(options=pipeline.opcoes()) as p:
         novos = p | corrente
-        pipeline.ramo_de_alerta(novos, fluxo, INICIO, semear=lambda _: list((semente or {}).items()),
-                                publicar=beam.ParDo(_publicador(diretorio)))
+        pipeline.ramo_de_alerta(novos, fluxo, INICIO, semear=lambda _: [(w, v, s) for (w, v), s in (semente or {}).items()],
+                                publicar=beam.ParDo(_publicador(diretorio)), fotografia=fotografia)
     return fluxo.processamento.janela_segundos
 
 
@@ -205,6 +212,44 @@ def test_o_ramo_confirma_cada_painel_inclusive_sem_alerta_e_o_atrasado(tmp_path)
     linhas = [json.loads(l) for f in tmp_path.glob("confirmacoes-*.jsonl") for l in f.read_text().splitlines()]
     assert sorted((l["warehouse_id"], l["atrasado"], l["alerta"]) for l in linhas) == [
         (1, False, False), (2, False, True), (2, True, False)]
+
+
+def _confirmacoes(diretorio):
+    return [json.loads(l) for f in diretorio.glob("confirmacoes-*.jsonl") for l in f.read_text().splitlines()]
+
+
+def test_o_limiar_e_o_ponto_de_cada_par(tmp_path):
+    """ADR-0057: o mesmo delta, a partir do mesmo saldo, abre o alerta só no par cujo ponto ele cruza.
+
+    (1, 1) tem ponto 10 e vai de 25 a 5: abre. (2, 2) tem ponto 30 e já estava abaixo: não abre.
+    (3, 3) não está na fotografia, tem ponto zero e não chega a zero: não abre. Todo painel é
+    confirmado, com alerta ou sem (D63).
+    """
+    eventos = [(150, [_evento(1, 1, 1, -20, 61), _evento(2, 2, 2, -20, 62), _evento(3, 3, 3, -20, 63)])]
+    _rodar(eventos, tmp_path, pontos={(1, 1): 10, (2, 2): 30},
+           semente={(1, 1): 25, (2, 2): 25, (3, 3): 25})
+    assert sorted((l["warehouse_id"], l["alerta"]) for l in _confirmacoes(tmp_path)) == [
+        (1, True), (2, False), (3, False)]
+
+
+def test_na_carga_o_snapshot_passa_e_confirma(tmp_path):
+    """Q79: sem fotografia, o painel só de *snapshot* constrói o saldo e é confirmado, sem alerta."""
+    from mvp_ed1.streaming import ponto
+
+    _rodar([(30, [_evento(1, 1, 1, 50, 5, snapshot=True)])], tmp_path, fotografia=ponto.carga())
+    assert [(l["warehouse_id"], l["alerta"]) for l in _confirmacoes(tmp_path)] == [(1, False)]
+
+
+@pytest.mark.parametrize("snapshot_junto", [False, True], ids=["ao-vivo", "misto"])
+def test_na_carga_o_painel_ao_vivo_reprova(tmp_path, snapshot_junto):
+    """Q79: um evento ao vivo, sozinho ou num painel misto com o *snapshot*, faz a execução falhar
+    antes de qualquer travessia, e o painel não é confirmado."""
+    from mvp_ed1.streaming import ponto
+
+    lote = [_evento(1, 1, 1, -5, 7)] + ([_evento(2, 1, 1, 50, 5, snapshot=True)] if snapshot_junto else [])
+    with pytest.raises(Exception, match="carga"):
+        _rodar([(30, lote)], tmp_path, fotografia=ponto.carga())
+    assert _confirmacoes(tmp_path) == []
 
 
 def test_a_entrega_que_falha_nao_confirma(tmp_path):

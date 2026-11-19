@@ -9,6 +9,8 @@
 #
 #   medir.sh <alvo> [--ate <alvo de espera>]     executa e, se pedido, espera
 #   medir.sh --cenario streaming [--limite n]    o caso do pipeline concorrente
+#   medir.sh --cenario streaming --carga-inicial o snapshot antes do build, sem a fotografia do ponto
+#                                                (Q79; nunca com --limite, que sobe o produtor)
 #   medir.sh --agregar <arquivo de amostras>     só agrega (é o que os testes usam)
 #
 # **Os extremos são amostrados, não garantidos.** Com uma pausa de `INTERVALO`
@@ -382,13 +384,14 @@ _interrompido() {
 _executar_alvo() { make --no-print-directory "$@"; }
 
 # ── Argumentos ──────────────────────────────────────────────────────────────
-ALVO=""; ATE=""; CENARIO=""; LIMITE=""
+ALVO=""; ATE=""; CENARIO=""; LIMITE=""; CARGA_INICIAL=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--agregar) agregar "$2"; exit 0 ;;
 	--ate)     ATE="$2"; shift ;;
 	--cenario) CENARIO="$2"; shift ;;
 	--limite)  LIMITE="$2"; shift ;;
+	--carga-inicial) CARGA_INICIAL=1 ;;
 	--*) echo "medir.sh: opção desconhecida '$1'" >&2; exit 2 ;;
 	*) ALVO="$1" ;;
 	esac
@@ -396,7 +399,12 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -n "$CENARIO" ]; then ALVO="cenario:$CENARIO"; fi
-[ -z "$ALVO" ] && { echo "uso: medir.sh <alvo> [--ate <alvo>] | --cenario streaming [--limite n]" >&2; exit 2; }
+[ -z "$ALVO" ] && { echo "uso: medir.sh <alvo> [--ate <alvo>] | --cenario streaming [--limite n | --carga-inicial]" >&2; exit 2; }
+# A carga é pedida, nunca deduzida (Q79): sem `--limite` ainda pode haver evento vivo no CDC, e com
+# produtor a carga reprovaria no primeiro painel ao vivo.
+if [ -n "$CARGA_INICIAL" ] && { [ "$CENARIO" != "streaming" ] || [ -n "$LIMITE" ]; }; then
+	echo "medir.sh: --carga-inicial só no cenário streaming e sem --limite (o produtor gera eventos vivos)" >&2; exit 2
+fi
 
 # Alvo inexistente falha ANTES de amostrar: medir o nada produz um registro
 # que parece uma medição e não é.
@@ -468,7 +476,7 @@ if [ -n "$CENARIO" ]; then
 			#     A execução tem diretório próprio (D63): é onde o publicador
 			#     confirma os painéis, e o passo (5b) o lê.
 			EXECUCAO="$EXECUCOES/medir_$(date -u +%Y%m%dT%H%M%SZ)_$$"
-			( trap - INT QUIT; exec setsid make --no-print-directory stream-run EXECUCAO="$EXECUCAO" ) &
+			( trap - INT QUIT; exec setsid make --no-print-directory stream-run EXECUCAO="$EXECUCAO" ${CARGA_INICIAL:+CARGA_INICIAL=1} ) &
 			BEAM=$!
 			FILHOS+=("$BEAM")
 			echo "[medir] pipeline Beam sob guarda: grupo $BEAM"

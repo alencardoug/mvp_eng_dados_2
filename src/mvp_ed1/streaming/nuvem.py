@@ -212,6 +212,29 @@ def semente(bq: BigQuery, destino: Destino, inicio: dt.datetime) -> list[tuple[i
     return [(l["warehouse_id"], l["product_variant_id"], l["s"]) for l in linhas]
 
 
+def ler_fotografia(ponto, projeto: Projeto | None = None):
+    """A fotografia do ponto de reposição lida do BigQuery pelo lançador do Dataflow (ADR-0057).
+
+    Com a ADC de quem lança, como o resto do lançador; a concessão ao `mvp-streamer` na relação é a do
+    dbt (`grants_no_bigquery`) e declara a dependência. Não exercitado: o GCP está desmontado (L9).
+    """
+    from mvp_ed1.streaming import ponto as ponto_de_reposicao
+
+    bq = armazem(projeto)
+    agora = dt.datetime.now(dt.timezone.utc)
+    try:
+        relacao = bq.tabela(ponto.qualificado)
+        linhas = bq.linhas(ponto_de_reposicao.consulta(relacao), {"origem": ponto.origem})
+    except Exception as erro:  # o cliente do BigQuery não tem uma hierarquia única de erro
+        raise ponto_de_reposicao.PontoIndisponivel(f"{ponto.qualificado}: {erro}") from erro
+    finally:
+        bq.dispose()
+    return ponto_de_reposicao.de_linhas(
+        ((l["warehouse_natural_key"], l["product_natural_key"], l["reorder_point"]) for l in linhas),
+        relacao, agora,
+    )
+
+
 class Semear:
     """A semente como chamável serializável, para o `AcumularSaldoEAlertar` rodar no *worker*."""
 
