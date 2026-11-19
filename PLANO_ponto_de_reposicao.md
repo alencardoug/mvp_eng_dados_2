@@ -178,8 +178,10 @@ leitura do ponto pelo lançador do Dataflow no BigQuery não é exercitada (L9).
    deles, com *fixtures*, entram nos *commits* da D′. **O arquivo só nasce depois da G**, do estado final restaurado e
    promovido, com a árvore limpa e a procedência `verified`, para nenhum `check` interno da restauração encontrá-lo:
    1. `make amostras` e, na mesma invocação, `make amostras-check` e as provas da máscara;
-   2. um *commit* com o arquivo e a validação offline dele no `check-offline`; ele não toca `dbt/`, `src/` nem os
-      insumos do pacote, e por isso não pede *build* novo;
+   2. o patch 06 (`tests/test_amostras_publicadas.py`) com o arquivo, e o pacote refeito por `catalog`, `test`,
+      `catalog` (RVPB1-1-04): o módulo novo é insumo do pacote e acrescenta três casos à coleta, e sem isso o
+      `check-offline` reprova. Os insumos do dbt não mudam, e por isso não há *build* novo. Um *commit* com o
+      arquivo, o teste e o pacote;
    3. a `prevista` do arquivo em Consumidores §5 passa a `feita`.
    Uma restauração futura não reprova por causa do arquivo: ele continua a amostra do *build* que cita, e a
    publicação seguinte o refaz.
@@ -414,4 +416,21 @@ inteiro, com o item 11, pode começar.** Não autoriza o ciclo destrutivo, que e
 |---|---|---|---|
 | RVPR-5-01 | A resposta ao `gdados` ainda prometia a guarda contínua, e a `prevista` não dizia que a amostra é do corte exportado | ajuste | **Aceito.** A resposta ganhou a correção na seção "Corrected the same day", que o aviso da caixa já manda reler; a `prevista` diz que a amostra retrata o *build* citado e pode divergir depois de outro |
 | RVPR-5-02 | `trusted.legacy_records` ficou entre o critério e a lista | ajuste | **Aceito.** Entra na lista, com `value_findings` não vazio; a lista passa a ser fechada (terceira retificação do ADR-0058); D95, Consumidores e o plano remetem a ela |
+
+### Bloco 1 — rodada 1 do codex2, sobre os *patches* de `4c8fe8a` (19/11/2026)
+
+Parecer em `data/medicoes/ponto_de_reposicao/codex2_bloco1_r1.md` (fora do Git). Nenhum defeito no cálculo do
+ponto, na P12, na cadeia da carga inicial nem no acesso; um bloqueante e quatro ajustes nas amostras e nos
+documentos. Todos aplicados nos *patches*, e o ensaio refeito (`bloco1/validacao.md`, última seção).
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVPB1-1-01 | `last_payload` é coleção e saía como marcador inteiro, no exportador e no oráculo | bloqueante | **Aceito.** Linha a linha nos dois, com esperado literal que reprovava a versão anterior |
+| RVPB1-1-02 | A varredura tirava as exceções de qualquer texto com `;` e não cobria o nome completo | ajuste | **Aceito.** A exceção é o valor legado exato do manifesto; o nome completo entra; contraprovas novas |
+| RVPB1-1-03 | A conferência ecoava ambiente e data do próprio arquivo | ajuste | **Aceito.** Vêm da declaração; contraprova com cabeçalho adulterado |
+| RVPB1-1-04 | O patch 06 muda os insumos e a coleta do pacote no Bloco 4 | ajuste | **Aceito.** Bloco 4, item 4.2: `catalog`, `test`, `catalog` com o arquivo e o 06, e o pacote no mesmo *commit* |
+| RVPB1-1-05 | Qualidade §4.2 ainda citava o ponto como espelho | ajuste | **Aceito.** Retirado, no patch 04 |
+
+**Próximo, em 20/11/2026:** o Bloco 2, a adaptação do ciclo, revisada antes de qualquer passo destrutivo, com o
+Owner presente para os `FORCE`.
 
