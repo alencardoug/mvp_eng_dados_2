@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 18/11/2026; rodada 1 de revisão aplicada (§7); Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5). Nada foi executado além das medidas de leitura do §3 |
+| Estado | **Proposto** em 18/11/2026; rodadas 1 e 2 de revisão aplicadas (§7); Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
 | Origem | O [F36](docs/achados_nl_sql.md#f36--o-ponto-de-reposição-fixo-deixa-de-distinguir-com-o-estoque-da-v5--gravidade-média), achado no ciclo da reabertura; a D94, decidida pelo Owner em 18/11/2026 ([ADR-0057](docs/adr/0057-ponto-de-reposicao-pela-demanda.md)); o pedido do Owner, na mesma conversa, de abrir a fase própria |
 | Base | `6e664c7`, sobre a `v2.2.0` (`f5a5173`) |
 | Consumidores durante a fase | O `gdados` recebeu o aviso da `v2.2.0` pela caixa de correio e segue contra ela. Os avisos da `v2.2.0` ao `bi-como-codigo` e ao `nl_sql` ficam **segurados** e saem no fim desta fase, um por consumidor, já com a *tag* nova (Owner, 18/11/2026). Nenhuma janela de leitura do armazém é aberta enquanto o ciclo do Bloco 3 durar |
@@ -20,13 +20,14 @@ Consumidores e os Achados.
 | 1 | **O modelo do ponto** (Q75): uma linha por par **natural** (origem × armazém × SKU), com a venda de 365 dias somada através de todas as versões do produto, a demanda diária, o prazo, a margem e o ponto, ancorado no último movimento da fato. As variáveis `reorder_lead_time_days: 28`, `reorder_safety_days: 14` e `reorder_demand_window_days: 365` no `dbt_project.yml`, com a origem da medida no comentário. Sai a `reorder_point_units` | O valor da P12 | 1 |
 | 2 | **A P12 lê o ponto do modelo.** `reorder_point` passa a ser o do par, e o filtro `quantity_available < reorder_point`. O resto da view não muda, e **o esquema dela também não**: as mesmas colunas, com os mesmos tipos | O valor | 1 |
 | 3 | **A referência independente da P12** (`tests/auditoria/skus_below_reorder_point.sql`) calcula o ponto sozinha, pelos três parâmetros e pela âncora da fato fria, sem ler o modelo. O carregador comum (`tests/test_auditoria_das_views.py:57–62`) passa os três parâmetros novos e conserva os outros | Não | 1 |
-| 4 | **O alerta do *streaming*.** Sai o `alerta.limiar_de_unidades` do `fluxo.yml`. O **lançador** lê uma fotografia do ponto de cada par do varejo (`source_system = 'retail'`, chaveada por `(warehouse_id, product_variant_id)`) e a entrega ao `AcumularSaldoEAlertar` pelo construtor. Todas as instâncias recebem a mesma, e ela é fixa enquanto a execução durar. A fotografia é guardada no diretório da execução com SHA-256 e contagem. O par ausente dela tem ponto zero; **a relação ausente, ilegível ou vazia faz o lançamento falhar**, salvo no modo da Q79. O corte D62 do saldo não muda. O alerta publica o ponto do par no campo `limiar`. O `cli.py` (`stream-alerts`) deixa de supor um limiar único | Não | 1 |
+| 4 | **O alerta do *streaming*.** Sai o `alerta.limiar_de_unidades` do `fluxo.yml`. O **lançador** lê uma fotografia do ponto de cada par do varejo (`source_system = 'retail'`, chaveada por `(warehouse_id, product_variant_id)`) e a entrega ao `AcumularSaldoEAlertar` pelo construtor. Todas as instâncias recebem a mesma, e ela é fixa enquanto a execução durar. A fotografia é guardada no diretório da execução com SHA-256 e contagem. O par ausente dela tem ponto zero; **a relação ausente, ilegível ou vazia faz o lançamento falhar**, salvo no modo da Q79. O corte D62 do saldo não muda. O alerta publica o ponto do par no campo `limiar`. O `cli.py` (`stream-alerts`) deixa de supor um limiar único. **O modo de carga** percorre a cadeia inteira: `Makefile::medir` → `docker/medir.sh` → `Makefile::stream-run` → `streaming/cli.py::comando_pipeline` → `pipeline.executar`/`construir` → o acumulador. Só o pede quem roda antes do *build*: o passo 7 de `recovery-restore` (`Makefile:803`) e a linha C do ciclo, com o modo explícito, nunca deduzido da ausência de `LIMITE`. Nele, um painel ao vivo, inclusive misto (`ao_vivo` > 0), reprova a execução antes de qualquer travessia, e a falha não vira confirmação | Não | 1 |
 | 5 | **A prova quente do GCP** (`gcp/prova_quente.py`): passa ao construtor uma fotografia própria, com o par de teste e o ponto dele, e mantém as travessias de hoje (semente 30, ponto 25, saldo final 23). Não exercita a leitura no BigQuery, que fica declarada como não provada (L9) | Não | 1 |
 | 6 | **O acesso do `streamer` ao ponto** (Q76) | Não | 1 |
 | 7 | **Os testes.** Saem o teste do espelho (`tests/test_dbt.py:223`) e o uso da variável em `dbt/tests/saldo_da_view_confere_com_o_livro_distinto.sql:104`, que passa a ler o ponto do modelo. Entram: testes unitários do dbt para o modelo, com os casos de borda (par sem venda no ano, par com ponto 2, ruptura, duas versões do produto com venda na janela, troca da versão corrente); a travessia por par e por painel no `tests/test_drenagem.py`; a fotografia (par ausente, relação ausente, relação mudando entre duas instâncias da mesma execução); o acesso no `tests/test_acesso.py`; as contagens de `tests/test_chaves.py:21` (modelos 26 → 27, FKs 58 → 60, colunas medidas depois do desenho) | Não | 1 |
-| 8 | **Os documentos do ADR-0057**: glossário (cobertura, ruptura e perguntas de negócio), `metricas.yml`, o `.yml` de `consumption` e de `analytics`, Streaming, Qualidade de Dados e Governança §7 | Não | 1 e 4 |
+| 8 | **Os documentos do ADR-0057**: glossário (cobertura, ruptura e perguntas de negócio), `metricas.yml`, o `.yml` de `consumption` e de `analytics`, Streaming, Qualidade de Dados e Governança §7; e, pelo modo de carga, Execução Local §3 (linha 10) e §3.2 (passo 4), e Capacidade §3.4, a restauração | Não | 1 e 4 |
 | 9 | **O ciclo** (Q77): a prova do *streaming* ao vivo com o limiar por par, o antes → depois das 16 views medido e a base publicada sem os eventos do exercício (D93) | Sim, descartado e refeito | 3 |
 | 10 | **A entrega:** Consumidores §5 e §6, os Achados, o pacote, a *tag* (Q78) e os avisos aos três consumidores | Não | 4 |
+| 11 | **As amostras de registros** (D95, [ADR-0058](docs/adr/0058-amostras-de-registros-para-o-publico.md)): o exportador de `docs/amostras_de_registros.json` e o esquema dele, com a recusa sem procedência `verified`, a ordem pela chave declarada, a máscara do `personal` nas colunas e dentro dos *payloads* do legado, e a guarda no `make check` que confere a procedência do arquivo. **O oráculo da máscara:** nenhum valor não nulo de coluna `personal` do armazém aparece no arquivo. Os documentos do ADR-0058 | Não | 1 e 4 |
 
 **Fica fora**, com o motivo:
 - **A posição de estoque com o pedido em aberto** (`quantity_outstanding`): o ADR-0057 a deixou de fora. A P12
@@ -45,8 +46,9 @@ Consumidores e os Achados.
 
 1. Este plano, revisado por outro agente antes de qualquer código.
 2. O README e Consumidores §5 passam a apontar para ele como o plano da fase em curso (RVPR-1-08).
-3. Uma linha `prevista` em Consumidores §5 para a mudança de **esquema** visível ao consumidor: a relação nova em
-   `analytics`, que entra no pacote com PK e FKs (Q75). Feita em 18/11/2026. Ela vira `feita` no fim, sem linha nova. A mudança de
+3. Uma linha `prevista` em Consumidores §5 para cada mudança de **esquema** visível ao consumidor: a relação nova
+   em `analytics`, que entra no pacote com PK e FKs (Q75), feita em 18/11/2026; e o arquivo das amostras (D95),
+   feita em 19/11/2026. Cada uma vira `feita` no fim, sem linha nova. A mudança de
    valor da P12 entra uma vez só, já `feita`, no fim (a regra da seção).
 
 ### Bloco 1 — o código e os testes, sem dado
@@ -54,18 +56,24 @@ Consumidores e os Achados.
 Os itens 1 a 8, nesta ordem: as variáveis e o modelo; a P12; a referência; o *streaming*; a prova quente; o
 acesso; os testes; os documentos.
 
-**Onde, e com que portão** (RVPR-1-04). `make test` **não isola** nada: as conexões dos testes são as do
-`.env`, o `source_db` e o armazém de trabalho. Por isso o bloco segue a forma do Bloco 3 da reabertura: o
-código num ramo de trabalho, *commits* por assunto, cada um com `make check-offline` verde. Nada é
-materializado no armazém publicado. O que roda contra ele no bloco é **só leitura**:
-- `dbt parse` e `dbt compile` do modelo novo;
-- os testes unitários do dbt do modelo, que substituem as entradas por *fixtures* e não materializam o modelo;
-- a consulta compilada do modelo numa transação `READ ONLY`, para o oráculo abaixo.
+**Onde, e com que portão** (RVPR-1-04, RVPR-2-01, RVPR-2-02). `make test` **não isola** nada: as conexões dos
+testes são as do `.env`. E o `check-offline` não pode ficar verde antes do primeiro *build*: ele confere o pacote
+contra os insumos e contra a coleta do pytest (`pacote --conferir-pytest`, `test_o_pacote_esta_em_dia_com_os_insumos`),
+e o pacote só se refaz com o manifesto de um *build*. Uma *branch* com *commits* nasceria vermelha, como a
+reabertura já tinha visto. Por isso o bloco segue o procedimento do Bloco 3 da reabertura:
+- o código fica **fora da árvore**, em *patches* por assunto em `data/medicoes/ponto_de_reposicao/bloco1/`, com
+  SHA-256;
+- antes de congelá-los, eles são aplicados numa **cópia de trabalho temporária**, com a suíte offline (só as
+  guardas do carimbo do pacote podem reprovar, e cada uma reprovada é nomeada) e o dbt compilado fora de
+  `dbt/target`. O resultado fica ao lado dos *patches*;
+- contra o armazém publicado, **só leitura**: `dbt parse`, `dbt compile` e a consulta compilada do modelo numa
+  transação `READ ONLY`. **Nenhum `dbt test`**, nem o unitário: o `on-run-end` reaplica as concessões
+  (`aplicar_acesso_por_camada`), e o teste unitário cria uma relação temporária (RVPR-2-01).
 
-Os testes que precisam do modelo materializado (o contrato, a PK e as FKs do ADR-0056, as concessões, a
-auditoria da P12, as contagens de `test_chaves`, o `dbt/tests` de saldo) rodam **no ciclo**, na linha D′, sobre o
-estado que vai ser descartado. O ramo só entra no `main` depois que o `make check` passar ali, como os *patches*
-da reabertura entraram na F0 dela.
+Os testes unitários do dbt e os que pedem o modelo materializado (o contrato, a PK e as FKs do ADR-0056, as
+concessões, a auditoria da P12, as contagens de `test_chaves`, o `dbt/tests` de saldo) rodam **no ciclo**, na
+linha D′, sobre o estado que vai ser descartado. Os *commits* nascem ali, sobre o estado validado, como na F0 da
+reabertura.
 
 **Os oráculos do bloco:**
 - o modelo contra a fórmula escrita à mão, nos casos de borda do item 7;
@@ -105,12 +113,16 @@ partida; o `geracao.json` ganha carimbo novo, e isso não conta como diferença.
 1. **A — o antes.** A captura das 16 views, numa transação `REPEATABLE READ READ ONLY`, sobre o armazém da
    `v2.2.0`, com SHA-256; as guardas do F31 na fase (i); a T3 sobre o estado de partida.
 2. **D′ — o primeiro *build* do código novo**, ainda sobre o estado de partida, para o modelo do ponto existir
-   antes do lançamento do *pipeline*. Os testes que pedem o modelo materializado (Bloco 1). A captura das 16
-   views: **o depois esperado**, em que só a P12 muda.
+   antes do lançamento do *pipeline*. A sequência da F0 da reabertura: os *patches* aplicados, `dbt-build`,
+   `catalog`, `test` (com os testes unitários do dbt e os que pedem o modelo), `catalog`, `check-offline` verde,
+   e só então os *commits* por assunto, sobre o estado validado. A captura das 16 views: **o depois esperado**,
+   em que só a P12 muda.
 3. **E — o exercício de *streaming***, como E1 a E10 da reabertura: o produtor, a duplicação, a drenagem da D63,
    o encerramento da V6, a sincronização, o *build* incremental e a comparação dos dois caminhos. **O oráculo
    novo do alerta**, sobre a fotografia guardada na execução e a leitura completa do tópico entre os *offsets*
    H0 e o final (o `stream-alerts` é só observação):
+   - **a fonte por painel** é desenhada no Bloco 2: as confirmações da D63 guardam a contagem e a presença de
+     alerta, sem o delta, o saldo nem a ordem dos painéis (`drenagem.py`), e o oráculo precisa deles;
    - todo alerta traz no `limiar` o ponto do par na fotografia;
    - recalculando o saldo físico **por painel**, como o acumulador, cada travessia do ponto, para baixo ou para
      cima, tem exatamente um alerta, e nenhum alerta existe sem travessia. Oscilação dentro de um painel não
@@ -146,14 +158,16 @@ leitura do ponto pelo lançador do Dataflow no BigQuery não é exercitada (L9).
    *commit* (RVPR-1-08).
 2. **Achados**: o F36 com o que foi feito.
 3. **O pacote** regenerado (`make catalog`), com o carimbo de execução em *commit* próprio.
-4. **A revisão do fechamento** por outro agente; depois o *push* e a *tag* (Q78).
-5. **Os avisos**, em `data/medicoes/base_consumidores/avisos/`:
+4. **As amostras** (item 11): exportadas do armazém publicado, depois da linha D e da procedência `verified`;
+   o oráculo da máscara; a `prevista` do arquivo em Consumidores §5 passa a `feita`.
+5. **A revisão do fechamento** por outro agente; depois o *push* e a *tag* (Q78).
+6. **Os avisos**, em `data/medicoes/base_consumidores/avisos/`:
    - `bi-como-codigo` e `nl_sql`: um aviso só cada, da `v2.1.0` à *tag* nova. Ele cita os avisos de 18/11/2026,
      sem reescrevê-los, e junta o que esta fase mudou. O trecho "o F36 está aberto" deixa de valer, e o
      denominador da P12 é 3.047 (o aviso do BI de 18/11 dizia 3.046). O alerta físico e a P12 disponível não são
      apresentados como equivalentes;
    - `gdados`: um aviso curto, pela caixa de correio (`~/Projetos/gdados/alinhamento.md`): a P12, o modelo
-     novo no pacote e o registro do GCP sanitizado, que a *tag* passa a levar.
+     novo no pacote, as amostras (a D06 dele) e o registro do GCP sanitizado, que a *tag* passa a levar.
 
 ---
 
@@ -240,7 +254,7 @@ nomeia dimensão (`dim_`), fato (`fact_` + grão) e view de consumo (pela pergun
 
 | Opção | A favor | Contra |
 |---|---|---|
-| **(a) `select` do `streamer` só na relação do ponto**, declarado no `grants` do modelo, ao lado do `transformer`. A leitura é do lançador, em nome do componente de *streaming*. No BigQuery, a mesma declaração vira `dataViewer` na relação pela macro que já existe (`grants_no_bigquery`), sem Terraform (recomendada; RVPR-1-07) | O menor privilégio que funciona; uma autoridade só para a concessão, o dbt; o `test_acesso` prova o permitido e o proibido; a dependência do alerta fica declarada | Muda a matriz da Governança §7, onde o `streamer` hoje só lê a própria tabela. O `on-run-end` deixa de revogar do `streamer` o `usage` de `analytics` |
+| **(a) `select` do `streamer` só na relação do ponto**, declarado no `grants` do modelo, ao lado do `transformer`. A concessão declara a dependência e é provada assumindo o papel (`SET ROLE streamer`); **a leitura em si é do lançador, com a credencial de quem o lança** (no local, o login do `.env`; na nuvem, a ADC do Owner, porque `--service_account_email` vale só para os *workers*), como hoje todo componente (Governança §7; RVPR-2-03). No BigQuery, a mesma declaração vira `dataViewer` na relação pela macro que já existe (`grants_no_bigquery`), sem Terraform (recomendada; RVPR-1-07) | O menor privilégio que funciona; uma autoridade só para a concessão, o dbt; o `test_acesso` prova o permitido e o proibido; a dependência do alerta fica declarada | Muda a matriz da Governança §7, onde o `streamer` hoje só lê a própria tabela. O `on-run-end` deixa de revogar do `streamer` o `usage` de `analytics` |
 | (b) Não declarar nada, porque o lançador se conecta hoje pelo superusuário | Nenhuma mudança de acesso | A dependência fica escondida e quebra no dia em que o *streaming* se conectar como `streamer`, o passo que a Governança §7 já prevê |
 | (c) O dbt publicar o ponto em `raw`, onde o `streamer` já está | Nenhum papel novo | Inverte as camadas: um modelo escrevendo na aterrissagem das origens |
 
@@ -321,3 +335,20 @@ bloqueantes de desenho impediam o Bloco 1.
 
 **Fora do escopo do F36, visto pelo revisor:** um aviso novo do `gdados` na caixa de correio (a D06 dele, a
 proposta de amostras de linhas para o portal). É outro assunto, atendido à parte.
+
+### Rodada 2 — codex2, sobre `c1c8f95` (19/11/2026)
+
+Parecer em `data/medicoes/ponto_de_reposicao/codex2_plano_r2.md` (fora do Git). O desenho central passou; dois
+bloqueantes no portão do Bloco 1.
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVPR-2-01 | O teste unitário do dbt não é só leitura: cria relação temporária e o `on-run-end` reaplica concessões | bloqueante | **Aceito.** Os testes unitários saem do Bloco 1 e vão para a D′. Contra o armazém publicado, só `parse`, `compile` e a consulta compilada em `READ ONLY` |
+| RVPR-2-02 | O `check-offline` verde por *commit* é inexequível antes do *build*, por causa do carimbo do pacote | bloqueante | **Aceito.** O Bloco 1 passa ao procedimento do Bloco 3 da reabertura: *patches* fora da árvore, validados numa cópia temporária com as guardas do carimbo nomeadas, e os *commits* na D′, sobre o estado validado (sequência da F0) |
+| RVPR-2-03 | A concessão ao `mvp-streamer` não é a identidade do lançador que lê a fotografia | ajuste | **Aceito.** A Q76(a) e a retificação do ADR-0057 dizem quem lê (o login do `.env`; a ADC do Owner na nuvem) e o que a concessão prova; ler como `streamer` fica para o passo geral da Governança §7 |
+| RVPR-2-04 | Faltava a cadeia completa do modo de carga e os procedimentos permanentes | ajuste | **Aceito.** O item 4 traz a cadeia até o acumulador e os dois chamadores, com o modo explícito e a reprovação do painel misto; o item 8 inclui Execução Local §3 e §3.2 e Capacidade §3.4 |
+| RVPR-2-05 | O ADR aceito foi reescrito no lugar | ajuste | **Aceito.** O ADR-0057 voltou ao texto aceito (`66b8415`) e ganhou a retificação de 19/11/2026, na forma do ADR-0056 |
+| RVPR-2-06 | O ADR mandava abrir `prevista` da P12 | ajuste | **Aceito.** Corrigido na retificação: a P12 entra uma vez, como `feita`; a `prevista` é da `dim_sku_location` |
+
+**Depois da rodada 2:** o Owner aceitou a proposta das amostras do `gdados` (D95, ADR-0058) e a incluiu nesta fase
+(item 11). A rodada 3 a revisa junto.
