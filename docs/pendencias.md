@@ -396,6 +396,10 @@ anônimo, inclusive dentro dos *payloads* do legado, com o oráculo de que nenhu
 no arquivo; e a exportação na fase do ponto de reposição, com a *tag* dela. Alternativas, medidas e custo aceito
 no [ADR-0058](adr/0058-amostras-de-registros-para-o-publico.md).
 
+**Retificada no mesmo dia, também pelo Owner:** nas relações do legado, as linhas com defeito registrado entram
+primeiro na amostra, e o conteúdo que o defeito desloca para uma coluna não pessoal aparece como está, para mostrar
+o defeito. Os detalhes, com a prova por ocorrência, na retificação do ADR-0058.
+
 ### D94 — o ponto de reposição passa a ser derivado da demanda de cada par (decidida em 18/11/2026)
 
 **Pergunta:** que regra substitui o ponto de reposição fixo de 25 unidades da P12 e do alerta do *streaming*, que

@@ -88,3 +88,45 @@ reposição.
   - [Consumidores](../consumidores.md) §5: a `prevista` do arquivo novo antes, a `feita` depois;
   - [Execução Local](../execucao_local.md): o alvo da exportação na sequência de publicação;
   - o README, no mapa da documentação.
+
+## Retificação de 19/11/2026
+
+O texto acima é o aceito em 19/11/2026 e não foi alterado. A revisão do
+[plano da fase](../../PLANO_ponto_de_reposicao.md) (rodada 3, RVPR-3-01 a RVPR-3-06) mostrou cinco afirmações
+erradas ou incompletas, e o Owner decidiu, no mesmo dia, como tratar o legado defeituoso. Ficam corrigidas aqui:
+
+- **O legado defeituoso, por decisão do Owner.** O defeito `TEXT_DELIMITER` do legado faz um campo absorver os
+  vizinhos: no lote `133e04d2…`, `support_agents`, linha 2, `agent_code = "AGT-0002;Renan;Costela"`, com os campos de
+  nome vazios. A coluna é `internal`, e mascarar pela classificação não alcança esse conteúdo. Perguntado, o Owner
+  decidiu **não mascará-lo e mostrar o defeito**: nas relações derivadas do legado, as linhas com defeito
+  registrado (na classificação do legado ou no manifesto de injeção) **entram primeiro** na amostra, pela chave,
+  e as limpas completam as cinco. O conteúdo deslocado aparece como está. Medido no manifesto: são três
+  `TEXT_DELIMITER` no lote, e só esse carrega dado pessoal, um nome sintético. Nenhum telefone é deslocado para
+  coluna não pessoal.
+- **Os *payloads*.** "A máscara alcança as chaves que são `personal` na relação de origem da linha" fica assim: a
+  estrutura do JSON é mantida, e cada folha cuja chave é `personal` na relação de origem vira marcador. A origem
+  é a dependência declarada do modelo, em `stg_legacy__*`, e a coluna `source_table`, em `trusted.legacy_*` e em
+  `quarantine.rejected_legacy_records`. As coleções de linhas (`payloads`, `last_payload`) são tratadas linha a
+  linha. Em `findings`, o `original_value` e o `cleaned_value` de uma coluna `personal` viram marcador; `achados` e
+  `value_findings` são mapas de códigos, sem valor. **Origem ou forma não resolvida vira marcador inteiro.**
+- **A prova da máscara.** "Nenhum valor não nulo de nenhuma coluna `personal` aparece em lugar nenhum" não é
+  executável: valores curtos (UF, número, `BR`) coincidem com campos públicos legítimos. A prova passa a ser **por
+  ocorrência**: para cada célula e cada folha exportada, o esperado (marcador, nulo ou o valor da origem) é
+  calculado de forma independente do exportador e comparado. Uma varredura complementar procura no arquivo os
+  valores pessoais **fortes** das células mascaradas (e-mail, documento, telefone e nome completo), e os curtos
+  ficam fora dela com o motivo escrito. O conteúdo deslocado mostrado por decisão do Owner é exceção listada, tirada
+  do manifesto. As duas provas têm contraprova: um vazamento deliberado reprova, e uma coincidência curta legítima
+  passa.
+- **A cobertura.** "Das 282" é a medida de partida. O arquivo cobre **o conjunto de relações do pacote da mesma
+  publicação**, e a guarda exige igualdade dos conjuntos. Com a `dim_sku_location` da Q75, são 283 previstas.
+- **A procedência e a guarda.** A exportação continua recusando procedência que não seja `verified`. A conferência
+  compara o arquivo com uma exportação refeita em memória, só leitura, **sem os campos de execução** (instante,
+  invocação, *commit* do *build*), e exige que o *commit* do *build* registrado seja ancestral do atual sem mudança
+  em código ou declaração desde então. Por isso ela sobrevive ao `dbt-build` do `make check`. A ordem da primeira
+  publicação e da restauração está no plano.
+- **A fase GCP.** "É o que a fase GCP faz com *policy tags*" (Alternativas) e "a máscara exercita a regra que a fase
+  GCP impõe com *policy tags*" (Consequências) estão errados. As *policy tags* da D79 **negam** a coluna a quem não
+  tem concessão; não a mascaram. A seção de Paridade já diz isso, e ela é que vale.
+- **O nome.** Nas Consequências negativas, o nome está entre os valores que "não poderiam coincidir". Não é verdade:
+  o gerador usa `faker: first_name` e `last_name`, sem marca de impossibilidade. Só o e-mail (`example.com`) e o
+  documento (`-SIN`) têm essa garantia. A máscara já cobre o nome.
