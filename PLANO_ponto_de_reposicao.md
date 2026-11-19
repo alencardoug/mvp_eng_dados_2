@@ -86,6 +86,22 @@ reabertura.
   intacto, com todo painel chegando ao publicador, inclusive sem alerta e com ponto zero;
 - a contraprova do acesso, que roda no ciclo: o `streamer` lê o ponto e continua sem ler o resto de `analytics`.
 
+**Feito em 19/11/2026,** fora da árvore. Seis *patches* em `data/medicoes/ponto_de_reposicao/bloco1/`, com
+SHA-256: do 01 ao 04 os itens 1 a 8, o 05 o item 11, e o 06 a validação offline do arquivo das amostras, que só
+entra com o arquivo (Bloco 4, item 4.2). Aplicados em ordem sobre `2ccf7b4`, eles reproduzem a cópia de trabalho.
+A validação está em `validacao.md`, ao lado:
+- os oráculos só leitura batem com o §3: o modelo compilado dá 3.047 pares (1.387, 1.637 e 23 de ponto 0, 1 e 2),
+  a P12 compilada dá 213 linhas, todas em ruptura, e a referência independente é igual a ela;
+- o ensaio das amostras, só leitura: 282 relações, 542 KB, procedência `verified`, a linha 2 de `support_agents`
+  com o defeito à vista; a conferência e as provas passam no arquivo verdadeiro e reprovam os vazamentos
+  plantados;
+- a suíte offline: 1.567 passaram, e as 9 que falharam são as esperadas antes da D′ (o carimbo do pacote, os
+  trechos que o `catalog` refaz, o manifesto de *parse* na cópia de trabalho e o arquivo das amostras ausente).
+
+Dois desvios do texto acima: o modo de carga se chama `CARGA_INICIAL=1`, porque `CARGA=1` já é do `make test`; e o
+ponto de reposição ganhou um bloco próprio no glossário, dentro do verbete de cobertura, porque a lista de
+conceitos é fechada.
+
 ### Bloco 2 — a adaptação do ciclo (antes de qualquer passo destrutivo)
 
 A forma da reabertura (Q77), com um diário próprio, `data/medicoes/diario_ponto_de_reposicao.md`. Ela fixa,
