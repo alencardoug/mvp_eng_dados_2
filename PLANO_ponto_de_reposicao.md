@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
+| Estado | **Proposto** em 18/11/2026; rodadas 1 a 5 de revisão aplicadas (§7), a 5ª sem bloqueante; Blocos 0 a 2 feitos (19/11/2026), o ciclo a começar; Q75, Q76, Q77 e Q79 respondidas pelo Owner (§5); a D95, as amostras do `gdados`, incluída pelo Owner em 19/11/2026 (item 11). Nada foi executado além das medidas de leitura do §3 |
 | Origem | O [F36](docs/achados_nl_sql.md#f36--o-ponto-de-reposição-fixo-deixa-de-distinguir-com-o-estoque-da-v5--gravidade-média), achado no ciclo da reabertura; a D94, decidida pelo Owner em 18/11/2026 ([ADR-0057](docs/adr/0057-ponto-de-reposicao-pela-demanda.md)); o pedido do Owner, na mesma conversa, de abrir a fase própria |
 | Base | `6e664c7`, sobre a `v2.2.0` (`f5a5173`) |
 | Consumidores durante a fase | O `gdados` recebeu o aviso da `v2.2.0` pela caixa de correio e segue contra ela. Os avisos da `v2.2.0` ao `bi-como-codigo` e ao `nl_sql` ficam **segurados** e saem no fim desta fase, um por consumidor, já com a *tag* nova (Owner, 18/11/2026). Nenhuma janela de leitura do armazém é aberta enquanto o ciclo do Bloco 3 durar |
@@ -118,6 +118,29 @@ antes do primeiro descarte e revisada por outro agente:
   continua proibido sem a máquina liberada pelo Owner (`CLAUDE.md` §5).
 
 O ciclo começa com a revisão da adaptação sem bloqueio e com o Owner presente para os `FORCE`.
+
+**Feito em 19/11/2026,** fora da árvore, no diário (`data/medicoes/diario_ponto_de_reposicao.md`, adaptação na revisão
+5), com as medidas de partida em `data/medicoes/ponto_de_reposicao/ciclo/P0_*`, só leitura ou em memória. O estado de
+partida é o da `v2.2.0`: as 16 views idênticas às da H1 da reabertura, a geração idêntica (nenhuma transição do
+legado, e por isso nenhuma remoção aceita no ciclo; a memória fica em 93 chaves), o cursor do produtor ausente, e a
+captura 85 além do pacote aprovado (o corte de recuo é reempacotado em `7e5065a`). O que a adaptação acrescentou:
+- **a fonte por painel do alerta**, um sétimo *patch* (`bloco1/07_fonte_por_painel.patch`), só instrumentação local:
+  a composição de cada painel registrada na saída da janela, a entrada no acumulador com a ordem do painel no par,
+  contada antes do saldo, e a confirmação da D63 com os movimentos, o delta, os saldos e o ponto. O oráculo
+  (`ciclo/alertas_por_painel.py`) confere cada painel contra o destino e contra os dois registros, refaz o saldo na
+  ordem desta execução e recalcula cada travessia; o ensaio passa no verdadeiro e reprova 17 adulterações. O limite
+  declarado: os registros são do mesmo processo, e reescrevê-los juntos não é detectado;
+- **o 05 dividido por assunto** (`05a_carga_inicial_e_acesso`, `05b_amostras`), só por trechos inteiros, para os
+  *commits* da D′; a árvore final é a mesma;
+- **as guardas do F31 no exercício:** elas estão na `v2.2.0` e reprovam por desenho com os eventos vivos, e a falha
+  pularia os descendentes no `dbt build`. Na E9, o *build* as exclui e elas rodam à parte, como a fase (ii); a fase
+  (i) fica na A8, sobre o publicado, sem falha esperada;
+- **a conferência de resíduo zero** da reabertura, na D5, sem mudança.
+
+Revisão pelo Codex, conta 1 (o Owner pediu a conta 1 em 19/11/2026), em cinco rodadas (tabela no §7); a quinta, sem
+achado e sem bloqueio para o ciclo. Os `FORCE` de descarte, o `RESET`, a restauração e a promoção são tomados por
+delegação do Owner ("tome as decisões técnicas mais recomendadas", 19/11/2026); o do *preflight* de memória continua
+fora (`CLAUDE.md` §5).
 
 ### Bloco 3 — o ciclo
 
@@ -431,6 +454,22 @@ documentos. Todos aplicados nos *patches*, e o ensaio refeito (`bloco1/validacao
 | RVPB1-1-04 | O patch 06 muda os insumos e a coleta do pacote no Bloco 4 | ajuste | **Aceito.** Bloco 4, item 4.2: `catalog`, `test`, `catalog` com o arquivo e o 06, e o pacote no mesmo *commit* |
 | RVPB1-1-05 | Qualidade §4.2 ainda citava o ponto como espelho | ajuste | **Aceito.** Retirado, no patch 04 |
 
-**Próximo, em 20/11/2026:** o Bloco 2, a adaptação do ciclo, revisada antes de qualquer passo destrutivo, com o
-Owner presente para os `FORCE`.
+### Bloco 2 — rodadas 1 a 5 do Codex conta 1, sobre a adaptação do ciclo (19/11/2026)
+
+Pareceres em `data/medicoes/ponto_de_reposicao/codex1_bloco2_r1.md` a `_r5.md` (fora do Git); as respostas, linha a
+linha, no fim da adaptação do diário.
+
+| # | Achado | Veredito | Situação |
+|---|---|---|---|
+| RVPB2-1-01 | O oráculo dispensava a avaliação pelo `ao_vivo` que o próprio ramo informa | bloqueante | **Aceito.** Os eventos e os vivos de cada janela conferidos contra o destino |
+| RVPB2-1-02 | A conferência de resíduo zero da reabertura tinha saído sem substituto | bloqueante | **Aceito.** De volta na D5 |
+| RVPB2-1-03 | A fase (i) das guardas sem linha | ajuste | **Aceito.** Na A8 |
+| RVPB2-1-04 | O ponto zero descrito como incapaz de abrir alerta | ajuste | **Aceito.** Execução Local corrigida no 05a; o oráculo conta o ponto zero à parte |
+| RVPB2-2-01 | A composição de cada painel não era ancorada nos eventos | bloqueante | **Aceito.** Os movimentos de cada painel na fonte, conferidos um a um |
+| RVPB2-3-01 | A associação movimento → painel vinha só da confirmação | bloqueante | **Aceito.** A composição registrada na saída da janela |
+| RVPB2-4-01 | A cadeia aceitava os saldos de outra ordem possível | bloqueante | **Aceito.** A ordem registrada na entrada do acumulador, e o saldo refeito nela |
+
+A quinta rodada não achou nada.
+
+**Próximo:** o Bloco 3, o ciclo, pela linha A do diário.
 
