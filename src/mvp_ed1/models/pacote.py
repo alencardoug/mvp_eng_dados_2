@@ -499,7 +499,9 @@ def _auditorias(resultado: dict, checks: dict, manifest: dict) -> dict:
         # com ele, id que não é caso da suíte é recusa: o portal leria um resultado que não existe.
         if checks and (faltam := [i for i in casos if i not in checks]):
             raise SystemExit(f"view_audits: `{v}` cita verificações que o JUnit não tem ({faltam}) — nenhum pacote é escrito")
-        saida[f"consumption.{v}"] = {"status": "audited", "commit": resultado["commit"], "criteria": resultado["criteria"],
+        # O commit da definição auditada (UQ-21): o da view, quando ela declara o seu; senão, o do topo.
+        saida[f"consumption.{v}"] = {"status": "audited", "commit": linha.get("commit", resultado["commit"]),
+                                     "criteria": resultado["criteria"],
                                      "reference": linha["reference"], "findings": linha["findings"],
                                      "checks": casos, "data_tests": testes}
     return saida

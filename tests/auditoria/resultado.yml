@@ -5,10 +5,15 @@
 # achados. O teste que sustenta cada linha é tests/test_auditoria_das_views.py, que compara a view
 # com a referência e a população com a camada responsável.
 #
-# `commit` é o das views como foram auditadas. Era 12677a3; a revisão da auditoria mudou a P15 (F21), e
-# ele passa a ser 0471f6a, o commit dessa correção; o SQL das 16 não mudou depois dele. O
-# commit que contém este arquivo não pode ser citado aqui, porque ainda não existe quando ele é
-# escrito (a mesma regra do pacote).
+# `commit` é o da definição auditada (UQ-21 do BI): o SQL da view, a referência e a população declarada
+# estão nele como a auditoria os conferiu, e nenhum commit depois dele os mudou. Não é o commit em que a
+# auditoria foi concluída pela primeira vez. O `commit` do topo vale para toda view que não declara o
+# seu; a view cuja definição mudou depois declara o dela. Eram as 16 em 12677a3, e a revisão da auditoria
+# mudou a P15 (F21) em 0471f6a. As rodadas 1 e 2 da revisão do Bloco 1b mudaram depois disso a população
+# da P02, a referência da P03 (504271a) e a população da P15 (4da9e60). O F36 mudou o SQL e a referência
+# da P12 (edf564a, ADR-0057). tests/test_auditoria_resultado.py confere a regra pelo histórico do Git. O
+# commit que contém este arquivo não pode ser citado aqui, porque ainda não existe quando ele é escrito
+# (a mesma regra do pacote): uma mudança de definição pede um commit depois dela que mude este arquivo.
 #
 # `findings` são os IDs dos Achados (docs/achados_nl_sql.md): os corrigidos antes ou durante a
 # auditoria e as observações dela.
@@ -22,10 +27,12 @@ views:
     population: tests/auditoria/populacao/p01_receita_dos_pedidos_realizados.sql
     findings: [F5]
   average_order_value_by_channel_and_segment:
+    commit: 504271a
     reference: tests/auditoria/average_order_value_by_channel_and_segment.sql
     population: tests/auditoria/populacao/p02_pedidos.sql
     findings: [F5, F21]
   top_skus_by_revenue:
+    commit: 504271a
     reference: tests/auditoria/top_skus_by_revenue.sql
     findings: [F5, F20]
   new_and_repeat_customers_by_month:
@@ -57,8 +64,9 @@ views:
     reference: tests/auditoria/inventory_turnover_by_sku_and_warehouse.sql
     findings: [F2]
   skus_below_reorder_point:
+    commit: edf564a
     reference: tests/auditoria/skus_below_reorder_point.sql
-    findings: []
+    findings: [F36]
   on_time_delivery_rate_by_carrier:
     reference: tests/auditoria/on_time_delivery_rate_by_carrier.sql
     population: dbt/tests/p13_conta_toda_remessa_entregue.sql
@@ -68,6 +76,7 @@ views:
     population: tests/auditoria/populacao/p14_pedidos_com_ciclo_fechado.sql
     findings: [F9, F17]
   support_tickets_per_hundred_orders:
+    commit: 4da9e60
     reference: tests/auditoria/support_tickets_per_hundred_orders.sql
     population: [tests/auditoria/populacao/p15_chamados.sql, tests/auditoria/populacao/p15_denominador.sql]
     findings: [F1, F21]

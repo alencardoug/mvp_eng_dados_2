@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+import subprocess
 
 import yaml
 
@@ -39,3 +40,31 @@ def test_cada_achado_citado_existe_nos_achados() -> None:
     achados = set(re.findall(r"^### (F\d+) —", (RAIZ / "docs/achados_nl_sql.md").read_text(encoding="utf-8"), re.M))
     citados = {f for linha in RESULTADO["views"].values() for f in linha["findings"]}
     assert citados <= achados, sorted(citados - achados)
+
+
+def _definicao(view: str, linha: dict) -> list[str]:
+    """O que a auditoria confere de uma view: o SQL dela, a referência e a população declarada."""
+    populacao = linha.get("population") or []
+    return [f"dbt/models/consumption/{view}.sql", linha["reference"],
+            *([populacao] if isinstance(populacao, str) else populacao)]
+
+
+def test_o_commit_de_cada_view_e_o_da_definicao_auditada() -> None:
+    """UQ-21: o `commit` de cada view, o dela ou o do topo, está no histórico, e nenhum commit depois dele muda o
+    SQL da view, a referência ou a população. Mudou a definição, a declaração muda num commit seguinte, com a
+    auditoria refeita: sem isso, `view_audits` diria auditada uma definição que não é a de hoje."""
+    erros = []
+    for view, linha in sorted(RESULTADO["views"].items()):
+        commit = linha.get("commit", RESULTADO["commit"])
+        if not re.fullmatch(r"[0-9a-f]{7,40}", str(commit)):
+            erros.append(f"{view}: commit `{commit}`")
+            continue
+        ancestral = subprocess.run(["git", "merge-base", "--is-ancestor", commit, "HEAD"], cwd=RAIZ)
+        if ancestral.returncode != 0:
+            erros.append(f"{view}: `{commit}` não está no histórico de HEAD")
+            continue
+        depois = subprocess.run(["git", "log", "--format=%h", f"{commit}..HEAD", "--", *_definicao(view, linha)],
+                                cwd=RAIZ, capture_output=True, text=True, check=True).stdout.split()
+        if depois:
+            erros.append(f"{view}: declarada em `{commit}`, e a definição mudou depois em {depois}")
+    assert erros == []
