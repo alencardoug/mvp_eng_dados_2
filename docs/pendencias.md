@@ -12,9 +12,9 @@
 |---|---|
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
-| Verificações e trabalho adiados | 3 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026). A V5, a V6 e a V7 foram implementadas na reabertura da base e fecharam com a `v2.2.0` (§1.1) |
+| Verificações e trabalho adiados | 4 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V8, a paridade multicloud e o grão estruturado para o `nl_sql`, registrada em 20/11/2026). A V5, a V6 e a V7 foram implementadas na reabertura da base e fecharam com a `v2.2.0` (§1.1) |
 | Decisões pendentes | 1 (D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D63 e a D64, levantadas em 04/10/2026, foram respondidas em 17/11/2026 e implementadas na reabertura da base, que fechou com a `v2.2.0` (§2). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2`, a D66 na fase da base dos consumidores, a D63, a D64 e a D93 na reabertura da base, a D94 na abertura da fase do F36, e a D95 nela, a pedido do `gdados` (§2) |
-| Última revisão | 19/11/2026 — V5, V6 e V7 fechadas, implementadas na reabertura da base, e a D63 e a D64 dadas por implementadas (UQ-22 do BI); 19/11/2026 — D95 levantada e decidida, a pedido do `gdados` (ADR-0058); 18/11/2026 — D94 levantada e decidida, na abertura da fase do F36 (ADR-0057); 17/11/2026 — a reabertura da base: D63 e D64 respondidas, V5 a V7 incluídas, D93 decidida (§2); 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Última revisão | 20/11/2026 — V8 registrada, a partir do aviso do `gdados`; 19/11/2026 — V5, V6 e V7 fechadas, implementadas na reabertura da base, e a D63 e a D64 dadas por implementadas (UQ-22 do BI); 19/11/2026 — D95 levantada e decidida, a pedido do `gdados` (ADR-0058); 18/11/2026 — D94 levantada e decidida, na abertura da fase do F36 (ADR-0057); 17/11/2026 — a reabertura da base: D63 e D64 respondidas, V5 a V7 incluídas, D93 decidida (§2); 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -230,6 +230,32 @@ do item 9.
 
 *Efeito de não decidir:* nenhum no projeto local. Os itens 1, 2, 6, 7 e 10 voltam se a fase GCP for
 reaberta; o 9 fecha o critério de custo do M6.
+
+### V8 — a paridade multicloud e o grão estruturado para o `nl_sql` (registrada em 20/11/2026)
+
+**Pergunta:** quando, e em que forma, declarar o que serve às páginas multicloud do `gdados` e ao `nl_sql`? O
+Owner pediu ao `gdados`, em 20/11/2026: "Mais adiante, quando implementar databricks, aws e snowflake (nesta
+ordem) vou querer criar páginas que também mostrem a paridade do que 'dá pra entrar nas clouds', com foco em
+favorecer o nl-sql (o outro projeto)". O aviso dele, nesta data, deixou dois pontos para a origem avaliar, sem
+urgência. Os dois foram conferidos no pacote da `v2.3.0` (`2bceb47`):
+
+1. **O mapa de paridade.** A página "Local e GCP lado a lado" do `gdados` lê a
+   [Arquitetura §5](arquitetura.md#5-mapa-de-paridade-local--gcp) pela âncora que `environments` aponta.
+   Renomear o título da seção derruba a *build* dele, de propósito. Com Databricks, AWS ou Snowflake, o mapa
+   precisa de uma forma declarada, com colunas novas ou um artefato versionado, para que nenhum consumidor
+   preencha célula de memória.
+2. **O grão estruturado.** `relations.*.grain` só está preenchido nas 27 relações de `analytics`. As outras 256
+   não têm o campo: 37 em `raw`, 40 em `raw_legacy`, 77 em `staging`, 76 em `trusted`, 4 em `snapshots`, 4 em
+   `governance` e 2 em `quarantine`. As 16 views de `consumption` têm o grão em `view_rules`, de propósito
+   (UQ-18). Para o NL→SQL, o grão estruturado é contexto direto. Hoje, em muitas relações, ele está só no
+   texto da descrição (F32).
+
+Cada nuvem nova é componente novo da arquitetura e pede ADR antes (`CLAUDE.md` §6, regra 5). Nada disso está no
+plano atual. Os detalhes e as recomendações do `gdados` ao `nl_sql` estão em `gdados/docs/multicloud_e_nl_sql.md`,
+naquele repositório.
+
+*Efeito de não decidir:* nenhum hoje. Quando a primeira nuvem nova entrar, o mapa da §5 não terá onde
+declará-la, e o grão das relações fora de `analytics` continuará legível só como texto.
 
 ## 1.1 Decididas e implementadas
 
