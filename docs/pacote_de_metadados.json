@@ -95677,27 +95677,6 @@
       "objects": null,
       "state": "deferred",
       "title": "o que o fechamento da Etapa 13 deixa (registrada em 13/11/2026)"
-    },
-    {
-      "anchor": "docs/pendencias.md#v5--o-giro-de-estoque-muito-baixo-do-dado-sintético-registrada-em-16112026",
-      "id": "V5",
-      "objects": null,
-      "state": "deferred",
-      "title": "o giro de estoque muito baixo do dado sintético (registrada em 16/11/2026)"
-    },
-    {
-      "anchor": "docs/pendencias.md#v6--o-python-aborta-no-desligamento-do-pipeline-do-streaming-registrada-em-17112026",
-      "id": "V6",
-      "objects": null,
-      "state": "deferred",
-      "title": "o Python aborta no desligamento do pipeline do *streaming* (registrada em 17/11/2026)"
-    },
-    {
-      "anchor": "docs/pendencias.md#v7--a-restauração-não-registra-o-tratamento-na-época-que-abre-registrada-em-17112026",
-      "id": "V7",
-      "objects": null,
-      "state": "deferred",
-      "title": "a restauração não registra o tratamento na época que abre (registrada em 17/11/2026)"
     }
   ],
   "provenance": {
@@ -96145,7 +96124,7 @@
       "tests/test_verificador_adr.py",
       "tests/test_vigencia_em_utc.py"
     ],
-    "inputs_sha256": "39b3f3ef41e64edcdc935103694ecc7b7fc3426323a106fc136595b213ffc362",
+    "inputs_sha256": "20e1e64fb8fd4d5b7cd8efa4dd721d44e3480c7a364a2c614aa2f3d132d17ecb",
     "link_base": "docs/",
     "tree_dirty_at_generation": true,
     "warehouse": {

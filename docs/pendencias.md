@@ -12,9 +12,9 @@
 |---|---|
 | Etapa atual | Etapa 13 — replicação no GCP com Terraform (M6). O estado dela, e o das anteriores, é do [Plano de Desenvolvimento](plano_de_desenvolvimento.md) |
 | Aprovações pendentes | 0 |
-| Verificações e trabalho adiados | 6 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026; V5, o giro de estoque muito baixo do dado sintético, registrada em 16/11/2026; V6, o Python que aborta no desligamento do pipeline do *streaming*, registrada em 17/11/2026; V7, a restauração que não registra o tratamento na época que abre, registrada em 17/11/2026) |
-| Decisões pendentes | 1 (D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D63 e a D64, levantadas em 04/10/2026, foram respondidas em 17/11/2026 e esperam a implementação na reabertura da base (§2). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2`, a D66 na fase da base dos consumidores, a D63, a D64 e a D93 na reabertura da base, a D94 na abertura da fase do F36, e a D95 nela, a pedido do `gdados` (§2) |
-| Última revisão | 19/11/2026 — D95 levantada e decidida, a pedido do `gdados` (ADR-0058); 18/11/2026 — D94 levantada e decidida, na abertura da fase do F36 (ADR-0057); 17/11/2026 — a reabertura da base: D63 e D64 respondidas, V5 a V7 incluídas, D93 decidida (§2); 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
+| Verificações e trabalho adiados | 3 (V1, da revisão da v1.1.0, lotes 1 a 3, registrada em 05/11/2026; V2, a governança e a documentação para quando não houver mais pendências, registrada em 10/11/2026; V3, o que o fechamento da Etapa 13 deixa, registrada em 13/11/2026). A V5, a V6 e a V7 foram implementadas na reabertura da base e fecharam com a `v2.2.0` (§1.1) |
+| Decisões pendentes | 1 (D43, adiada de propósito para a fase GCP e **medida em 07/11/2026**). A D63 e a D64, levantadas em 04/10/2026, foram respondidas em 17/11/2026 e implementadas na reabertura da base, que fechou com a `v2.2.0` (§2). A D65 e a D67 foram fechadas pela v1.1.0, a D68 a D74 na abertura da Etapa 13, a D76 e a D77 no G1 dela, a D62 e a D78 no G2.3, a D79 no G4, a D80 no G5, a D81 no G2.4, a D82 e a D83 no G2.3, a D84 a D87 na revisão dos roteiros da janela, a D88 a D90 na revisão das correções de terça, a D91 na revisão da governança para o portal, a D92 na separação do `mvp_eng_dados_2`, a D66 na fase da base dos consumidores, a D63, a D64 e a D93 na reabertura da base, a D94 na abertura da fase do F36, e a D95 nela, a pedido do `gdados` (§2) |
+| Última revisão | 19/11/2026 — V5, V6 e V7 fechadas, implementadas na reabertura da base, e a D63 e a D64 dadas por implementadas (UQ-22 do BI); 19/11/2026 — D95 levantada e decidida, a pedido do `gdados` (ADR-0058); 18/11/2026 — D94 levantada e decidida, na abertura da fase do F36 (ADR-0057); 17/11/2026 — a reabertura da base: D63 e D64 respondidas, V5 a V7 incluídas, D93 decidida (§2); 17/11/2026 — V4 medida, explicada e **fechada** no aceite da `v2.1.0`; V6 e V7 registradas; V2 com o G06, a Q6 e o pacote feitos; 16/11/2026 — V4 com a forma escolhida (Q42); V5 registrada; 14/11/2026 — D66 decidida (ADR-0053); V4 registrada, com o ADR-0052 (giro pelo estoque médio do trimestre); 13/11/2026 — D92: o projeto continua no `mvp_eng_dados_2`; M6 aceito com ressalvas; V3 registrada; V1 com o recorte da Etapa 13; 10/11/2026, noite — D91 levantada e decidida; V2 com G01 a G05 fechados; 10/11/2026 — D88 a D90 levantadas pela revisão das correções de terça e decididas; V2 registrada; 08/11/2026 — D84 a D87 levantadas pela revisão dos roteiros da janela e decididas; 07/11/2026 — D76 decidida, D43 medida, D77 levantada e decidida, no G1 da Etapa 13; D62 e D78 no G2.3; D79 no G4; D80 no G5; D81 no G2.4; D82 e D83 no G2.3 (08/11) |
 
 ---
 
@@ -28,8 +28,8 @@ Etapa 13 (§2). O achado D, a venda antes do lançamento, foi a D65, fechada pel
 foram respondidas pelo Owner em 17/11/2026** e estão no §2, com a implementação no
 [plano da reabertura](../PLANO_reabertura_da_base.md), Bloco 1.
 
-Na mesma data, o Owner **incluiu a V5, a V6 e a V7 na reabertura da base**. As três ficam aqui até a
-implementação ser aceita, cada uma com o bloco do plano.
+Na mesma data, o Owner **incluiu a V5, a V6 e a V7 na reabertura da base**. As três foram implementadas nela e
+fecharam com a `v2.2.0` (18/11/2026); o registro passou ao §1.1.
 
 ### D43 — a guarda de identidade como função no armazém (adiada em 16/09/2026)
 
@@ -231,58 +231,6 @@ do item 9.
 *Efeito de não decidir:* nenhum no projeto local. Os itens 1, 2, 6, 7 e 10 voltam se a fase GCP for
 reaberta; o 9 fecha o critério de custo do M6.
 
-### V5 — o giro de estoque muito baixo do dado sintético (registrada em 16/11/2026)
-
-**Pergunta:** quando redimensionar o estoque à venda? A P11 simulada em memória para a V4, em 16/11/2026,
-mostra giro mediano de cerca de 0,01 por trimestre, em qualquer das formas medidas: o estoque — abertura
-de 10 a 400 unidades por par, compras de 40 a 500 — é muito maior que a venda, de 1 a 3 unidades por
-item. O giro é definido e coerente com o livro; não é realista para varejo. A medida é da simulação, no
-varejo. **No armazém, depois do ciclo do Bloco 5R (17/11/2026):** mediana 0,02 e p90 0,49 nas 6.626 linhas
-da P11, as duas origens juntas (consulta e saída em `data/medicoes/bloco5r_ciclo/pos_p11_agregados.*`, fora do Git).
-
-Corrigir é mudar declaração em várias tabelas (`geracao.yml`: abertura, compras, as referências que
-delas dependem), com a sua revisão integral, e regerar as duas origens. Decidido em 16/11/2026 (Q47 do
-[plano](../PLANO_base_dos_consumidores.md)): fica fora deste ciclo, que já leva oito correções.
-
-*Efeito de não decidir:* a P11 responde com um giro que nenhuma operação real teria; a ordem entre os
-pares continua informativa, o nível não.
-
-**Reaberta em 17/11/2026 pelo Owner:** entra na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 2 e 5). A meta é uma faixa
-declarada para a mediana trimestral da P11, fixada pelo Owner depois da medida em memória (Q67).
-
-### V6 — o Python aborta no desligamento do pipeline do *streaming* (registrada em 17/11/2026)
-
-**Pergunta:** quando investigar? No ciclo do Bloco 5R (diário, C3, E8 e o passo 7 da G7), o SIGINT ao pipeline
-imprime a mensagem de encerramento limpo — "pipeline interrompido. O offset confirmado retoma de onde parou." —
-e, **depois** dela, o Python aborta com núcleo: "Fatal Python error: _enter_buffered_busy: could not acquire lock
-for <_io.BufferedWriter name='<stderr>'> at interpreter shutdown, possibly due to daemon threads", e o `make`
-sai com "Abortado (arquivo core criado)". O medidor registra o encerramento como limpo, nenhum processo sobra no
-host, e o offset confirmado se mostrou certo depois (os quatro zeros da C4 e da E10). **Visto em dois dos três
-encerramentos do ciclo** — na C3 (`C3_a1_streaming.txt`) e na E8 (`E3_a1_stream_run.log`); no passo 7 da G7 o
-pipeline encerrou sem ele (`G7_a1_restore.txt`, "grupo … encerrou limpo em 2s"). Não medido antes desta fase,
-nem a frequência, nem o efeito sobre os alertas em voo (a D63 é vizinha: o medidor encerra antes de o ramo de
-alertas drenar).
-
-*Efeito de não decidir:* um arquivo de núcleo nos encerramentos em que acontece, e um código de saída que não é o
-do encerramento limpo para quem chamar o `make stream-run` direto.
-
-**Incluída em 17/11/2026** na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 1 e 5): primeiro a medida, depois a correção. Se a
-causa não aparecer, volta ao Owner com a medida.
-
-### V7 — a restauração não registra o tratamento na época que abre (registrada em 17/11/2026)
-
-**Pergunta:** quando acrescentar o registro? O `make recovery-restore` abre uma época nova do livro retido antes
-da captura dele (H8), e o passo 8 constrói a quarentena dessa captura (`dbt-rebuild` e `check`), mas não chama o
-`make ledger-treatment`. No ciclo do Bloco 5R a época 4 ficou sem o registro do tratamento da captura 76 até a
-revisão do fechamento apontar (RVFC-1-02); foi registrado depois, enquanto ainda era o corrente. Se outra captura
-ou outro tratamento o substituir antes do registro, a fatia dele fica sem explicação na T3 — a lacuna da época 2,
-que a Q51 aceitou como exceção.
-
-*Efeito de não decidir:* depois de cada restauração, o operador precisa lembrar do `make ledger-treatment` antes
-de qualquer outra captura ou *build*.
-
-**Incluída em 17/11/2026** na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 1 e 5).
-
 ## 1.1 Decididas e implementadas
 
 ### V4 — a correção-relâmpago do gerador de estoque (registrada em 14/11/2026)
@@ -323,6 +271,78 @@ indefinido em 5.775: o SKU-0000306 no CD Recife, em 2024-T3, com saldo médio ze
 que a UQ-17 pedia era condicionada a o par continuar igual, e não se aplica.
 
 *Efeito de não decidir:* o giro indefinido nesses pares, declarado na view e no glossário.
+
+### V5 — o giro de estoque muito baixo do dado sintético (registrada em 16/11/2026)
+
+**Pergunta:** quando redimensionar o estoque à venda? A P11 simulada em memória para a V4, em 16/11/2026,
+mostra giro mediano de cerca de 0,01 por trimestre, em qualquer das formas medidas: o estoque — abertura
+de 10 a 400 unidades por par, compras de 40 a 500 — é muito maior que a venda, de 1 a 3 unidades por
+item. O giro é definido e coerente com o livro; não é realista para varejo. A medida é da simulação, no
+varejo. **No armazém, depois do ciclo do Bloco 5R (17/11/2026):** mediana 0,02 e p90 0,49 nas 6.626 linhas
+da P11, as duas origens juntas (consulta e saída em `data/medicoes/bloco5r_ciclo/pos_p11_agregados.*`, fora do Git).
+
+Corrigir é mudar declaração em várias tabelas (`geracao.yml`: abertura, compras, as referências que
+delas dependem), com a sua revisão integral, e regerar as duas origens. Decidido em 16/11/2026 (Q47 do
+[plano](../PLANO_base_dos_consumidores.md)): fica fora deste ciclo, que já leva oito correções.
+
+*Efeito de não decidir:* a P11 responde com um giro que nenhuma operação real teria; a ordem entre os
+pares continua informativa, o nível não.
+
+**Reaberta em 17/11/2026 pelo Owner:** entra na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 2 e 5). A meta é uma faixa
+declarada para a mediana trimestral da P11, fixada pelo Owner depois da medida em memória (Q67).
+
+**Implementada na reabertura e fechada com a `v2.2.0` (18/11/2026).** A faixa da Q67, fixada pelo Owner em
+18/11/2026, é de 0,30 a 0,80 para a mediana trimestral da P11 (`turnover_median_min` e `turnover_median_max`, em
+`dbt/dbt_project.yml`). A compra e a abertura de estoque passaram a ser dimensionadas pela venda, em
+`generator/geracao.yml` (`e237470`), e a guarda `v5_giro_mediano_dentro_da_faixa` (`1ac1274`) reprova o `check`
+fora da faixa. **Medido no armazém depois do ciclo:** mediana 0,46 e p90 1,28, nas 5.775 linhas da P11
+([Consumidores §5](consumidores.md#5-o-que-mudou-para-quem-consome), linha de 18/11/2026). O efeito na P12, 94%
+dos pares abaixo do ponto fixo de 25 unidades, foi o F36, resolvido pela D94 na `v2.3.0` (§2).
+
+### V6 — o Python aborta no desligamento do pipeline do *streaming* (registrada em 17/11/2026)
+
+**Pergunta:** quando investigar? No ciclo do Bloco 5R (diário, C3, E8 e o passo 7 da G7), o SIGINT ao pipeline
+imprime a mensagem de encerramento limpo — "pipeline interrompido. O offset confirmado retoma de onde parou." —
+e, **depois** dela, o Python aborta com núcleo: "Fatal Python error: _enter_buffered_busy: could not acquire lock
+for <_io.BufferedWriter name='<stderr>'> at interpreter shutdown, possibly due to daemon threads", e o `make`
+sai com "Abortado (arquivo core criado)". O medidor registra o encerramento como limpo, nenhum processo sobra no
+host, e o offset confirmado se mostrou certo depois (os quatro zeros da C4 e da E10). **Visto em dois dos três
+encerramentos do ciclo** — na C3 (`C3_a1_streaming.txt`) e na E8 (`E3_a1_stream_run.log`); no passo 7 da G7 o
+pipeline encerrou sem ele (`G7_a1_restore.txt`, "grupo … encerrou limpo em 2s"). Não medido antes desta fase,
+nem a frequência, nem o efeito sobre os alertas em voo (a D63 é vizinha: o medidor encerra antes de o ramo de
+alertas drenar).
+
+*Efeito de não decidir:* um arquivo de núcleo nos encerramentos em que acontece, e um código de saída que não é o
+do encerramento limpo para quem chamar o `make stream-run` direto.
+
+**Incluída em 17/11/2026** na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 1 e 5): primeiro a medida, depois a correção. Se a
+causa não aparecer, volta ao Owner com a medida.
+
+**Implementada na reabertura e fechada com a `v2.2.0` (18/11/2026).** A causa foi medida numa execução sem
+produtor: no SIGINT, onze *threads daemon* do Beam (o *worker* LOOPBACK do Prism e os leitores gRPC) continuam
+vivas, e o Python aborta ao finalizar com uma delas segurando a trava do `stderr` (código 134). O medidor passou a
+registrar o código de saída do pipeline (`6cf6731`). Depois, a CLI passou a esperar essas *threads* por até 10 s,
+esvaziar as saídas e sair com código 0 (`9bc91a6`), e o medidor passou a reprovar o encerramento que não é limpo. No
+ciclo da reabertura, a fase E saiu com código 0 ([plano da reabertura](../PLANO_reabertura_da_base.md), Bloco 5).
+
+### V7 — a restauração não registra o tratamento na época que abre (registrada em 17/11/2026)
+
+**Pergunta:** quando acrescentar o registro? O `make recovery-restore` abre uma época nova do livro retido antes
+da captura dele (H8), e o passo 8 constrói a quarentena dessa captura (`dbt-rebuild` e `check`), mas não chama o
+`make ledger-treatment`. No ciclo do Bloco 5R a época 4 ficou sem o registro do tratamento da captura 76 até a
+revisão do fechamento apontar (RVFC-1-02); foi registrado depois, enquanto ainda era o corrente. Se outra captura
+ou outro tratamento o substituir antes do registro, a fatia dele fica sem explicação na T3 — a lacuna da época 2,
+que a Q51 aceitou como exceção.
+
+*Efeito de não decidir:* depois de cada restauração, o operador precisa lembrar do `make ledger-treatment` antes
+de qualquer outra captura ou *build*.
+
+**Incluída em 17/11/2026** na reabertura da base ([plano da reabertura](../PLANO_reabertura_da_base.md), Blocos 1 e 5).
+
+**Implementada na reabertura e fechada com a `v2.2.0` (18/11/2026)**, em `166948c`. O passo 8 do
+`make recovery-restore` passou a rodar o `make ledger-treatment` logo depois do `dbt-rebuild` e antes do `check`,
+que é o *build* seguinte, e um teste confere essa ordem. Na G7 do ciclo, a restauração rodou com ela, e a T3 da
+época 6 ficou contida ([plano da reabertura](../PLANO_reabertura_da_base.md), Bloco 5).
 
 As três questões que a revisão da Etapa 10 levantou — D33, D34 e D35 — foram decididas em
 07/09/2026 e estão implementadas; o registro delas está abaixo.
